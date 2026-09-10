@@ -75,6 +75,15 @@ RSpec.describe Whatsapp::Session::Registry do
       end
     end
 
+    # A compose file listing the variable with no value, or a blank field in a panel,
+    # sets it to the empty string. Read as a value it takes the fallback away and the
+    # deployment loses every group capability on upgrade, silently.
+    it 'reads the new name left blank as not set at all' do
+      with_modified_env WHATSAPP_GROUPS_ENABLED: '', BAILEYS_WHATSAPP_GROUPS_ENABLED: 'true' do
+        expect(described_class.groups_enabled?).to be(true)
+      end
+    end
+
     # Two readers of one switch is how an inbox ends up advertising `groups` in its
     # capabilities while refusing to create one.
     it 'is the same answer the legacy service gives' do

@@ -172,7 +172,12 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
     # disagree. The Baileys-era name still works, so an existing deployment does not have
     # to change its env on upgrade.
     def groups_enabled?
-      value = ENV.fetch('WHATSAPP_GROUPS_ENABLED', nil) || ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false')
+      # `.presence`, not just the nil check: a compose file that lists the variable with
+      # no value, or a panel field left blank, sets it to the empty string, and an empty
+      # string is truthy here. Read as a value it takes the fallback away, so a
+      # deployment that never migrated off the Baileys-era name loses every group
+      # capability on upgrade -- which is the one thing this fallback exists to prevent.
+      value = ENV.fetch('WHATSAPP_GROUPS_ENABLED', nil).presence || ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false')
       value == 'true'
     end
 

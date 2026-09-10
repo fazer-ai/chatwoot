@@ -23,6 +23,7 @@ class Whatsapp::Session::Inbound::GroupResolver
     group_contact_inbox, group_contact = find_or_create_group_contact
     sender_contact = resolve_sender
     track_membership(group_contact, sender_contact) if sender_contact
+    sync_unless_known(group_contact)
 
     Result.new(group_contact_inbox: group_contact_inbox, group_contact: group_contact, sender_contact: sender_contact)
   end
@@ -70,6 +71,27 @@ class Whatsapp::Session::Inbound::GroupResolver
 
     member.update!(is_active: true) unless member.is_active?
     member
+  end
+
+  # A group nobody ever synced is named after its JID, because that is the fallback
+  # `find_or_create_group_contact` uses when no subject was supplied, and a message
+  # carries none: the wire names the chat, not the group. Left alone the thread stays
+  # called `120363...` forever, since the events that do carry a subject only fire when
+  # something happens to the group, and being added to it already happened.
+  #
+  # A group is first seen through a message far more often than through `group.joined`:
+  # an inbox converted from another provider, a session resumed after a deploy, any
+  # downtime at all. The Baileys layer schedules the same sync from its own stub handler,
+  # for the same reason.
+  #
+  # Once, not per message: the job's own 15 minute cooldown covers a burst, and this
+  # guard covers the rest, so a busy group does not queue a roster read per message.
+  def sync_unless_known(group_contact)
+    return if group_contact.additional_attributes&.dig('group_last_synced_at').present?
+    return unless inbox.channel.respond_to?(:session_capabilities)
+    return unless inbox.channel.session_capabilities.include?('group_management')
+
+    Contacts::SyncGroupJob.perform_later(group_contact, channel: inbox.channel)
   end
 
   def resolve_sender
