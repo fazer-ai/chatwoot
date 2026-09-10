@@ -351,6 +351,26 @@ describe Messages::MessageBuilder do
       end
     end
 
+    # The constructor casts this sibling parameter and always did, but nothing measured it, so
+    # the guard that keeps a multipart `is_voice_message=false` from going out as a voice note
+    # was free to disappear unnoticed. Same string, same request, one line away from the flags
+    # this change casts.
+    context 'when is_voice_message arrives as the string false' do
+      let(:params) do
+        ActionController::Parameters.new({
+                                           content: 'test',
+                                           attachments: [Rack::Test::UploadedFile.new('spec/assets/sample.ogg', 'audio/ogg')],
+                                           is_voice_message: 'false'
+                                         })
+      end
+
+      it 'leaves the voice flag off' do
+        message = message_builder
+
+        expect(message.attachments.first.meta).not_to include('is_voice_message')
+      end
+    end
+
     context 'when the voice message is a private note' do
       let(:params) do
         ActionController::Parameters.new({
