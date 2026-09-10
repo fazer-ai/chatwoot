@@ -14,7 +14,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
     trigger_typing_event(CONVERSATION_TYPING_OFF)
   rescue StandardError => e
-    render_could_not_create_error(e.message)
+    render_rescued_error(e)
   end
 
   def update
@@ -48,7 +48,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
     ::SendReplyJob.perform_later(message.id)
   rescue StandardError => e
-    render_could_not_create_error(e.message)
+    render_rescued_error(e)
   end
 
   def translate

@@ -158,6 +158,16 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     values.merge(flags)
   end
 
+  # Anything that is not a hash of its own is ignored rather than coerced. `to_h` answers a
+  # different exception for each shape a caller can leave here -- NoMethodError for a String or
+  # a number, TypeError for a bare array, ArgumentError for an array of short pairs -- and every
+  # one of them took the whole request down. The single shape it does accept is worse than the
+  # crashes: an array of pairs became metadata whose `is_voice_message` was the string "false",
+  # which `cast_metadata_flags` never sees, because it only casts inside a Hash, and which both
+  # providers read as an explicit yes.
+  #
+  # Ignoring keeps the message and the attachment, which is what the caller was asking for, and
+  # leaves the reason in the log rather than in the answer.
   def custom_attachment_metadata(attachment)
     return unless @attachments_metadata.is_a?(Hash)
 
@@ -165,13 +175,27 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     return unless filename
 
     metadata = @attachments_metadata[filename]
-    metadata.to_h if metadata.present?
+    return if metadata.blank?
+    return metadata.to_h if metadata.is_a?(Hash)
+
+    log_ignored_metadata("for #{filename}", metadata)
   end
 
+  # Answers nil, which is what the caller does with an entry it cannot read.
+  def log_ignored_metadata(where, value)
+    Rails.logger.warn("[MESSAGE BUILDER] ignoring attachments_metadata #{where}: expected a hash, got #{value.class}")
+    nil
+  end
+
+  # The same value can arrive one level up, and there it died even earlier: `attachments_metadata=x`
+  # and `attachments_metadata[]=x` broke on `deep_stringify_keys` before any attachment was looked
+  # at, so a guard on the per-file value alone would have left this one standing.
   def normalize_attachments_metadata(metadata)
     return if metadata.blank?
 
     metadata = metadata.to_unsafe_h if metadata.respond_to?(:to_unsafe_h)
+    return log_ignored_metadata('at the top level', metadata) unless metadata.is_a?(Hash)
+
     metadata.deep_stringify_keys.transform_values { |values| cast_metadata_flags(values) }
   end
 

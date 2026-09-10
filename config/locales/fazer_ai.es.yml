@@ -12,6 +12,8 @@ es:
     messages:
       deleted: Este mensaje fue eliminado
   errors:
+    request:
+      unexpected: No se pudo completar la solicitud.
     account:
       brand_name:
         invalid: no puede contener < ni >

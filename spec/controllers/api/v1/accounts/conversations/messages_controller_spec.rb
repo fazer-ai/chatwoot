@@ -442,6 +442,84 @@ RSpec.describe 'Conversation Messages API', type: :request do
     end
   end
 
+  # Both actions rescue StandardError and hand the exception's own message to the caller, so a
+  # bug in the builder answered with a Ruby diagnostic and a missing record answered with the
+  # SQL predicate that missed. What the caller can act on has to survive; what only describes
+  # our own code must not be echoed.
+  describe 'what an error answers to the caller' do
+    let!(:inbox) { create(:inbox, account: account) }
+    let!(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    before do
+      create(:inbox_member, inbox: conversation.inbox, user: agent)
+      allow(Rails.logger).to receive(:error)
+    end
+
+    def create_message
+      post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+           params: { content: 'test-message' }, headers: agent.create_new_auth_token, as: :json
+    end
+
+    context 'when the failure is a bug in our own code' do
+      before do
+        allow(Messages::MessageBuilder).to receive(:new)
+          .and_raise(NoMethodError, "undefined method 'to_h' for an instance of String")
+      end
+
+      it 'does not put the Ruby diagnostic in the body' do
+        create_message
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).not_to include('undefined method')
+        expect(response.body).not_to include('an instance of')
+      end
+
+      it 'records the real error for whoever has to debug it' do
+        create_message
+
+        expect(Rails.logger).to have_received(:error).with(/NoMethodError/)
+      end
+    end
+
+    # Raised by the builder itself as a plain StandardError, which is indistinguishable from a
+    # bug by class alone. The caller can act on it, so it has to keep arriving.
+    context 'when the failure is something the caller can act on' do
+      before do
+        allow(Messages::MessageBuilder).to receive(:new)
+          .and_raise(StandardError, 'Incoming messages are only allowed in Api inboxes')
+      end
+
+      it 'keeps the message the app chose to raise' do
+        create_message
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('Incoming messages are only allowed in Api inboxes')
+      end
+    end
+
+    context 'when a validation refuses the message' do
+      it 'keeps the validation text, which names what to fix' do
+        post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { content: 'x' * 150_001 }, headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include('too long')
+      end
+    end
+
+    context 'when the message asked for does not exist' do
+      it 'answers without the SQL predicate that missed' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/999999/retry",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response.code.to_i).to be_between(400, 499)
+        expect(response.body).not_to include("Couldn't find Message")
+        expect(response.body).not_to include('[WHERE')
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/retry' do
     let(:message) { create(:message, account: account, message_type: :outgoing, status: :failed, content_attributes: { external_error: 'error' }) }
 

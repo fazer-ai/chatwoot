@@ -15,7 +15,40 @@ module RequestExceptionHandler
                 with: :render_error_response
   end
 
+  # Exceptions whose message describes our own code instead of answering the caller.
+  # `undefined method 'to_h' for an instance of String` tells whoever sent the request nothing
+  # and tells them how the builder is written. They reach HTTP bodies through the blanket
+  # `rescue StandardError` some actions need, which also shadows the handling below.
+  INTERNAL_DIAGNOSIS = [NameError, TypeError, ArgumentError].freeze
+
   private
+
+  # For an action that has to rescue broadly. What the caller can act on keeps its own message,
+  # including the ones the app raises as a plain StandardError, which no rule by class can tell
+  # from a bug. What only describes a bug is logged and answered with a sentence, and a record
+  # that was not found is answered the way this concern already answers it everywhere else,
+  # rather than with the SQL predicate that missed.
+  def render_rescued_error(exception)
+    if exception.is_a?(ActiveRecord::RecordNotFound)
+      log_handled_error(exception)
+      # The status stays what the blanket rescue has been answering for this, rather than the 404
+      # `handle_with_exception` would give it: only the body was the complaint, and a caller that
+      # branches on 422 here would break for a reason that has nothing to do with the leak.
+      return render_could_not_create_error('Resource could not be found')
+    end
+
+    return render_could_not_create_error(exception.message) unless INTERNAL_DIAGNOSIS.any? { |klass| exception.is_a?(klass) }
+
+    log_unexpected_error(exception)
+    render_could_not_create_error(I18n.t('errors.request.unexpected'))
+  end
+
+  # The only record of what actually happened, since the caller no longer carries it.
+  def log_unexpected_error(exception)
+    Rails.logger.error(
+      "Unexpected error: #{exception.class}: #{exception.message}\n#{Array(exception.backtrace).first(5).join("\n")}"
+    )
+  end
 
   def handle_with_exception
     yield
