@@ -69,6 +69,14 @@ pt_BR:
           connector_incompatible: A versão do conector do WhatsApp é incompatível com esta versão do Chatwoot. Atualize o conector.
           connect_failure: O WhatsApp recusou a conexão. Novas tentativas continuam automaticamente.
           pairing_timed_out: O código expirou antes de o telefone concluir o pareamento. Inicie a conexão novamente para obter um novo.
+          pairing_timeout: Ninguém escaneou o código antes de ele expirar. Inicie a conexão novamente para obter um novo.
+          pairing_pair_error: O WhatsApp aceitou o código mas não concluiu a conexão do dispositivo. Inicie a conexão novamente.
+          pairing_err-scanned-without-multidevice: Esta conta do WhatsApp precisa ativar o multidispositivo antes de poder ser conectada.
+          pairing_code_refused: O WhatsApp não quis enviar um código de pareamento para este número. Conecte o dispositivo pelo QR code.
+          pairing_connect_failed: O conector não conseguiu falar com o WhatsApp para iniciar o pareamento. Tente novamente.
+          connect_failed: O conector não conseguiu falar com o WhatsApp. Novas tentativas continuam automaticamente.
+          disconnect_requested: 'Esta conexão foi encerrada aqui. O pareamento continua válido: conecte novamente para retomá-la.'
+          disconnected: A conexão com o WhatsApp caiu. Novas tentativas continuam automaticamente.
   notifications:
     notification_title:
       internal_chat_mention: Você foi mencionado em %{name}

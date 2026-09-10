@@ -69,6 +69,14 @@ en:
           connector_incompatible: The WhatsApp connector version is incompatible with this Chatwoot version. Update the connector.
           connect_failure: WhatsApp refused the connection. New attempts continue automatically.
           pairing_timed_out: The code expired before the phone finished pairing. Start the connection again to get a new one.
+          pairing_timeout: Nobody scanned the code before it expired. Start the connection again to get a new one.
+          pairing_pair_error: WhatsApp accepted the code but did not finish linking the device. Start the connection again.
+          pairing_err-scanned-without-multidevice: This WhatsApp account has to turn multi-device on before it can be linked.
+          pairing_code_refused: WhatsApp would not send a pairing code to this number. Link the device with the QR code instead.
+          pairing_connect_failed: The connector could not reach WhatsApp to start the pairing. Try again.
+          connect_failed: The connector could not reach WhatsApp. Retries continue automatically.
+          disconnect_requested: 'This connection was closed here. The pairing is still valid: connect again to resume it.'
+          disconnected: The connection to WhatsApp dropped. Retries continue automatically.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}
