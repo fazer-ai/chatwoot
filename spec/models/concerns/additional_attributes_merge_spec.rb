@@ -14,6 +14,23 @@ RSpec.describe AdditionalAttributesMerge do
         .to eq('city' => 'Curitiba', 'company_name' => 'fazer.ai', 'country' => 'Brazil')
     end
 
+    # A mechanism test, and named as one. Re-reading is what fixes the defect this exists for, a
+    # copy that went stale across a network call, and the example above measures that outcome.
+    # The lock answers the other half, two processes re-reading and writing at the same instant,
+    # and a single-threaded suite cannot stage that. Without this the lock could be deleted with
+    # every example still green.
+    it 'reads the row for update' do
+      statements = []
+      subscription = ActiveSupport::Notifications.subscribe('sql.active_record') do |*, payload|
+        statements << payload[:sql]
+      end
+
+      contact.merge_additional_attributes!(merge: { 'country' => 'Brazil' })
+
+      ActiveSupport::Notifications.unsubscribe(subscription)
+      expect(statements).to include(a_string_matching(/SELECT .* FROM "contacts" .* FOR UPDATE/m))
+    end
+
     it 'leaves the receiver alone, because the lock is taken on a separate row object' do
       contact.merge_additional_attributes!(merge: { 'country' => 'Brazil' })
 
@@ -31,15 +48,21 @@ RSpec.describe AdditionalAttributesMerge do
       expect(conversation.reload.additional_attributes).to include('conversation_language' => 'pt')
     end
 
-    it 'stringifies the keys it is handed, so one key cannot arrive under two spellings' do
+    it 'takes a symbol key as the same key' do
       contact.merge_additional_attributes!(merge: { city: 'Sao Paulo' })
 
-      stored = ActiveRecord::Base.connection.select_value(
-        "SELECT additional_attributes::text FROM contacts WHERE id = #{contact.id}"
-      )
-
-      expect(stored.scan('city').size).to eq(1)
       expect(contact.reload.additional_attributes).to eq('city' => 'Sao Paulo')
+    end
+
+    # Assigning the column normalises the spelling on its own, so the stored value is right
+    # either way. What stringifying buys is this: the check for a write that changes nothing
+    # runs before the assignment, against String keys, so without it a symbol-keyed merge would
+    # never look equal and would write, and fire its callbacks, on every call.
+    it 'does not touch the row when a symbol-keyed merge changes nothing' do
+      before_write = contact.reload.updated_at
+
+      expect(contact.merge_additional_attributes!(merge: { city: 'Curitiba' })).to be(false)
+      expect(contact.reload.updated_at).to eq(before_write)
     end
 
     it 'carries the other columns of the same write' do

@@ -26,10 +26,11 @@ module AdditionalAttributesMerge
   # `under` writes inside a nested hash and leaves its siblings alone, which is what the CRM
   # writers need: merging their one key at the top level would replace the whole per-CRM hash.
   #
-  # Keys are stringified on the way in. The column stringifies them anyway when it serialises,
-  # so a symbol merged over a string spelling of the same key would arrive as one key with the
-  # last value silently winning, and which one is last is not something a caller should have to
-  # know.
+  # Keys are stringified on the way in. Not for the stored value: assigning the column already
+  # normalises it, so `{ 'a' => 1, a: 2 }` reaches the row as `{ 'a' => 2 }` either way. It is
+  # the comparison below that needs it. That runs before the assignment, against a hash whose
+  # keys are Strings, so a symbol-keyed merge of a value that did not change would never look
+  # equal, and every call would write and fire its callbacks for nothing.
   #
   # A row that disappeared during the call is not an error. Every caller is enrichment after a
   # network round trip, and before this existed the write simply matched zero rows and the job
