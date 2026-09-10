@@ -34,6 +34,7 @@ es:
       conversation_not_visible: Esta conversación no está en su lista, así que no se puede fijar.
     whatsapp:
       group_announcement_only: Solo los administradores pueden enviar mensajes en este grupo
+      group_description_cannot_be_removed: WhatsApp no permite eliminar la descripción de un grupo una vez definida. Reemplace el texto en lugar de borrarlo.
     inboxes:
       channel:
         provider_unavailable: Este proveedor de WhatsApp aún no está disponible en esta instalación.

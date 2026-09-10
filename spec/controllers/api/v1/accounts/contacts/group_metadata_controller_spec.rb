@@ -47,6 +47,35 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_metadata', type
         expect(baileys_service).to have_received(:update_group_description).with('group@g.us', 'A new description')
       end
 
+      # An emptied field used to be indistinguishable from an absent one: `present?` skipped
+      # the update, the response came back 200 with the old text intact, and the operator
+      # was told the save worked. Neither provider can remove a description (measured on
+      # 10/09/2026), so the honest answer is to say no rather than to report a success that
+      # did not happen.
+      it 'refuses to clear a description instead of reporting a save that did not happen' do
+        group_contact.update!(additional_attributes: group_contact.additional_attributes.merge('description' => 'antes'))
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+              params: { description: '' },
+              headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to match(/description/i)
+        expect(group_contact.reload.additional_attributes['description']).to eq('antes')
+        expect(baileys_service).not_to have_received(:update_group_description)
+      end
+
+      # A request that never mentions the description is not asking for anything, and has
+      # to keep working: the subject panel saves on its own.
+      it 'still updates the subject when the description was not part of the request' do
+        patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+              params: { subject: 'Só o nome' },
+              headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        expect(group_contact.reload.name).to eq('Só o nome')
+      end
+
       it 'updates both subject and description' do
         patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
               params: { subject: 'Updated Name', description: 'Updated Desc' },
