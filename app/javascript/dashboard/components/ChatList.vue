@@ -397,10 +397,11 @@ const conversationList = computed(() => {
     });
   }
 
-  if (
-    !hasAppliedFiltersOrActiveFolders.value &&
-    activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
-  ) {
+  // Filtered lists included. `unread` is the one option with no entry in the store's
+  // SORT_OPTIONS, so `getFilteredConversations` re-sorts by last activity and silently
+  // undoes what the server returned; this pass is what puts the order back. Skipping it
+  // for folders was harmless only while the sort control was hidden there.
+  if (activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD) {
     localConversationList = sortByUnreadStatus(localConversationList);
   }
 
