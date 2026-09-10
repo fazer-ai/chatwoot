@@ -60,9 +60,11 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
       attachment = @message.attachments.build(
         account_id: @message.account_id,
         file: uploaded_attachment,
-        # An agent picked this file, so an empty one is a mistake we can still name to their face
-        # instead of a message that turns red minutes later. Ingestion never comes through here.
-        refuse_empty_file: true
+        # Someone on our side picked this file, so an empty one is a mistake we can still name to
+        # their face instead of a message that turns red minutes later. An API inbox pushes
+        # customer messages through this same builder, and those are ingestion: refusing one would
+        # throw away its text along with the odd attachment.
+        refuse_empty_file: !@message.incoming?
       )
       metadata = process_metadata(uploaded_attachment)
       attachment.meta = metadata if metadata.present?
