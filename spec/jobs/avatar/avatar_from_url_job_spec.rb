@@ -149,6 +149,32 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       expect(WebMock).not_to have_requested(:get, valid_url)
     end
 
+    # The shortest path to the same loss, and it needs no removal at all: a contact who changes
+    # their photo twice inside one window. The first job fetches, the second is turned away by the
+    # window, and while it stamped on the way out the second URL was recorded as synced without a
+    # byte having been read. Found by a parallel session working the same issue.
+    it 'still fetches the second picture when two arrive inside one window' do
+      second_url = 'https://example.com/avatar-2.png'
+      [valid_url, second_url].each do |url|
+        stub_request(:get, url).to_return(
+          status: 200,
+          body: File.read(Rails.root.join('spec/assets/avatar.png')),
+          headers: { 'Content-Type' => 'image/png' }
+        )
+      end
+
+      described_class.perform_now(avatarable, valid_url)
+      described_class.perform_now(avatarable, second_url)
+
+      travel_to((described_class::RATE_LIMIT_WINDOW + 1.second).from_now) do
+        described_class.perform_now(avatarable, second_url)
+      end
+
+      expect(WebMock).to have_requested(:get, second_url)
+      expect(avatarable.reload.additional_attributes['avatar_url_hash'])
+        .to eq(Digest::SHA256.hexdigest(second_url))
+    end
+
     it 'returns early when hash unchanged, without opening a new rate-limit window' do
       avatarable.update!(additional_attributes: { 'avatar_url_hash' => Digest::SHA256.hexdigest(valid_url) })
 
