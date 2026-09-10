@@ -30,6 +30,22 @@ RSpec.describe Whatsapp::Session::AvatarSync do
       .to contain_exactly('app/models/concerns/avatarable.rb')
   end
 
+  # The fence that actually protects the markers, and the one that survives the objection to the
+  # other. It watches the key names rather than the call, so it does not care whether a future
+  # writer reaches the column with `update!`, `save!` or an index assignment: naming a marker at
+  # all is what trips it. Both files that may name one write through the primitive.
+  it 'is named in exactly the two places that own it' do
+    roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
+    owners = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
+      body = File.read(path)
+      (described_class::MARKERS + [described_class::REMOVED_AT]).any? { |marker| body.include?(marker) }
+    end
+
+    expect(owners.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s })
+      .to contain_exactly('app/services/whatsapp/session/avatar_sync.rb',
+                          'app/jobs/avatar/avatar_from_url_job.rb')
+  end
+
   describe '.reset' do
     it 'clears both markers and leaves everything else alone' do
       described_class.reset(contact)
