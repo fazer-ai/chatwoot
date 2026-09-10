@@ -54,6 +54,27 @@ RSpec.describe Avatar::AvatarFromUrlJob do
 
       expect(avatarable.reload.avatar).to be_attached
     end
+
+    # The sequence the markers used to lose outright: a removal, then a new picture, then
+    # the stale job finally running. It correctly declines to download, and while it stamped
+    # on its way out it opened a window the new picture's job then fell into -- which
+    # recorded the new URL as synced without fetching it, so nothing ever asked again.
+    it 'leaves the new picture reachable after a stale job declines to run' do
+      new_url = 'https://example.com/avatar-new.png'
+      stub_request(:get, new_url).to_return(
+        status: 200,
+        body: File.read(Rails.root.join('spec/assets/avatar.png')),
+        headers: { 'Content-Type' => 'image/png' }
+      )
+      resolved_at = 1.minute.ago.iso8601
+      Whatsapp::Session::AvatarSync.remove(avatarable)
+
+      described_class.perform_now(avatarable, valid_url, resolved_at: resolved_at)
+      described_class.perform_now(avatarable, new_url, resolved_at: 1.minute.from_now.iso8601)
+
+      expect(avatarable.reload.avatar).to be_attached
+      expect(WebMock).to have_requested(:get, new_url)
+    end
   end
 
   context 'with rate-limited avatarable (Contact)' do
@@ -128,7 +149,11 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(authenticated_url))
     end
 
-    it 'returns early when rate limited' do
+    # The window says when the last attempt happened, so a job it turns away has to leave it
+    # where it was. Advancing it pushed the window forward for work nobody did, and writing
+    # the hash of a URL this job never fetched marked it synced: the next job for that URL
+    # is then skipped as a duplicate, and the picture never arrives.
+    it 'leaves the markers alone when it is rate limited' do
       ts = 30.seconds.ago.iso8601
       avatarable.update!(additional_attributes: { 'last_avatar_sync_at' => ts })
 
@@ -142,11 +167,33 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       described_class.perform_now(avatarable, valid_url)
       avatarable.reload
       expect(avatarable.avatar).not_to be_attached
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
-      expect(Time.zone.parse(avatarable.additional_attributes['last_avatar_sync_at']))
-        .to be > Time.zone.parse(ts)
-      expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(valid_url))
+      expect(avatarable.additional_attributes['last_avatar_sync_at']).to eq(ts)
+      expect(avatarable.additional_attributes).not_to have_key('avatar_url_hash')
       expect(WebMock).not_to have_requested(:get, valid_url)
+    end
+
+    # The shortest route to the same loss, and it needs no removal at all: a contact that
+    # changes its picture twice inside the window. The first job fetches, the second is
+    # turned away by the window, and while it stamped on its way out the second URL was
+    # recorded as synced without a single byte being read.
+    it 'still fetches the second picture when two arrive inside one window' do
+      second_url = 'https://example.com/avatar-2.png'
+      [valid_url, second_url].each do |url|
+        stub_request(:get, url).to_return(
+          status: 200,
+          body: File.read(Rails.root.join('spec/assets/avatar.png')),
+          headers: { 'Content-Type' => 'image/png' }
+        )
+      end
+
+      described_class.perform_now(avatarable, valid_url)
+      described_class.perform_now(avatarable, second_url)
+
+      travel_to((described_class::RATE_LIMIT_WINDOW + 1.second).from_now) { described_class.perform_now(avatarable, second_url) }
+
+      expect(WebMock).to have_requested(:get, second_url)
+      expect(avatarable.reload.additional_attributes['avatar_url_hash'])
+        .to eq(Digest::SHA256.hexdigest(second_url))
     end
 
     it 'returns early when hash unchanged' do
@@ -162,18 +209,21 @@ RSpec.describe Avatar::AvatarFromUrlJob do
       described_class.perform_now(avatarable, valid_url)
       expect(avatarable.avatar).not_to be_attached
       avatarable.reload
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
+      expect(avatarable.additional_attributes).not_to have_key('last_avatar_sync_at')
       expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(valid_url))
       expect(WebMock).not_to have_requested(:get, valid_url)
     end
 
-    it 'updates sync attributes even when URL is invalid' do
+    # An address that cannot be fetched spends no request, so it must not open a window
+    # either. It used to, and that is what made a valid URL arriving seconds later be turned
+    # away and then recorded as synced on its way out.
+    it 'opens no window for a URL it cannot even parse' do
       invalid_url = 'invalid_url'
       described_class.perform_now(avatarable, invalid_url)
       avatarable.reload
       expect(avatarable.avatar).not_to be_attached
-      expect(avatarable.additional_attributes['last_avatar_sync_at']).to be_present
-      expect(avatarable.additional_attributes['avatar_url_hash']).to eq(Digest::SHA256.hexdigest(invalid_url))
+      expect(avatarable.additional_attributes).not_to have_key('last_avatar_sync_at')
+      expect(avatarable.additional_attributes).not_to have_key('avatar_url_hash')
     end
 
     it 'updates sync attributes when file download is valid but content type is unsupported' do

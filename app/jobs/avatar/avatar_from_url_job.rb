@@ -22,6 +22,22 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
     return unless syncable_avatar?(avatarable, avatar_url)
     return if superseded?(avatarable, resolved_at)
 
+    attempt_download(avatarable, avatar_url)
+  end
+
+  private
+
+  # The markers belong to a job that reached the network, which is how both readers of them
+  # are written: `within_rate_limit?` spaces attempts out, and `duplicate_url?` skips a URL
+  # already fetched. A job that returned before this point writing them says an attempt
+  # happened that never did, and it is the second reader that bites -- a URL recorded as
+  # synced without ever being downloaded is never asked for again, so the picture the
+  # contact has now never arrives and nothing retries until the next time it changes.
+  #
+  # A fetch that failed still counts as an attempt: it spent the request, and repeating it
+  # every minute for a URL that answers 404 is what the window exists to prevent. So the
+  # `ensure` stays, and what changed is only how much of the method it covers.
+  def attempt_download(avatarable, avatar_url)
     fetch_and_attach_avatar(avatarable, avatar_url)
   rescue SafeFetch::HttpError => e
     log_http_error(avatar_url, e)
@@ -30,8 +46,6 @@ class Avatar::AvatarFromUrlJob < ApplicationJob
   ensure
     update_avatar_sync_attributes(avatarable, avatar_url)
   end
-
-  private
 
   # A removal recorded after the URL was resolved makes that URL a picture the contact
   # has already taken down. Only Contacts carry the marker, which is where this job
