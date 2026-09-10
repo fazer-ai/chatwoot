@@ -16,7 +16,7 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
     @page = [(params[:page] || 1).to_i, 1].max
     @per_page = (params[:per_page] || DEFAULT_PER_PAGE).to_i.clamp(1, 100)
     @inbox_phone_number = inbox_phone_number
-    @own_member = Whatsapp::Session::Owner.group_member(channel, @contact)
+    @own_member = Whatsapp::Session::Owner.group_member(channel_if_any, @contact)
     @is_inbox_admin = @own_member&.role == 'admin'
 
     paginated = base_query.order(role: :desc, id: :asc)
@@ -88,7 +88,7 @@ class Api::V1::Accounts::Contacts::GroupMembersController < Api::V1::Accounts::C
   end
 
   def inbox_phone_number
-    channel&.phone_number
+    channel_if_any&.phone_number
   end
 
   def pin_own_member_on_first_page(paginated)
