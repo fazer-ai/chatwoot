@@ -75,11 +75,42 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   end
 
   def attachment_file_type(uploaded_attachment)
-    if uploaded_attachment.is_a?(String)
-      file_type_by_signed_id(uploaded_attachment)
-    else
-      file_type(uploaded_attachment&.content_type)
-    end
+    return file_type(uploaded_attachment&.content_type) unless uploaded_attachment.is_a?(String)
+
+    file_type(blob_for(uploaded_attachment)&.content_type)
+  end
+
+  # A direct upload sends an ActiveStorage signed ID, which is a String, so everything that used
+  # to ask the uploaded file about itself has to ask the blob instead. Memoised because the file
+  # type asks first and the metadata asks second, and resolving the same signed ID twice per
+  # attachment is a query nobody needs.
+  def blob_for(signed_id)
+    @blobs_by_signed_id ||= {}
+    return @blobs_by_signed_id[signed_id] if @blobs_by_signed_id.key?(signed_id)
+
+    @blobs_by_signed_id[signed_id] = ActiveStorage::Blob.find_signed(signed_id)
+  end
+
+  # The name the caller used when they picked the file, whichever of the three shapes they sent.
+  # An upload answers `original_filename`, a signed ID has to be resolved, and a blob, which is
+  # what a macro and an automation rule pass, answers `filename`. Nil when there is no name to be
+  # had, which is what both readers below already treat as "no metadata for this one" rather than
+  # as an error.
+  #
+  # No caller sends a blob together with per-attachment metadata today, so that branch is
+  # consistency rather than a fix. What it does remove is a latent raise: `recorded_audio_metadata`
+  # asked a blob for `original_filename` too, and would have died the same way it died on a
+  # signed ID the day someone passed both.
+  def uploaded_filename(uploaded_attachment)
+    return uploaded_attachment.original_filename if uploaded_attachment.respond_to?(:original_filename)
+    return uploaded_attachment.filename.to_s if uploaded_attachment.respond_to?(:filename)
+    return unless uploaded_attachment.is_a?(String)
+
+    # The safe navigation cannot fire today and is kept on purpose: a signed ID that does not
+    # resolve already raises one line earlier, at `attachments.build`, so nothing unresolvable
+    # reaches this method. Dropping it would make that ordering load-bearing, and the failure it
+    # would produce is a `NoMethodError` on nil in place of a legible 422.
+    blob_for(uploaded_attachment)&.filename&.to_s
   end
 
   def tag_voice_message(attachment)
@@ -100,12 +131,13 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     return unless @is_recorded_audio
     return { is_recorded_audio: true } if @is_recorded_audio == true || @is_recorded_audio == 'true'
 
-    return { is_recorded_audio: true } if @is_recorded_audio.is_a?(Array) && attachment.original_filename.in?(@is_recorded_audio)
+    filename = uploaded_filename(attachment)
+    return { is_recorded_audio: true } if @is_recorded_audio.is_a?(Array) && filename.in?(@is_recorded_audio)
 
     # FIXME: Remove backwards compatibility with old format.
     if @is_recorded_audio.is_a?(String)
       parsed = JSON.parse(@is_recorded_audio)
-      { is_recorded_audio: true } if parsed.is_a?(Array) && attachment.original_filename.in?(parsed)
+      { is_recorded_audio: true } if parsed.is_a?(Array) && filename.in?(parsed)
     end
   rescue JSON::ParserError
     nil
@@ -129,7 +161,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   def custom_attachment_metadata(attachment)
     return unless @attachments_metadata.is_a?(Hash)
 
-    filename = attachment.respond_to?(:original_filename) ? attachment.original_filename : nil
+    filename = uploaded_filename(attachment)
     return unless filename
 
     metadata = @attachments_metadata[filename]
