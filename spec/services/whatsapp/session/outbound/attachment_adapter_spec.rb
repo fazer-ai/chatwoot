@@ -28,6 +28,105 @@ RSpec.describe Whatsapp::Session::Outbound::AttachmentAdapter do
     expect(media.voice_note).to be(true)
   end
 
+  # What the recipient's client lays the bubble out from before a byte has arrived. All of
+  # it read from what ActiveStorage already analysed, except the waveform, which no analyser
+  # produces.
+  describe 'the measurements the bubble is drawn from' do
+    def analysed(metadata)
+      attachment.file.blob.update!(metadata: attachment.file.blob.metadata.merge(metadata))
+      described_class.new(attachment.reload, channel: channel).perform
+    end
+
+    it 'carries both sides of a picture it has a size for' do
+      media = analysed('width' => 1280, 'height' => 720)
+
+      expect(media.width).to eq(1280)
+      expect(media.height).to eq(720)
+    end
+
+    # The connector refuses one side without the other, and it is right to: half a size
+    # lays out nothing, and the two only ever come from the same analysis anyway.
+    it 'sends neither side when it only has one' do
+      media = analysed('width' => 1280, 'height' => nil)
+
+      expect(media.width).to be_nil
+      expect(media.height).to be_nil
+    end
+
+    # The case this has to get right on a machine with no ffprobe, which is most developer
+    # machines: ActiveStorage stores the analysis with the sizes null. Absent has to stay
+    # absent, because a zero on the wire is a measurement of nothing and the client draws a
+    # bubble from it.
+    it 'sends no size at all when nothing analysed the file' do
+      media = described_class.new(attachment, channel: channel).perform
+
+      expect(media.to_h).not_to have_key(:width)
+      expect(media.to_h).not_to have_key(:height)
+    end
+
+    it 'sends no duration for a picture, which has none' do
+      media = analysed('width' => 1280, 'height' => 720, 'duration' => 12.0)
+
+      expect(media.duration).to be_nil
+    end
+
+    context 'with a video' do
+      before { attachment.update!(file_type: :video) }
+
+      it 'carries the size and the duration, rounded to the seconds the contract types' do
+        media = analysed('width' => 640, 'height' => 360, 'duration' => 8.4)
+
+        expect([media.width, media.height, media.duration]).to eq([640, 360, 8])
+      end
+    end
+
+    context 'with a voice note' do
+      before do
+        attachment.file.blob.update!(content_type: 'audio/ogg', filename: 'gravacao.ogg')
+        attachment.update!(file_type: :audio, meta: { 'is_voice_message' => true })
+      end
+
+      it 'carries the shape of the audio and no picture size' do
+        allow(Whatsapp::Session::Outbound::Waveform).to receive(:for).and_return(Array.new(64, 42))
+
+        media = analysed('duration' => 7.2)
+
+        expect(media.waveform.length).to eq(64)
+        expect(media.duration).to eq(7)
+        expect(media.to_h).not_to have_key(:width)
+      end
+
+      # A note the machine could not measure travels without the field rather than with a
+      # flat row, which is a shape that is not the audio.
+      it 'leaves the field out when the audio could not be measured' do
+        allow(Whatsapp::Session::Outbound::Waveform).to receive(:for).and_return(nil)
+
+        expect(described_class.new(attachment.reload, channel: channel).perform.to_h).not_to have_key(:waveform)
+      end
+    end
+
+    # Played from a track, not from a row of bars, so measuring it would cost the decode
+    # and change nothing on screen.
+    it 'does not measure an audio file nobody recorded as a note' do
+      attachment.file.blob.update!(content_type: 'audio/mpeg', filename: 'musica.mp3')
+      attachment.update!(file_type: :audio, meta: {})
+      allow(Whatsapp::Session::Outbound::Waveform).to receive(:for)
+
+      described_class.new(attachment.reload, channel: channel).perform
+
+      expect(Whatsapp::Session::Outbound::Waveform).not_to have_received(:for)
+    end
+
+    it 'sends nothing measured for a document' do
+      attachment.file.blob.update!(content_type: 'application/pdf', filename: 'contrato.pdf')
+      attachment.update!(file_type: :file)
+
+      media = analysed('width' => 600, 'height' => 800, 'duration' => 3.0)
+
+      expect(media.to_h.keys).not_to include(:width, :height, :duration, :waveform)
+    end
+  end
+
   describe 'the address the provider is told to fetch from' do
     let(:disk_url) { 'http://localhost:3000/rails/active_storage/disk/TOKEN/avatar.png' }
 
