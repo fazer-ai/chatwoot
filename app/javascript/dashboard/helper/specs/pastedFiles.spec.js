@@ -9,9 +9,12 @@ import {
 // the round's holdout folder (clipboard-measurements.json). Two of them decide the whole
 // question, and they are the two the issue said had to be measured before shipping:
 //
-//   * a Numbers copy really does carry an invalid zero-byte attachment, and it is `image.png`
-//     of `image/png`, never a spreadsheet file. It arrives WITH text/plain, text/html and
-//     text/rtf, because the point of copying a cell is to paste its text somewhere.
+//   * a Numbers copy really does carry an invalid attachment, and it is `image.png` of
+//     `image/png`, never a spreadsheet file. It arrives WITH text/plain, text/html and text/rtf,
+//     because the point of copying a cell is to paste its text somewhere. Its 0 bytes are a
+//     race rather than a state: the pasteboard promises the image, so a paste seconds after
+//     Cmd+C reads 0 and the same clipboard 45 s later gives 10594 bytes. Both are covered here:
+//     the empty one must not warn, and the filled one is an ordinary attachment.
 //   * a file copied in Finder arrives as `Files` alone. The macOS pasteboard does carry the
 //     file name as text, and the browser drops it, so `types` has no text flavour at all.
 //
@@ -27,6 +30,11 @@ const NUMBERS_SINGLE_CELL = transfer(
   [['image.png', 'image/png', 0]]
 );
 const NUMBERS_RANGE = NUMBERS_SINGLE_CELL;
+// The same copy, pasted once the promised image has been filled in.
+const NUMBERS_SETTLED = transfer(
+  ['text/plain', 'text/html', 'text/rtf', 'Files'],
+  [['image.png', 'image/png', 10594]]
+);
 const FINDER_ZERO_BYTE_FILE = transfer(
   ['Files'],
   [['vazio.txt', 'text/plain', 0]]
@@ -111,6 +119,13 @@ describe('pastedFiles', () => {
       expect(usableFilesFromTransfer(FINDER_ZERO_BYTE_FILE)).toEqual({
         files: [],
         shouldAlertEmpty: true,
+      });
+    });
+
+    it('attaches the spreadsheet image once the pasteboard has filled it in', () => {
+      expect(usableFilesFromTransfer(NUMBERS_SETTLED)).toEqual({
+        files: [{ name: 'image.png', type: 'image/png', size: 10594 }],
+        shouldAlertEmpty: false,
       });
     });
 

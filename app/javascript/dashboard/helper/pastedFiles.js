@@ -9,7 +9,11 @@
  * Chromium 153):
  *
  *   - a Numbers copy, one cell or a range, reports `text/plain`, `text/html`, `text/rtf` and
- *     `Files`, the file being `image.png` of `image/png` at 0 bytes;
+ *     `Files`, the file being `image.png` of `image/png`. Its size is a race, not a state: the
+ *     pasteboard promises the image and macOS fills it in afterwards, so a paste in the first
+ *     seconds reads 0 bytes and the same clipboard read tens of seconds later gives a real
+ *     image (0 then, 10594 bytes at 45 s, measured on the same copy). The empty case is
+ *     therefore the window right after Cmd+C, which is also when a person pastes;
  *   - a file copied in Finder reports `Files` alone. The macOS pasteboard does carry the file
  *     name as text, and the browser suppresses every text flavour once a file URL is present,
  *     so the paste event sees no text at all.
