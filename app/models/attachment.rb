@@ -196,12 +196,13 @@ class Attachment < ApplicationRecord
     true
   end
 
-  # Separate from `acceptable_file`, which only runs on a web widget inbox: what is an acceptable
-  # *type* is a per-channel policy, but a file with no bytes is useless on every channel. It used
-  # to be accepted, stored and handed to the provider — the agent saw a message that looked sent,
-  # and the refusal came back later as a failed status carrying an error nobody could tie to it.
+  # Separate from `acceptable_file`, which runs only on a web widget inbox: which *types* an inbox
+  # accepts is a per-channel policy, while a file with no bytes is useless on every channel.
+  # Outgoing only, and that boundary is the point: refusing what an agent uploads hands them the
+  # reason while they can still fix it, while refusing what a contact sent would raise inside
+  # `Whatsapp::IncomingMessageBaseService#process_messages` and take the inbound webhook down.
   def file_is_not_empty
-    return unless file.attached?
+    return unless file.attached? && (message&.outgoing? || message&.template?)
     return unless file.byte_size.to_i.zero?
 
     errors.add(:file, 'is empty')
