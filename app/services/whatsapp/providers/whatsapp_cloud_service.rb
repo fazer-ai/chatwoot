@@ -1,4 +1,17 @@
 class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
+  # The types WhatsApp accepts for a voice message, taken from its own rejection message:
+  # "Please use one of audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac."
+  # Measured live in #520: a phone renders every one of them as a voice bubble, and only opus
+  # carries a waveform. Requiring opus turned a voice note into a file to tap and protected
+  # against nothing, since the API never rejected the others. `audio/amr` is here on WhatsApp's
+  # own authority and was not measured, for lack of an AMR encoder to test with; the risk of
+  # keeping it is a send that fails, not a wrong bubble.
+  #
+  # This list is WhatsApp Cloud's. Baileys and the session provider send their own voice flag
+  # without looking at the type at all, so hoisting this anywhere shared would break voice notes
+  # that work there today.
+  VOICE_MESSAGE_CONTENT_TYPES = %w[audio/ogg audio/mpeg audio/amr audio/mp4 audio/aac].freeze
+
   def send_message(phone_number, message)
     @message = message
 
@@ -257,10 +270,17 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def voice_message?(type, attachment)
-    return false unless type == 'audio' && attachment.file.content_type == 'audio/ogg'
+    return false unless type == 'audio' && VOICE_MESSAGE_CONTENT_TYPES.include?(voice_content_type(attachment))
 
     # `is_recorded_audio` is the legacy fazer.ai meta key (transcode pipeline and old messages).
     (attachment.meta&.dig('is_voice_message') || attachment.meta&.dig('is_recorded_audio')).present?
+  end
+
+  # A browser can hand ActiveStorage a type carrying parameters (`audio/ogg; codecs=opus`), and the
+  # blob keeps it verbatim. Compare the media type alone, or a recording made in Chrome misses the
+  # list it belongs to.
+  def voice_content_type(attachment)
+    attachment.file.content_type.to_s.split(';').first.to_s.strip.downcase
   end
 
   def build_attachment_content(type, attachment, message)
