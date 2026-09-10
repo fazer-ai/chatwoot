@@ -200,6 +200,32 @@ describe Whatsapp::BaileysHandlers::MessagingHistorySet do
       expect(conversation.reload.additional_attributes['history_exhausted']).to be(true)
     end
 
+    # The case the equality match could not reach, and the one that actually happens: a row
+    # keyed by the LID, answered by the phone. Consolidation re-keys a contact inbox to its
+    # LID and the phone survives only on the contact, so the two ids are different strings
+    # and stripping the domain does not bring them together.
+    context 'when the row is keyed by the LID and the answer comes addressed by the phone' do
+      let!(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '199887766554433') }
+
+      it 'still records the answer on the thread' do
+        perform({ syncType: 6, messages: [], exhausted: ['5511912345678@s.whatsapp.net'] })
+
+        expect(conversation.reload.additional_attributes['history_exhausted']).to be(true)
+      end
+    end
+
+    # Brazilian and Argentinian numbers have two spellings, and which one a row carries
+    # depends on who wrote it first.
+    context 'when the row carries the other ninth-digit spelling' do
+      let!(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '551112345678') }
+
+      it 'still records the answer on the thread' do
+        perform({ syncType: 6, messages: [], exhausted: ['5511912345678@s.whatsapp.net'] })
+
+        expect(conversation.reload.additional_attributes['history_exhausted']).to be(true)
+      end
+    end
+
     it 'leaves the thread alone when no chat was flagged' do
       perform({ syncType: 6, messages: [raw_message('A', '5511912345678@s.whatsapp.net')] })
 
