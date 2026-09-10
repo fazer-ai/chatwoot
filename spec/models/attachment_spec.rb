@@ -59,6 +59,28 @@ RSpec.describe Attachment do
       expect(attachment.file.blob.reload.content_type).to eq('audio/ogg')
     end
 
+    # A blob stored before the identification was fixed still carries audio/opus on the object in
+    # the bucket, and on GCS that is the type WhatsApp reads: the response-content-type override a
+    # signed URL carries is ignored whenever the object's own metadata sets one. So correcting the
+    # column is not enough, the object has to be rewritten.
+    it 'rewrites the stored object when it normalizes a blob written before the fix' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
+      attachment.file.attach(io: Rails.root.join('spec/assets/sample_opus.ogg').open, filename: 'voice.ogg', content_type: 'audio/ogg')
+      attachment.save!
+      attachment.file.blob.update_column(:content_type, 'audio/opus') # rubocop:disable Rails/SkipsModelValidations
+      attachment.file.blob.reload
+      rewritten = []
+      allow(ActiveStorage::Blob.service).to receive(:update_metadata).and_wrap_original do |original, *args, **kwargs|
+        rewritten << kwargs[:content_type]
+        original.call(*args, **kwargs)
+      end
+
+      attachment.download_url
+
+      expect(attachment.file.blob.reload.content_type).to eq('audio/ogg')
+      expect(rewritten).to eq(['audio/ogg'])
+    end
+
     it 'leaves an audio type it was not asked about alone' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
       attachment.file.attach(io: Rails.root.join('spec/assets/sample.mp3').open, filename: 'voice.mp3', content_type: 'audio/mpeg')

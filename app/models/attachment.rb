@@ -228,21 +228,19 @@ class Attachment < ApplicationRecord
     File.extname(file.filename.to_s).delete_prefix('.').downcase
   end
 
-  # Marcel gem may detect OGG/Opus files as audio/opus instead of audio/ogg.
-  # Lazily normalize existing blobs so presigned URLs serve the correct Content-Type.
-  #
-  # Both extensions, because audio/opus here is never a statement about the bytes. Marcel
-  # reads the same file as audio/ogg by content and audio/opus only once it is shown the
-  # name: the container is Ogg either way, which is what .opus means (RFC 7845), and
-  # audio/ogg is the type registered for it. WhatsApp Cloud accepts audio/ogg and has no
-  # entry for audio/opus at all, so a voice note named .opus came back 131053.
-  OPUS_EXTENSIONS = %w[.ogg .opus].freeze
-
+  # Blobs written before the identification was corrected still carry audio/opus, which is the
+  # type WhatsApp Cloud rejects with 131053. Catch them the next time the file is handed to an
+  # external service. New blobs never reach here: config/initializers/active_storage_opus_fix.rb
+  # settles the type before the object is written.
   def normalize_opus_blob_content_type!
     blob = file.blob
-    return unless blob.content_type == 'audio/opus' && blob.filename.to_s.downcase.end_with?(*OPUS_EXTENSIONS)
+    return unless blob.content_type == 'audio/opus'
 
-    blob.update_column(:content_type, 'audio/ogg') # rubocop:disable Rails/SkipsModelValidations
+    # update!, not update_column, because the point is the callback: ActiveStorage rewrites the
+    # object's own Content-Type in the bucket on commit. Correcting only the column leaves the
+    # stored object as audio/opus, and on GCS that metadata is what a reader gets, so the fix
+    # would be invisible to the one service where it matters.
+    blob.update!(content_type: 'audio/ogg')
   end
 end
 
