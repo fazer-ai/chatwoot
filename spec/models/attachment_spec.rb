@@ -393,17 +393,21 @@ RSpec.describe Attachment do
     # note: the agent saw a message that looked sent, and the rejection arrived later as a failed
     # status carrying an error nobody could tie back to "the file was empty".
     describe 'an empty file' do
-      def empty_attachment_on(channel)
+      def empty_attachment_on(channel, message_type: :outgoing, refuse: true)
         inbox = create(:inbox, account: message.account, channel: channel)
         conversation = create(:conversation, account: message.account, inbox: inbox)
-        empty_message = create(:message, account: message.account, conversation: conversation, message_type: :outgoing)
-        attachment = empty_message.attachments.new(account_id: message.account_id, file_type: :audio)
+        owner = create(:message, account: message.account, conversation: conversation, message_type: message_type)
+        attachment = owner.attachments.new(account_id: message.account_id, file_type: :audio, refuse_empty_file: refuse)
         attachment.file.attach(io: StringIO.new(''), filename: 'voice.ogg', content_type: 'audio/ogg')
         attachment
       end
 
+      def whatsapp_channel
+        create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false)
+      end
+
       it 'is rejected on a provider inbox, where nothing used to look' do
-        attachment = empty_attachment_on(create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
+        attachment = empty_attachment_on(whatsapp_channel)
 
         expect(attachment).not_to be_valid
         expect(attachment.errors[:file]).to include('is empty')
@@ -416,65 +420,61 @@ RSpec.describe Attachment do
         expect(attachment.errors[:file]).to include('is empty')
       end
 
+      it 'is rejected on a template message too' do
+        attachment = empty_attachment_on(whatsapp_channel, message_type: :template)
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
       it 'leaves a file with bytes alone' do
-        inbox = create(:inbox, account: message.account, channel: create(:channel_whatsapp, account: message.account,
-                                                                                            validate_provider_config: false, sync_templates: false))
+        inbox = create(:inbox, account: message.account, channel: whatsapp_channel)
         conversation = create(:conversation, account: message.account, inbox: inbox)
         sized_message = create(:message, account: message.account, conversation: conversation, message_type: :outgoing)
-        attachment = sized_message.attachments.new(account_id: message.account_id, file_type: :audio)
+        attachment = sized_message.attachments.new(account_id: message.account_id, file_type: :audio, refuse_empty_file: true)
         attachment.file.attach(io: Rails.root.join('spec/assets/sample_opus.ogg').open, filename: 'voice.ogg', content_type: 'audio/ogg')
 
         expect(attachment).to be_valid
       end
 
-      # Refusing an inbound empty file would raise inside Whatsapp::IncomingMessageBaseService and
-      # take the whole webhook down, losing the message rather than recording an odd one.
-      it 'leaves an incoming message alone, so the inbound webhook is not brought down' do
-        inbox = create(:inbox, account: message.account,
-                               channel: create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
-        conversation = create(:conversation, account: message.account, inbox: inbox)
-        incoming = create(:message, account: message.account, conversation: conversation, message_type: :incoming)
-        attachment = incoming.attachments.new(account_id: message.account_id, file_type: :file)
-        attachment.file.attach(io: StringIO.new(''), filename: 'empty.pdf', content_type: 'application/pdf')
+      # The refusal is off unless the caller asks for it. Every provider ingestion path builds
+      # attachments without asking, so an empty download is stored rather than raising inside the
+      # webhook and losing the message. This holds for an incoming message and for an echo alike,
+      # which is why neither needs its own marker here.
+      it 'is accepted by default, because ingestion never asks to refuse' do
+        attachment = empty_attachment_on(whatsapp_channel, refuse: false)
 
         expect(attachment).to be_valid
       end
 
-      # On an outgoing message, so the `file.attached?` guard is what keeps this valid rather than
-      # the outgoing check short-circuiting before the file is ever looked at.
+      it 'is accepted by default on an incoming message too' do
+        attachment = empty_attachment_on(whatsapp_channel, message_type: :incoming, refuse: false)
+
+        expect(attachment).to be_valid
+      end
+
+      # A fence, not a checklist. There are four provider ingestion paths that build outgoing
+      # attachments (baileys, z-api, the session writer, the reaction store), each marking the
+      # echo differently, and enumerating them is how the third one got missed. Assert instead
+      # that composing a message is the only thing in the tree that turns the refusal on.
+      it 'is turned on in exactly one place in the source tree' do
+        roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
+        setters = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
+          File.read(path).match?(/refuse_empty_file\s*[:=]/)
+        end
+
+        expect(setters.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s })
+          .to contain_exactly('app/builders/messages/message_builder.rb')
+      end
+
+      # On a message that asked to refuse, so the `file.attached?` guard is what keeps this valid
+      # rather than the flag short-circuiting before the file is ever looked at.
       it 'leaves an attachment that carries no file at all alone' do
         outgoing = create(:message, account: message.account, conversation: message.conversation, message_type: :outgoing)
-        location = outgoing.attachments.new(account_id: message.account_id, file_type: :location,
+        location = outgoing.attachments.new(account_id: message.account_id, file_type: :location, refuse_empty_file: true,
                                             coordinates_lat: 1.0, coordinates_long: 1.0, fallback_title: 'here')
 
         expect(location).to be_valid
-      end
-
-      # An echo is a message someone sent from another WhatsApp client; it reaches us through the
-      # same webhook as an incoming one and is only stored as outgoing. We never send it, so
-      # refusing it would roll back the ingestion the same way an incoming refusal would.
-      it 'leaves an outgoing echo alone, because we are not the ones sending it' do
-        inbox = create(:inbox, account: message.account,
-                               channel: create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
-        conversation = create(:conversation, account: message.account, inbox: inbox)
-        echo = create(:message, account: message.account, conversation: conversation, message_type: :outgoing,
-                                content_attributes: { external_echo: true })
-        attachment = echo.attachments.new(account_id: message.account_id, file_type: :file)
-        attachment.file.attach(io: StringIO.new(''), filename: 'empty.pdf', content_type: 'application/pdf')
-
-        expect(attachment).to be_valid
-      end
-
-      it 'is rejected on a template message too' do
-        inbox = create(:inbox, account: message.account,
-                               channel: create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
-        conversation = create(:conversation, account: message.account, inbox: inbox)
-        template = create(:message, account: message.account, conversation: conversation, message_type: :template)
-        attachment = template.attachments.new(account_id: message.account_id, file_type: :file)
-        attachment.file.attach(io: StringIO.new(''), filename: 'empty.pdf', content_type: 'application/pdf')
-
-        expect(attachment).not_to be_valid
-        expect(attachment.errors[:file]).to include('is empty')
       end
     end
 

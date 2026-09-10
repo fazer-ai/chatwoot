@@ -43,7 +43,12 @@ class Attachment < ApplicationRecord
   has_one_attached :file
   before_save :set_extension
   validate :acceptable_file
-  validate :file_is_not_empty
+  # Off by default on purpose. Only the paths where we compose a message and are about to send it
+  # turn this on, because a refusal on an ingested attachment raises inside the provider webhook
+  # and loses the whole message instead of storing an odd one.
+  attr_accessor :refuse_empty_file
+
+  validate :file_is_not_empty, if: :refuse_empty_file
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
                     :contact => 8, :ig_reel => 9, :ig_post => 10, :ig_story => 11, :embed => 12 }
@@ -201,12 +206,8 @@ class Attachment < ApplicationRecord
   # Outgoing only, and that boundary is the point: refusing what an agent uploads hands them the
   # reason while they can still fix it, while refusing what a contact sent would raise inside
   # `Whatsapp::IncomingMessageBaseService#process_messages` and take the inbound webhook down.
-  # Only worth refusing when we are the ones about to send the file. Whatever the provider handed
-  # us is recorded as it arrived, whether incoming or an echo of a message sent from another
-  # client, because refusing it would roll back the whole webhook.
   def file_is_not_empty
     return unless file.attached? && file.byte_size.to_i.zero?
-    return unless %w[outgoing template].include?(message&.message_type) && !message.content_attributes['external_echo']
 
     errors.add(:file, 'is empty')
   end

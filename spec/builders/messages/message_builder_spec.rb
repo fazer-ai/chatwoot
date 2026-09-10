@@ -134,6 +134,21 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.file_type).to eq 'image'
       end
 
+      # This builder is the boundary where an agent (or a campaign, macro or automation) composes
+      # a message we are about to send. It is the only place that asks the attachment to refuse an
+      # empty file, so a zero-byte upload is named here instead of failing at the provider later.
+      it 'asks the attachment to refuse an empty file' do
+        message = message_builder
+        expect(message.attachments.first.refuse_empty_file).to be(true)
+      end
+
+      it 'refuses a zero-byte upload instead of storing it' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/attachment.pdf', 'application/pdf')]
+
+        expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /file is empty/i)
+        expect(Message.count).to eq(0)
+      end
+
       it 'creates attachment with is_recorded_audio metadata' do
         params[:is_recorded_audio] = true
 
