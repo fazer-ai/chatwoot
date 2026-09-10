@@ -56,13 +56,33 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(false)
       end
 
-      # The connector is what serves `native`, so an installation without one must not
-      # offer it however the account is configured.
-      it 'keeps native uncreatable while no connector is deployed' do
-        expect(payload.find { |p| p['key'] == 'native' }).to include('available' => false, 'creatable' => false)
+      # `native` answers to two gates that point the same way and are set by different
+      # people: the deployment has to serve it, and the account has to have been named.
+      describe 'the two gates on native' do
+        let(:native) { payload.find { |p| p['key'] == 'native' } }
 
-        with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
-          expect(payload.find { |p| p['key'] == 'native' }).to include('available' => true, 'creatable' => true)
+        # The connector is what serves it, so an installation without one must not offer it
+        # however the account is configured.
+        it 'keeps it uncreatable while no connector is deployed, account opted in or not' do
+          account.update!(whatsapp_native_enabled: true)
+
+          expect(native).to include('available' => false, 'creatable' => false)
+        end
+
+        # And the half that makes a restricted first release possible: turning the connector
+        # on for the deployment does not hand the provider to every account on it.
+        it 'keeps it uncreatable for an account nobody named, even with a connector' do
+          with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
+            expect(native).to include('available' => true, 'creatable' => false)
+          end
+        end
+
+        it 'offers it once both are true' do
+          account.update!(whatsapp_native_enabled: true)
+
+          with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
+            expect(native).to include('available' => true, 'creatable' => true)
+          end
         end
       end
 
