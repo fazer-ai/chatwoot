@@ -202,10 +202,9 @@ class Attachment < ApplicationRecord
   end
 
   # Separate from `acceptable_file`, which runs only on a web widget inbox: which *types* an inbox
-  # accepts is a per-channel policy, while a file with no bytes is useless on every channel.
-  # Outgoing only, and that boundary is the point: refusing what an agent uploads hands them the
-  # reason while they can still fix it, while refusing what a contact sent would raise inside
-  # `Whatsapp::IncomingMessageBaseService#process_messages` and take the inbound webhook down.
+  # accepts is a per-channel policy, while a file with no bytes is useless on every channel. Who
+  # gets refused is decided by `refuse_empty_file`, not by the message type, and the flag lives in
+  # memory only, so reloading a row that was stored before this existed never refuses it later.
   def file_is_not_empty
     return unless file.attached? && file.byte_size.to_i.zero?
 

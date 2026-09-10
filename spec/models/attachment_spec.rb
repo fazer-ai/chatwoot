@@ -453,6 +453,21 @@ RSpec.describe Attachment do
         expect(attachment).to be_valid
       end
 
+      # The flag is in-memory only, so a row that already exists is never re-refused when something
+      # saves it again later. Retry does exactly that: it calls `message.update!` on a failed
+      # message, and an attachment stored before this validation existed must not block it.
+      it 'never refuses a row that is already stored, however it is saved again' do
+        attachment = empty_attachment_on(whatsapp_channel, refuse: false)
+        attachment.save!
+        owner = attachment.message
+
+        # A fresh instance, because `reload` keeps the in-memory accessor on the object it is
+        # called on and would hide exactly the thing under test.
+        expect(described_class.find(attachment.id).refuse_empty_file).to be_nil
+        expect { owner.update!(content: 'edited') }.not_to raise_error
+        expect(described_class.find(attachment.id)).to be_valid
+      end
+
       # A fence, not a checklist. There are four provider ingestion paths that build outgoing
       # attachments (baileys, z-api, the session writer, the reaction store), each marking the
       # echo differently, and enumerating them is how the third one got missed. Assert instead
