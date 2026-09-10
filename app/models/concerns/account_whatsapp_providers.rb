@@ -25,7 +25,12 @@ module AccountWhatsappProviders
     store_accessor :settings, :whatsapp_native_enabled, :whatsapp_uazapi_disabled
   end
 
-  # The superadmin form posts "1"/"0" and the settings JSON schema only accepts booleans.
+  # Deliberately not on the super admin form, either of them: these are console switches by
+  # decision, so that offering the native channel to an account is a step somebody takes on
+  # purpose rather than a checkbox next to the ordinary account settings.
+  #
+  # The cast stays because the value can still arrive as a string, from the settings API or
+  # from a console line that types "1", and the settings JSON schema only accepts booleans.
   def whatsapp_native_enabled=(value)
     super(ActiveModel::Type::Boolean.new.cast(value))
   end

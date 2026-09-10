@@ -39,8 +39,7 @@ class AccountDashboard < Administrate::BaseDashboard
     custom_attributes: Field::String,
     hide_agent_unassigned_tab: Field::Boolean,
     hide_agent_all_tab: HideAgentAllTabField,
-    disable_agent_message_deletion: Field::Boolean,
-    whatsapp_native_enabled: Field::Boolean
+    disable_agent_message_deletion: Field::Boolean
   }.merge(enterprise_attribute_types).freeze
 
   # COLLECTION_ATTRIBUTES
@@ -81,7 +80,6 @@ class AccountDashboard < Administrate::BaseDashboard
     hide_agent_unassigned_tab
     hide_agent_all_tab
     disable_agent_message_deletion
-    whatsapp_native_enabled
   ] + enterprise_show_page_attributes).freeze
 
   # FORM_ATTRIBUTES
@@ -103,7 +101,6 @@ class AccountDashboard < Administrate::BaseDashboard
     hide_agent_unassigned_tab
     hide_agent_all_tab
     disable_agent_message_deletion
-    whatsapp_native_enabled
   ] + enterprise_form_attributes).freeze
 
   # COLLECTION_FILTERS
