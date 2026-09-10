@@ -1012,6 +1012,89 @@ describe('#addMentions', () => {
     ]);
   });
 
+  // The server answers a bounded window per call. An agent away long enough to miss more
+  // than one of them was handed the first window and told the catch-up was over: the cursor
+  // was cleared and nothing fetched the rest until the conversation was opened again.
+  it('#syncActiveConversationMessages walks past a full window', async () => {
+    const firstWindow = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 2,
+      content: `page one ${index}`,
+    }));
+    axios.get
+      .mockResolvedValueOnce({ data: { payload: firstWindow, meta: {} } })
+      .mockResolvedValueOnce({
+        data: { payload: [{ id: 500, content: 'page two' }], meta: {} },
+      });
+
+    await actions.syncActiveConversationMessages(
+      {
+        commit,
+        dispatch,
+        state: {
+          allConversations: [{ id: 1, messages: [], inbox_id: 1 }],
+          syncConversationsMessages: { 1: 1 },
+        },
+      },
+      { conversationId: 1 }
+    );
+
+    expect(axios.get.mock.calls.length).toBe(2);
+    // The second call starts above the highest id the first window carried, not above the
+    // cursor it was given.
+    expect(axios.get.mock.calls[1][1]).toEqual({ params: { after: 101 } });
+    const written = commit.mock.calls.find(
+      ([name]) => name === 'SET_MISSING_MESSAGES'
+    );
+    expect(written[1].data.map(message => message.id)).toContain(500);
+  });
+
+  // A full window that carries nothing above the cursor would be asked for again for ever.
+  it('#syncActiveConversationMessages stops on a window that does not advance', async () => {
+    const stuck = Array.from({ length: 100 }, () => ({
+      id: 1,
+      content: 'same',
+    }));
+    axios.get.mockResolvedValue({ data: { payload: stuck, meta: {} } });
+
+    await actions.syncActiveConversationMessages(
+      {
+        commit,
+        dispatch,
+        state: {
+          allConversations: [{ id: 1, messages: [], inbox_id: 1 }],
+          syncConversationsMessages: { 1: 1 },
+        },
+      },
+      { conversationId: 1 }
+    );
+
+    expect(axios.get.mock.calls.length).toBe(1);
+  });
+
+  // The cursor is the highest id the client holds, not the last row of a list sorted by
+  // time: an imported message is stamped with when it was sent and takes its id from the
+  // INSERT, so taking the newest by time set the cursor above rows never received.
+  it('#setConversationLastMessageId takes the highest id, not the newest', async () => {
+    await actions.setConversationLastMessageId(
+      {
+        commit,
+        state: {
+          allConversations: [
+            { id: 1, messages: [{ id: 90 }, { id: 91 }, { id: 42 }] },
+          ],
+        },
+      },
+      { conversationId: 1 }
+    );
+
+    expect(commit.mock.calls).toEqual([
+      [
+        'SET_LAST_MESSAGE_ID_FOR_SYNC_CONVERSATION',
+        { conversationId: 1, messageId: 91 },
+      ],
+    ]);
+  });
+
   describe('#fetchAllAttachments', () => {
     it('fetches all attachments', async () => {
       axios.get.mockResolvedValue({

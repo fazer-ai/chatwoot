@@ -68,3 +68,14 @@ export const buildConversationList = (
     markEndReached: !conversationList.length,
   });
 };
+
+// The cursor the catch-up asks from, which is the highest id the client holds and not the
+// last row of a list sorted by time. A message still on its way out carries a uuid instead
+// of a server id, and "everything written after this uuid" is not a question the server can
+// answer, so those are skipped rather than allowed to become the cursor.
+export const highestMessageId = messages =>
+  (messages || []).reduce((highest, { id } = {}) => {
+    if (!Number.isFinite(id)) return highest;
+
+    return highest === undefined || id > highest ? id : highest;
+  }, undefined);
