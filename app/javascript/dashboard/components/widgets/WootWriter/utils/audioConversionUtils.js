@@ -150,9 +150,10 @@ export const convertAudio = async (inputBlob, outputFormat, bitrate = 128) => {
     } else {
       // Browsers that record neither WebM nor OGG (e.g. Safari records
       // audio/mp4) cannot produce OGG/Opus. Fall back to MP3 so the recording
-      // still sends as a regular audio message instead of failing. The caller
-      // keys the voice-note flag off the returned blob type, so an MP3 result
-      // is never mislabeled as an OGG/Opus voice note.
+      // still sends instead of failing. The caller flags every recording as a
+      // voice note regardless of what comes back here, and that is now correct:
+      // WhatsApp accepts the voice flag on MP3 too. What the fallback costs is
+      // the waveform, which only Opus carries.
       audio = await convertToMp3(inputBlob, bitrate);
     }
   } else {

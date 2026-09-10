@@ -3,7 +3,13 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   # "Please use one of audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac."
   # Measured live in #520: a phone renders every one of them as a voice bubble, and only opus
   # carries a waveform. Requiring opus turned a voice note into a file to tap and protected
-  # against nothing, since the API never rejected the others.
+  # against nothing, since the API never rejected the others. `audio/amr` is here on WhatsApp's
+  # own authority and was not measured, for lack of an AMR encoder to test with; the risk of
+  # keeping it is a send that fails, not a wrong bubble.
+  #
+  # This list is WhatsApp Cloud's. Baileys and the session provider send their own voice flag
+  # without looking at the type at all, so hoisting this anywhere shared would break voice notes
+  # that work there today.
   VOICE_MESSAGE_CONTENT_TYPES = %w[audio/ogg audio/mpeg audio/amr audio/mp4 audio/aac].freeze
 
   def send_message(phone_number, message)
