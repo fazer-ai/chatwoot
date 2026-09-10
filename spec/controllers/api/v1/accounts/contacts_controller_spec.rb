@@ -802,13 +802,32 @@ RSpec.describe 'Contacts API', type: :request do
     end
 
     context 'when it is an authenticated user' do
-      it 'enqueues SyncGroupJob and returns accepted' do
+      # The refresh runs through a session, so the inbox it runs as is the agent's own.
+      it 'enqueues SyncGroupJob as the inbox the agent is on and returns accepted' do
+        whatsapp_channel = create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false)
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '12345678901234567890')
+        create(:inbox_member, user: agent, inbox: whatsapp_channel.inbox)
+
         post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
              headers: agent.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:accepted)
-        expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact, channel: nil)
+        expect(Contacts::SyncGroupJob).to have_been_enqueued.with(contact, channel: whatsapp_channel)
+      end
+
+      # An agent with no claim to any inbox this group is in is refused, the same way the
+      # group endpoints refuse an inbox the group is not in. Before, the job was queued with
+      # no channel and the service picked the group's first contact inbox, so the refresh ran
+      # over a session the caller has no claim to -- and for a group in no inbox at all, over
+      # nothing.
+      it 'refuses a group it can reach no inbox of the agent for' do
+        post "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/sync_group",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(Contacts::SyncGroupJob).not_to have_been_enqueued
       end
 
       # A group contact is account-scoped, so the same WhatsApp group can sit in two
