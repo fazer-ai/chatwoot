@@ -3,6 +3,8 @@ import { defineAsyncComponent, ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useFileUpload } from 'dashboard/composables/useFileUpload';
+import { useAlert } from 'dashboard/composables';
+import { usableFilesFromTransfer } from 'dashboard/helper/pastedFiles';
 import { vOnClickOutside } from '@vueuse/components';
 import { useEventListener } from '@vueuse/core';
 import { ALLOWED_FILE_TYPES } from 'shared/constants/messages';
@@ -187,14 +189,19 @@ const onPaste = e => {
   const files = e.clipboardData?.files;
   if (!files?.length) return;
 
-  // Filter valid files (non-zero size)
-  Array.from(files)
-    .filter(file => file.size > 0)
-    .forEach(file => {
-      const { name, type, size } = file;
-      // Add unique ID for clipboard-pasted files
-      onFileUpload({ file, name, type, size, id: generateUid() });
-    });
+  // Same rule as the reply composer: empty files are dropped, and the refusal is said out loud
+  // unless the clipboard also carried text, which is the shape of a rich copy bringing an
+  // invalid zero-byte attachment nobody chose.
+  const { files: usable, shouldAlertEmpty } = usableFilesFromTransfer(
+    e.clipboardData
+  );
+  if (shouldAlertEmpty) useAlert(t('CONVERSATION.FILE_IS_EMPTY'));
+
+  usable.forEach(file => {
+    const { name, type, size } = file;
+    // Add unique ID for clipboard-pasted files
+    onFileUpload({ file, name, type, size, id: generateUid() });
+  });
 };
 
 useEventListener(document, 'paste', onPaste);
