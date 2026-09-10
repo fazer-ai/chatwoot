@@ -116,10 +116,20 @@ RSpec.describe Whatsapp::Session::Outbound::Waveform do
     it 'measures a real recording end to end', if: described_class.send(:ffmpeg).present? do
       attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'nota.ogg',
                              content_type: 'audio/ogg')
+      record = attachment.reload
 
-      bars = described_class.for(attachment.reload)
+      # Reported in the failure message, because a bare nil here is not debuggable on a
+      # machine nobody can open.
+      diagnosis = record.file.blob.open do |file|
+        out, err, status = Open3.capture3(described_class.send(:ffmpeg), '-v', 'error', '-i', file.path,
+                                          '-f', 's16le', '-ac', '1', '-ar', '8000', '-', binmode: true)
+        { bytes: out.bytesize, exit: status.exitstatus, on_disk: File.size(file.path),
+          stderr: err.byteslice(0, 300) }
+      end
 
-      expect(bars).to be_present
+      bars = described_class.for(record)
+
+      expect(bars).to be_present, "waveform nil; ffmpeg=#{described_class.send(:ffmpeg)} #{diagnosis}"
       expect(bars.length).to eq(samples)
       expect(bars).to all(be_between(0, ceiling))
       # Normalized against its own peak, so a recording with sound in it always reaches the
