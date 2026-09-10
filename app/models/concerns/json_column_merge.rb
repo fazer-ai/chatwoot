@@ -10,6 +10,13 @@
 # write and never the call itself, because a lock held across a network round trip is a worse
 # problem than the one it would solve.
 #
+# That last part is only true while the caller is not already inside a database transaction.
+# This opens its own, so a caller that wraps the network call in one would hold the row from
+# the first write until its own transaction ends, which is the cost this exists to avoid, and
+# nothing here can detect it. Measured on the seven callers as they stand: the group syncer's
+# chat lock is Redis, and none of the others is inside a transaction while it talks to the
+# network.
+#
 # Column-agnostic on purpose. The same idea is already written out by hand three times, in three
 # different columns: `Avatarable#update_avatar_sync_markers!` on `additional_attributes`, and
 # `Channel::Whatsapp#update_reachout_time_lock!` and `#update_new_chat_cap!` on
