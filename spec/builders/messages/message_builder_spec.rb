@@ -333,6 +333,102 @@ describe Messages::MessageBuilder do
           message = message_builder
           expect(message.attachments.first.file_type).to eq 'image'
         end
+
+        # A direct upload sends an ActiveStorage signed ID, which is a String, and a String has no
+        # `original_filename`. The per-attachment metadata is keyed off that name, so the whole of
+        # `attachments_metadata` was dropped on this path, silently, with a 200 and a stored message.
+        it 'applies the per-attachment metadata, which is keyed off a name a signed ID also has' do
+          params[:attachments_metadata] = { 'avatar.png' => { description: 'legenda' } }
+
+          message = message_builder
+
+          expect(message.attachments.first.meta).to include('description' => 'legenda')
+        end
+
+        # Worse than losing metadata: losing a refusal. The top-level `is_recorded_audio` is merged
+        # first and the per-attachment entry merges over it, so a caller saying "not this one" was
+        # honoured on multipart and ignored here, where the entry never arrived.
+        it 'lets a per-attachment refusal beat the top-level flag, as multipart does' do
+          params[:attachments] = [get_blob_for('spec/assets/sample.ogg', 'audio/ogg').signed_id]
+          params[:is_recorded_audio] = true
+          params[:attachments_metadata] = { 'sample.ogg' => { is_recorded_audio: 'false' } }
+
+          message = message_builder
+
+          expect(message.attachments.first.meta).to include('is_recorded_audio' => false)
+        end
+
+        # The sibling reader in the same `process_metadata` has no `respond_to?` guard at all, so
+        # this raised `NoMethodError` for a String and the request answered 422 with nothing stored.
+        it 'reads the recorded-audio file list instead of raising on a signed ID' do
+          params[:attachments] = [get_blob_for('spec/assets/sample.ogg', 'audio/ogg').signed_id]
+          params[:is_recorded_audio] = ['sample.ogg']
+
+          message = message_builder
+
+          expect(message.attachments.first.meta).to include('is_recorded_audio' => true)
+        end
+
+        it 'reads the recorded-audio list sent as a JSON string too' do
+          params[:attachments] = [get_blob_for('spec/assets/sample.ogg', 'audio/ogg').signed_id]
+          params[:is_recorded_audio] = '["sample.ogg"]'
+
+          message = message_builder
+
+          expect(message.attachments.first.meta).to include('is_recorded_audio' => true)
+        end
+
+        # Parity, not a new decision: the multipart path already applies one entry to every
+        # attachment of the same name, with no error and no warning. Inventing a tie-break on one
+        # side only is what would be wrong.
+        it 'applies one entry to every attachment of that name, exactly as multipart does' do
+          params[:attachments] = [
+            get_blob_for('spec/assets/avatar.png', 'image/png').signed_id,
+            get_blob_for('spec/assets/avatar.png', 'image/png').signed_id
+          ]
+          params[:attachments_metadata] = { 'avatar.png' => { description: 'legenda' } }
+
+          message = message_builder
+
+          expect(message.attachments.map(&:meta)).to all(include('description' => 'legenda'))
+        end
+
+        # A signed ID that does not resolve already fails at the attach, before any of this runs,
+        # and it has to keep failing exactly there. Resolving a name must not add a second way to
+        # raise, and must not swallow the first one either.
+        it 'keeps failing at the attach for a signed ID that does not resolve' do
+          params[:attachments] = ['not-a-signed-id']
+          params[:attachments_metadata] = { 'avatar.png' => { description: 'legenda' } }
+
+          expect { message_builder }.to raise_error(ActiveSupport::MessageVerifier::InvalidSignature)
+        end
+
+        # The third shape: a macro and an automation rule pass blobs, which answer `filename` and
+        # not `original_filename`. No caller sends one together with per-attachment metadata today,
+        # so this is consistency, and what it removes is a raise that was waiting for the first one
+        # that did.
+        it 'reads the name of a blob attachment too' do
+          blob = get_blob_for('spec/assets/sample.ogg', 'audio/ogg')
+          params[:attachments] = ActiveStorage::Blob.where(id: blob.id)
+          params[:is_recorded_audio] = ['sample.ogg']
+          params[:attachments_metadata] = { 'sample.ogg' => { description: 'legenda' } }
+
+          message = message_builder
+
+          expect(message.attachments.first.meta)
+            .to include('description' => 'legenda', 'is_recorded_audio' => true)
+        end
+
+        # Resolving the name must not pay for a second lookup: the file type already resolves the
+        # same signed ID once per attachment.
+        it 'resolves each signed ID once, not twice' do
+          allow(ActiveStorage::Blob).to receive(:find_signed).and_call_original
+          params[:attachments_metadata] = { 'avatar.png' => { description: 'legenda' } }
+
+          message_builder
+
+          expect(ActiveStorage::Blob).to have_received(:find_signed).once
+        end
       end
     end
 
