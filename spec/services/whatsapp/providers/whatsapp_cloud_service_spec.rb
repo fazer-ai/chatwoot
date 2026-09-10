@@ -224,6 +224,25 @@ describe Whatsapp::Providers::WhatsappCloudService do
         end
       end
 
+      # The end of the path the cast in `Messages::MessageBuilder` protects: a caller that writes
+      # `is_voice_message=false` through `attachments_metadata` over multipart sends the string,
+      # and before the cast it arrived here as an explicit yes.
+      it 'leaves the voice flag off for a flag the caller sent as the string false' do
+        message = create(:message, message_type: :outgoing, content: nil, conversation: conversation)
+        Messages::MessageBuilder.new(
+          nil, message.conversation,
+          ActionController::Parameters.new(
+            content: nil,
+            attachments: [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')],
+            attachments_metadata: { 'sample.mp3' => { is_voice_message: 'false' } }
+          )
+        ).perform
+
+        built = message.conversation.messages.last
+        expect(built.attachments.first.meta).to include('is_voice_message' => false)
+        expect(service.send(:voice_message?, 'audio', built.attachments.first)).to be(false)
+      end
+
       # A caller that says "this is not a voice message" is not the same as one that says nothing,
       # and both have to come out the same way: no flag. Both keys are set, because `false || nil`
       # is `nil` and would let a presence check and a nil check agree by accident. The API lets a
