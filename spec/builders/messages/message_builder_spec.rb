@@ -205,6 +205,41 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.meta).to include('is_voice_message' => true)
       end
 
+      # The case that separates casting the value from dropping the key, and the only one that
+      # does. The per-attachment metadata merges over the top-level flag, so a cast `false` wins
+      # and the note goes out silent. Dropping the key instead would leave the top-level `true`
+      # standing alone and send it as a voice note, which is the opposite of what was asked.
+      it 'lets a per-attachment refusal beat the top-level flag' do
+        params[:is_recorded_audio] = true
+        params[:attachments_metadata] = { 'avatar.png' => { is_recorded_audio: 'false' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('is_recorded_audio' => false)
+      end
+
+      # What the cast covers is `ActiveModel::Type::Boolean`'s own list, and no more. Widening it
+      # would be inventing a second truth table one line from the sibling parameter that uses the
+      # standard one, which is the inconsistency this exists to remove.
+      it 'turns the flag off for every value Rails treats as false' do
+        %w[false FALSE 0 off f].each do |falsey|
+          params[:attachments_metadata] = { 'avatar.png' => { is_voice_message: falsey } }
+
+          expect(described_class.new(user, conversation, params).perform.attachments.first.meta)
+            .to include('is_voice_message' => false), "expected #{falsey.inspect} to turn the flag off"
+        end
+      end
+
+      # Measured, not aspired to: `no` is not on that list, so it still reads as a yes. Anyone who
+      # wants it to stop has to change the truth table, not this cast.
+      it 'still reads a value Rails does not know as a yes' do
+        params[:attachments_metadata] = { 'avatar.png' => { is_voice_message: 'no' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('is_voice_message' => true)
+      end
+
       # Only the flags that are booleans. Everything else a caller sends is theirs.
       it 'leaves other metadata values exactly as they were sent' do
         params[:attachments_metadata] = { 'avatar.png' => { description: 'false', source: '0' } }
