@@ -237,7 +237,17 @@ class Whatsapp::Session::Backends::Uazapi::WebhookTranslator
   # A membership change carries no `Type` at all: which of the arrays is populated is what
   # says what happened.
   def updated(payload)
-    changes = uazapi::GroupChangeMapper.new(payload).perform
+    mapper = uazapi::GroupChangeMapper.new(payload)
+    changes = mapper.perform
+    # Something changed and the contract has no truthful field for it, so the group is
+    # pinged instead of described: this side reads it back from a snapshot, which is the
+    # only source that knows which way an approval setting was moved.
+    #
+    # Only when nothing else came with it, because one webhook produces one event here. A
+    # notification carrying both a carriable change and this one describes what it can, and
+    # the setting waits for the next scheduled sync. WhatsApp was measured sending one
+    # change per notification, so that is a residue rather than the common case.
+    return event(events::GroupActivity.new(groups: [model::Address.parse(payload[:JID])])) if changes.nil? && mapper.uncarried?
     return if changes.nil?
 
     timestamp = timestamp_ms(payload[:Timestamp])
