@@ -319,6 +319,48 @@ RSpec.describe Whatsapp::Session::Backends::Uazapi::WebhookTranslator do
       end
     end
 
+    # Measured against real accounts on 10/09/2026: turning approval on and turning it off
+    # both arrive as `MembershipApprovalMode: {IsJoinApprovalRequired: true}`, because
+    # WhatsApp sends the same tag in both directions with the state in a child element and
+    # whatsmeow reads only the tag. So the value is a coin flip, and describing it would put
+    # "join approval enabled" in the thread at the moment somebody disabled it.
+    context 'when the approval setting was moved' do
+      let(:body) do
+        fixture('group_participant_left').tap do |raw|
+          raw['event'].merge!('Leave' => nil, 'LeaveLid' => nil,
+                              'MembershipApprovalMode' => { 'IsJoinApprovalRequired' => true })
+        end
+      end
+
+      it 'pings the group instead of asserting which way it went' do
+        expect(events.first.type).to eq('group.activity')
+        expect(events.first.payload.groups.first.id).to be_present
+      end
+
+      it 'describes nothing about the setting itself' do
+        expect(events.map(&:type)).not_to include('group.updated')
+      end
+    end
+
+    # A change the contract can carry is still described, and the setting simply does not
+    # appear: the handler reads an absent field as "not reported", which is true.
+    context 'when the approval setting moved alongside something describable' do
+      let(:body) do
+        fixture('group_participant_left').tap do |raw|
+          raw['event'].merge!('Leave' => nil, 'LeaveLid' => nil, 'Name' => { 'Name' => 'novo nome' },
+                              'MembershipApprovalMode' => { 'IsJoinApprovalRequired' => true })
+        end
+      end
+
+      it 'describes what it can and stays quiet about the rest' do
+        changes = events.first.payload.changes
+
+        expect(events.first.type).to eq('group.updated')
+        expect(changes.subject).to eq('novo nome')
+        expect(changes.to_h).not_to have_key(:join_approval)
+      end
+    end
+
     context 'when nothing actually changed' do
       let(:body) do
         fixture('group_participant_left').tap { |raw| raw['event'].merge!('Leave' => nil, 'LeaveLid' => nil) }
