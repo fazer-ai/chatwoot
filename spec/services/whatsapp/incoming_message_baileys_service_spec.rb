@@ -1132,7 +1132,10 @@ describe Whatsapp::IncomingMessageBaileysService do
           attachment = message.attachments.last
           expect(attachment.file_type).to eq('audio')
           expect(attachment.file.filename.to_s).to eq("audio_msg_123_#{Time.current.strftime('%Y%m%d')}.opus")
-          expect(attachment.file.content_type).to eq('audio/opus')
+          # audio/ogg, not the audio/opus the payload declares: the container is Ogg either way and
+          # audio/ogg is the type registered for it, so this is what makes the note forwardable.
+          # WhatsApp Cloud rejects audio/opus with 131053, and only classifies audio/ogg as voice.
+          expect(attachment.file.content_type).to eq('audio/ogg')
         end
       end
 
