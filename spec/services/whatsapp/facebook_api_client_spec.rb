@@ -238,32 +238,60 @@ describe Whatsapp::FacebookApiClient do
       end
     end
 
+    # The override is the half a channel can live without: the WABA subscription is what makes
+    # Meta deliver at all, and the override only re-routes one number of a shared WABA. Meta
+    # refuses it for a whole class of accounts that receive perfectly well without it, and under
+    # a shared rescue that refusal marked the channel for reauthorization and cost it every
+    # inbound webhook.
     context 'when phone number callback override fails' do
       before do
-        # Step 1 succeeds
         stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
-          .with(
-            headers: { 'Authorization' => "Bearer #{access_token}", 'Content-Type' => 'application/json' }
-          )
-          .to_return(
-            status: 200,
-            body: { success: true }.to_json,
-            headers: { 'Content-Type' => 'application/json' }
-          )
-
-        # Step 2 fails
-        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
-          .with(
-            headers: { 'Authorization' => "Bearer #{access_token}", 'Content-Type' => 'application/json' },
-            body: { webhook_configuration: { override_callback_uri: callback_url, verify_token: verify_token } }.to_json
-          )
-          .to_return(status: 400, body: { error: 'Phone number webhook callback override failed' }.to_json)
+          .with(headers: { 'Authorization' => "Bearer #{access_token}", 'Content-Type' => 'application/json' })
+          .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+        allow(Rails.logger).to receive(:warn)
       end
 
-      it 'raises an error' do
-        expect do
-          api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
-        end.to raise_error(/Phone number webhook callback override failed/)
+      # Three shapes of the same refusal, because a fix that reads the status or the message
+      # covers one of them and leaves the other two killing the channel.
+      [
+        ['a permissions error',
+         ->(stub) { stub.to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json) }],
+        ['a plain server error',
+         ->(stub) { stub.to_return(status: 500, body: { error: { message: 'Internal server error' } }.to_json) }],
+        ['a connection that answers nothing', ->(stub) { stub.to_raise(Errno::ECONNRESET) }]
+      ].each do |shape, refuse|
+        context "when Meta answers with #{shape}" do
+          before { refuse.call(stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")) }
+
+          it 'does not raise, and answers with the subscription that did land' do
+            result = api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
+
+            expect(result['success']).to be(true)
+          end
+
+          it 'says in the log which call was refused and for which number' do
+            api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
+
+            expect(Rails.logger).to have_received(:warn).with(/override failed but continuing.*#{phone_number_id}/)
+          end
+        end
+      end
+    end
+
+    # Still attempted whenever it can work: dropping the call altogether would take the routing
+    # away from every installation that shares a WABA between numbers.
+    context 'when both calls succeed' do
+      it 'sends the override with the callback url and the verify token' do
+        subscription = stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
+                       .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+        override = stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+                   .with(body: { webhook_configuration: { override_callback_uri: callback_url, verify_token: verify_token } }.to_json)
+                   .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
+
+        expect(subscription).to have_been_requested
+        expect(override).to have_been_requested
       end
     end
   end
