@@ -159,11 +159,20 @@ class Whatsapp::Session::Backends::Uazapi::Client
     STATUS_CODES[status] || (status >= 500 ? 'wa_error' : 'invalid_payload')
   end
 
-  # The provider's own message, when it sends one, and only that field. The rest of an
-  # error body is echoed request data, and on `/send/*` that includes the file we just
-  # uploaded.
+  # The provider's own words, when it sends any, and only that field. The rest of an error
+  # body is echoed request data, and on `/send/*` that includes the file we just uploaded.
+  #
+  # Two keys, because this provider uses two and the one it uses for failures was the one
+  # not being read: `error` carries the refusal ("the number ... is not on WhatsApp",
+  # "Description cannot be empty"), and `message` carries prose that is usually a report
+  # rather than a complaint. Reading only `message` left the operator with the bare status
+  # and no reason, on exactly the answers that had one.
+  ERROR_KEYS = %w[error message].freeze
+
   def detail(body)
-    message = body.is_a?(Hash) ? body['message'] : nil
-    ": #{message}" if message.present?
+    return unless body.is_a?(Hash)
+
+    said = ERROR_KEYS.filter_map { |key| body[key] }.find { |value| value.is_a?(String) && value.present? }
+    ": #{said}" if said
   end
 end

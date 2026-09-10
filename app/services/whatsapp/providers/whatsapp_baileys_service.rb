@@ -1139,8 +1139,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   def reset_avatar_state(group_contact)
     group_contact.avatar.purge if group_contact.avatar.attached?
-    attrs = (group_contact.additional_attributes || {}).except('last_avatar_sync_at', 'avatar_url_hash')
-    group_contact.update_columns(additional_attributes: attrs) # rubocop:disable Rails/SkipsModelValidations
+    group_contact.update_avatar_sync_markers!(remove: Whatsapp::Session::AvatarSync::MARKERS)
   end
 
   def try_update_participant_avatar(contact)

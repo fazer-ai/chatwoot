@@ -44,9 +44,9 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def retry
     return if message.blank?
-    return head :unprocessable_entity unless reset_message_for_retry
+    return head :unprocessable_entity unless claim_message_for_retry
 
-    ::SendReplyJob.perform_later(message.id) if claim_message_retry
+    ::SendReplyJob.perform_later(message.id)
   rescue StandardError => e
     render_could_not_create_error(e.message)
   end
@@ -98,22 +98,6 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message_finder ||= MessageFinder.new(@conversation, params)
   end
 
-  def claim_message_retry
-    message.with_lock do
-      next false unless message.failed?
-
-      Messages::StatusUpdateService.new(message, 'sent').perform
-      previous_source_id = message.source_id
-      retry_attributes = { content_attributes: {} }
-      retry_attributes[:source_id] = nil unless @conversation.inbox.api? || @conversation.inbox.web_widget?
-      message.update!(retry_attributes)
-      if retry_attributes.key?(:source_id) && previous_source_id.present?
-        Rails.logger.info "Cleared older source ID #{previous_source_id} for message #{message.id}"
-      end
-      true
-    end
-  end
-
   def permitted_params
     params.permit(:id, :target_language, :status, :external_error, :content)
   end
@@ -128,20 +112,36 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     ::Messages::DeleteOnChannelJob.perform_later(message.id)
   end
 
+  # One claim, not two. Both halves used to run in sequence and the first flipped the very status
+  # the second tested, so the second could only ever answer false and the send job it guarded was
+  # never queued: Retry cleared the failure marker and delivered nothing.
+  #
   # The `deleted?` check and the `content_attributes` reset have to share the lock the DELETE endpoint
   # takes: a delete landing between them would have its flag wiped by the reset, and the job `retry`
   # queues afterwards would then push the "deleted" placeholder to the contact.
-  def reset_message_for_retry
-    retryable = false
+  def claim_message_for_retry
     message.with_lock do
-      next if message.deleted?
-      next unless message.failed? && (message.outgoing? || message.template?)
+      next false if message.deleted?
+      next false unless message.failed? && (message.outgoing? || message.template?)
 
-      retryable = true
       Messages::StatusUpdateService.new(message, 'sent').perform
-      message.update!(content_attributes: {}, source_id: nil)
+      reset_message_state_for_retry
+      true
     end
-    retryable
+  end
+
+  # Called from inside the claim's lock, so the reset cannot land between a delete and its check.
+  def reset_message_state_for_retry
+    previous_source_id = message.source_id
+    retry_attributes = { content_attributes: {} }
+    # An API or web widget inbox owns its source_id: it is the caller's own reference, and the
+    # reply job there is an email notification rather than a channel send. On a provider channel
+    # a stale id instead makes Base::SendOnChannelService treat the message as already sent.
+    retry_attributes[:source_id] = nil unless @conversation.inbox.api? || @conversation.inbox.web_widget?
+    message.update!(retry_attributes)
+    return unless retry_attributes.key?(:source_id) && previous_source_id.present?
+
+    Rails.logger.info "Cleared older source ID #{previous_source_id} for message #{message.id}"
   end
 
   def edit_message_on_channel(new_content, original_content)

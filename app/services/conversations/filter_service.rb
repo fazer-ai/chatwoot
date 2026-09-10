@@ -49,8 +49,23 @@ class Conversations::FilterService < FilterService
     }
   end
 
+  # Folders and ad-hoc filters go through here, and until now they ignored `sort_by`
+  # entirely: the list came back newest-first no matter what the agent picked, while the
+  # ordinary conversation list (ConversationFinder) honoured ten different orders. The
+  # sort control is hidden in that view, so the disagreement was invisible rather than
+  # broken-looking, and a team working a folder oldest-first had no way to ask for it.
+  #
+  # SORT_OPTIONS is reused rather than redefined so the two paths cannot drift: one
+  # allowlist, one set of names, and an unknown value falls back to the previous default
+  # instead of reaching `send` (the params here are `permit!`ed straight from the request).
   def conversations
-    @conversations.pinned_first_for(@user).sort_on_last_activity_at.page(current_page).per(per_page)
+    sort_by, sort_direction = ConversationFinder::SORT_OPTIONS[@params[:sort_by]] ||
+                              ConversationFinder::SORT_OPTIONS['last_activity_at_desc']
+
+    # `pinned_first_for` orders too, and every sort_on_* uses `order` rather than
+    # `reorder`, so pinned conversations keep leading the list in every order. That is the
+    # existing behaviour of the ordinary list and it stays true here.
+    @conversations.pinned_first_for(@user).send(sort_by, sort_direction).page(current_page).per(per_page)
   end
 
   def per_page

@@ -465,6 +465,22 @@ RSpec.describe Whatsapp::Session::Facade do
     expect(backend.commands_of('session.delete')).to be_present
   end
 
+  # A backend that cannot tear down its session is not a quiet case. What the fallback can
+  # do is end the connection, which leaves the pairing alive under a session id nothing
+  # points at any more, and this line is the only trace of that anywhere: the operator sees
+  # the inbox disappear and concludes it is over.
+  it 'says so in the log when the provider has no teardown' do
+    allow(backend).to receive(:delete_session).and_raise(
+      Whatsapp::Session::Errors::NotSupported, 'no teardown here'
+    )
+    allow(Rails.logger).to receive(:warn)
+
+    channel.disconnect_channel_provider
+
+    expect(Rails.logger).to have_received(:warn).with(/leaves the pairing alive/)
+    expect(backend.commands_of('session.disconnect')).to be_present
+  end
+
   # Chatwoot availability is online/offline/busy; the contract knows available and
   # unavailable. The Baileys service maps them, and this used to forward them raw.
   it 'maps account availability onto the two states the contract accepts' do

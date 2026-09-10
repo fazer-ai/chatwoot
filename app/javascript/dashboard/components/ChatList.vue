@@ -397,10 +397,11 @@ const conversationList = computed(() => {
     });
   }
 
-  if (
-    !hasAppliedFiltersOrActiveFolders.value &&
-    activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
-  ) {
+  // Filtered lists included. `unread` is the one option with no entry in the store's
+  // SORT_OPTIONS, so `getFilteredConversations` re-sorts by last activity and silently
+  // undoes what the server returned; this pass is what puts the order back. Skipping it
+  // for folders was harmless only while the sort control was hidden there.
+  if (activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD) {
     localConversationList = sortByUnreadStatus(localConversationList);
   }
 
@@ -452,6 +453,7 @@ function fetchFilteredConversations(payload) {
     .dispatch('fetchFilteredConversations', {
       queryData: filterQueryGenerator(payload),
       page,
+      sortBy: activeSortBy.value,
     })
     .catch(() => useAlert(t('CHAT_LIST.FETCH_ERROR')))
     // emit even on failure so a deep-linked conversation still loads via
@@ -468,6 +470,7 @@ function fetchSavedFilteredConversations(payload) {
     .dispatch('fetchFilteredConversations', {
       queryData: payload,
       page,
+      sortBy: activeSortBy.value,
     })
     .catch(() => useAlert(t('CHAT_LIST.FETCH_ERROR')))
     .finally(emitConversationLoaded);
@@ -690,6 +693,20 @@ function onBasicFilterChange(value, type) {
   } else {
     activeSortBy.value = value;
   }
+
+  // An ad-hoc filter cannot go through resetAndFetchData: that path calls
+  // `clearConversationFilters` and falls back to the unfiltered list, so re-sorting would
+  // silently throw the agent's filter away. It never showed before because this control
+  // was hidden whenever a filter was applied. Folders are safe there (resetAndFetchData
+  // refetches the saved query), so only this branch is special-cased.
+  if (hasAppliedFilters.value && !hasActiveFolders.value) {
+    resetBulkActions();
+    store.dispatch('conversationPage/reset');
+    store.dispatch('emptyAllConversations');
+    fetchFilteredConversations(appliedFilters.value);
+    return;
+  }
+
   resetAndFetchData();
 }
 

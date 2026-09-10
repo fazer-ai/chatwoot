@@ -73,7 +73,25 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(commands::SessionLogout.new)
   end
 
+  # The teardown, published as a pair, and the `logout` is the half that matters most: it
+  # unlinks the device from the customer's phone, which is the part of a pairing that
+  # outlives this inbox. `session.delete` is what clears the session's own rows, and a
+  # connector build without a handler for it answers `unsupported` and undoes nothing -- so
+  # sending `delete` alone leaves a device listed on somebody's phone with nothing in
+  # Chatwoot corresponding to it.
+  #
+  # Ordering is what makes the pair safe rather than redundant. Both land on this session's
+  # command stream in the order written, so the `delete` that follows finds nothing linked,
+  # which is a teardown with less to do and not a failure to retry.
+  #
+  # Published, not called, for two independent reasons. This runs inside the transaction
+  # that destroys the inbox, and an RPC there would hold it open for the round trip. And a
+  # teardown is deliberately left pending, with no reply at all, while the session is
+  # between owners -- being handed over, or waiting on a lease with room to finish -- so a
+  # caller waiting for an answer would time out exactly when the connector is doing the
+  # right thing.
   def delete_session
+    client.publish(commands::SessionLogout.new)
     client.publish(commands::SessionDelete.new)
   end
 

@@ -125,6 +125,26 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(client).to have_received(:call).ordered
   end
 
+  # The pairing is what outlives the inbox: a device stays listed on the customer's phone
+  # with nothing in Chatwoot corresponding to it. `session.delete` is the command that
+  # clears the session's own rows, and a connector build with no handler for it answers
+  # `unsupported` and undoes nothing, so the unlink cannot be left to it alone.
+  it 'unlinks the device before it asks for the session to be deleted' do
+    backend.delete_session
+
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).ordered
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete)).ordered
+  end
+
+  # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
+  # deliberately leaves a teardown pending with no reply while the session is between
+  # owners, so there is no answer to wait for.
+  it 'asks for the teardown without waiting for an answer' do
+    backend.delete_session
+
+    expect(client).not_to have_received(:call)
+  end
+
   it 'turns the connect reply into the connection state the inbox stores' do
     state = backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
 
