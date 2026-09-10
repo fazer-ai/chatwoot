@@ -154,3 +154,9 @@ COPY --from=pre-builder /app/.git_sha /app/.git_sha
 WORKDIR /app
 
 EXPOSE 3000
+
+# The worker's schema gate rides in the image instead of in a compose, because a gate that
+# has to be remembered in every deployment's compose is one that goes missing. It dispatches
+# by argv: a sidekiq command waits for the schema, everything else execs straight through.
+# A compose that sets its own `entrypoint:` still replaces this.
+ENTRYPOINT ["docker/entrypoints/docker-entrypoint.sh"]
