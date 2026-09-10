@@ -37,6 +37,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     )
   end
 
+  # The connector already tells the two apart and says which. Collapsing them sends an
+  # agent who just clicked disconnect to go look at a phone that did nothing, and leaves
+  # an operator who really was unlinked on the phone with no idea where it happened.
+  it 'says the disconnect came from here when it was asked for from here' do
+    event = model::Event.build(model::Events::SessionLoggedOut.new(reason: 'logout_requested'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).to include(
+      'connection' => 'close', 'error_code' => 'logged_out_by_request',
+      'error' => I18n.t('errors.inboxes.channel.provider_connection.logged_out_by_request')
+    )
+  end
+
+  # Both are the end of a pairing, not a connection that may come back. Left out of that
+  # list the number stays on the channel, and the next connect tries to resume credentials
+  # WhatsApp has already thrown away instead of asking for a fresh QR.
+  it 'forgets the number a requested logout ended' do
+    model::Event.build(model::Events::SessionState.new(state: 'open', phone: '+5541988887777'), epoch: 3).then do |opened|
+      described_class.new(channel: channel, event: opened).perform
+    end
+    event = model::Event.build(model::Events::SessionLoggedOut.new(reason: 'logout_requested'), epoch: 4)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).not_to include('phone_number')
+  end
+
   # The dispatcher looks before the handler runs, and this lands in between: the operator
   # saved new credentials while the event was on its way to the write. The instance travels
   # with the event so the writer can compare it inside the row lock, which is the only place

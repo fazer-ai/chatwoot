@@ -35,9 +35,15 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     'pairing.error' => 'connect_failure'
   }.freeze
 
+  # A logout this installation asked for, told apart from an unlink done on the phone.
+  # The connector already separates them and says which, and both arrive as
+  # `session.logged_out`: collapsing the two sends an agent who just clicked disconnect
+  # to go look at a phone that did nothing.
+  LOGOUT_REQUESTED = 'logout_requested'.freeze
+
   def build_state
     type = payload&.wire_type
-    error = CLOSING_ERRORS[type]
+    error = closing_error(type)
     return closed(error, ban: payload.try(:ban)) if error
 
     case type
@@ -46,6 +52,14 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     when 'pairing.code' then connecting(pairing_code: payload.code)
     when 'pairing.success' then pairing_success
     end
+  end
+
+  # Which sentence the dashboard ends up rendering, for the events that end a connection.
+  def closing_error(type)
+    error = CLOSING_ERRORS[type]
+    return error unless error == 'logged_out' && payload.try(:reason) == LOGOUT_REQUESTED
+
+    'logged_out_by_request'
   end
 
   # Whose account this is, is not decided here: the writer refuses any state that names
