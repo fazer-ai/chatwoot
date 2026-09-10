@@ -1,4 +1,5 @@
 import { shallowMount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import MessageEditor from '../MessageEditor.vue';
 
 const mockAlert = vi.fn();
@@ -25,6 +26,16 @@ const mountEditor = () =>
 describe('MessageEditor attachments', () => {
   // The paste and drop listeners sit on the composer's root element.
   const editor = wrapper => wrapper;
+
+  // `trigger` builds its own event object, so a spy passed as an option never becomes the
+  // event's `preventDefault`. Dispatching a real event is the only way to read whether the
+  // handler took the paste over, which is what decides if the editor still gets the text.
+  const dispatchPaste = (wrapper, clipboardData) => {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    event.clipboardData = clipboardData;
+    wrapper.element.dispatchEvent(event);
+    return event;
+  };
   const attachmentNames = wrapper =>
     wrapper.findAll('.truncate.text-xs').map(node => node.text());
 
@@ -95,6 +106,38 @@ describe('MessageEditor attachments', () => {
     });
 
     expect(mockAlert).not.toHaveBeenCalled();
+    expect(attachmentNames(wrapper)).toEqual(['valido.txt']);
+  });
+
+  // A rich copy brings its zero-byte artifact along with the text the person actually copied, and
+  // the paste handler used to call preventDefault() the moment it saw any file, cancelling a
+  // paste that then attached nothing. Measured in a browser, the text still lands, because the
+  // editor's own paste handler runs first and inserts it. Nothing is lost today, and that is the
+  // point: the text survives by listener ordering rather than by anything this code decided.
+  it('lets the text of a rich paste through instead of eating it for an empty artifact', async () => {
+    const wrapper = mountEditor();
+
+    const event = dispatchPaste(wrapper, {
+      types: ['text/plain', 'text/html', 'text/rtf', 'Files'],
+      files: [file('image.png', 'image/png', 0)],
+    });
+    await nextTick();
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(attachmentNames(wrapper)).toEqual([]);
+  });
+
+  it('still takes over the paste when there is a real file to attach', async () => {
+    const wrapper = mountEditor();
+
+    const event = dispatchPaste(wrapper, {
+      types: ['Files'],
+      files: [file('valido.txt', 'text/plain', 4)],
+    });
+    await nextTick();
+
+    expect(event.defaultPrevented).toBe(true);
     expect(attachmentNames(wrapper)).toEqual(['valido.txt']);
   });
 

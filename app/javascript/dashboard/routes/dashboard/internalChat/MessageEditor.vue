@@ -163,18 +163,25 @@ function removeFile(index) {
 // Paste and drop share the rule with the conversation composer: empty files are dropped, and
 // the refusal is said out loud only when the transfer carried no text, which is what tells a
 // genuine empty file apart from the invalid zero-byte attachment a rich copy brings along.
+// Returns what it took, so a caller can tell "I handled this" from "there was nothing to take".
 function addFiles(transfer) {
   const { files, shouldAlertEmpty } = usableFilesFromTransfer(transfer);
   if (shouldAlertEmpty) useAlert(t('CONVERSATION.FILE_IS_EMPTY'));
-  if (!files.length) return;
+  if (!files.length) return false;
+
   attachedFiles.value = [...attachedFiles.value, ...files];
+  return true;
 }
 
+// The paste is taken over only when something is actually attached. A rich copy carries its
+// zero-byte artifact beside the text the person meant to paste, and cancelling the paste for
+// that artifact attaches nothing in its place. The text still arrives today because the editor's
+// own handler runs before this one, which is ordering rather than a decision made here.
 function handlePaste(event) {
-  const files = event.clipboardData?.files;
-  if (!files?.length) return;
+  if (!event.clipboardData?.files?.length) return;
+  if (!addFiles(event.clipboardData)) return;
+
   event.preventDefault();
-  addFiles(event.clipboardData);
 }
 
 function hasFileDrag(event) {
