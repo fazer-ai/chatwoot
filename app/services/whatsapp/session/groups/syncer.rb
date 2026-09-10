@@ -100,7 +100,7 @@ class Whatsapp::Session::Groups::Syncer
     attributes = {}
     attributes[:name] = info.subject if info.subject.present? && group_contact.name != info.subject
 
-    group_contact.merge_additional_attributes!(attributes: attributes, merge: synced_attributes(info))
+    group_contact.merge_json_column!(:additional_attributes, attributes: attributes, merge: synced_attributes(info))
   end
 
   # A snapshot describes the group as it is now, so a description the group removed has

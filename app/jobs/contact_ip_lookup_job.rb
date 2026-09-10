@@ -15,7 +15,8 @@ class ContactIpLookupJob < ApplicationJob
 
     # The lookup is a network call and this object was read before it, so the three keys go in
     # against the row as it is now rather than against a copy that predates the call.
-    contact.merge_additional_attributes!(
+    contact.merge_json_column!(
+      :additional_attributes,
       merge: {
         'city' => geocoder_result.city,
         'country' => geocoder_result.country,

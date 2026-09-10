@@ -1046,7 +1046,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     attributes = {}
     attributes[:name] = metadata[:subject] if metadata[:subject].present? && group_contact.name != metadata[:subject]
 
-    group_contact.merge_additional_attributes!(
+    group_contact.merge_json_column!(
+      :additional_attributes,
       attributes: attributes,
       merge: {
         'description' => metadata[:desc].presence,
@@ -1085,7 +1086,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
     return if settings.blank?
 
-    group_contact.merge_additional_attributes!(merge: settings)
+    group_contact.merge_json_column!(:additional_attributes, merge: settings)
   end
 
   # `group_left` is not cleared here. It is per inbox now (see WhatsappGroupMembership),
@@ -1093,14 +1094,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # nothing for it to clear; rejoining is what clears it, and only the rejoin path knows
   # that happened.
   def persist_sync_status(group_contact)
-    group_contact.merge_additional_attributes!(merge: { 'group_last_synced_at' => Time.current.to_i })
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'group_last_synced_at' => Time.current.to_i })
   end
 
   def persist_invite_code(group_contact)
     code = group_invite_code(group_contact.identifier)
     return if code.blank?
 
-    group_contact.merge_additional_attributes!(merge: { 'invite_code' => code })
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'invite_code' => code })
   rescue StandardError => e
     Rails.logger.error "Failed to fetch invite code for group #{group_contact.identifier}: #{e.message}"
   end
@@ -1114,7 +1115,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       { 'jid' => req['jid'], 'contact_id' => contact.id, 'request_time' => req['request_time'] }
     end
 
-    group_contact.merge_additional_attributes!(merge: { 'pending_join_requests' => requests })
+    group_contact.merge_json_column!(:additional_attributes, merge: { 'pending_join_requests' => requests })
   rescue StandardError => e
     Rails.logger.error "Failed to fetch pending join requests for group #{group_contact.identifier}: #{e.message}"
   end

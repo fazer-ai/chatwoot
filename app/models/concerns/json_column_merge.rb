@@ -10,13 +10,18 @@
 # write and never the call itself, because a lock held across a network round trip is a worse
 # problem than the one it would solve.
 #
+# Column-agnostic on purpose. The same idea is already written out by hand three times, in three
+# different columns: `Avatarable#update_avatar_sync_markers!` on `additional_attributes`, and
+# `Channel::Whatsapp#update_reachout_time_lock!` and `#update_new_chat_cap!` on
+# `provider_connection`. Naming this after any one column would have made a fourth.
+#
 # The lock is taken on a freshly loaded row rather than through `with_lock`, which reloads the
 # receiver and raises outright when it has unsaved changes. That is not a corner case here: a
 # Conversation carries a dirty `display_id` from the moment it is created, on purpose, because
 # `load_attributes_created_by_db_triggers` reads the trigger's value without reloading so the
 # dispatcher still sees `previous_changes`. So the receiver is left untouched, and a caller that
 # needs the merged value afterwards has to read it back.
-module AdditionalAttributesMerge
+module JsonColumnMerge
   extend ActiveSupport::Concern
 
   # `attributes` carries the other columns that belong to the same write. It is not a
@@ -36,12 +41,12 @@ module AdditionalAttributesMerge
   # network round trip, and before this existed the write simply matched zero rows and the job
   # ended clean; raising here would turn a deleted contact into a job that retries until it
   # gives up.
-  def merge_additional_attributes!(merge: {}, remove: [], under: nil, attributes: {})
+  def merge_json_column!(column, merge: {}, remove: [], under: nil, attributes: {})
     self.class.transaction do
       row = self.class.lock.find(id)
-      stored = merged_attributes(row.additional_attributes, merge: merge, remove: remove, under: under)
+      stored = merged_attributes(row[column], merge: merge, remove: remove, under: under)
 
-      params = attributes.to_h.merge(additional_attributes: stored)
+      params = attributes.to_h.merge(column => stored)
       next false if params.all? { |name, value| row[name] == value }
 
       row.update!(params)

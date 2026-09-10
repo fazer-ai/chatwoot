@@ -30,7 +30,7 @@ class Integrations::GoogleTranslate::DetectLanguageService
 
     conversation_language = response.languages.first.language_code
     # `detect_language` is a network call and the conversation was read before it.
-    conversation.merge_additional_attributes!(merge: { 'conversation_language' => conversation_language })
+    conversation.merge_json_column!(:additional_attributes, merge: { 'conversation_language' => conversation_language })
   end
 
   def client
