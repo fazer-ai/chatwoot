@@ -215,19 +215,21 @@ RSpec.describe Attachment do
   describe 'push_event_data for instagram direct message attachments' do
     let(:account) { create(:account) }
     let(:instagram_inbox) do
-      create(:inbox, account: account,
+      create(:inbox, account: message.account,
                      channel: create(:channel_instagram_fb_page, account: account, instagram_id: 'instagram-dm-test'))
     end
 
     context 'when conversation type is instagram_direct_message' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'instagram_direct_message' })
       end
-      let(:instagram_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming) }
+      let(:instagram_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming)
+      end
 
       it 'uses external_url for data_url and thumb_url' do
-        attachment = instagram_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = instagram_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -239,13 +241,15 @@ RSpec.describe Attachment do
 
     context 'when conversation type is not instagram_direct_message' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'other_type' })
       end
-      let(:instagram_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming) }
+      let(:instagram_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming)
+      end
 
       it 'uses file_url for data_url instead of external_url' do
-        attachment = instagram_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = instagram_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -256,13 +260,15 @@ RSpec.describe Attachment do
 
     context 'when message is outgoing on instagram DM conversation' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'instagram_direct_message' })
       end
-      let(:outgoing_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :outgoing) }
+      let(:outgoing_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :outgoing)
+      end
 
       it 'does not override data_url with external_url' do
-        attachment = outgoing_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = outgoing_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -274,11 +280,11 @@ RSpec.describe Attachment do
     context 'when inbox is Channel::Instagram (direct login)' do
       let(:instagram_channel) { create(:channel_instagram, account: account) }
       let(:direct_inbox) { instagram_channel.inbox }
-      let(:conversation) { create(:conversation, account: account, inbox: direct_inbox) }
-      let(:incoming_message) { create(:message, account: account, inbox: direct_inbox, conversation: conversation, message_type: :incoming) }
+      let(:conversation) { create(:conversation, account: message.account, inbox: direct_inbox) }
+      let(:incoming_message) { create(:message, account: message.account, inbox: direct_inbox, conversation: conversation, message_type: :incoming) }
 
       it 'uses external_url for data_url and thumb_url' do
-        attachment = incoming_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = incoming_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -380,6 +386,111 @@ RSpec.describe Attachment do
       attachment.send(:validate_file_size, 6.megabytes)
 
       expect(attachment.errors[:file]).to include('size is too big')
+    end
+
+    # The size validation only runs on a web widget inbox, so nothing was checking a file on a
+    # WhatsApp one. A zero-byte recording was accepted, stored and sent to the provider as a voice
+    # note: the agent saw a message that looked sent, and the rejection arrived later as a failed
+    # status carrying an error nobody could tie back to "the file was empty".
+    describe 'an empty file' do
+      def empty_attachment_on(channel, message_type: :outgoing, refuse: true)
+        inbox = create(:inbox, account: message.account, channel: channel)
+        conversation = create(:conversation, account: message.account, inbox: inbox)
+        owner = create(:message, account: message.account, conversation: conversation, message_type: message_type)
+        attachment = owner.attachments.new(account_id: message.account_id, file_type: :audio, refuse_empty_file: refuse)
+        attachment.file.attach(io: StringIO.new(''), filename: 'voice.ogg', content_type: 'audio/ogg')
+        attachment
+      end
+
+      def whatsapp_channel
+        create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false)
+      end
+
+      it 'is rejected on a provider inbox, where nothing used to look' do
+        attachment = empty_attachment_on(whatsapp_channel)
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
+      it 'is rejected on a web widget inbox too' do
+        attachment = empty_attachment_on(create(:channel_widget, account: message.account))
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
+      it 'is rejected on a template message too' do
+        attachment = empty_attachment_on(whatsapp_channel, message_type: :template)
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
+      it 'leaves a file with bytes alone' do
+        inbox = create(:inbox, account: message.account, channel: whatsapp_channel)
+        conversation = create(:conversation, account: message.account, inbox: inbox)
+        sized_message = create(:message, account: message.account, conversation: conversation, message_type: :outgoing)
+        attachment = sized_message.attachments.new(account_id: message.account_id, file_type: :audio, refuse_empty_file: true)
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample_opus.ogg').open, filename: 'voice.ogg', content_type: 'audio/ogg')
+
+        expect(attachment).to be_valid
+      end
+
+      # The refusal is off unless the caller asks for it. Every provider ingestion path builds
+      # attachments without asking, so an empty download is stored rather than raising inside the
+      # webhook and losing the message. This holds for an incoming message and for an echo alike,
+      # which is why neither needs its own marker here.
+      it 'is accepted by default, because ingestion never asks to refuse' do
+        attachment = empty_attachment_on(whatsapp_channel, refuse: false)
+
+        expect(attachment).to be_valid
+      end
+
+      it 'is accepted by default on an incoming message too' do
+        attachment = empty_attachment_on(whatsapp_channel, message_type: :incoming, refuse: false)
+
+        expect(attachment).to be_valid
+      end
+
+      # The flag is in-memory only, so a row that already exists is never re-refused when something
+      # saves it again later. Retry does exactly that: it calls `message.update!` on a failed
+      # message, and an attachment stored before this validation existed must not block it.
+      it 'never refuses a row that is already stored, however it is saved again' do
+        attachment = empty_attachment_on(whatsapp_channel, refuse: false)
+        attachment.save!
+        owner = attachment.message
+
+        # A fresh instance, because `reload` keeps the in-memory accessor on the object it is
+        # called on and would hide exactly the thing under test.
+        expect(described_class.find(attachment.id).refuse_empty_file).to be_nil
+        expect { owner.update!(content: 'edited') }.not_to raise_error
+        expect(described_class.find(attachment.id)).to be_valid
+      end
+
+      # A fence, not a checklist. There are four provider ingestion paths that build outgoing
+      # attachments (baileys, z-api, the session writer, the reaction store), each marking the
+      # echo differently, and enumerating them is how the third one got missed. Assert instead
+      # that composing a message is the only thing in the tree that turns the refusal on.
+      it 'is turned on in exactly one place in the source tree' do
+        roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
+        setters = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
+          File.read(path).match?(/refuse_empty_file\s*[:=]/)
+        end
+
+        expect(setters.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s })
+          .to contain_exactly('app/builders/messages/message_builder.rb')
+      end
+
+      # On a message that asked to refuse, so the `file.attached?` guard is what keeps this valid
+      # rather than the flag short-circuiting before the file is ever looked at.
+      it 'leaves an attachment that carries no file at all alone' do
+        outgoing = create(:message, account: message.account, conversation: message.conversation, message_type: :outgoing)
+        location = outgoing.attachments.new(account_id: message.account_id, file_type: :location, refuse_empty_file: true,
+                                            coordinates_lat: 1.0, coordinates_long: 1.0, fallback_title: 'here')
+
+        expect(location).to be_valid
+      end
     end
 
     it 'falls back to default when configured limit is invalid' do

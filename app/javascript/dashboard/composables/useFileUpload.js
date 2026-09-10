@@ -3,7 +3,7 @@ import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { DirectUpload } from 'activestorage';
 import { setDirectUploadAuthHeaders } from 'dashboard/helper/directUploadsHelper';
-import { checkFileSizeLimit } from 'shared/helpers/FileHelper';
+import { checkFileSizeLimit, isFileEmpty } from 'shared/helpers/FileHelper';
 import { getMaxUploadSizeByChannel } from '@chatwoot/utils';
 import {
   DEFAULT_MAXIMUM_FILE_UPLOAD_SIZE,
@@ -55,6 +55,8 @@ export const useFileUpload = ({ inbox, attachFile, isPrivateNote = false }) => {
     return Math.min(channelLimit, installationLimit);
   };
 
+  const alertEmptyFile = () => useAlert(t('CONVERSATION.FILE_IS_EMPTY'));
+
   const alertOverLimit = maxSizeMB =>
     useAlert(
       t('CONVERSATION.FILE_SIZE_LIMIT', {
@@ -67,6 +69,11 @@ export const useFileUpload = ({ inbox, attachFile, isPrivateNote = false }) => {
 
     const mime = file.file?.type || file.type;
     const maxSizeMB = maxSizeFor(mime);
+
+    if (isFileEmpty(file)) {
+      alertEmptyFile();
+      return;
+    }
 
     if (!checkFileSizeLimit(file, maxSizeMB)) {
       alertOverLimit(maxSizeMB);
@@ -97,6 +104,11 @@ export const useFileUpload = ({ inbox, attachFile, isPrivateNote = false }) => {
 
     const mime = file.file?.type || file.type;
     const maxSizeMB = maxSizeFor(mime);
+
+    if (isFileEmpty(file)) {
+      alertEmptyFile();
+      return;
+    }
 
     if (!checkFileSizeLimit(file, maxSizeMB)) {
       alertOverLimit(maxSizeMB);

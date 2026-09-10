@@ -98,6 +98,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(conversation.messages.last.attachments.first.file_type).to eq('image')
       end
 
+      # The agent has to learn now, from the request they made, rather than from a failed status
+      # minutes later carrying a provider error nobody can tie back to an empty file.
+      it 'refuses an empty attachment without creating the message' do
+        empty = Tempfile.new(['voice', '.ogg'])
+        empty.close
+        params = { content: nil, attachments: [Rack::Test::UploadedFile.new(empty.path, 'audio/ogg')] }
+
+        post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: params,
+             headers: agent.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('file is empty')
+        expect(conversation.messages.count).to eq(0)
+      end
+
       it 'triggers typing off event for non-private messages' do
         params = { content: 'test-message', private: false }
         allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original

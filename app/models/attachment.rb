@@ -43,6 +43,12 @@ class Attachment < ApplicationRecord
   has_one_attached :file
   before_save :set_extension
   validate :acceptable_file
+  # Off by default on purpose. Only the paths where we compose a message and are about to send it
+  # turn this on, because a refusal on an ingested attachment raises inside the provider webhook
+  # and loses the whole message instead of storing an odd one.
+  attr_accessor :refuse_empty_file
+
+  validate :file_is_not_empty, if: :refuse_empty_file
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
                     :contact => 8, :ig_reel => 9, :ig_post => 10, :ig_story => 11, :embed => 12 }
@@ -193,6 +199,16 @@ class Attachment < ApplicationRecord
     return false unless message.inbox.channel_type == 'Channel::WebWidget'
 
     true
+  end
+
+  # Separate from `acceptable_file`, which runs only on a web widget inbox: which *types* an inbox
+  # accepts is a per-channel policy, while a file with no bytes is useless on every channel. Who
+  # gets refused is decided by `refuse_empty_file`, not by the message type, and the flag lives in
+  # memory only, so reloading a row that was stored before this existed never refuses it later.
+  def file_is_not_empty
+    return unless file.attached? && file.byte_size.to_i.zero?
+
+    errors.add(:file, 'is empty')
   end
 
   def acceptable_file

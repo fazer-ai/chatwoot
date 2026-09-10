@@ -59,7 +59,12 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @attachments.each do |uploaded_attachment|
       attachment = @message.attachments.build(
         account_id: @message.account_id,
-        file: uploaded_attachment
+        file: uploaded_attachment,
+        # Someone on our side picked this file, so an empty one is a mistake we can still name to
+        # their face instead of a message that turns red minutes later. An API inbox pushes
+        # customer messages through this same builder, and those are ingestion: refusing one would
+        # throw away its text along with the odd attachment.
+        refuse_empty_file: !@message.incoming?
       )
       metadata = process_metadata(uploaded_attachment)
       attachment.meta = metadata if metadata.present?

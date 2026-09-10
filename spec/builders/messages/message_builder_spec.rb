@@ -119,6 +119,18 @@ describe Messages::MessageBuilder do
         message = message_builder
         expect(message.message_type).to eq params[:message_type]
       end
+
+      # An API inbox pushes customer messages through this same builder, so it is ingestion even
+      # though it comes in over HTTP. Refusing an empty attachment here would answer 422 and throw
+      # away the message text with it.
+      it 'keeps an empty attachment on an incoming message instead of refusing the whole message' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/attachment.pdf', 'application/pdf')]
+
+        message = message_builder
+
+        expect(message.attachments.first.refuse_empty_file).to be(false)
+        expect(message.attachments.first.file.byte_size).to eq(0)
+      end
     end
 
     context 'when attachment messages' do
@@ -132,6 +144,21 @@ describe Messages::MessageBuilder do
       it 'creates message with attachments' do
         message = message_builder
         expect(message.attachments.first.file_type).to eq 'image'
+      end
+
+      # This builder is the boundary where an agent (or a campaign, macro or automation) composes
+      # a message we are about to send. It is the only place that asks the attachment to refuse an
+      # empty file, so a zero-byte upload is named here instead of failing at the provider later.
+      it 'asks the attachment to refuse an empty file' do
+        message = message_builder
+        expect(message.attachments.first.refuse_empty_file).to be(true)
+      end
+
+      it 'refuses a zero-byte upload instead of storing it' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/attachment.pdf', 'application/pdf')]
+
+        expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /file is empty/i)
+        expect(Message.count).to eq(0)
       end
 
       it 'creates attachment with is_recorded_audio metadata' do
