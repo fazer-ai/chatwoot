@@ -34,6 +34,7 @@ en:
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
     whatsapp:
       group_announcement_only: Only administrators are allowed to send messages in this group
+      group_description_cannot_be_removed: WhatsApp does not allow a group description to be removed once it is set. Replace the text instead.
     inboxes:
       channel:
         provider_unavailable: This WhatsApp provider is not available on this installation yet.
