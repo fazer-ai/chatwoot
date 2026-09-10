@@ -30,7 +30,7 @@ class Whatsapp::Session::ConnectionStateWriter
   PAIRING_KEYS = %w[phone_number lid].freeze
 
   # The two ways a pairing really ends. Everything else is a connection that may come back.
-  PAIRING_ENDED = [WRONG_PHONE_ERROR, 'logged_out'].freeze
+  PAIRING_ENDED = [WRONG_PHONE_ERROR, 'logged_out', 'logged_out_by_request'].freeze
 
   # Quarantined: the connection belongs to somebody else's WhatsApp account.
   def self.disowned?(channel)
