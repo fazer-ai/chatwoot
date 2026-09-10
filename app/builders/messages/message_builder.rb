@@ -106,6 +106,10 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     return uploaded_attachment.filename.to_s if uploaded_attachment.respond_to?(:filename)
     return unless uploaded_attachment.is_a?(String)
 
+    # The safe navigation cannot fire today and is kept on purpose: a signed ID that does not
+    # resolve already raises one line earlier, at `attachments.build`, so nothing unresolvable
+    # reaches this method. Dropping it would make that ordering load-bearing, and the failure it
+    # would produce is a `NoMethodError` on nil in place of a legible 422.
     blob_for(uploaded_attachment)&.filename&.to_s
   end
 
