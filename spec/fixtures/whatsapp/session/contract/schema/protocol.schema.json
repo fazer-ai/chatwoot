@@ -117,6 +117,13 @@
         "voice_note": { "type": "boolean" },
         "size": { "type": ["integer", "null"], "minimum": 0 },
         "duration": { "type": ["integer", "null"], "minimum": 0 },
+        "width": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture width in pixels, for an image, a video or a sticker; both sides or neither" },
+        "height": { "type": ["integer", "null"], "minimum": 0,
+          "description": "picture height in pixels, for an image, a video or a sticker; both sides or neither" },
+        "waveform": { "type": ["array", "null"], "minItems": 64, "maxItems": 64,
+          "items": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "description": "voice note amplitudes, exactly 64 samples of 0-100" },
         "thumbnail": { "type": ["string", "null"], "description": "data: URI, at most 32 KiB" },
         "ref": { "oneOf": [{ "$ref": "#/definitions/media_ref" }, { "type": "null" }] }
       },
