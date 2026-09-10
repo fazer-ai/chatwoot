@@ -94,7 +94,8 @@
       "REQUESTED": "Le pedimos al teléfono los mensajes más antiguos. Aparecen aquí a medida que los envía.",
       "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento.",
       "EXHAUSTED": "No hay nada más antiguo aquí. El resto de esta conversación está solo en el teléfono."
-    }
+    },
+    "FILE_IS_EMPTY": "Este archivo está vacío y no se puede enviar"
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

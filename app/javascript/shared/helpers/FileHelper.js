@@ -25,6 +25,14 @@ export const checkFileSizeLimit = (file, maximumUploadLimit) => {
   return fileSizeInMB <= maximumUploadLimit;
 };
 
+// A zero-byte file is refused by the server, and on a WhatsApp inbox that refusal used to reach
+// the agent only as a message that looked sent and failed minutes later. Catch it here so the
+// reason is readable, the same way the size limit is.
+export const isFileEmpty = file => {
+  const fileSize = file?.file?.size ?? file?.size;
+  return fileSize === 0;
+};
+
 export const resolveMaximumFileUploadSize = value => {
   const parsedValue = Number(value);
 
