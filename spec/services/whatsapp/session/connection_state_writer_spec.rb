@@ -20,7 +20,7 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
   # `pairing_timed_out`, which nothing sends.
   %w[
     connect_failed disconnect_requested disconnected
-    pairing_timeout pairing_pair_error pairing_err-scanned-without-multidevice
+    pairing_pair_error pairing_err-scanned-without-multidevice
     pairing_code_refused pairing_connect_failed
   ].each do |reason|
     it "has a sentence written for #{reason}" do

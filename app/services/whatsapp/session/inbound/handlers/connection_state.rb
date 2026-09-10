@@ -31,9 +31,14 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     'session.stream_replaced' => 'stream_replaced',
     'session.temporary_ban' => 'temporary_ban',
     'session.client_outdated' => 'client_outdated',
-    'session.connect_failure' => 'connect_failure',
-    'pairing.error' => 'connect_failure'
+    'session.connect_failure' => 'connect_failure'
   }.freeze
+
+  # A pairing nobody completed in time. It is the way most pairings that go nowhere end,
+  # and there is nothing to report: the code ran out because nobody scanned it, which the
+  # person looking at the screen is the one who knows. Reported, it reads as a failure of
+  # the connection, and the operator goes looking for one.
+  PAIRING_EXPIRED = %w[timeout pairing_timeout].freeze
 
   # A logout this installation asked for, told apart from an unlink done on the phone.
   # The connector already separates them and says which, and both arrive as
@@ -41,18 +46,28 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # to go look at a phone that did nothing.
   LOGOUT_REQUESTED = 'logout_requested'.freeze
 
+  # The events that carry a pairing along, keyed by wire type for the same reason
+  # CLOSING_ERRORS is: a constant holding a class is the generation this file was loaded
+  # in, and after a reload the lookup misses without saying so.
+  PAIRING_STEPS = {
+    'pairing.error' => :pairing_failure,
+    'pairing.qr' => :pairing_qr,
+    'pairing.code' => :pairing_code,
+    'pairing.success' => :pairing_success
+  }.freeze
+
   def build_state
     type = payload&.wire_type
     error = closing_error(type)
     return closed(error, ban: payload.try(:ban)) if error
+    return session_state if type == 'session.state'
 
-    case type
-    when 'session.state' then session_state
-    when 'pairing.qr' then connecting(qr_data_url: payload.png_data_url)
-    when 'pairing.code' then connecting(pairing_code: payload.code)
-    when 'pairing.success' then pairing_success
-    end
+    step = PAIRING_STEPS[type]
+    send(step) if step
   end
+
+  def pairing_qr = connecting(qr_data_url: payload.png_data_url)
+  def pairing_code = connecting(pairing_code: payload.code)
 
   # Which sentence the dashboard ends up rendering, for the events that end a connection.
   def closing_error(type)
@@ -62,11 +77,22 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     'logged_out_by_request'
   end
 
+  # A pairing that ended without one. Named after what went wrong rather than reported as
+  # a refused connection, because they are different things and only one of them is worth
+  # an operator's attention: WhatsApp would not send a code to that number, or the account
+  # has not turned multi-device on, are both things they can act on.
+  def pairing_failure
+    return closed(nil) if payload.reason.to_s.in?(PAIRING_EXPIRED)
+
+    closed("pairing_#{payload.reason}")
+  end
+
   # Whose account this is, is not decided here: the writer refuses any state that names
   # the wrong number, or that names none while the inbox is quarantined, because the poll
   # and the connect answer write states without ever passing through a handler.
   def session_state
-    state(payload.state, error: payload.reason, phone_number: payload.phone, lid: payload.lid,
+    reason = payload.reason.to_s.in?(PAIRING_EXPIRED) ? nil : payload.reason
+    state(payload.state, error: reason, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end
 
