@@ -20,6 +20,11 @@ module GroupChannelResolver
     channel_if_any || raise(ActiveRecord::RecordNotFound)
   end
 
+  # Returns nil rather than refusing, which is the very shape the bug above had, so reach for it
+  # only where nil is a real answer. Today that is `GroupMembersController#index`, which is a read
+  # governed by `ContactPolicy` rather than by inbox membership and shows the roster without the
+  # "am I an admin here" flag. Anything that acts on the group needs `channel` and must not borrow
+  # this because it happens to be nearby.
   def channel_if_any
     return @channel_if_any if defined?(@channel_if_any)
 
