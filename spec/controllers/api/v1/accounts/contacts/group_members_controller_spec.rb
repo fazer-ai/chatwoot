@@ -275,6 +275,33 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
           .to include('+5511999990002')
       end
 
+      # Which is what this is. A Brazilian or Argentinian line has two spellings and one
+      # owner, so WhatsApp accepting both does not make them two members: read literally
+      # they resolved to two contacts and two rows, and the operator saw the group with one
+      # member more than it has, where promoting or removing one row left the other
+      # standing.
+      it 'writes one row when a line is submitted under both of its spellings' do
+        allow(baileys_service).to receive(:validate_provider_config?).and_return(true)
+        allow(baileys_service).to receive(:update_group_participants).and_return(
+          [{ 'address' => { 'kind' => 'phone', 'id' => '5511999990002' }, 'status' => 'success', 'code' => nil },
+           { 'address' => { 'kind' => 'phone', 'id' => '551199990002' }, 'status' => 'success', 'code' => nil }]
+        )
+
+        post "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+             params: { participants: ['+5511999990002', '+551199990002'] },
+             headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:ok)
+        # The first spelling submitted, because nothing here knows which one the person's
+        # own device answers under.
+        expect(GroupMember.active.where(group_contact: group_contact).joins(:contact).pluck(:phone_number))
+          .to contain_exactly('+5511999990002')
+        # And the provider is still asked about both, which is the whole reason submitting
+        # both spellings is worth doing: whichever one WhatsApp knows is the one that lands.
+        expect(baileys_service).to have_received(:update_group_participants)
+          .with('group@g.us', ['5511999990002@s.whatsapp.net', '551199990002@s.whatsapp.net'], 'add')
+      end
+
       # A row is only readable where it names an address the way the contract does. A
       # provider that writes the participant as a bare JID has not been refused any less,
       # but it has not said whom in a shape this can act on either, and answering the
