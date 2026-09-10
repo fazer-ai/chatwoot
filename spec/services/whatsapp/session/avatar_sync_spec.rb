@@ -11,11 +11,16 @@ RSpec.describe Whatsapp::Session::AvatarSync do
            })
   end
 
-  # A fence, not a checklist. The defect in #534 was a read-modify-write on this one JSON column
-  # persisting a copy taken before something slow, and it existed in four places at once. Assert
-  # that nothing writes the column directly any more, so the next writer inherits the lock and
-  # the re-read instead of the bug.
-  it 'is the only shape in which the shared column is written' do
+  # A fence over the avatar markers, and only over them. It catches a validation-skipping write
+  # to this column, which is how the markers have to be persisted, since the avatar file checks
+  # would refuse them. That is where this bug was written and where it would be rewritten.
+  #
+  # It is deliberately not a fence over every writer of the column. A dozen others use `update!`
+  # or `save!`, most of them adjacent read-then-write with nothing slow in between, and what makes
+  # this defect a defect is the order rather than the call: read, network, write. Grep cannot see
+  # order, so a fence wide enough to cover them would be mostly false positives. The writers that
+  # do span a network call are named in #542 and need a scenario each, not a pattern.
+  it 'is the only place that skips validations to write this column' do
     roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
     writers = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
       File.read(path).match?(/update_columns?\(\s*additional_attributes/)
