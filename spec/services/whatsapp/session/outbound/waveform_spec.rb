@@ -105,31 +105,27 @@ RSpec.describe Whatsapp::Session::Outbound::Waveform do
     end
 
     # The only example that runs the decoder, and the only proof that the two halves meet:
-    # everything above hands samples in or stubs the binary away. It is skipped rather than
-    # stubbed where ffmpeg is missing, and says so, because a green suite that quietly never
-    # decoded anything is what would let a broken invocation ship.
+    # everything above hands samples in or stubs the binary away. It reads a file that is
+    # checked in rather than one built here, so what it measures is the decoding and not
+    # whether this machine's ffmpeg can also write the fixture.
+    #
+    # Skipped rather than stubbed where ffmpeg is missing, and it says so: a green suite
+    # that quietly never decoded anything is what let `out.present?` over raw PCM ship,
+    # which raises on the first byte that is not valid UTF-8 and was read as "could not
+    # measure". CI installs ffmpeg for this reason.
     it 'measures a real recording end to end', if: described_class.send(:ffmpeg).present? do
-      audio = Tempfile.new(['nota', '.ogg'])
-      loud = 'sine=frequency=440:duration=1'
-      quiet = 'anullsrc=r=44100:cl=mono:d=1'
-      system('ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', loud, '-f', 'lavfi', '-i', quiet,
-             '-filter_complex', '[1:a][0:a][1:a][0:a][1:a]concat=n=5:v=0:a=1', '-c:a', 'libopus',
-             audio.path, exception: false)
-      skip 'this build of ffmpeg cannot write opus' unless File.size?(audio.path)
+      attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'nota.ogg',
+                             content_type: 'audio/ogg')
 
-      attachment.file.attach(io: File.open(audio.path), filename: 'nota.ogg', content_type: 'audio/ogg')
       bars = described_class.for(attachment.reload)
 
+      expect(bars).to be_present
       expect(bars.length).to eq(samples)
       expect(bars).to all(be_between(0, ceiling))
-      # Five seconds of silence, tone, silence, tone, silence, so a second is about 12.8
-      # bars. Windows taken inside the second they describe, never across a boundary.
-      average = ->(range) { bars[range].sum / bars[range].length }
-
-      expect(average.call(15..23)).to be > average.call(2..10)
-      expect(average.call(41..49)).to be > average.call(55..62)
-    ensure
-      audio&.close!
+      # Normalized against its own peak, so a recording with sound in it always reaches the
+      # top somewhere. A row that never does is silence, which this file is not.
+      expect(bars.max).to eq(ceiling)
+      expect(bars.count(&:zero?)).to be < samples
     end
   end
 end
