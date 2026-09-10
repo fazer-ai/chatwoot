@@ -215,19 +215,21 @@ RSpec.describe Attachment do
   describe 'push_event_data for instagram direct message attachments' do
     let(:account) { create(:account) }
     let(:instagram_inbox) do
-      create(:inbox, account: account,
+      create(:inbox, account: message.account,
                      channel: create(:channel_instagram_fb_page, account: account, instagram_id: 'instagram-dm-test'))
     end
 
     context 'when conversation type is instagram_direct_message' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'instagram_direct_message' })
       end
-      let(:instagram_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming) }
+      let(:instagram_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming)
+      end
 
       it 'uses external_url for data_url and thumb_url' do
-        attachment = instagram_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = instagram_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -239,13 +241,15 @@ RSpec.describe Attachment do
 
     context 'when conversation type is not instagram_direct_message' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'other_type' })
       end
-      let(:instagram_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming) }
+      let(:instagram_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :incoming)
+      end
 
       it 'uses file_url for data_url instead of external_url' do
-        attachment = instagram_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = instagram_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -256,13 +260,15 @@ RSpec.describe Attachment do
 
     context 'when message is outgoing on instagram DM conversation' do
       let(:conversation) do
-        create(:conversation, account: account, inbox: instagram_inbox,
+        create(:conversation, account: message.account, inbox: instagram_inbox,
                               additional_attributes: { 'type' => 'instagram_direct_message' })
       end
-      let(:outgoing_message) { create(:message, account: account, inbox: instagram_inbox, conversation: conversation, message_type: :outgoing) }
+      let(:outgoing_message) do
+        create(:message, account: message.account, inbox: instagram_inbox, conversation: conversation, message_type: :outgoing)
+      end
 
       it 'does not override data_url with external_url' do
-        attachment = outgoing_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = outgoing_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -274,11 +280,11 @@ RSpec.describe Attachment do
     context 'when inbox is Channel::Instagram (direct login)' do
       let(:instagram_channel) { create(:channel_instagram, account: account) }
       let(:direct_inbox) { instagram_channel.inbox }
-      let(:conversation) { create(:conversation, account: account, inbox: direct_inbox) }
-      let(:incoming_message) { create(:message, account: account, inbox: direct_inbox, conversation: conversation, message_type: :incoming) }
+      let(:conversation) { create(:conversation, account: message.account, inbox: direct_inbox) }
+      let(:incoming_message) { create(:message, account: message.account, inbox: direct_inbox, conversation: conversation, message_type: :incoming) }
 
       it 'uses external_url for data_url and thumb_url' do
-        attachment = incoming_message.attachments.new(account_id: account.id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
+        attachment = incoming_message.attachments.new(account_id: message.account_id, file_type: :image, external_url: 'https://instagram.com/image.jpg')
         attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
         attachment.save!
 
@@ -380,6 +386,53 @@ RSpec.describe Attachment do
       attachment.send(:validate_file_size, 6.megabytes)
 
       expect(attachment.errors[:file]).to include('size is too big')
+    end
+
+    # The size validation only runs on a web widget inbox, so nothing was checking a file on a
+    # WhatsApp one. A zero-byte recording was accepted, stored and sent to the provider as a voice
+    # note: the agent saw a message that looked sent, and the rejection arrived later as a failed
+    # status carrying an error nobody could tie back to "the file was empty".
+    describe 'an empty file' do
+      def empty_attachment_on(channel)
+        inbox = create(:inbox, account: message.account, channel: channel)
+        conversation = create(:conversation, account: message.account, inbox: inbox)
+        empty_message = create(:message, account: message.account, conversation: conversation)
+        attachment = empty_message.attachments.new(account_id: message.account_id, file_type: :audio)
+        attachment.file.attach(io: StringIO.new(''), filename: 'voice.ogg', content_type: 'audio/ogg')
+        attachment
+      end
+
+      it 'is rejected on a provider inbox, where nothing used to look' do
+        attachment = empty_attachment_on(create(:channel_whatsapp, account: message.account, validate_provider_config: false, sync_templates: false))
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
+      it 'is rejected on a web widget inbox too' do
+        attachment = empty_attachment_on(create(:channel_widget, account: message.account))
+
+        expect(attachment).not_to be_valid
+        expect(attachment.errors[:file]).to include('is empty')
+      end
+
+      it 'leaves a file with bytes alone' do
+        inbox = create(:inbox, account: message.account, channel: create(:channel_whatsapp, account: message.account,
+                                                                                            validate_provider_config: false, sync_templates: false))
+        conversation = create(:conversation, account: message.account, inbox: inbox)
+        sized_message = create(:message, account: message.account, conversation: conversation)
+        attachment = sized_message.attachments.new(account_id: message.account_id, file_type: :audio)
+        attachment.file.attach(io: Rails.root.join('spec/assets/sample_opus.ogg').open, filename: 'voice.ogg', content_type: 'audio/ogg')
+
+        expect(attachment).to be_valid
+      end
+
+      it 'leaves an attachment that carries no file at all alone' do
+        location = message.attachments.new(account_id: message.account_id, file_type: :location,
+                                           coordinates_lat: 1.0, coordinates_long: 1.0, fallback_title: 'here')
+
+        expect(location).to be_valid
+      end
     end
 
     it 'falls back to default when configured limit is invalid' do

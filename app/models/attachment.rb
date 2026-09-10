@@ -43,6 +43,7 @@ class Attachment < ApplicationRecord
   has_one_attached :file
   before_save :set_extension
   validate :acceptable_file
+  validate :file_is_not_empty
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
   enum file_type: { :image => 0, :audio => 1, :video => 2, :file => 3, :location => 4, :fallback => 5, :share => 6, :story_mention => 7,
                     :contact => 8, :ig_reel => 9, :ig_post => 10, :ig_story => 11, :embed => 12 }
@@ -193,6 +194,17 @@ class Attachment < ApplicationRecord
     return false unless message.inbox.channel_type == 'Channel::WebWidget'
 
     true
+  end
+
+  # Separate from `acceptable_file`, which only runs on a web widget inbox: what is an acceptable
+  # *type* is a per-channel policy, but a file with no bytes is useless on every channel. It used
+  # to be accepted, stored and handed to the provider — the agent saw a message that looked sent,
+  # and the refusal came back later as a failed status carrying an error nobody could tie to it.
+  def file_is_not_empty
+    return unless file.attached?
+    return unless file.byte_size.to_i.zero?
+
+    errors.add(:file, 'is empty')
   end
 
   def acceptable_file
