@@ -123,6 +123,66 @@ RSpec.describe Attachment do
     end
   end
 
+  # Chrome and Firefox play a `<video>` whose response says attachment; Safari does not, so
+  # a video arrived in the dashboard as a file to download while the same code looked fine
+  # to anyone testing in Chrome. Two halves are needed and neither works alone: an inline
+  # URL, and the MIME on `content_types_allowed_inline`, without which ActiveStorage forces
+  # the disposition back to attachment before signing.
+  describe 'a video attachment' do
+    let(:attachment) do
+      message.attachments.new(account_id: message.account_id, file_type: :video).tap do |record|
+        record.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'sample.mp4',
+                           content_type: 'video/mp4')
+        record.save!
+      end
+    end
+
+    it 'is served with a disposition the player can use' do
+      expect(attachment.push_event_data[:data_url]).to match(/disposition=inline/)
+    end
+
+    # The half that lives in the initializer, and the one asking is not enough for: `Blob#url`
+    # applies `forced_disposition_for_serving || disposition`, so a type outside the list is
+    # served as an attachment however the caller asked for it. Read off the decision itself
+    # rather than the signed URL, which the Disk service encodes the disposition inside. The
+    # zip is the control: without it this passes on a build where nothing is ever forced.
+    it 'is a type ActiveStorage agrees to serve inline' do
+      zipped = message.attachments.new(account_id: message.account_id, file_type: :file)
+      zipped.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'archive.zip',
+                         content_type: 'application/zip', identify: false)
+      zipped.save!
+
+      expect(attachment.file.blob.send(:forced_disposition_for_serving)).to be_nil
+      expect(zipped.file.blob.send(:forced_disposition_for_serving)).to eq(:attachment)
+    end
+
+    it 'keeps the external address when we hold only a link' do
+      linked = message.attachments.create!(account_id: message.account_id, file_type: :video,
+                                           external_url: 'https://cdn.example.com/clip.mp4')
+
+      expect(linked.push_event_data[:data_url]).to eq('https://cdn.example.com/clip.mp4')
+    end
+
+    # Meta serves these, so naming this deployment's storage would name a file that is not
+    # there. `file_metadata` already decides that, and the inline URL must not undo it.
+    it 'keeps Meta as the source for an Instagram incoming message' do
+      instagram_inbox = create(:inbox, account: message.account,
+                                       channel: create(:channel_instagram_fb_page, account: message.account,
+                                                                                   instagram_id: 'instagram-video-test'))
+      conversation = create(:conversation, account: message.account, inbox: instagram_inbox,
+                                           additional_attributes: { 'type' => 'instagram_direct_message' })
+      instagram_message = create(:message, account: message.account, inbox: instagram_inbox,
+                                           conversation: conversation, message_type: :incoming)
+      from_meta = instagram_message.attachments.new(account_id: message.account_id, file_type: :video,
+                                                    external_url: 'https://instagram.com/clip.mp4')
+      from_meta.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'sample.mp4',
+                            content_type: 'video/mp4')
+      from_meta.save!
+
+      expect(from_meta.push_event_data[:data_url]).to eq('https://instagram.com/clip.mp4')
+    end
+  end
+
   describe 'thumb_url' do
     it 'returns empty string for non-image attachments' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :file)
