@@ -31,10 +31,11 @@ module RequestExceptionHandler
   def render_rescued_error(exception)
     if exception.is_a?(ActiveRecord::RecordNotFound)
       log_handled_error(exception)
-      # The status stays what the blanket rescue has been answering for this, rather than the 404
-      # `handle_with_exception` would give it: only the body was the complaint, and a caller that
-      # branches on 422 here would break for a reason that has nothing to do with the leak.
-      return render_could_not_create_error('Resource could not be found')
+      # The same answer `handle_with_exception` gives for it everywhere else, status included. A
+      # record that is not there is not a refused write, and while the two paths said different
+      # sentences the status was at least redundant; with one sentence it was all that separated
+      # them, and it separated by who caught the exception rather than by what happened.
+      return render_not_found_error('Resource could not be found')
     end
 
     return render_could_not_create_error(exception.message) unless INTERNAL_DIAGNOSIS.any? { |klass| exception.is_a?(klass) }
