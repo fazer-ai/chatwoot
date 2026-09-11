@@ -431,6 +431,29 @@ describe Whatsapp::WebhookSetupService do
           service.perform
         end
       end
+
+      it 'reuses it even when it was never confirmed, which is the whole reason to keep it' do
+        # An unconfirmed PIN is the one a write left behind when nobody saw its outcome. Meta may be
+        # holding exactly that number, so the retry has to send the same one; drawing a new one is
+        # how the app used to guarantee it could never agree with Meta again (#590).
+        channel.provider_config.delete('verification_pin_confirmed')
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).to receive(:register_phone_number).with('123456789', 123_456)
+          expect(SecureRandom).not_to receive(:random_number)
+          service.perform
+        end
+      end
+
+      it 'draws a new one after a refusal, because then the old one is not held anywhere' do
+        channel.provider_config.delete('verification_pin')
+        allow(SecureRandom).to receive(:random_number).with(900_000).and_return(123_456)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).to receive(:register_phone_number).with('123456789', 223_456)
+          service.perform
+        end
+      end
     end
 
     context 'when webhook setup fails and should trigger reauthorization' do
