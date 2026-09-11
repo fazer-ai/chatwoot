@@ -33,6 +33,22 @@ describe Whatsapp::GraphRequestOptions do
     calls
   end
 
+  it 'reads a call to its own closing paren, not to the first one it meets' do
+    # Every call in the guarded files happens to carry the options right after the URL, so a scanner
+    # that stopped at the first `)` would still find them and this fence would pass for the wrong
+    # reason. It would then report a false offender the day a call carries the options after an
+    # argument that has parens of its own, which is what this arrangement is.
+    source = <<~RUBY
+      HTTParty.get(
+        "\#{BASE_URI}/\#{@api_version}/x",
+        query: { token: GlobalConfigService.load('A', '') },
+        **GRAPH_REQUEST_OPTIONS
+      )
+    RUBY
+
+    expect(graph_calls(source).first).to include('GRAPH_REQUEST_OPTIONS')
+  end
+
   it 'caps the wait and the retry, because a ceiling alone still costs twice on a read' do
     expect(described_class::GRAPH_REQUEST_OPTIONS).to eq(timeout: 10, max_retries: 0)
   end
