@@ -1621,6 +1621,58 @@ RSpec.describe 'Inboxes API', type: :request do
   # of accounts, and since that refusal stopped taking the channel down (#568) the answer here was
   # "registered successfully" either way, which is the only thing the operator sees at the moment
   # they press it.
+  # Meta answers three levels of webhook routing and delivery follows the most specific one that
+  # exists, so the same green "configured" URL means two different things: the inbox owns its
+  # routing, or it is riding on the app's own callback and stops the day that URL changes.
+  describe 'GET /api/v1/accounts/{account.id}/inboxes/{inbox.id}/health routing level' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:expected_url) { 'https://chat.example.com/webhooks/whatsapp/+123' }
+    let(:health_service) { instance_double(Whatsapp::HealthService) }
+
+    # The outer keys are the service's own symbols; the ones inside come from Meta's JSON.
+    def stub_health(configuration)
+      allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
+      allow(health_service).to receive(:sync_health_status!).and_return(
+        { id: 'phone123', webhook_configuration: configuration, expected_webhook_url: expected_url }
+      )
+    end
+
+    def routing_answer
+      get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/health",
+          headers: admin.create_new_auth_token, as: :json
+      response.parsed_body['routed_by_app_callback_only']
+    end
+
+    it 'is false when this number is the one pointed here' do
+      stub_health({ 'phone_number' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is false when the business account is the one pointed here' do
+      stub_health({ 'whatsapp_business_account' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is true when only the app callback is pointed here' do
+      stub_health({ 'application' => expected_url })
+
+      expect(routing_answer).to be(true)
+    end
+
+    # Not knowing is not a warning: Meta answering nothing about the configuration says nothing
+    # about where this number is routed.
+    it 'is false when Meta did not answer the configuration' do
+      stub_health(nil)
+
+      expect(routing_answer).to be(false)
+    end
+  end
+
   describe 'POST /api/v1/accounts/{account.id}/inboxes/{inbox.id}/register_webhook' do
     let(:whatsapp_channel) do
       create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)

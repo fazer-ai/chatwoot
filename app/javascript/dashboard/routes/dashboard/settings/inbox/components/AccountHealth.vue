@@ -373,22 +373,18 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
-// Meta answers three levels of routing, and `webhookUrl` prefers them in that order: this number,
-// the WhatsApp Business Account it belongs to, and the app's own callback. The card is green
-// whenever the effective one is ours, which hides a real difference: routed by the first two, this
-// inbox owns its delivery; routed by the third, it is riding on a URL that belongs to the app and
-// can be pointed elsewhere at any time, and then this inbox goes quiet with a green card.
-const routedByAppCallbackOnly = computed(() => {
-  const configuration = props.healthData?.webhook_configuration;
-  const expected = props.healthData?.expected_webhook_url;
-
-  return (
+// The card is green whenever the effective URL is ours, which hides a real difference: routed by
+// this number or by its WhatsApp Business Account, the inbox owns its delivery; routed by the
+// app's own callback, it is riding on a URL that belongs to the installation and can be pointed
+// elsewhere at any time, and then this inbox goes quiet with a green card. The reading of Meta's
+// three levels is the endpoint's (`routed_by_app_callback_only`), so an API consumer sees the
+// same thing the screen does; what is decided here is only whether to say it a second time.
+const routedByAppCallbackOnly = computed(
+  () =>
+    props.healthData?.routed_by_app_callback_only === true &&
     webhookConfigured.value &&
-    !webhookUrlMismatch.value &&
-    configuration?.phone_number !== expected &&
-    configuration?.whatsapp_business_account !== expected
-  );
-});
+    !webhookUrlMismatch.value
+);
 
 const handleRegisterWebhook = () => {
   emit('registerWebhook');

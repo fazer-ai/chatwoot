@@ -32,7 +32,7 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
 
   def health
     health_data = Whatsapp::HealthService.new(@inbox.channel).sync_health_status!
-    render json: health_data
+    render json: health_data.merge(routed_by_app_callback_only: routed_by_app_callback_only?(health_data))
   rescue Whatsapp::HealthService::ApiError => e
     Rails.logger.error "[INBOX HEALTH] Error fetching health data: #{e.message}"
     render json: {
@@ -70,6 +70,19 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   end
 
   private
+
+  # Meta answers three levels of webhook routing and delivery follows the most specific one that
+  # exists. This number pointed here, or the WhatsApp Business Account it belongs to, means the
+  # inbox owns its delivery; neither of them means it is riding on the app's own callback, which
+  # belongs to the installation rather than to this inbox and can be pointed elsewhere at any
+  # time. Read on every request rather than stored, so it cannot go stale against Meta, and false
+  # when Meta did not answer the configuration at all, because not knowing is not a warning.
+  def routed_by_app_callback_only?(health_data)
+    configuration = health_data[:webhook_configuration]
+    return false if configuration.blank?
+
+    configuration.values_at('phone_number', 'whatsapp_business_account').exclude?(health_data[:expected_webhook_url])
+  end
 
   def whatsapp_channel
     channel = @inbox.channel

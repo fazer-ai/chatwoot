@@ -90,6 +90,7 @@ describe('AccountHealth', () => {
       const wrapper = mountComponent({
         webhook_configuration: { application: expectedUrl },
         expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: true,
       });
 
       expect(wrapper.text()).toContain(
@@ -107,6 +108,7 @@ describe('AccountHealth', () => {
           application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
         },
         expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: false,
       });
 
       expect(wrapper.text()).not.toContain(
@@ -121,6 +123,7 @@ describe('AccountHealth', () => {
           application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
         },
         expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: false,
       });
 
       expect(wrapper.text()).not.toContain(
@@ -136,6 +139,7 @@ describe('AccountHealth', () => {
           application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
         },
         expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: true,
       });
 
       expect(wrapper.text()).toContain(
