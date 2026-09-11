@@ -134,6 +134,28 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       expect(frame).not_to have_key('deadline')
     end
 
+    # The wake used to be the only caller here, and what refused a connector speaking
+    # another protocol was the `call` that `connect` makes right after it. A teardown has
+    # no call behind it: written to a connector that reads the frame and drops it, the
+    # caller is told it was queued, and the device stays listed on the customer's phone
+    # with the inbox already destroyed.
+    it 'refuses to queue for a connector that speaks another protocol' do
+      redis.hset("#{prefix}instance:one", 'protocol_min', '2', 'protocol_max', '3')
+      redis.sadd("#{prefix}instances", 'one')
+
+      expect { client.control(model::Commands::SessionDelete.new) }
+        .to raise_error(Whatsapp::Session::Errors::ProviderUnavailable, /speaks protocol 1/)
+      expect(redis.exists?("#{prefix}control")).to be(false)
+    end
+
+    # An empty registry is a different thing, and it is fine for the same reason it is on
+    # publish: the stream holds the frame until a connector comes up and reads it, which
+    # is what a teardown nobody waits on is for.
+    it 'queues a control command with nobody listening yet' do
+      expect { client.control(model::Commands::SessionDelete.new) }.not_to raise_error
+      expect(redis.xrange("#{prefix}control").size).to eq(1)
+    end
+
     it 'bounds a control command that answers the way it bounds an RPC' do
       allow(SecureRandom).to receive(:uuid).and_return('cmd-0003')
       redis.lpush("#{prefix}reply:cmd-0003", { 'v' => 1, 'id' => 'cmd-0003', 'ok' => true, 'result' => {} }.to_json)

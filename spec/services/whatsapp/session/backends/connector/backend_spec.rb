@@ -125,15 +125,40 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(client).to have_received(:call).ordered
   end
 
+  # A connector reads a session's own command stream only while it is running that
+  # session, so a teardown written there for an account nobody has adopted reaches no
+  # connector at all and dies when the stream is trimmed -- which is the state an inbox is
+  # most often destroyed in. The control stream is read by every instance.
+  it 'asks for the session to be deleted on the control stream, where an account nobody runs is still reachable' do
+    backend.delete_session
+
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete))
+    expect(client).not_to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete))
+  end
+
   # The pairing is what outlives the inbox: a device stays listed on the customer's phone
-  # with nothing in Chatwoot corresponding to it. `session.delete` is the command that
-  # clears the session's own rows, and a connector build with no handler for it answers
-  # `unsupported` and undoes nothing, so the unlink cannot be left to it alone.
-  it 'unlinks the device before it asks for the session to be deleted' do
+  # with nothing in Chatwoot corresponding to it. Delivery through the control stream is
+  # to some instance rather than to the one running the account, so for a session that is
+  # up the unlink rides the owner's own stream and happens at once.
+  it 'unlinks the device on the session stream before it asks for the session to be deleted' do
     backend.delete_session
 
     expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).ordered
-    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete)).ordered
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete)).ordered
+  end
+
+  # The connector answers a teardown it could not carry out with `command.failed`, and
+  # that event is routed to an inbox by `session_id`: this inbox is being destroyed, so
+  # the lookup misses and the event is dropped as an orphan. What is written here is the
+  # last thing about the session anybody can see.
+  it 'writes down what it asked for, because the failure has nowhere to be reported' do
+    allow(Rails.logger).to receive(:info)
+
+    backend.delete_session
+
+    # The command ids too: they are what ties this line to the connector's own log, which
+    # is the only other place a teardown that failed leaves a trace.
+    expect(Rails.logger).to have_received(:info).with(/tearing session #{session_id} down.*cmd-0001.*cmd-0002/)
   end
 
   # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
@@ -349,6 +374,6 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
     expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDisconnect))
     expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).twice
-    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete))
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete))
   end
 end

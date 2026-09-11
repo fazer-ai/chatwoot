@@ -89,8 +89,17 @@ class Whatsapp::Connector::Client
     await(command, timeout)
   end
 
-  # Session-agnostic commands (wake, ping): any live instance answers.
+  # Commands that go to the fleet rather than to one session's owner: a wake, a ping, and
+  # the teardown of a session nobody is running.
+  #
+  # Guarded like `publish` and for the same reason, which used to be covered by accident:
+  # the only caller was `connect`, whose `call` right after raises before anything reads
+  # the wake. A fire-and-forget command written here is the whole of what the caller does,
+  # and a connector that is up and speaks another protocol consumes the frame and drops it
+  # while the caller is told it was queued -- which for a teardown is a device left listed
+  # on somebody's phone with nothing anywhere saying so.
   def control(payload, timeout: RPC_TIMEOUT)
+    ensure_readable!
     rpc = model::Commands.rpc?(payload.class.wire_type)
     command = build(payload, reply_to: rpc, timeout: (timeout - DEADLINE_MARGIN if rpc))
     write(Whatsapp::Connector.key('control'), command)

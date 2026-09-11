@@ -18,21 +18,38 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     let(:unbounded_on_purpose) { %w[disconnect logout delete_session] }
 
     # [method name, source line] for every `client.publish` call in the backend.
-    let(:publish_sites) do
+    let(:publish_sites) { sites_calling('client.publish(') }
+
+    # The same question, asked of the other fire-and-forget door. A command written to the
+    # control stream has no caller waiting on it either, so nothing else bounds it, and
+    # moving a command from one door to the other must not take it out of the sweep.
+    let(:control_sites) { sites_calling('client.control(') }
+
+    def sites_calling(call)
       method = nil
       source.readlines.each_with_object([]) do |line, sites|
         method = Regexp.last_match(1) if line =~ /^\s*def ([a-z_0-9?!]+)/
-        sites << [method, line] if line.include?('client.publish(')
+        sites << [method, line] if line.include?(call)
       end
     end
 
     it 'finds every publish site the backend has' do
       # Vacuity guard: a rename or a refactor that hides the calls would leave the sweep
       # passing over nothing at all.
-      expect(publish_sites.size).to eq(10)
+      expect(publish_sites.size).to eq(9)
       expect(publish_sites.map(&:first).uniq)
         .to contain_exactly('disconnect', 'logout', 'delete_session', 'request_pairing_code', 'mark_read',
                             'mark_unread', 'send_chat_presence', 'update_presence', 'subscribe_presence')
+    end
+
+    # Both are unbounded on purpose, and for one reason: each starts something for a
+    # session that may not be running, where "do not start after this" is the reading of
+    # `deadline` that costs more than the other buys. A wake dropped for arriving late is
+    # a session nobody starts; a teardown dropped for arriving late is a device left
+    # listed on the customer's phone.
+    it 'finds every control site, and each is a command that must not be dropped for being late' do
+      expect(control_sites.map(&:first)).to contain_exactly('connect', 'delete_session')
+      expect(control_sites.select { |_, line| line.include?('timeout:') }).to be_empty
     end
 
     it 'declares a ceiling at every publish site that is not the teardown' do
