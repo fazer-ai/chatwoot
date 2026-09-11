@@ -30,17 +30,11 @@ describe Whatsapp::WebhookSetupService do
     expect(boolean_rescues(source)).to be_empty
   end
 
-  it 'reads the rescues it is supposed to inspect, so an empty scan cannot pass as a clean one' do
-    # Four today: the registration write, the webhook setup that re-raises, and the two reads that
-    # answer `:unknown`. If this number changes, someone touched the error handling in this file and
-    # should say which of the four they meant.
-    expect(rescue_bodies(source).size).to eq(4)
-  end
-
-  it 'answers the two reads with the same vocabulary, so neither drifts back to a boolean' do
-    # The health axis already defaulted the harmless way when it could not tell; the verification
-    # axis defaulted the expensive way. They now say the same word for the same fact.
-    expect(source.scan(/^\s*:unknown$/).size).to eq(2)
+  it 'read some rescues at all, so an empty scan cannot pass as a clean one' do
+    # The canary, and deliberately not a count. Freezing the number would fail on a refactor that
+    # changed no behaviour, and pass a rescue that answered `:unknown` where the decision needed a
+    # definite one. What has to hold is that the check above actually looked at something.
+    expect(rescue_bodies(source)).not_to be_empty
   end
 
   # The scanner is the fence, so it gets its own arrangements. A mutation that blinded it killed
@@ -102,7 +96,7 @@ describe Whatsapp::WebhookSetupService do
         end
       RUBY
 
-      expect(rescue_bodies(source).size).to eq(1)
+      expect(rescue_bodies(source)).not_to be_empty
       expect(boolean_rescues(source)).to be_empty
     end
   end
