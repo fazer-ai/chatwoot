@@ -668,11 +668,16 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
 
       it 'returns not found error' do
+        allow(Rails.logger).to receive(:info)
+
         post "/api/v1/accounts/#{account.id}/conversations/#{message.conversation.display_id}/messages/99999/retry",
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:not_found)
+        expect(response.parsed_body['error']).to eq('Resource could not be found')
+        # the body no longer names the record, so the log is the only place left that does
+        expect(Rails.logger).to have_received(:info).with(/Handled error.*RecordNotFound/)
       end
     end
   end
