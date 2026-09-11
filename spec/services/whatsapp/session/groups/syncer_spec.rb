@@ -50,6 +50,42 @@ RSpec.describe Whatsapp::Session::Groups::Syncer do
     )
   end
 
+  # WhatsApp refuses every edit of such a group's description, so what the panel owes the
+  # operator is the reason rather than a retry. The stored flag is what it reads.
+  context 'when the snapshot says the description can no longer be changed' do
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe de Vendas', topic_id: 'undefined') }
+
+    it 'records that it is frozen' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(true)
+    end
+  end
+
+  context 'when the snapshot reports an ordinary description id' do
+    let(:stored) { super().merge('description_frozen' => true) }
+    let(:info) { model::GroupInfo.new(group: group, subject: 'Equipe de Vendas', topic_id: '3EB0C7' * 3) }
+
+    it 'records that it is not frozen any more' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(false)
+    end
+  end
+
+  # uazapi never reports the id, and a sync of a group this account also has on a native
+  # inbox must not read that silence as "this description can be changed". Writing false
+  # here would put the edit back in front of the operator and it would fail forever.
+  context 'when the provider does not report the description id' do
+    let(:stored) { super().merge('description_frozen' => true) }
+
+    it 'leaves the stored answer alone' do
+      sync
+
+      expect(group_contact.reload.additional_attributes['description_frozen']).to be(true)
+    end
+  end
+
   # The settings are optional on the wire. A snapshot that does not report one says
   # nothing about it, and a sync must not read that silence as "off".
   context 'when the snapshot reports no settings at all' do
