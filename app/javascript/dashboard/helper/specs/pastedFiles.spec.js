@@ -21,14 +21,19 @@ import {
 //
 // That asymmetry is the whole discriminator: warn when every pasted file is empty and nothing
 // on the clipboard is text, stay quiet otherwise.
-const transfer = (types, files) => ({
+// A real DataTransfer answers for every type it announces, so the fixture answers too: whether
+// the announced text has anything in it is the other candidate discriminator, and a fixture that
+// cannot be asked would let it pass untested.
+const transfer = (types, files, data = {}) => ({
   types,
   files: files.map(([name, type, size]) => ({ name, type, size })),
+  getData: type => data[type] ?? '',
 });
 
 const NUMBERS_SINGLE_CELL = transfer(
   ['text/plain', 'text/html', 'text/rtf', 'Files'],
-  [['image.png', 'image/png', 0]]
+  [['image.png', 'image/png', 0]],
+  { 'text/plain': 'planilha 2' }
 );
 const NUMBERS_RANGE = NUMBERS_SINGLE_CELL;
 // The other shape the same gesture has produced, twice and not on demand: a real PNG.
@@ -45,7 +50,24 @@ const FINDER_VALID_FILE = transfer(
   [['valido.txt', 'text/plain', 4]]
 );
 const SCREENSHOT = transfer(['Files'], [['image.png', 'image/png', 40656]]);
-const PLAIN_TEXT = transfer(['text/plain'], []);
+// Copying an EMPTY cell in Numbers, measured on 10/09/2026 in the same probe as the shapes
+// above, in Chromium 153.0.8010.12 and in WebKit 605.1.15 (Version/26.6 Safari): the text flavour
+// is announced with nothing in it, beside the same artifact nobody chose. Four of five copies of
+// an empty cell came out as `text/plain` of zero characters next to `Files`, and a pasteboard
+// carrying an empty text flavour beside a zero-byte PNG reaches both engines exactly like this.
+//
+// This is the shape #567 proposed to treat as "no text", by reading the content instead of
+// trusting the announced type. The measurement says the opposite: when the clipboard carries a
+// file the person actually picked (`public.file-url`), NEITHER engine announces any text flavour
+// at all, empty or filled, in one pasteboard item or in two. So a genuine empty file never
+// arrives with text beside it, deciding on the content recovers no warning that is being missed,
+// and it would turn this paste, an ordinary spreadsheet paste, into a false alarm about a file
+// nobody chose. That is why the rule reads the announced type and not the content.
+const NUMBERS_EMPTY_CELL = transfer(
+  ['text/plain', 'Files'],
+  [['image.png', 'image/png', 0]]
+);
+const PLAIN_TEXT = transfer(['text/plain'], [], { 'text/plain': 'texto' });
 
 describe('pastedFiles', () => {
   describe('clipboardCarriesText', () => {
@@ -67,11 +89,18 @@ describe('pastedFiles', () => {
       type => {
         expect(
           clipboardCarriesText(
-            transfer([type, 'Files'], [['image.png', 'image/png', 0]])
+            transfer([type, 'Files'], [['image.png', 'image/png', 0]], {
+              [type]: 'planilha 2',
+            })
           )
         ).toBe(true);
       }
     );
+
+    it('counts an announced text flavour with nothing in it, the empty spreadsheet cell', () => {
+      expect(clipboardCarriesText(NUMBERS_EMPTY_CELL)).toBe(true);
+      expect(NUMBERS_EMPTY_CELL.getData('text/plain')).toBe('');
+    });
 
     it('survives a transfer with no types at all', () => {
       expect(clipboardCarriesText(undefined)).toBe(false);
@@ -114,6 +143,13 @@ describe('pastedFiles', () => {
       expect(usableFilesFromTransfer(NUMBERS_RANGE).shouldAlertEmpty).toBe(
         false
       );
+    });
+
+    it('stays quiet for an empty spreadsheet cell, whose text is announced empty', () => {
+      expect(usableFilesFromTransfer(NUMBERS_EMPTY_CELL)).toEqual({
+        files: [],
+        shouldAlertEmpty: false,
+      });
     });
 
     it('explains the refusal for a genuine empty file', () => {
