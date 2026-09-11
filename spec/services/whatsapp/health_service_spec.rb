@@ -339,4 +339,19 @@ RSpec.describe Whatsapp::HealthService do
       end
     end
   end
+
+  describe 'the ceiling on the health read' do
+    # The register endpoint reads the routing back through this service (#585), so a Meta that
+    # accepts and stays quiet holds the request here too. Webmock answers instantly and can never
+    # show that, so the ceiling is asserted on the call.
+    it 'passes the wait ceiling and switches the retry off' do
+      allow(HTTParty).to receive(:get).and_return(
+        instance_double(HTTParty::Response, success?: true, parsed_response: { 'id' => 'test_phone_number_id' })
+      )
+
+      service.sync_health_status!
+
+      expect(HTTParty).to have_received(:get).with(anything, hash_including(timeout: 10, max_retries: 0)).at_least(:once)
+    end
+  end
 end

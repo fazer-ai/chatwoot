@@ -334,4 +334,25 @@ describe Whatsapp::FacebookApiClient do
       end
     end
   end
+
+  describe 'the ceiling on every Graph call' do
+    # Meta accepting the connection and then staying quiet is the arrangement this is about, and
+    # webmock cannot show it: it answers instantly, so a missing ceiling passes every stub in this
+    # file. What the ceiling is made of is therefore asserted on the call itself.
+    it 'passes the wait ceiling and switches the retry off, on a read' do
+      allow(HTTParty).to receive(:get).and_return(instance_double(HTTParty::Response, success?: true, parsed_response: {}))
+
+      api_client.fetch_phone_numbers('test_waba_id')
+
+      expect(HTTParty).to have_received(:get).with(anything, hash_including(timeout: 10, max_retries: 0))
+    end
+
+    it 'passes the same ceiling on a write' do
+      allow(HTTParty).to receive(:post).and_return(instance_double(HTTParty::Response, success?: true, parsed_response: {}))
+
+      api_client.subscribe_app_to_waba('test_waba_id')
+
+      expect(HTTParty).to have_received(:post).with(anything, hash_including(timeout: 10, max_retries: 0))
+    end
+  end
 end
