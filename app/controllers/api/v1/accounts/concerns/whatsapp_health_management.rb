@@ -52,10 +52,11 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   def register_webhook
     # The per-number override is allowed to be refused without taking the channel down, so
     # "registered successfully" on its own would be the whole answer for a number Meta refused to
-    # point here. The answer says which half landed.
+    # point here. The answer says which half landed, and then where delivery goes.
     applied = Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
 
-    render json: { message: 'Webhook registered successfully', callback_override_applied: applied }, status: :ok
+    render json: { message: 'Webhook registered successfully', callback_override_applied: applied }
+      .merge(routing_after_attempt), status: :ok
   rescue StandardError => e
     Rails.logger.error "[INBOX WEBHOOK] Webhook registration failed: #{e.message}"
     render json: { error: e.message }, status: :unprocessable_entity
@@ -70,6 +71,28 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   end
 
   private
+
+  # `callback_override_applied` answers one write, and it answers `false` for a refusal, for a 500
+  # and for a connection that closed with nothing to read alike: the rescue behind it is that wide
+  # on purpose, because the same refusal arrives in all three shapes (#568). Where delivery goes
+  # after the attempt is a different question, and the only authority on it is Meta. Reading it
+  # back is also what separates the two cases the write cannot: a refusal leaves the routing where
+  # it was, and an error that arrived after Meta stored the override leaves it changed.
+  #
+  # Best effort, and `routing_read_back` is why it is stated rather than implied: the write may
+  # well have landed, so a read that did not come back must not turn a registration into an error,
+  # and must not be answered as a routing nobody read.
+  def routing_after_attempt
+    health_data = Whatsapp::HealthService.new(@inbox.channel).sync_health_status!
+
+    {
+      routing_read_back: true,
+      health: health_data.merge(routed_by_app_callback_only: routed_by_app_callback_only?(health_data))
+    }
+  rescue StandardError => e
+    Rails.logger.warn("[INBOX WEBHOOK] Registered, but reading the routing back failed: #{e.message}")
+    { routing_read_back: false }
+  end
 
   # Meta answers three levels of webhook routing and delivery follows the most specific one that
   # EXISTS, wherever it points. So this asks about existence, not about the URL: an override of
