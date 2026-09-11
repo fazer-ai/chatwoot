@@ -184,7 +184,7 @@
       "WEBHOOK": {
         "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registrado. Meta rechazó apuntar este número en sí aquí, así que la entrega depende del callback a nivel de cuenta, que se muestra abajo.",
         "RIDES_ON_APP_CALLBACK": "La entrega sigue la URL de callback de la aplicación: ni este número ni su cuenta de WhatsApp Business apuntan a esta instalación, así que deja de llegar si esa URL cambia.",
-        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número no tiene enrutamiento propio, así que la entrega sigue la URL de callback de la aplicación, mostrada abajo, que no es esta instalación. Registrar el webhook aquí no cambia eso: hay que reapuntar el callback de la aplicación en la configuración de la app en Meta."
+        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número no tiene enrutamiento propio, así que la entrega sigue la URL de callback de la aplicación, mostrada abajo, que no es esta instalación. Registrar el webhook apunta este número aquí; si Meta lo rechaza en esta cuenta, lo que hay que cambiar es el callback de la aplicación."
       }
     }
   }

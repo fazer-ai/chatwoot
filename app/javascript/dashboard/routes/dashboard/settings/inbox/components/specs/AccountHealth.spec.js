@@ -148,10 +148,11 @@ describe('AccountHealth', () => {
     });
 
     // The same chip, the other repair. With no override of its own, the URL on the card IS the
-    // app callback, and the button writes the per-number override that Meta refuses for exactly
-    // these accounts: it comes back identical and the operator presses again. The sentence is the
-    // only thing on the screen that sends them to the app's own callback.
-    it('says the button cannot repoint it when the app callback is what points elsewhere', () => {
+    // app callback: the button is writing an override that does not exist yet, which lands unless
+    // Meta refuses it for this account, and only the press tells which. The sentence names the
+    // app callback as the fallback, so the operator is not sent to a shared URL for a number the
+    // button would have fixed.
+    it('names the app callback as the fallback when it is what points elsewhere', () => {
       const wrapper = mountComponent({
         webhook_configuration: { application: elsewhereUrl },
         expected_webhook_url: expectedUrl,

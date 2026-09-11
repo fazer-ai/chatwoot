@@ -385,10 +385,11 @@ const appCallbackRoutingMessage = computed(() => {
   if (!webhookConfigured.value) return null;
 
   // Mismatch splits into two repairs that the one chip cannot tell apart. With an override of its
-  // own, the button above rewrites it. With none, the URL on the card IS the app callback, and
-  // the button writes the per-number override that Meta refuses for exactly the accounts that end
-  // up here: pressing it changes nothing and the card comes back identical. The repair is at the
-  // app's callback, outside this screen, and the sentence is the only place that says so.
+  // own, the button above rewrites it and nothing else needs saying. With none, the URL on the
+  // card IS the app callback, so the button is writing a per-number override that does not exist
+  // yet: it repairs this whenever Meta allows it, and Meta refuses it for a whole class of
+  // accounts. Which of the two is only known at the press, and the toast reports it; the sentence
+  // is for before that, and it names the app callback as the fallback rather than as the repair.
   return webhookUrlMismatch.value
     ? 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.APP_CALLBACK_POINTS_ELSEWHERE'
     : 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.RIDES_ON_APP_CALLBACK';
