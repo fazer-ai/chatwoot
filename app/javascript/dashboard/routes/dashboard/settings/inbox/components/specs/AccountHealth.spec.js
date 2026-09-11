@@ -80,11 +80,12 @@ describe('AccountHealth', () => {
     expect(wrapper.text()).toContain('2026');
   });
 
-  // Meta answers with the effective webhook configuration, and the card is green whenever the
-  // effective URL is ours. It is ours in two different situations, and only one of them means
-  // this number is pointed here.
+  // Meta answers with the effective webhook configuration, and the chip above reads it as two
+  // states: ours, or not ours. Both readings cover a number that owns its routing and a number
+  // that owns none, which are different problems with different repairs.
   describe('when the number itself is not pointed at this installation', () => {
     const expectedUrl = 'https://chat.example.com/webhooks/whatsapp/+123';
+    const elsewhereUrl = 'https://elsewhere.example.com/webhooks/whatsapp/+123';
 
     it('says so even though the card is green, because delivery rides on the app URL', () => {
       const wrapper = mountComponent({
@@ -94,7 +95,7 @@ describe('AccountHealth', () => {
       });
 
       expect(wrapper.text()).toContain(
-        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.RIDES_ON_APP_CALLBACK'
       );
     });
 
@@ -105,39 +106,54 @@ describe('AccountHealth', () => {
       const wrapper = mountComponent({
         webhook_configuration: {
           whatsapp_business_account: expectedUrl,
-          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+          application: elsewhereUrl,
         },
         expected_webhook_url: expectedUrl,
         routed_by_app_callback_only: false,
       });
 
-      expect(wrapper.text()).not.toContain(
-        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
-      );
+      expect(wrapper.text()).not.toContain('APP_CALLBACK');
     });
 
     it('stays quiet when the override is in place for this number', () => {
       const wrapper = mountComponent({
         webhook_configuration: {
           phone_number: expectedUrl,
-          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+          application: elsewhereUrl,
         },
         expected_webhook_url: expectedUrl,
         routed_by_app_callback_only: false,
       });
 
-      expect(wrapper.text()).not.toContain(
-        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
-      );
+      expect(wrapper.text()).not.toContain('APP_CALLBACK');
     });
 
-    // A mismatch already has its own chip and its own button, and two warnings about one problem
-    // is how the second one stops being read.
-    it('does not repeat itself when the URL already mismatches', () => {
+    // An override of its own pointing at the wrong place is a mismatch the button above repairs:
+    // registering rewrites that override. Saying anything about the app callback here would be
+    // false, since the app callback is not what delivery follows.
+    it('leaves the mismatch chip alone when the number has an override of its own', () => {
       const wrapper = mountComponent({
         webhook_configuration: {
-          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+          phone_number: elsewhereUrl,
+          application: expectedUrl,
         },
+        expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: false,
+      });
+
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH'
+      );
+      expect(wrapper.text()).not.toContain('APP_CALLBACK');
+    });
+
+    // The same chip, the other repair. With no override of its own, the URL on the card IS the
+    // app callback, and the button writes the per-number override that Meta refuses for exactly
+    // these accounts: it comes back identical and the operator presses again. The sentence is the
+    // only thing on the screen that sends them to the app's own callback.
+    it('says the button cannot repoint it when the app callback is what points elsewhere', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: { application: elsewhereUrl },
         expected_webhook_url: expectedUrl,
         routed_by_app_callback_only: true,
       });
@@ -145,9 +161,27 @@ describe('AccountHealth', () => {
       expect(wrapper.text()).toContain(
         'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH'
       );
-      expect(wrapper.text()).not.toContain(
-        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.APP_CALLBACK_POINTS_ELSEWHERE'
       );
+      // The sentence for a URL that still points here would be a lie about one that does not.
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.RIDES_ON_APP_CALLBACK'
+      );
+    });
+
+    // Nothing configured at all is the chip's own case, and its button is the repair.
+    it('stays quiet when there is no webhook configuration to ride on', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: {},
+        expected_webhook_url: expectedUrl,
+        routed_by_app_callback_only: true,
+      });
+
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.ACTION_REQUIRED'
+      );
+      expect(wrapper.text()).not.toContain('APP_CALLBACK');
     });
   });
 

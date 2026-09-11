@@ -373,18 +373,26 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
-// The card is green whenever the effective URL is ours, which hides a real difference: routed by
-// this number or by its WhatsApp Business Account, the inbox owns its delivery; routed by the
-// app's own callback, it is riding on a URL that belongs to the installation and can be pointed
-// elsewhere at any time, and then this inbox goes quiet with a green card. The reading of Meta's
-// three levels is the endpoint's (`routed_by_app_callback_only`), so an API consumer sees the
-// same thing the screen does; what is decided here is only whether to say it a second time.
-const routedByAppCallbackOnly = computed(
-  () =>
-    props.healthData?.routed_by_app_callback_only === true &&
-    webhookConfigured.value &&
-    !webhookUrlMismatch.value
-);
+// A number with no override of its own rides on the app's own callback, which belongs to the
+// installation and can be pointed elsewhere at any time. The chip above cannot say that: green
+// whenever the effective URL is ours, amber "mismatch" whenever it is not, and both readings are
+// the same for a number that owns its routing and one that does not. The reading of Meta's three
+// levels is the endpoint's (`routed_by_app_callback_only`), so an API consumer sees what the
+// screen sees; what is decided here is which sentence that answer deserves.
+const appCallbackRoutingMessage = computed(() => {
+  if (props.healthData?.routed_by_app_callback_only !== true) return null;
+  // Nothing is configured at all: the chip already says so, and its button is the repair.
+  if (!webhookConfigured.value) return null;
+
+  // Mismatch splits into two repairs that the one chip cannot tell apart. With an override of its
+  // own, the button above rewrites it. With none, the URL on the card IS the app callback, and
+  // the button writes the per-number override that Meta refuses for exactly the accounts that end
+  // up here: pressing it changes nothing and the card comes back identical. The repair is at the
+  // app's callback, outside this screen, and the sentence is the only place that says so.
+  return webhookUrlMismatch.value
+    ? 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.APP_CALLBACK_POINTS_ELSEWHERE'
+    : 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.RIDES_ON_APP_CALLBACK';
+});
 
 const handleRegisterWebhook = () => {
   emit('registerWebhook');
@@ -532,7 +540,7 @@ const handleCopyWebhookUrl = async url => {
             </ButtonV4>
           </div>
           <div
-            v-if="routedByAppCallbackOnly"
+            v-if="appCallbackRoutingMessage"
             class="flex gap-1.5 items-start text-label-small text-n-amber-11"
           >
             <Icon
@@ -540,7 +548,7 @@ const handleCopyWebhookUrl = async url => {
               class="flex-shrink-0 mt-0.5 w-3.5 h-3.5"
             />
             <span>
-              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED') }}
+              {{ t(appCallbackRoutingMessage) }}
             </span>
           </div>
           <div v-if="webhookConfigured" class="pt-1 space-y-2">
