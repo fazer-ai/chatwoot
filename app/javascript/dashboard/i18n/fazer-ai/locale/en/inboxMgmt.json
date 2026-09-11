@@ -182,7 +182,7 @@
     },
     "ACCOUNT_HEALTH": {
       "WEBHOOK": {
-        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registered. Meta refused to point this number itself here, so delivery depends on the account-level callback shown below.",
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registered, but Meta did not accept pointing this number itself here, so this number's own routing was not changed. The card below shows which URL delivery follows.",
         "RIDES_ON_APP_CALLBACK": "Delivery follows the app callback URL: neither this number nor its WhatsApp Business Account is pointed at this installation, so it stops arriving if that URL changes.",
         "APP_CALLBACK_POINTS_ELSEWHERE": "This number has no routing of its own, so delivery follows the app callback URL shown below, which is not the one expected for this number. Registering the webhook points this number here; if Meta refuses that for this account, the app callback is what has to change."
       }

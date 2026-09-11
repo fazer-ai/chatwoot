@@ -642,7 +642,11 @@ export default {
         const { data } = await InboxHealthAPI.registerWebhook(this.inbox.id);
         // Meta refuses the per-number override for a whole class of accounts, and that refusal no
         // longer takes the channel down, so a plain success here would be the only thing the
-        // operator sees about a number that is not being routed to this installation.
+        // operator sees about a write that did not land. The answer is about the write and says
+        // nothing about where delivery goes now: a number that already had an override keeps it,
+        // and the rescue behind this flag swallows a transient 500 the same as a refusal. The card
+        // is refreshed on the next line and reads the routing from Meta, so it is what the
+        // sentence points at.
         useAlert(
           data?.callback_override_applied === false
             ? this.$t(
