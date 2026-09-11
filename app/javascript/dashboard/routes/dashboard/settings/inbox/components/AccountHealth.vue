@@ -373,6 +373,28 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
+// A number with no override of its own rides on the app's own callback, which belongs to the
+// installation and can be pointed elsewhere at any time. The chip above cannot say that: green
+// whenever the effective URL is ours, amber "mismatch" whenever it is not, and both readings are
+// the same for a number that owns its routing and one that does not. The reading of Meta's three
+// levels is the endpoint's (`routed_by_app_callback_only`), so an API consumer sees what the
+// screen sees; what is decided here is which sentence that answer deserves.
+const appCallbackRoutingMessage = computed(() => {
+  if (props.healthData?.routed_by_app_callback_only !== true) return null;
+  // Nothing is configured at all: the chip already says so, and its button is the repair.
+  if (!webhookConfigured.value) return null;
+
+  // Mismatch splits into two repairs that the one chip cannot tell apart. With an override of its
+  // own, the button above rewrites it and nothing else needs saying. With none, the URL on the
+  // card IS the app callback, so the button is writing a per-number override that does not exist
+  // yet: it repairs this whenever Meta allows it, and Meta refuses it for a whole class of
+  // accounts. Which of the two is only known at the press, and the toast reports it; the sentence
+  // is for before that, and it names the app callback as the fallback rather than as the repair.
+  return webhookUrlMismatch.value
+    ? 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.APP_CALLBACK_POINTS_ELSEWHERE'
+    : 'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.RIDES_ON_APP_CALLBACK';
+});
+
 const handleRegisterWebhook = () => {
   emit('registerWebhook');
 };
@@ -517,6 +539,18 @@ const handleCopyWebhookUrl = async url => {
             >
               {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON') }}
             </ButtonV4>
+          </div>
+          <div
+            v-if="appCallbackRoutingMessage"
+            class="flex gap-1.5 items-start text-label-small text-n-amber-11"
+          >
+            <Icon
+              icon="i-lucide-alert-triangle"
+              class="flex-shrink-0 mt-0.5 w-3.5 h-3.5"
+            />
+            <span>
+              {{ t(appCallbackRoutingMessage) }}
+            </span>
           </div>
           <div v-if="webhookConfigured" class="pt-1 space-y-2">
             <div class="flex items-center gap-3 min-w-0">

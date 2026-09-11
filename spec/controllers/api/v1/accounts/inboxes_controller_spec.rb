@@ -1617,6 +1617,156 @@ RSpec.describe 'Inboxes API', type: :request do
     end
   end
 
+  # The button on the inbox health screen. Meta refuses the per-number override for a whole class
+  # of accounts, and since that refusal stopped taking the channel down (#568) the answer here was
+  # "registered successfully" either way, which is the only thing the operator sees at the moment
+  # they press it.
+  # Meta answers three levels of webhook routing and delivery follows the most specific one that
+  # exists, so the same green "configured" URL means two different things: the inbox owns its
+  # routing, or it is riding on the app's own callback and stops the day that URL changes.
+  describe 'GET /api/v1/accounts/{account.id}/inboxes/{inbox.id}/health routing level' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:expected_url) { 'https://chat.example.com/webhooks/whatsapp/+123' }
+    let(:health_service) { instance_double(Whatsapp::HealthService) }
+
+    # The outer keys are the service's own symbols; the ones inside come from Meta's JSON.
+    def stub_health(configuration)
+      allow(Whatsapp::HealthService).to receive(:new).and_return(health_service)
+      allow(health_service).to receive(:sync_health_status!).and_return(
+        { id: 'phone123', webhook_configuration: configuration, expected_webhook_url: expected_url }
+      )
+    end
+
+    def routing_answer
+      get "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/health",
+          headers: admin.create_new_auth_token, as: :json
+      response.parsed_body['routed_by_app_callback_only']
+    end
+
+    it 'is false when this number has an override of its own' do
+      stub_health({ 'phone_number' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is false when the business account has one' do
+      stub_health({ 'whatsapp_business_account' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    # Delivery follows the most specific override that exists, wherever it points: a number sent
+    # to the wrong place is misrouted, not riding on the app callback, and the card already says
+    # so with its own URL mismatch warning.
+    it 'is false when the override exists but points somewhere else' do
+      stub_health({ 'phone_number' => 'https://elsewhere.example.com/hook', 'application' => expected_url })
+
+      expect(routing_answer).to be(false)
+    end
+
+    it 'is true when only the app callback is pointed here' do
+      stub_health({ 'application' => expected_url })
+
+      expect(routing_answer).to be(true)
+    end
+
+    # Not knowing is not a warning: Meta answering nothing about the configuration says nothing
+    # about where this number is routed.
+    it 'is false when Meta did not answer the configuration' do
+      stub_health(nil)
+
+      expect(routing_answer).to be(false)
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/inboxes/{inbox.id}/register_webhook' do
+    let(:whatsapp_channel) do
+      create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    end
+    let(:whatsapp_inbox) { create(:inbox, account: account, channel: whatsapp_channel) }
+    let(:phone_number_id) { whatsapp_channel.provider_config['phone_number_id'] }
+    let(:waba_id) { whatsapp_channel.provider_config['business_account_id'] }
+    let(:api_version) { 'v22.0' }
+    let(:subscription) do
+      stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
+        .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    before do
+      allow(GlobalConfigService).to receive(:load).and_call_original
+      allow(GlobalConfigService).to receive(:load).with('WHATSAPP_API_VERSION', 'v22.0').and_return(api_version)
+      subscription
+    end
+
+    context 'when Meta accepts both calls' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'says the routing was applied' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq('message' => 'Webhook registered successfully', 'callback_override_applied' => true)
+      end
+    end
+
+    # The refusal this endpoint has to describe: the WABA subscription lands, so Meta delivers,
+    # and the number is not pointed at this installation.
+    context 'when Meta refuses the per-number override' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+      end
+
+      it 'still succeeds, and says the routing was not applied' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq('message' => 'Webhook registered successfully', 'callback_override_applied' => false)
+        expect(subscription).to have_been_requested
+      end
+
+      it 'leaves the channel authorized, which is what #568 fixed' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(whatsapp_channel.reload.reauthorization_required?).to be(false)
+      end
+    end
+
+    context 'when the subscription Meta needs fails' do
+      before do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{waba_id}/subscribed_apps")
+          .to_return(status: 400, body: { error: { message: 'App subscription to WABA failed' } }.to_json)
+      end
+
+      it 'answers the failure instead of a partial success' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to include('Webhook setup failed')
+        expect(response.parsed_body).not_to have_key('callback_override_applied')
+      end
+    end
+
+    context 'when the user is not an administrator' do
+      it 'refuses' do
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+  end
+
   describe 'POST /api/v1/accounts/:account_id/inboxes/:id/setup_channel_provider' do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false) }
     let(:inbox) { channel.inbox }

@@ -86,10 +86,16 @@ class Whatsapp::FacebookApiClient
   # `Webhooks::WhatsappEventsJob` then discarded every inbound webhook for it: a number was dead for hours while
   # Meta kept delivering, nine webhooks in and no conversations out. So it is best effort here, the same way the
   # phone registration already is, and refused by the same accounts for the same reason.
+  #
+  # Answers whether that optional half landed. The required one raises when it fails, so reaching
+  # the answer at all means Meta is delivering; `false` means it is delivering to whatever the
+  # app's own callback says, which on an installation that points elsewhere is the difference
+  # between a working inbox and a quiet one. The caller is what turns that answer into something
+  # the operator can see.
   def subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: nil)
-    subscription = subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields || WEBHOOK_DEFAULT_FIELDS)
+    subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields || WEBHOOK_DEFAULT_FIELDS)
 
-    optional_callback_override(phone_number_id, callback_url, verify_token) || subscription
+    callback_override_applied?(phone_number_id, callback_url, verify_token)
   end
 
   def subscribe_app_to_waba(waba_id, subscribed_fields: WEBHOOK_DEFAULT_FIELDS)
@@ -147,15 +153,19 @@ class Whatsapp::FacebookApiClient
   # 403 carrying Meta's code 200, as a plain 500, and as a connection that closes with nothing to
   # read. A guard that recognizes one shape leaves the other two killing the channel.
   #
-  # It is the only record that the routing was not applied, so it names the call and the number:
-  # on an installation whose app-level callback points elsewhere, this line is the difference
-  # between a quiet inbox and a diagnosis.
-  def optional_callback_override(phone_number_id, callback_url, verify_token)
+  # The line names the call and the number because it is what a diagnosis starts from: the answer
+  # below reaches the operator as a sentence, and the log is where you find which number and which
+  # URL were refused.
+  #
+  # The rescue is the whole definition of "not applied": a refusal is the only way this call does
+  # not land, and reading the body for a shape would put the three of them back in play.
+  def callback_override_applied?(phone_number_id, callback_url, verify_token)
     override_phone_number_callback(phone_number_id, callback_url, verify_token)
+    true
   rescue StandardError => e
     Rails.logger.warn('[WHATSAPP] Phone number webhook callback override failed but continuing ' \
                       "(phone_number_id #{phone_number_id}, #{callback_url}): #{e.message}")
-    nil
+    false
   end
 
   def request_headers

@@ -32,7 +32,7 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
 
   def health
     health_data = Whatsapp::HealthService.new(@inbox.channel).sync_health_status!
-    render json: health_data
+    render json: health_data.merge(routed_by_app_callback_only: routed_by_app_callback_only?(health_data))
   rescue Whatsapp::HealthService::ApiError => e
     Rails.logger.error "[INBOX HEALTH] Error fetching health data: #{e.message}"
     render json: {
@@ -50,9 +50,12 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   end
 
   def register_webhook
-    Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
+    # The per-number override is allowed to be refused without taking the channel down, so
+    # "registered successfully" on its own would be the whole answer for a number Meta refused to
+    # point here. The answer says which half landed.
+    applied = Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
 
-    render json: { message: 'Webhook registered successfully' }, status: :ok
+    render json: { message: 'Webhook registered successfully', callback_override_applied: applied }, status: :ok
   rescue StandardError => e
     Rails.logger.error "[INBOX WEBHOOK] Webhook registration failed: #{e.message}"
     render json: { error: e.message }, status: :unprocessable_entity
@@ -67,6 +70,22 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   end
 
   private
+
+  # Meta answers three levels of webhook routing and delivery follows the most specific one that
+  # EXISTS, wherever it points. So this asks about existence, not about the URL: an override of
+  # its own, for this number or for the WhatsApp Business Account it belongs to, means the inbox
+  # owns its routing even when that override points somewhere wrong, which is a different problem
+  # and already has its own warning. Only when neither exists does delivery ride on the app's own
+  # callback, which belongs to the installation rather than to this inbox and can be pointed
+  # elsewhere at any time. Read on every request rather than stored, so it cannot go stale against
+  # Meta, and false when Meta answered no configuration at all, because not knowing is not a
+  # warning.
+  def routed_by_app_callback_only?(health_data)
+    configuration = health_data[:webhook_configuration]
+    return false if configuration.blank?
+
+    configuration.values_at('phone_number', 'whatsapp_business_account').all?(&:blank?)
+  end
 
   def whatsapp_channel
     channel = @inbox.channel

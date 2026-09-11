@@ -179,6 +179,13 @@
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - nativo",
       "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
+    },
+    "ACCOUNT_HEALTH": {
+      "WEBHOOK": {
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registrado, pero Meta no aceptó apuntar este número en sí aquí, así que su enrutamiento propio no cambió. La tarjeta de abajo muestra qué URL sigue la entrega.",
+        "RIDES_ON_APP_CALLBACK": "La entrega sigue la URL de callback de la aplicación: ni este número ni su cuenta de WhatsApp Business apuntan a esta instalación, así que deja de llegar si esa URL cambia.",
+        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número no tiene enrutamiento propio, así que la entrega sigue la URL de callback de la aplicación, mostrada abajo, que no es la esperada para este número. Registrar el webhook apunta este número aquí; si Meta lo rechaza en esta cuenta, lo que hay que cambiar es el callback de la aplicación."
+      }
     }
   }
 }

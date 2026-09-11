@@ -216,9 +216,9 @@ describe Whatsapp::FacebookApiClient do
           )
       end
 
-      it 'returns success response' do
+      it 'answers that the per-number routing landed' do
         result = api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
-        expect(result['success']).to be(true)
+        expect(result).to be(true)
       end
     end
 
@@ -263,10 +263,10 @@ describe Whatsapp::FacebookApiClient do
         context "when Meta answers with #{shape}" do
           before { refuse.call(stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")) }
 
-          it 'does not raise, and answers with the subscription that did land' do
+          it 'does not raise, and answers that the routing was not applied' do
             result = api_client.subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token)
 
-            expect(result['success']).to be(true)
+            expect(result).to be(false)
           end
 
           it 'says in the log which call was refused and for which number' do
