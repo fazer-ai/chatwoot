@@ -18,10 +18,16 @@ set -x
 # the ordering when a single container is restarted later. The gate has to live somewhere
 # it cannot be dropped, which is here.
 #
-# Wired into docker-compose.coolify.yaml and nowhere else. docker-compose.production.yaml
-# is upstream's file and names upstream's image, which has no such script: pointing its
-# worker here would break every deployment that runs it as checked in, to install a gate
-# for a container that is not this fork's.
+# Reached from the image's ENTRYPOINT (docker/entrypoints/docker-entrypoint.sh), which
+# dispatches by argv, so every deployment of this image gets the gate whether or not its
+# compose knows this file exists. That indirection is the point: while this was wired from
+# docker-compose.coolify.yaml and nowhere else, the protection was present exactly where
+# somebody had remembered it, and it went missing twice.
+#
+# docker-compose.production.yaml stays untouched on purpose. It is upstream's file and
+# names upstream's image, which has no such script; pointing its worker here by name would
+# break every deployment that runs it as checked in. Running that same file against this
+# fork's image does get the gate, because the gate travels in the image.
 #
 # The Rails container owns the migrations; this one only waits for them. A worker that
 # comes up alone against a database nobody is migrating waits forever, on purpose: the

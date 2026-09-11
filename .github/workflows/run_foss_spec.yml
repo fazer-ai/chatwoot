@@ -107,6 +107,13 @@ jobs:
                 spec/enterprise/*|enterprise/*) continue ;;   # stripped before the suite runs
                 spec/*_spec.rb) [ -f "$f" ] && specs+="$f"$'\n' ;;
                 app/javascript/*) continue ;;
+                docker/entrypoints/*|docker/Dockerfile)
+                  # A shell script has no `_spec.rb` twin, so the filename map below cannot
+                  # reach spec/docker and the entrypoint's own guard would change with
+                  # nothing running against it.
+                  found=$(find spec/docker -name '*_spec.rb' 2>/dev/null || true)
+                  [ -n "$found" ] && specs+="$found"$'\n'
+                  ;;
                 app/*.rb|lib/*.rb)
                   # Every spec named after the file, wherever it sits (spec/models, spec/requests...).
                   base=$(basename "$f" .rb)
