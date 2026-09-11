@@ -132,8 +132,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   it 'asks for the session to be deleted on the control stream, where an account nobody runs is still reachable' do
     backend.delete_session
 
-    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete))
-    expect(client).not_to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete))
+    expect(client).to have_received(:control)
+      .with(an_instance_of(model::Commands::SessionDelete), max_runtime: described_class::TEARDOWN_RUNTIME)
+    expect(client).not_to have_received(:publish).with(an_instance_of(model::Commands::SessionDelete), any_args)
   end
 
   # The pairing is what outlives the inbox: a device stays listed on the customer's phone
@@ -143,8 +144,10 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   it 'unlinks the device on the session stream before it asks for the session to be deleted' do
     backend.delete_session
 
-    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).ordered
-    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete)).ordered
+    expect(client).to have_received(:publish)
+      .with(an_instance_of(model::Commands::SessionLogout), max_runtime: described_class::TEARDOWN_RUNTIME).ordered
+    expect(client).to have_received(:control)
+      .with(an_instance_of(model::Commands::SessionDelete), max_runtime: described_class::TEARDOWN_RUNTIME).ordered
   end
 
   # The connector answers a teardown it could not carry out with `command.failed`, and
@@ -363,17 +366,21 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       .with(an_instance_of(model::Commands::PairingRequestCode), timeout: described_class::PAIRING_TIMEOUT)
   end
 
-  # `deadline` says "do not start after this" as much as it says "do not run longer than
-  # this", and for the teardown the first costs more than the second buys: a `session.logout`
-  # dropped for arriving late leaves a device listed on the customer's phone forever. It is
-  # published precisely so it can sit pending while the session is between owners.
-  it 'leaves the teardown unbounded' do
+  # The teardown takes the ceiling counted from when the work starts, and takes it alone.
+  # A deadline is the half it cannot have: it is published precisely so it can sit pending
+  # while the session is between owners, and a `session.logout` refused for arriving late
+  # leaves a device listed on the customer's phone with nothing here corresponding to it.
+  it 'bounds the teardown by how long it may run, never by when it stops being worth running' do
     backend.disconnect
     backend.logout
     backend.delete_session
 
-    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDisconnect))
-    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout)).twice
-    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete))
+    ceiling = { max_runtime: described_class::TEARDOWN_RUNTIME }
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionDisconnect), **ceiling)
+    expect(client).to have_received(:publish).with(an_instance_of(model::Commands::SessionLogout), **ceiling).twice
+    expect(client).to have_received(:control).with(an_instance_of(model::Commands::SessionDelete), **ceiling)
+    # And never the other one, which is the whole reason both fields exist.
+    expect(client).not_to have_received(:publish).with(anything, hash_including(:timeout))
+    expect(client).not_to have_received(:control).with(anything, hash_including(:timeout))
   end
 end

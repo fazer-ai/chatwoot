@@ -11,6 +11,7 @@
   "definitions": {
     "protocol_version": { "type": "integer", "const": 1 },
     "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 1 },
     "digits": { "type": "string", "pattern": "^[0-9]+$" },
     "message_id": { "type": "string", "minLength": 1, "maxLength": 128 },
 
@@ -324,7 +325,7 @@
 
     "command_frame": {
       "type": "object",
-      "description": "One entry of wa:cmd:<sid> or wa:control. reply_to is the wa:reply:<id> list an RPC answer is pushed to.",
+      "description": "One entry of wa:cmd:<sid> or wa:control. reply_to is the wa:reply:<id> list an RPC answer is pushed to. deadline and max_runtime_ms are two different requests: deadline says do not start this after that moment, max_runtime_ms says do not let it run longer than that once started. A command carrying both gets whichever runs out first.",
       "properties": {
         "v": { "$ref": "#/definitions/protocol_version" },
         "id": { "type": "string", "minLength": 1 },
@@ -333,6 +334,7 @@
         "ts": { "$ref": "#/definitions/timestamp_ms" },
         "reply_to": { "type": ["string", "null"] },
         "deadline": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
+        "max_runtime_ms": { "oneOf": [{ "$ref": "#/definitions/duration_ms" }, { "type": "null" }] },
         "idempotency_key": { "type": ["string", "null"] },
         "payload": { "type": "object" }
       },
