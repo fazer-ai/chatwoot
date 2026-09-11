@@ -97,6 +97,23 @@ describe('AccountHealth', () => {
       );
     });
 
+    // Meta routes at three levels, and only the third one belongs to the app. A WABA-level
+    // override pointing here is this account's own routing: changing the app callback does not
+    // touch it.
+    it('stays quiet when the business account is the one pointed here', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: {
+          whatsapp_business_account: expectedUrl,
+          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+        },
+        expected_webhook_url: expectedUrl,
+      });
+
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+      );
+    });
+
     it('stays quiet when the override is in place for this number', () => {
       const wrapper = mountComponent({
         webhook_configuration: {

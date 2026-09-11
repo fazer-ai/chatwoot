@@ -373,18 +373,22 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
-// The card is green whenever the effective URL is ours, and it is ours in two different
-// situations: this number is pointed here, or the app's own callback happens to be here and this
-// number rides on it. Meta refuses to point a number here for a whole class of accounts, and that
-// refusal no longer takes the channel down, so nothing distinguished the two: delivery works
-// until the app-level URL changes, and then this inbox goes quiet with a green card.
-const numberNotRoutedHere = computed(
-  () =>
+// Meta answers three levels of routing, and `webhookUrl` prefers them in that order: this number,
+// the WhatsApp Business Account it belongs to, and the app's own callback. The card is green
+// whenever the effective one is ours, which hides a real difference: routed by the first two, this
+// inbox owns its delivery; routed by the third, it is riding on a URL that belongs to the app and
+// can be pointed elsewhere at any time, and then this inbox goes quiet with a green card.
+const routedByAppCallbackOnly = computed(() => {
+  const configuration = props.healthData?.webhook_configuration;
+  const expected = props.healthData?.expected_webhook_url;
+
+  return (
     webhookConfigured.value &&
     !webhookUrlMismatch.value &&
-    props.healthData?.webhook_configuration?.phone_number !==
-      props.healthData?.expected_webhook_url
-);
+    configuration?.phone_number !== expected &&
+    configuration?.whatsapp_business_account !== expected
+  );
+});
 
 const handleRegisterWebhook = () => {
   emit('registerWebhook');
@@ -532,7 +536,7 @@ const handleCopyWebhookUrl = async url => {
             </ButtonV4>
           </div>
           <div
-            v-if="numberNotRoutedHere"
+            v-if="routedByAppCallbackOnly"
             class="flex gap-1.5 items-start text-label-small text-n-amber-11"
           >
             <Icon
