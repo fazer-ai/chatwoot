@@ -12,6 +12,8 @@ en:
     messages:
       deleted: This message was deleted
   errors:
+    request:
+      unexpected: The request could not be completed.
     account:
       brand_name:
         invalid: cannot contain < or >

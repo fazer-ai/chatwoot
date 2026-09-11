@@ -257,6 +257,57 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.meta).to include('description' => 'Profile picture', 'source' => 'upload')
       end
 
+      # `to_h` answers a different exception for each shape a caller can put at a value
+      # position -- NoMethodError for a String or a number, TypeError for a bare array,
+      # ArgumentError for an array of short pairs -- and each of them took the whole request
+      # down and put the Ruby text in the HTTP body. Ignoring the entry keeps the message and
+      # the attachment, which is what the caller was asking for.
+      [['a String', 'lixo'], ['a number', 5], ['a bare array', %w[a b]], ['an array of short pairs', [['a']]]].each do |shape, value|
+        it "ignores metadata sent as #{shape}, and still creates the message and the attachment" do
+          params[:attachments_metadata] = { 'avatar.png' => value }
+
+          message = message_builder
+
+          expect(message.attachments.count).to eq(1)
+          expect(message.attachments.first.meta).to eq({})
+        end
+      end
+
+      # The one shape `to_h` accepts, and the reason ignoring beats coercing: an array of pairs
+      # became metadata whose `is_voice_message` was the string "false", which is `present?` and
+      # reads at both providers as an explicit yes. `cast_metadata_flags` never saw it, because
+      # it only casts inside a Hash.
+      it 'does not turn an array of pairs into metadata with a string boolean' do
+        params[:attachments_metadata] = { 'avatar.png' => [%w[is_voice_message false], %w[description legenda]] }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta['is_voice_message']).not_to eq('false')
+        expect(message.attachments.first.meta).to eq({})
+      end
+
+      it 'says in the log which file had its metadata ignored, and what arrived' do
+        allow(Rails.logger).to receive(:warn)
+        params[:attachments_metadata] = { 'avatar.png' => 'lixo' }
+
+        message_builder
+
+        expect(Rails.logger).to have_received(:warn).with(/avatar\.png.*String/)
+      end
+
+      # The other place the same value can arrive, and it died earlier: `attachments_metadata=lixo`
+      # never reached an attachment at all, it broke on `deep_stringify_keys`.
+      [['a String', 'lixo'], ['an array', %w[a]]].each do |shape, value|
+        it "ignores attachments_metadata sent as #{shape} at the top level" do
+          params[:attachments_metadata] = value
+
+          message = message_builder
+
+          expect(message.attachments.count).to eq(1)
+          expect(message.attachments.first.meta).to eq({})
+        end
+      end
+
       it 'does not apply metadata when filename key does not match' do
         params[:attachments_metadata] = { 'other_file.png' => { description: 'Wrong file' } }
 

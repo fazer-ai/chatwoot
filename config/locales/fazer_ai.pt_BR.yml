@@ -12,6 +12,8 @@ pt_BR:
     messages:
       deleted: Esta mensagem foi excluída
   errors:
+    request:
+      unexpected: Não foi possível completar a requisição.
     account:
       brand_name:
         invalid: não pode conter < ou >
