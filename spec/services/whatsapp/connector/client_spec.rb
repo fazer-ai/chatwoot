@@ -57,14 +57,26 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
       expect(frame).not_to have_key('reply_to')
     end
 
-    # The teardown is published exactly so it can sit pending while the session is between
-    # owners, and `deadline` means "do not start after this" as much as it means "do not
-    # run longer than this": a ceiling here would discard the logout that unlinks the
-    # device from the customer's phone.
+    # The other ceiling, and the teardown is what it exists for: published exactly so it can
+    # sit pending while the session is between owners, it cannot take a deadline without
+    # becoming droppable, and a `session.logout` dropped for arriving late leaves the device
+    # listed on the customer's phone. This one is a duration the connector starts counting
+    # when the work does, so queueing time never eats into it.
+    it 'bounds a published command by how long it may run once it starts' do
+      client.publish(model::Commands::SessionLogout.new, max_runtime: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame['max_runtime_ms'].to_i).to eq(30_000)
+      # An instant would be the wrong half, and sending both would reintroduce it.
+      expect(frame).not_to have_key('deadline')
+    end
+
     it 'leaves a published command unbounded when its caller declared no ceiling' do
       client.publish(model::Commands::SessionLogout.new)
 
-      expect(frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)).not_to have_key('deadline')
+      frame = frame_of(redis.xrange("#{prefix}cmd:#{session_id}").first)
+      expect(frame).not_to have_key('deadline')
+      expect(frame).not_to have_key('max_runtime_ms')
     end
 
     it 'refuses to queue for a connector that speaks another protocol' do
@@ -131,6 +143,18 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
 
       frame = frame_of(redis.xrange("#{prefix}control").first)
       expect(frame).not_to have_key('reply_to')
+      expect(frame).not_to have_key('deadline')
+      expect(frame).not_to have_key('max_runtime_ms')
+    end
+
+    # The teardown of a session nobody is running goes through this door, and it needs the
+    # same ceiling as the half that rides the session's own stream: the executor it holds
+    # is the one the connector adopted for the length of the teardown.
+    it 'carries a runtime ceiling on a control command that asks for one' do
+      client.control(model::Commands::SessionDelete.new, max_runtime: 30)
+
+      frame = frame_of(redis.xrange("#{prefix}control").first)
+      expect(frame['max_runtime_ms'].to_i).to eq(30_000)
       expect(frame).not_to have_key('deadline')
     end
 

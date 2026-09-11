@@ -1,21 +1,28 @@
 require 'rails_helper'
 
-# The same question at every `client.publish` site, asked of the source rather than of a
+# The same question at every fire-and-forget site, asked of the source rather than of a
 # checklist: how long may this command hold the session?
 #
-# A published command has no caller waiting on it, so the `deadline` on its frame is the
-# only ceiling the connector has for it, and the session's executor runs one command at a
-# time -- one parked on a socket write is every send behind it parked too. A tenth publish
-# site added without a ceiling would reintroduce that with nothing failing.
+# A published command has no caller waiting on it, so whatever ceiling its frame declares
+# is the only one the connector has for it, and the session's executor runs one command at
+# a time -- one parked on a socket write is every send behind it parked too. A tenth site
+# added without a ceiling would reintroduce that with nothing failing.
 #
-# The teardown is the deliberate exception, and it is named here rather than inferred:
-# `deadline` means "do not start after this" as much as "do not run longer than this", and
-# a `session.logout` dropped for arriving late leaves a device listed on the customer's
-# phone. It is published precisely so it can sit pending between owners.
+# There are two ceilings and they are not interchangeable. `timeout:` becomes `deadline`,
+# an instant, and refuses the command unrun once it passes; `max_runtime:` is counted from
+# the moment the work starts and can never drop anything. The teardown takes the second
+# alone, which is exactly why it used to take neither: it is published so it can sit
+# pending between owners, and a `session.logout` dropped for arriving late leaves a device
+# listed on the customer's phone.
 RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
-  describe 'the ceiling on every published command' do
+  describe 'the ceiling on every fire-and-forget command' do
     let(:source) { Rails.root.join('app/services/whatsapp/session/backends/connector/backend.rb') }
-    let(:unbounded_on_purpose) { %w[disconnect logout delete_session] }
+
+    # The wake, and the last site with no ceiling of either kind. It starts a session that
+    # may not be running and nothing here waits on it, so a deadline would drop the very
+    # command that was meant to bring the session up; what follows it is an RPC with a
+    # ceiling of its own, which is what bounds the connect it asks for.
+    let(:unbounded_on_purpose) { %w[connect] }
 
     # [method name, source line] for every `client.publish` call in the backend.
     let(:publish_sites) { sites_calling('client.publish(') }
@@ -33,6 +40,13 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       end
     end
 
+    def bound(line)
+      return :deadline if line.include?('timeout:')
+      return :runtime if line.include?('max_runtime:')
+
+      :none
+    end
+
     it 'finds every publish site the backend has' do
       # Vacuity guard: a rename or a refactor that hides the calls would leave the sweep
       # passing over nothing at all.
@@ -42,33 +56,42 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
                             'mark_unread', 'send_chat_presence', 'update_presence', 'subscribe_presence')
     end
 
-    # Both are unbounded on purpose, and for one reason: each starts something for a
-    # session that may not be running, where "do not start after this" is the reading of
-    # `deadline` that costs more than the other buys. A wake dropped for arriving late is
-    # a session nobody starts; a teardown dropped for arriving late is a device left
-    # listed on the customer's phone.
-    it 'finds every control site, and each is a command that must not be dropped for being late' do
+    it 'finds every control site the backend has' do
       expect(control_sites.map(&:first)).to contain_exactly('connect', 'delete_session')
-      expect(control_sites.select { |_, line| line.include?('timeout:') }).to be_empty
     end
 
-    it 'declares a ceiling at every publish site that is not the teardown' do
-      missing = publish_sites.reject { |method, line| unbounded_on_purpose.include?(method) || line.include?('timeout:') }
+    it 'declares a ceiling at every site that is not the wake' do
+      sites = publish_sites + control_sites
+      missing = sites.reject { |method, line| unbounded_on_purpose.include?(method) || bound(line) != :none }
 
       expect(missing.map(&:first)).to be_empty,
-                                      "these publish a command with no ceiling: #{missing.map(&:first).uniq.join(', ')}. " \
-                                      'Nobody waits on a published command, so the deadline on the frame is the only ' \
-                                      'limit the connector has for it.'
+                                      "these send a command with no ceiling: #{missing.map(&:first).uniq.join(', ')}. " \
+                                      'Nobody waits on a fire-and-forget command, so the frame is the only place a ' \
+                                      'limit can come from.'
     end
 
-    it 'covers both sides of the exception' do
-      # The fence proves nothing if every site is on the exception list, and nothing if none
-      # is: it has to be reached by both kinds.
-      bounded, unbounded = publish_sites.partition { |_, line| line.include?('timeout:') }
+    it 'gives the teardown the ceiling it can take and withholds the one it cannot' do
+      # The distinction is the whole point of having two fields, so it is asserted rather
+      # than left to whichever one somebody reaches for next. A deadline here would refuse
+      # the teardown that arrives while the session is between owners.
+      teardown = (publish_sites + control_sites).filter_map do |method, line|
+        bound(line) if %w[disconnect logout delete_session].include?(method)
+      end
 
-      expect(bounded.map(&:first).uniq).to contain_exactly('request_pairing_code', 'mark_read', 'mark_unread',
-                                                           'send_chat_presence', 'update_presence', 'subscribe_presence')
-      expect(unbounded.map(&:first).uniq).to match_array(unbounded_on_purpose)
+      expect(teardown.size).to eq(4)
+      expect(teardown.uniq).to eq([:runtime])
+    end
+
+    it 'covers all three kinds' do
+      # The fence proves nothing if every site is bounded the same way: it has to be
+      # reached by a deadline, by a runtime ceiling, and by the exception.
+      by_bound = (publish_sites + control_sites).group_by { |_, line| bound(line) }
+                                                .transform_values { |sites| sites.map(&:first).uniq }
+
+      expect(by_bound[:deadline]).to contain_exactly('request_pairing_code', 'mark_read', 'mark_unread',
+                                                     'send_chat_presence', 'update_presence', 'subscribe_presence')
+      expect(by_bound[:runtime]).to contain_exactly('disconnect', 'logout', 'delete_session')
+      expect(by_bound[:none]).to match_array(unbounded_on_purpose)
     end
 
     it 'names methods that exist' do

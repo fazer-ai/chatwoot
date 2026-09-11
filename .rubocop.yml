@@ -20,6 +20,11 @@ Metrics/ClassLength:
     - 'app/models/conversation.rb'
     - 'app/models/inbox.rb'
     - 'config/initializers/rack_attack.rb'
+    # A flat adapter: one short method per command in the connector protocol, and its
+    # length is the size of that protocol rather than complexity anyone can factor out.
+    # Every command the contract adds costs a line here, so the limit is met by shaving
+    # something unrelated, which is the opposite of what the cop is for.
+    - 'app/services/whatsapp/session/backends/connector/backend.rb'
 
 Metrics/MethodLength:
   Max: 19

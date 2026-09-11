@@ -24,14 +24,18 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
   # --- the ceiling on a published command ------------------------------------------
   #
-  # A published command carries no `reply_to`, so nobody here is waiting to give up on it,
-  # and the `deadline` on its frame is the only limit the connector has for it: it refuses
-  # a command whose deadline passed before it was reached, and it bounds the execution of
-  # one it does run. The session's executor takes one command at a time, so a published
-  # command with no ceiling, parked on a socket write, is every send behind it parked too.
+  # A published command carries no `reply_to`, so nobody here is waiting to give up on it
+  # and whatever ceiling the frame declares is the only limit the connector has. The
+  # session's executor takes one command at a time, so a published command with no ceiling
+  # at all, parked on a socket write, is every send behind it parked too.
   #
-  # How much budget differs by what a late execution would mean, because the one field
-  # says "do not start after this" and "do not run longer than this" at the same time.
+  # The frame offers two, and which one a command wants follows from what a late execution
+  # would cost it. `deadline` is an instant, refusing the command unrun once it passes, so
+  # it is for the commands that are wrong rather than merely late when they land. The
+  # runtime ceiling below is counted from the moment the work starts and can never drop
+  # anything, so it is for the ones that have to happen whenever they arrive.
+  #
+  # The timeouts here are deadlines. The teardown takes the other one, on its own constant.
 
   # A momentary state that lands late is not late, it is wrong: an `available` applied
   # after the agent went offline flips the account back, and a `composing` applied minutes
@@ -49,6 +53,19 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # the pairing screen already runs on: past it, the screen the operator would type the
   # code into is gone.
   PAIRING_TIMEOUT = Whatsapp::Session::PairingPollJob::DEADLINES.fetch('code').to_i
+
+  # The teardown takes the other ceiling, the one counted from when the work starts, and
+  # takes it alone. A deadline would be the wrong half: a teardown is deliberately left
+  # pending while the session is between owners, and refusing it for arriving late leaves
+  # a device listed on the customer's phone with nothing here corresponding to it. What
+  # the runtime ceiling bounds instead is a teardown parked on a socket write, and it
+  # cannot drop anything, because the clock only starts once the connector picks it up.
+  #
+  # Generous, because the wait it exists to end is a half-open socket rather than a slow
+  # answer: WhatsApp answers an unlink in well under a second, and a socket that is simply
+  # down answers at once with a refusal. Everything the connector still owes itself after
+  # the unlink runs outside this ceiling, by contract.
+  TEARDOWN_RUNTIME = 30
 
   class << self
     def provider_key
@@ -93,17 +110,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     model::ConnectionState.from_h(client.call(command))
   end
 
-  # The teardown carries no ceiling, and that is the one place where the two readings of
-  # `deadline` pull against each other hard enough to matter: a command dropped for
-  # arriving late is a device left listed on the customer's phone, while the executor a
-  # stuck teardown holds belongs to the session that is going away rather than to an
-  # account still in use.
   def disconnect
-    client.publish(commands::SessionDisconnect.new)
+    client.publish(commands::SessionDisconnect.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
   def logout
-    client.publish(commands::SessionLogout.new)
+    client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
   # The teardown, and the two halves go by different routes because they cover states the
@@ -139,11 +151,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # misses and the event is dropped as an orphan. What we publish is the last thing about
   # this session that anybody can see.
   #
-  # One hash rather than two assignments so the method stays inside this class's line
-  # budget; Ruby evaluates the values in order, so the logout is still written first, and
-  # a spec pins that ordering rather than leaving it to be read out of this comment.
+  # The two ids go into the hash the log line carries. Ruby evaluates the values in the
+  # order they are written, so the logout is still sent first, and a spec pins that
+  # ordering rather than leaving it to be read out of this comment.
   def delete_session
-    asked = { logout: client.publish(commands::SessionLogout.new), delete: client.control(commands::SessionDelete.new) }
+    asked = { logout: client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME),
+              delete: client.control(commands::SessionDelete.new, max_runtime: TEARDOWN_RUNTIME) }
     Rails.logger.info("[WHATSAPP] tearing session #{session_id} down for inbox #{channel.inbox&.id}: #{asked.to_json}")
   end
 
