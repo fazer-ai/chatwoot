@@ -642,11 +642,9 @@ export default {
         const { data } = await InboxHealthAPI.registerWebhook(this.inbox.id);
         // Meta refuses the per-number override for a whole class of accounts, and that refusal no
         // longer takes the channel down, so a plain success here would be the only thing the
-        // operator sees about a write that did not land. The answer is about the write and says
-        // nothing about where delivery goes now: a number that already had an override keeps it,
-        // and the rescue behind this flag swallows a transient 500 the same as a refusal. The card
-        // is refreshed on the next line and reads the routing from Meta, so it is what the
-        // sentence points at.
+        // operator sees about a write that did not land. The flag is about that write and nothing
+        // else: it reads `false` for a refusal, for a 500 and for a connection that closed, so the
+        // sentence sends the reader to the card instead of claiming where delivery goes.
         useAlert(
           data?.callback_override_applied === false
             ? this.$t(
@@ -654,7 +652,14 @@ export default {
               )
             : this.$t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS')
         );
-        await this.fetchHealthData();
+        // The answer already carries the routing Meta reported after the write, so the card comes
+        // from it instead of a second round trip. When that read did not come back the field says
+        // so, and then the card is fetched rather than left showing what it had before the press.
+        if (data?.routing_read_back) {
+          this.healthData = data.health;
+        } else {
+          await this.fetchHealthData();
+        }
       } catch (error) {
         useAlert(
           error.response?.data?.error ||

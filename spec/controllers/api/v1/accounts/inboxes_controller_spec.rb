@@ -1695,10 +1695,28 @@ RSpec.describe 'Inboxes API', type: :request do
         .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
     end
 
+    # The endpoint reads the routing back after the attempt, so every example here answers that read
+    # too. One stub covers both GETs because the factory gives the phone number and the business
+    # account the same id, and each formatter reads its own keys out of the body.
+    let(:health_api_version) { 'v24.0' }
+    let(:elsewhere_url) { 'https://elsewhere.example.com/webhooks/whatsapp/+123' }
+
+    def stub_health_read(phone_number_override)
+      stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/#{phone_number_id}})
+        .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: {
+          id: phone_number_id,
+          display_phone_number: '+1 234 567 8911',
+          webhook_configuration: { phone_number: phone_number_override }.compact,
+          name: 'WABA',
+          owner_business_info: { id: 'biz', name: 'Portfolio' }
+        }.to_json)
+    end
+
     before do
       allow(GlobalConfigService).to receive(:load).and_call_original
       allow(GlobalConfigService).to receive(:load).with('WHATSAPP_API_VERSION', 'v22.0').and_return(api_version)
       subscription
+      stub_health_read(elsewhere_url)
     end
 
     context 'when Meta accepts both calls' do
@@ -1712,7 +1730,7 @@ RSpec.describe 'Inboxes API', type: :request do
              headers: admin.create_new_auth_token, as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body).to eq('message' => 'Webhook registered successfully', 'callback_override_applied' => true)
+        expect(response.parsed_body).to include('message' => 'Webhook registered successfully', 'callback_override_applied' => true)
       end
     end
 
@@ -1729,7 +1747,7 @@ RSpec.describe 'Inboxes API', type: :request do
              headers: admin.create_new_auth_token, as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body).to eq('message' => 'Webhook registered successfully', 'callback_override_applied' => false)
+        expect(response.parsed_body).to include('message' => 'Webhook registered successfully', 'callback_override_applied' => false)
         expect(subscription).to have_been_requested
       end
 
@@ -1754,6 +1772,92 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['error']).to include('Webhook setup failed')
         expect(response.parsed_body).not_to have_key('callback_override_applied')
+      end
+    end
+
+    # `callback_override_applied` answers one write, and a refusal, a 500 and a connection that
+    # closes with nothing to read all reach it as the same `false`. Where delivery goes afterwards
+    # is a different question, and the only authority on it is Meta, read back after the attempt.
+    context 'when the answer has to say where delivery goes' do
+      let(:expected_url) { "#{ENV.fetch('FRONTEND_URL', 'http://www.chatwoot.test')}/webhooks/whatsapp/#{whatsapp_channel.phone_number}" }
+
+      def register
+        post "/api/v1/accounts/#{account.id}/inboxes/#{whatsapp_inbox.id}/register_webhook",
+             headers: admin.create_new_auth_token, as: :json
+        response.parsed_body
+      end
+
+      it 'reads the routing back when Meta refused the write, and answers what it found' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+        stub_health_read(elsewhere_url)
+
+        body = register
+
+        expect(response).to have_http_status(:success)
+        expect(body['callback_override_applied']).to be(false)
+        expect(body['routing_read_back']).to be(true)
+        expect(body.dig('health', 'webhook_configuration', 'phone_number')).to eq(elsewhere_url)
+      end
+
+      # The case this endpoint could not describe: Meta stored the override and then answered 500.
+      # The write is not confirmed and the routing did change, so an answer derived from the write
+      # alone contradicts the card that is rendered from the read.
+      it 'answers the routing the write actually left, even though the write was not confirmed' do
+        # The fake Meta stores the override and only then fails, and the read answers what is
+        # stored at the moment it is asked. So a read taken before the write would answer the old
+        # URL, and this example is what pins the order rather than only the value.
+        stored = elsewhere_url
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return do
+            stored = expected_url
+            { status: 500, body: { error: { message: 'An unexpected error has occurred.', code: 1 } }.to_json }
+          end
+        stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/#{phone_number_id}})
+          .to_return do
+            { status: 200, headers: { 'Content-Type' => 'application/json' },
+              body: { id: phone_number_id, webhook_configuration: { phone_number: stored } }.to_json }
+          end
+
+        body = register
+
+        expect(body['callback_override_applied']).to be(false)
+        expect(body['routing_read_back']).to be(true)
+        expect(body.dig('health', 'webhook_configuration', 'phone_number')).to eq(expected_url)
+        expect(body.dig('health', 'routed_by_app_callback_only')).to be(false)
+      end
+
+      # The read is the addition, so it is the thing that must not cost anything: a write that
+      # landed cannot be reported as a failure because the read after it did not come back.
+      it 'says the routing is unknown when it could not be read back, and still answers 2xx' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 200, body: { success: true }.to_json, headers: { 'Content-Type' => 'application/json' })
+        stub_request(:get, %r{graph\.facebook\.com/#{health_api_version}/}).to_return(status: 500, body: '{}')
+
+        body = register
+
+        expect(response).to have_http_status(:success)
+        expect(body['callback_override_applied']).to be(true)
+        expect(body['routing_read_back']).to be(false)
+        expect(body).not_to have_key('health')
+      end
+
+      # Two arrangements that differ only in what Meta did with the write, and a consumer that is
+      # not the dashboard has to be able to tell them apart.
+      it 'answers differently for a refused write and one that landed before the error' do
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+        stub_health_read(elsewhere_url)
+        refused = register
+
+        stub_request(:post, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+          .to_return(status: 500, body: { error: { message: 'An unexpected error has occurred.', code: 1 } }.to_json)
+        stub_health_read(expected_url)
+        landed = register
+
+        expect(refused['callback_override_applied']).to eq(landed['callback_override_applied'])
+        expect(refused.dig('health', 'webhook_configuration', 'phone_number'))
+          .not_to eq(landed.dig('health', 'webhook_configuration', 'phone_number'))
       end
     end
 
