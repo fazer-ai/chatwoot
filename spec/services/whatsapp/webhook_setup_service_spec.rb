@@ -312,14 +312,36 @@ describe Whatsapp::WebhookSetupService do
         expect(config).not_to have_key('verification_pin_confirmed')
       end
 
-      it 'forgets the PIN when Meta refused, because then Meta holds none' do
+      it 'keeps the PIN even when Meta refused, because a refusal establishes nothing about it' do
+        # A 5xx, a rate limit, a body this code could not parse and a failure to save the
+        # confirmation after a registration Meta ACCEPTED all arrive here as the same exception.
+        # Dropping the PIN on any of them loses one that may be live and sends a different one next
+        # time, which is the disagreement this change exists to prevent.
         allow(api_client).to receive(:register_phone_number).and_raise('Phone registration failed: {"error":"bad pin"}')
 
         with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
           service.perform
         end
 
-        expect(channel.reload.provider_config).not_to have_key('verification_pin')
+        expect(channel.reload.provider_config['verification_pin']).to eq(223_456)
+      end
+
+      it 'keeps a PIN Meta already confirmed when saving the confirmation itself fails' do
+        # The worst case of dropping on failure: the registration landed, and the exception comes
+        # from the write that records it.
+        allow(api_client).to receive(:register_phone_number).and_return({ 'success' => true })
+        allow(channel).to receive(:save!).with(validate: false).and_call_original
+        call = 0
+        allow(channel).to receive(:save!).with(validate: false) do
+          call += 1
+          raise ActiveRecord::RecordInvalid if call > 1
+
+          true
+        end
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect { service.perform }.not_to raise_error
+        end
       end
 
       it 'confirms the PIN when the call came back, because then Meta holds this one' do
@@ -344,6 +366,18 @@ describe Whatsapp::WebhookSetupService do
 
         expect(Rails.logger).to have_received(:warn).with(/outcome unknown/)
         expect(Rails.logger).not_to have_received(:warn).with(/refused/)
+      end
+
+      it 'never puts the PIN in the log, because it is a credential' do
+        # Direct interpolation into the logger bypasses Rails parameter filtering, and on a timeout
+        # this is very likely the PIN Meta is holding.
+        allow(Rails.logger).to receive(:warn)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        expect(Rails.logger).not_to have_received(:warn).with(/223456|223_456/)
       end
 
       it 'writes the PIN without re-validating the credentials against Meta' do

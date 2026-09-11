@@ -40,12 +40,13 @@ class Whatsapp::WebhookSetupService
     @api_client.register_phone_number(phone_number_id, pin)
     confirm_pin
   rescue StandardError => e
-    outcome = registration_outcome(e)
-    # Meta answering "no" is knowledge: it does not hold a PIN for this number, so neither do we.
-    # A silence is not, and the PIN stays exactly because it might be the one Meta is holding.
-    forget_pin if outcome == 'refused'
-    Rails.logger.warn("[WHATSAPP] Phone registration #{outcome} but continuing " \
-                      "(phone_number_id #{phone_number_id}, pin #{pin}): #{e.message}")
+    # The PIN is never dropped here. A failure establishes nothing about what Meta holds: a 5xx, a
+    # rate limit and a body this code could not parse all reach this line, and so does a failure to
+    # save the confirmation AFTER a registration Meta accepted. Dropping it on any of those loses a
+    # PIN that may well be live and makes the next attempt send a different one, which is the exact
+    # disagreement this change exists to prevent.
+    Rails.logger.warn("[WHATSAPP] Phone registration #{registration_outcome(e)} but continuing " \
+                      "(phone_number_id #{phone_number_id}): #{e.message}")
   end
 
   # A refusal and a silence are different facts and used to share one sentence. Meta answering "no"
@@ -79,16 +80,11 @@ class Whatsapp::WebhookSetupService
   # Storing the PIN before the call is what makes a retry send the same one, and it costs the field
   # its old meaning: it used to appear only after Meta answered, so its presence was an answer. Now
   # it says what was sent, and this marker says what came back. The three states the issue is about
-  # (#590) are readable again: no PIN means Meta holds none, a confirmed PIN means Meta holds this
-  # one, and an unconfirmed PIN means nobody knows, which is the state that used to be unwritable.
+  # (#590) are readable again: no PIN means none was ever sent, a confirmed PIN means Meta answered
+  # for this one, and an unconfirmed PIN means nobody knows, which is the state that used to be
+  # unwritable. Only the middle one is a claim about Meta, and it is only ever written by an answer.
   def confirm_pin
     @channel.provider_config['verification_pin_confirmed'] = true
-    @channel.save!(validate: false)
-  end
-
-  def forget_pin
-    @channel.provider_config.delete('verification_pin')
-    @channel.provider_config.delete('verification_pin_confirmed')
     @channel.save!(validate: false)
   end
 
