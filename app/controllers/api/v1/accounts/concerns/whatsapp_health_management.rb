@@ -72,16 +72,19 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   private
 
   # Meta answers three levels of webhook routing and delivery follows the most specific one that
-  # exists. This number pointed here, or the WhatsApp Business Account it belongs to, means the
-  # inbox owns its delivery; neither of them means it is riding on the app's own callback, which
-  # belongs to the installation rather than to this inbox and can be pointed elsewhere at any
-  # time. Read on every request rather than stored, so it cannot go stale against Meta, and false
-  # when Meta did not answer the configuration at all, because not knowing is not a warning.
+  # EXISTS, wherever it points. So this asks about existence, not about the URL: an override of
+  # its own, for this number or for the WhatsApp Business Account it belongs to, means the inbox
+  # owns its routing even when that override points somewhere wrong, which is a different problem
+  # and already has its own warning. Only when neither exists does delivery ride on the app's own
+  # callback, which belongs to the installation rather than to this inbox and can be pointed
+  # elsewhere at any time. Read on every request rather than stored, so it cannot go stale against
+  # Meta, and false when Meta answered no configuration at all, because not knowing is not a
+  # warning.
   def routed_by_app_callback_only?(health_data)
     configuration = health_data[:webhook_configuration]
     return false if configuration.blank?
 
-    configuration.values_at('phone_number', 'whatsapp_business_account').exclude?(health_data[:expected_webhook_url])
+    configuration.values_at('phone_number', 'whatsapp_business_account').all?(&:blank?)
   end
 
   def whatsapp_channel

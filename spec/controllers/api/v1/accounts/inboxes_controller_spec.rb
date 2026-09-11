@@ -1646,14 +1646,23 @@ RSpec.describe 'Inboxes API', type: :request do
       response.parsed_body['routed_by_app_callback_only']
     end
 
-    it 'is false when this number is the one pointed here' do
+    it 'is false when this number has an override of its own' do
       stub_health({ 'phone_number' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
 
       expect(routing_answer).to be(false)
     end
 
-    it 'is false when the business account is the one pointed here' do
+    it 'is false when the business account has one' do
       stub_health({ 'whatsapp_business_account' => expected_url, 'application' => 'https://elsewhere.example.com/hook' })
+
+      expect(routing_answer).to be(false)
+    end
+
+    # Delivery follows the most specific override that exists, wherever it points: a number sent
+    # to the wrong place is misrouted, not riding on the app callback, and the card already says
+    # so with its own URL mismatch warning.
+    it 'is false when the override exists but points somewhere else' do
+      stub_health({ 'phone_number' => 'https://elsewhere.example.com/hook', 'application' => expected_url })
 
       expect(routing_answer).to be(false)
     end
