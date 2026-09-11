@@ -184,6 +184,45 @@ describe Whatsapp::WebhookSetupService do
       end
     end
 
+    context 'when the code verification read answers an empty value' do
+      # Absent, null and empty string are the same fact: the read did not answer the question. The
+      # client hands them over verbatim now, so it is here that they have to mean the same thing.
+      %w[nil empty].each do |shape|
+        it "treats #{shape} as an answer that answers nothing" do
+          allow(api_client).to receive(:phone_number_code_verification_status)
+            .with('123456789').and_return(shape == 'nil' ? nil : '')
+          allow(health_service).to receive(:fetch_health_status).and_return({
+                                                                              platform_type: 'APPLICABLE',
+                                                                              throughput: { level: 'APPLICABLE' }
+                                                                            })
+          allow(api_client).to receive(:register_phone_number)
+          allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+
+          with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+            expect(api_client).not_to receive(:register_phone_number)
+            service.perform
+          end
+        end
+      end
+    end
+
+    context 'when the code verification read answers something that is not VERIFIED' do
+      # EXPIRED is a documented Meta value and is a definite "no", not a silence.
+      %w[NOT_VERIFIED PENDING EXPIRED].each do |status|
+        it "registers on #{status}, because Meta answered" do
+          allow(api_client).to receive(:phone_number_code_verification_status).with('123456789').and_return(status)
+          allow(SecureRandom).to receive(:random_number).with(900_000).and_return(123_456)
+          allow(api_client).to receive(:register_phone_number)
+          allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+
+          with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+            expect(api_client).to receive(:register_phone_number).with('123456789', 223_456)
+            service.perform
+          end
+        end
+      end
+    end
+
     context 'when the code verification read answers without the field' do
       before do
         # A perfectly good 200 that does not carry `code_verification_status`. This never reached a
@@ -259,6 +298,40 @@ describe Whatsapp::WebhookSetupService do
         end
 
         expect(channel.reload.provider_config['verification_pin']).to eq(223_456)
+      end
+
+      it 'leaves the PIN unconfirmed, so the three states stay readable' do
+        # No PIN means Meta holds none. A confirmed PIN means Meta holds this one. An unconfirmed
+        # PIN means nobody knows, and that is the state this endpoint could not write down before.
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        config = channel.reload.provider_config
+        expect(config['verification_pin']).to eq(223_456)
+        expect(config).not_to have_key('verification_pin_confirmed')
+      end
+
+      it 'forgets the PIN when Meta refused, because then Meta holds none' do
+        allow(api_client).to receive(:register_phone_number).and_raise('Phone registration failed: {"error":"bad pin"}')
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        expect(channel.reload.provider_config).not_to have_key('verification_pin')
+      end
+
+      it 'confirms the PIN when the call came back, because then Meta holds this one' do
+        allow(api_client).to receive(:register_phone_number).and_return({ 'success' => true })
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        config = channel.reload.provider_config
+        expect(config['verification_pin']).to eq(223_456)
+        expect(config['verification_pin_confirmed']).to be(true)
       end
 
       it 'says the outcome is unknown, not that Meta refused' do

@@ -38,8 +38,13 @@ class Whatsapp::WebhookSetupService
     store_pin(pin)
 
     @api_client.register_phone_number(phone_number_id, pin)
+    confirm_pin
   rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP] Phone registration #{registration_outcome(e)} but continuing " \
+    outcome = registration_outcome(e)
+    # Meta answering "no" is knowledge: it does not hold a PIN for this number, so neither do we.
+    # A silence is not, and the PIN stays exactly because it might be the one Meta is holding.
+    forget_pin if outcome == 'refused'
+    Rails.logger.warn("[WHATSAPP] Phone registration #{outcome} but continuing " \
                       "(phone_number_id #{phone_number_id}, pin #{pin}): #{e.message}")
   end
 
@@ -67,6 +72,23 @@ class Whatsapp::WebhookSetupService
   # not depend on Meta answering a different question first.
   def store_pin(pin)
     @channel.provider_config['verification_pin'] = pin
+    @channel.provider_config.delete('verification_pin_confirmed')
+    @channel.save!(validate: false)
+  end
+
+  # Storing the PIN before the call is what makes a retry send the same one, and it costs the field
+  # its old meaning: it used to appear only after Meta answered, so its presence was an answer. Now
+  # it says what was sent, and this marker says what came back. The three states the issue is about
+  # (#590) are readable again: no PIN means Meta holds none, a confirmed PIN means Meta holds this
+  # one, and an unconfirmed PIN means nobody knows, which is the state that used to be unwritable.
+  def confirm_pin
+    @channel.provider_config['verification_pin_confirmed'] = true
+    @channel.save!(validate: false)
+  end
+
+  def forget_pin
+    @channel.provider_config.delete('verification_pin')
+    @channel.provider_config.delete('verification_pin_confirmed')
     @channel.save!(validate: false)
   end
 
