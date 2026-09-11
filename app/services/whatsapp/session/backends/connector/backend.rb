@@ -106,26 +106,45 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(commands::SessionLogout.new)
   end
 
-  # The teardown, published as a pair, and the `logout` is the half that matters most: it
-  # unlinks the device from the customer's phone, which is the part of a pairing that
-  # outlives this inbox. `session.delete` is what clears the session's own rows, and a
-  # connector build without a handler for it answers `unsupported` and undoes nothing -- so
-  # sending `delete` alone leaves a device listed on somebody's phone with nothing in
-  # Chatwoot corresponding to it.
+  # The teardown, and the two halves go by different routes because they cover states the
+  # other cannot reach.
   #
-  # Ordering is what makes the pair safe rather than redundant. Both land on this session's
-  # command stream in the order written, so the `delete` that follows finds nothing linked,
-  # which is a teardown with less to do and not a failure to retry.
+  # `session.delete` goes on the **control stream**, which every connector instance reads.
+  # A connector reads `wa:cmd:<sid>` only for the sessions it is running, so a teardown
+  # written there for an account nobody has adopted is delivered to nobody at all and dies
+  # when the stream is trimmed -- and that is exactly the state a teardown is most often
+  # sent in: an inbox destroyed while its session was down, or destroyed while the
+  # connector fleet was restarting. On the control stream, whoever reads it adopts the
+  # account for the length of the teardown and tears it down without ever connecting.
   #
-  # Published, not called, for two independent reasons. This runs inside the transaction
-  # that destroys the inbox, and an RPC there would hold it open for the round trip. And a
-  # teardown is deliberately left pending, with no reply at all, while the session is
-  # between owners -- being handed over, or waiting on a lease with room to finish -- so a
-  # caller waiting for an answer would time out exactly when the connector is doing the
-  # right thing.
+  # The `session.logout` stays, on the session's own stream, and it is not redundant.
+  # Delivery through the control stream is to *some* instance rather than to the one
+  # running the account: an entry naming a session somebody else owns is left pending and
+  # reclaimed until it reaches that owner, which happens but is not bounded. The logout
+  # rides the owner's own stream, so for a session that is up the device is unlinked at
+  # once, and the delete that follows finds nothing linked, which is a teardown with less
+  # to do rather than a failure. It is also what keeps this working against a connector
+  # build older than fazer-ai/whatsapp-connector#157, whose `session.delete` has no
+  # handler and answers `unsupported`.
+  #
+  # Neither is `call`ed. This runs inside the transaction that destroys the inbox, and an
+  # RPC there would hold it open for the round trip. And a teardown is deliberately left
+  # pending, with no reply at all, while the session is between owners -- being handed
+  # over, or waiting on a lease with room to finish -- so a caller waiting for an answer
+  # would time out exactly when the connector is doing the right thing.
+  #
+  # Logged here, which is the only place it can be. The connector answers a teardown it
+  # could not carry out with `command.failed`, and that event is routed to an inbox by
+  # `session_id`: the inbox this one is about has just been destroyed, so the lookup
+  # misses and the event is dropped as an orphan. What we publish is the last thing about
+  # this session that anybody can see.
+  #
+  # One hash rather than two assignments so the method stays inside this class's line
+  # budget; Ruby evaluates the values in order, so the logout is still written first, and
+  # a spec pins that ordering rather than leaving it to be read out of this comment.
   def delete_session
-    client.publish(commands::SessionLogout.new)
-    client.publish(commands::SessionDelete.new)
+    asked = { logout: client.publish(commands::SessionLogout.new), delete: client.control(commands::SessionDelete.new) }
+    Rails.logger.info("[WHATSAPP] tearing session #{session_id} down for inbox #{channel.inbox&.id}: #{asked.to_json}")
   end
 
   def fetch_connection_state
