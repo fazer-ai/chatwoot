@@ -179,6 +179,12 @@
       "WHATSAPP_ZAPI": "WhatsApp - Z-API",
       "WHATSAPP_NATIVE": "WhatsApp - native",
       "WHATSAPP_UAZAPI": "WhatsApp - Uazapi"
+    },
+    "ACCOUNT_HEALTH": {
+      "WEBHOOK": {
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registered. Meta refused to route this number here, so delivery follows the app callback URL shown below.",
+        "NUMBER_NOT_ROUTED": "Delivery follows the app callback URL: this number is not pointed at this installation, so it stops arriving if that URL changes."
+      }
     }
   }
 }

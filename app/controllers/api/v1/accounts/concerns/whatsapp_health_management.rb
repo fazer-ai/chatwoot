@@ -50,9 +50,12 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   end
 
   def register_webhook
-    Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
+    # The per-number override is allowed to be refused without taking the channel down, so
+    # "registered successfully" on its own would be the whole answer for a number Meta refused to
+    # point here. The answer says which half landed.
+    applied = Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
 
-    render json: { message: 'Webhook registered successfully' }, status: :ok
+    render json: { message: 'Webhook registered successfully', callback_override_applied: applied }, status: :ok
   rescue StandardError => e
     Rails.logger.error "[INBOX WEBHOOK] Webhook registration failed: #{e.message}"
     render json: { error: e.message }, status: :unprocessable_entity

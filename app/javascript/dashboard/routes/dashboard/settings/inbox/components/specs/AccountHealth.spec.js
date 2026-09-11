@@ -80,6 +80,56 @@ describe('AccountHealth', () => {
     expect(wrapper.text()).toContain('2026');
   });
 
+  // Meta answers with the effective webhook configuration, and the card is green whenever the
+  // effective URL is ours. It is ours in two different situations, and only one of them means
+  // this number is pointed here.
+  describe('when the number itself is not pointed at this installation', () => {
+    const expectedUrl = 'https://chat.example.com/webhooks/whatsapp/+123';
+
+    it('says so even though the card is green, because delivery rides on the app URL', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: { application: expectedUrl },
+        expected_webhook_url: expectedUrl,
+      });
+
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+      );
+    });
+
+    it('stays quiet when the override is in place for this number', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: {
+          phone_number: expectedUrl,
+          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+        },
+        expected_webhook_url: expectedUrl,
+      });
+
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+      );
+    });
+
+    // A mismatch already has its own chip and its own button, and two warnings about one problem
+    // is how the second one stops being read.
+    it('does not repeat itself when the URL already mismatches', () => {
+      const wrapper = mountComponent({
+        webhook_configuration: {
+          application: 'https://elsewhere.example.com/webhooks/whatsapp/+123',
+        },
+        expected_webhook_url: expectedUrl,
+      });
+
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH'
+      );
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED'
+      );
+    });
+  });
+
   it('shows the current error instead of stale health data', () => {
     const wrapper = mountComponent(
       { verified_name: 'Stale Business Name' },

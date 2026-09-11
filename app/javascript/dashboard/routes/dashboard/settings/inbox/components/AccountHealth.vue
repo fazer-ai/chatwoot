@@ -373,6 +373,19 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
+// The card is green whenever the effective URL is ours, and it is ours in two different
+// situations: this number is pointed here, or the app's own callback happens to be here and this
+// number rides on it. Meta refuses to point a number here for a whole class of accounts, and that
+// refusal no longer takes the channel down, so nothing distinguished the two: delivery works
+// until the app-level URL changes, and then this inbox goes quiet with a green card.
+const numberNotRoutedHere = computed(
+  () =>
+    webhookConfigured.value &&
+    !webhookUrlMismatch.value &&
+    props.healthData?.webhook_configuration?.phone_number !==
+      props.healthData?.expected_webhook_url
+);
+
 const handleRegisterWebhook = () => {
   emit('registerWebhook');
 };
@@ -517,6 +530,18 @@ const handleCopyWebhookUrl = async url => {
             >
               {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON') }}
             </ButtonV4>
+          </div>
+          <div
+            v-if="numberNotRoutedHere"
+            class="flex gap-1.5 items-start text-label-small text-n-amber-11"
+          >
+            <Icon
+              icon="i-lucide-alert-triangle"
+              class="flex-shrink-0 mt-0.5 w-3.5 h-3.5"
+            />
+            <span>
+              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.NUMBER_NOT_ROUTED') }}
+            </span>
           </div>
           <div v-if="webhookConfigured" class="pt-1 space-y-2">
             <div class="flex items-center gap-3 min-w-0">

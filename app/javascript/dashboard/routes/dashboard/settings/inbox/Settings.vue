@@ -639,8 +639,17 @@ export default {
 
       try {
         this.isRegisteringWebhook = true;
-        await InboxHealthAPI.registerWebhook(this.inbox.id);
-        useAlert(this.$t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS'));
+        const { data } = await InboxHealthAPI.registerWebhook(this.inbox.id);
+        // Meta refuses the per-number override for a whole class of accounts, and that refusal no
+        // longer takes the channel down, so a plain success here would be the only thing the
+        // operator sees about a number that is not being routed to this installation.
+        useAlert(
+          data?.callback_override_applied === false
+            ? this.$t(
+                'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS_WITHOUT_ROUTING'
+              )
+            : this.$t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_SUCCESS')
+        );
         await this.fetchHealthData();
       } catch (error) {
         useAlert(
