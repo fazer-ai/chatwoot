@@ -131,4 +131,88 @@ RSpec.describe JsonColumnMerge do
       end
     end
   end
+
+  describe '#swap_json_column!' do
+    let(:contact) { create(:contact, additional_attributes: { 'token' => 'T1', 'city' => 'Curitiba' }) }
+
+    it 'writes when the row still holds what the caller based its call on' do
+      expect(contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' }, merge: { 'token' => 'T2' }))
+        .to be(:written)
+      expect(contact.reload.additional_attributes).to eq('token' => 'T2', 'city' => 'Curitiba')
+    end
+
+    # The whole point: not an error, not a raise, and above all not a write. The caller has to be
+    # able to tell this apart from "there was nothing to write", which is why the answer is a symbol
+    # and not a boolean.
+    it 'writes nothing when another writer got there first' do
+      contact.update!(additional_attributes: { 'token' => 'T_OTHER', 'city' => 'Curitiba' })
+
+      expect(contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' }, merge: { 'token' => 'T2' }))
+        .to be(:stale)
+      expect(contact.reload.additional_attributes['token']).to eq('T_OTHER')
+    end
+
+    it 'compares the stored value whether the caller asked with a symbol or a string' do
+      expect(contact.swap_json_column!(:additional_attributes, expect: { token: 'T1' }, merge: { 'token' => 'T2' }))
+        .to be(:written)
+    end
+
+    it 'answers that it did not write when the write would change nothing' do
+      expect(contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' }, merge: { 'token' => 'T1' }))
+        .to be(:unchanged)
+    end
+
+    # A key the row does not have is not the value the caller expected, so an `expect` on it is a
+    # precondition that fails rather than one that is vacuously true.
+    it 'does not write when the key it expected is not there at all' do
+      contact.update!(additional_attributes: { 'city' => 'Curitiba' })
+
+      expect(contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' }, merge: { 'token' => 'T2' }))
+        .to be(:stale)
+    end
+
+    # The compare and the write have to come from the same locked read, or this is a check followed
+    # by a hope: another writer lands in between and the loser overwrites it anyway, which is the
+    # whole defect. Nothing a single connection can do shows the difference, and a mutation that
+    # moves the read out of the lock survives every example above, so what is asserted here is the
+    # property itself: inside the swap, no read of this row happens without the lock.
+    it 'compares a value it read under the lock' do
+      contact.id
+
+      reads = []
+      subscriber = ActiveSupport::Notifications.subscribe('sql.active_record') do |*, payload|
+        reads << payload[:sql] if payload[:sql].match?(/SELECT .+ FROM "contacts"/i)
+      end
+
+      begin
+        contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' }, merge: { 'token' => 'T2' })
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber)
+      end
+
+      expect(reads).to be_present
+      expect(reads.grep_v(/FOR UPDATE/i)).to be_empty
+    end
+
+    it 'writes with no precondition when nothing is expected' do
+      expect(contact.swap_json_column!(:additional_attributes, expect: {}, merge: { 'token' => 'T2' })).to be(:written)
+    end
+
+    it 'writes the other columns that belong to the same write' do
+      expect(contact.swap_json_column!(:additional_attributes, expect: { 'token' => 'T1' },
+                                                               merge: { 'token' => 'T2' }, attributes: { name: 'Equipe' }))
+        .to be(:written)
+      expect(contact.reload.name).to eq('Equipe')
+    end
+
+    # Same reason as the merge: every caller is enrichment after a network round trip, so a row that
+    # went away during the call ends the work instead of raising into a retry loop.
+    it 'answers that the row is gone instead of raising' do
+      id = contact.id
+      contact.destroy!
+
+      expect(Contact.new(id: id).swap_json_column!(:additional_attributes, expect: {}, merge: { 'token' => 'T2' }))
+        .to be(:gone)
+    end
+  end
 end
