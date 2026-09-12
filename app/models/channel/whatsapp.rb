@@ -435,7 +435,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     Rails.logger.error "[WHATSAPP] Webhook setup failed: #{e.message}"
     return unless credentials_refused?(e)
 
-    Rails.logger.error "[WHATSAPP] Meta refused the credentials for inbox #{inbox&.id}; asking for reauthorization"
+    Rails.logger.error("[WHATSAPP] Asking for reauthorization on channel #{id}: #{reauthorization_reason(e)}")
     prompt_reauthorization!
   end
 
@@ -455,6 +455,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # The walk down `cause` is what makes this survive the layers in between: the setup service
   # re-raises with a prefix so the operator can see which step failed, and Ruby keeps the original
   # underneath. Asking only the outermost error would read every one of those as silence.
+  # Named by what happened, not by "Meta refused": the blank-credential branch reaches this line
+  # without a single call having left, and a log that says Meta spoke is the same trade this class
+  # of bug is about. The channel id rather than the inbox's, because the `after_commit on: :create`
+  # path runs before the inbox exists and was printing "for inbox ;".
+  def reauthorization_reason(error)
+    return 'the setup could not run without a credential' if error.is_a?(ArgumentError)
+
+    'Meta answered that the credentials are the problem'
+  end
+
   def credentials_refused?(error)
     # Read at the top and not down the chain, unlike Meta's answer: the setup service raises this one
     # from `perform` and nothing wraps it, while an `ArgumentError` coming from inside the Graph call
