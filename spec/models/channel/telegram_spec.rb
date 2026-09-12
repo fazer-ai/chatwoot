@@ -32,6 +32,24 @@ RSpec.describe Channel::Telegram do
       expect(channel.errors[:bot_token]).to eq(['invalid token'])
     end
 
+    # The webhook is set in `before_save`, where adding an error changes nothing on its
+    # own: the record is written anyway, and what gets written is an inbox whose webhook
+    # was never set, so it receives no message and nothing on the screen says why. The
+    # answer has to roll the save back, and it has to do it as a 422 with the message,
+    # since that is the only shape this API renders instead of answering 500.
+    it 'saves nothing when the webhook could not be set' do
+      stub_request(:get, %r{api\.telegram\.org/bot.*/getMe})
+        .to_return(status: 200, body: { result: { username: 'a_bot' } }.to_json)
+      stub_request(:post, %r{api\.telegram\.org/bot.*/deleteWebhook}).to_return(status: 200, body: '{}')
+      stub_request(:post, %r{api\.telegram\.org/bot.*/setWebhook}).to_timeout
+
+      channel = described_class.new(account: account, bot_token: 'a-token')
+
+      expect { channel.save! }.to raise_error(ActiveRecord::RecordInvalid, /could not reach Telegram/)
+      expect(channel).not_to be_persisted
+      expect(described_class.where(bot_token: 'a-token')).to be_empty
+    end
+
     # The `rescue` covers the call and not the reading of the answer: a bug in the parsing
     # below reported as "could not reach Telegram" is a bug nobody goes looking for.
     it 'does not answer for a body it did reach and could not read' do

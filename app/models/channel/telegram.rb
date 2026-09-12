@@ -95,6 +95,15 @@ class Channel::Telegram < ApplicationRecord
     self.bot_name = response.parsed_response['result']['username']
   end
 
+  # This one runs in `before_save`, where an error on its own changes nothing: the callback
+  # returning stops nothing, and the record is written anyway. Before the ceiling, a
+  # Telegram that did not answer raised out of here, which at least left nothing saved;
+  # swallowing it would have persisted an inbox whose webhook was never set, so it cannot
+  # receive a message and nothing on the screen says so.
+  #
+  # `RecordInvalid` and not `throw :abort`, because only `RecordInvalid` is rendered as a
+  # 422 carrying the message: an abort answers 500 again, which is the thing this change
+  # exists to stop saying.
   def setup_telegram_webhook
     reaching_telegram { HTTParty.post("#{telegram_api_url}/deleteWebhook", **TELEGRAM_SHORT_REQUEST_OPTIONS) }
     response = reaching_telegram do
@@ -104,12 +113,12 @@ class Channel::Telegram < ApplicationRecord
                     },
                     **TELEGRAM_SHORT_REQUEST_OPTIONS)
     end
-    return if response.nil?
+    raise ActiveRecord::RecordInvalid, self if response.nil?
 
     errors.add(:bot_token, 'error setting up the webook') unless response.success?
   end
 
-  # Both calls above run inside the request the operator is waiting on, and until now a
+  # Both setup calls run inside the request the operator is waiting on, and until now a
   # Telegram that did not answer came back as a 500 on the inbox form: the app saying it
   # is broken, about the one thing it cannot know. Putting a ceiling on the call without
   # this would only have delivered that 500 sooner.
