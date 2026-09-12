@@ -16,8 +16,16 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
     end
 
     context 'when user is logged in' do
+      # The roster read resolves the inbox it would act as, like every other group route, so a
+      # group that is in no inbox at all is refused rather than listed (#535). These examples are
+      # about what the roster contains, so they get an inbox and go on measuring that.
+      let(:whatsapp_channel) do
+        create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false, account: account)
+      end
+
       it 'returns active group members' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '120363041234567890')
         create(:group_member, group_contact: contact, contact: contact)
         create(:group_member, group_contact: contact, contact: create(:contact, account: account))
 
@@ -51,6 +59,7 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
 
       it 'does not return inactive group members' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '120363041234567890')
         create(:group_member, group_contact: contact, contact: contact)
         create(:group_member, :inactive, group_contact: contact, contact: create(:contact, account: account))
 
@@ -63,6 +72,7 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
 
       it 'does not return group members from another account' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '120363041234567890')
         create(:group_member, group_contact: contact, contact: contact)
         other_account = create(:account)
         other_group_contact = create(:contact, account: other_account, group_type: :group, identifier: 'other@g.us')
@@ -77,6 +87,7 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
 
       it 'returns expected attributes in the response' do
         contact = create(:contact, account: account, group_type: :group, identifier: 'group@g.us')
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '120363041234567890')
         create(:group_member, group_contact: contact, contact: contact)
 
         get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/group_members",
@@ -94,6 +105,7 @@ RSpec.describe '/api/v1/accounts/{account.id}/contacts/:id/group_members', type:
 
       it 'returns empty payload when contact is not a group' do
         contact = create(:contact, account: account, group_type: :individual)
+        create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '5511999999999')
 
         get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/group_members",
             headers: admin.create_new_auth_token

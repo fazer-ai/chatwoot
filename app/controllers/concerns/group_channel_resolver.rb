@@ -12,23 +12,23 @@ module GroupChannelResolver
 
   private
 
-  # The channel a group action runs as. Every action that actually talks to WhatsApp needs a real
-  # one, so this refuses rather than handing back nil for the provider call to raise on: an agent
-  # with no claim to any of this group's inboxes was answered 500 for a request that is simply not
-  # theirs. Use `channel_if_any` in the few reads that are meant to work without one.
+  # The channel a group action runs as, and the only way to get one. It refuses rather than handing
+  # back nil for the provider call to raise on: an agent with no claim to any of this group's
+  # inboxes was answered 500 for a request that is simply not theirs.
+  #
+  # There used to be a nil-tolerant reader beside this one, for the roster read, on the grounds
+  # that `ContactPolicy` and not inbox membership governs it. What that produced was one endpoint
+  # answering the same question two ways: 200 with the roster when the caller left `inbox_id` out,
+  # 404 when they named an inbox they are not on. The verdict may not depend on whether an
+  # optional parameter was typed, and refusing is what the other eleven group routes already
+  # answer (fazer-ai/chatwoot#535).
+  #
+  # What that costs, said out loud: the roster of a group contact that is in no inbox at all stops
+  # being readable. Nothing in the dashboard asks for one -- every caller passes the inbox of the
+  # conversation it has open, and an administrator gets every inbox of the account -- so the case
+  # is reachable through the API and not through the product.
   def channel
-    channel_if_any || raise(ActiveRecord::RecordNotFound)
-  end
-
-  # Returns nil rather than refusing, which is the very shape the bug above had, so reach for it
-  # only where nil is a real answer. Today that is `GroupMembersController#index`, which is a read
-  # governed by `ContactPolicy` rather than by inbox membership and shows the roster without the
-  # "am I an admin here" flag. Anything that acts on the group needs `channel` and must not borrow
-  # this because it happens to be nearby.
-  def channel_if_any
-    return @channel_if_any if defined?(@channel_if_any)
-
-    @channel_if_any = group_contact_inbox&.inbox&.channel
+    group_contact_inbox&.inbox&.channel || raise(ActiveRecord::RecordNotFound)
   end
 
   def group_contact_inbox
@@ -54,8 +54,9 @@ module GroupChannelResolver
     candidates = @contact.contact_inboxes.includes(:inbox).where(inbox: Current.user.assigned_inboxes)
     return candidates.find_by!(inbox_id: params[:inbox_id]) if params[:inbox_id].present?
 
-    # None and one both answer nil here, and that is the honest answer: whether nil is fatal is
-    # the caller's question, not this one's. `channel` refuses on it, `channel_if_any` does not.
+    # None and one both answer nil here, and `channel` is what turns that into the refusal. Kept
+    # as nil rather than raised here because this method answers which inbox, not whether one
+    # exists to answer with.
     return candidates.first if candidates.size <= 1
 
     raise ActionController::BadRequest, I18n.t('contacts.group.inbox_id_required')
