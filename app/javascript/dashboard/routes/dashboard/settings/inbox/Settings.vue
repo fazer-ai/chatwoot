@@ -656,7 +656,11 @@ export default {
         // from it instead of a second round trip. When that read did not come back the field says
         // so, and then the card is fetched rather than left showing what it had before the press.
         if (data?.routing_read_back) {
+          // The error has to go with it. Until #593 the screen could not be repaired from the error
+          // state at all, so nothing ever reached this line holding a stale failure; now it can,
+          // and leaving `healthError` set would keep the error card over a reading that came back.
           this.healthData = data.health;
+          this.healthError = null;
         } else {
           await this.fetchHealthData();
         }

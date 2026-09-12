@@ -4,6 +4,12 @@ import AccountHealth from '../AccountHealth.vue';
 
 const { locale } = vi.hoisted(() => ({ locale: { value: 'en' } }));
 
+// jsdom has no `navigator.clipboard`, so the copy button's handler rejects and the run exits 1
+// even with every assertion green. The helper is the boundary this component talks to.
+vi.mock('shared/helpers/clipboard', () => ({
+  copyTextToClipboard: vi.fn(),
+}));
+
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: key => key,
