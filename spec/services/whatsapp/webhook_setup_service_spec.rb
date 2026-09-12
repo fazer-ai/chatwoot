@@ -108,12 +108,50 @@ describe Whatsapp::WebhookSetupService do
       end
     end
 
+    context 'when the pending state comes only from throughput, in the shape HealthService produces' do
+      # HealthService keeps Meta's `throughput` object verbatim, so its keys are strings, and it
+      # derives `:throughput_level` alongside. A spec that stubs `throughput: { level: ... }` with
+      # symbols is testing a payload the app never sees.
+      before do
+        allow(api_client).to receive(:phone_number_code_verification_status).with('123456789').and_return('VERIFIED')
+        allow(health_service).to receive(:fetch_health_status).and_return({
+                                                                            platform_type: 'APPLICABLE',
+                                                                            throughput: { 'level' => 'NOT_APPLICABLE' },
+                                                                            throughput_level: 'NOT_APPLICABLE'
+                                                                          })
+        allow(SecureRandom).to receive(:random_number).with(900_000).and_return(123_456)
+        allow(api_client).to receive(:register_phone_number)
+        allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+        allow(channel).to receive(:save!)
+      end
+
+      it 'registers the number' do
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).to receive(:register_phone_number).with('123456789', 223_456)
+          service.perform
+        end
+      end
+
+      it 'registers it on the unknown-verification path too, which is where it now matters' do
+        # This is the path the change created: an unread verification used to register regardless,
+        # and now it defers to health. If health misses the throughput half, the number is silently
+        # left unregistered.
+        allow(api_client).to receive(:phone_number_code_verification_status).with('123456789').and_raise('API down')
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).to receive(:register_phone_number).with('123456789', 223_456)
+          service.perform
+        end
+      end
+    end
+
     context 'when phone number needs registration due to throughput level' do
       before do
         allow(api_client).to receive(:phone_number_code_verification_status).with('123456789').and_return('VERIFIED')
         allow(health_service).to receive(:fetch_health_status).and_return({
                                                                             platform_type: 'APPLICABLE',
-                                                                            throughput: { level: 'NOT_APPLICABLE' }
+                                                                            throughput: { 'level' => 'NOT_APPLICABLE' },
+                                                                            throughput_level: 'NOT_APPLICABLE'
                                                                           })
         allow(SecureRandom).to receive(:random_number).with(900_000).and_return(123_456)
         allow(api_client).to receive(:register_phone_number).with('123456789', 223_456)

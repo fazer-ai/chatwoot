@@ -171,8 +171,14 @@ class Whatsapp::WebhookSetupService
   def pending_state
     health_data = Whatsapp::HealthService.new(@channel).fetch_health_status
 
+    # `:throughput_level`, not `dig(:throughput, :level)`. `throughput` is Meta's object kept
+    # verbatim, so its keys are strings and the symbol dig has always answered nil: the throughput
+    # half of this check never fired. It did not show because a failed verification read registered
+    # the number anyway, and the existing spec stubs the payload with symbol keys, which is not the
+    # shape HealthService produces. Now that an unread verification defers to this answer, a number
+    # pending only by throughput would have been left unregistered.
     pending = health_data[:platform_type] == 'NOT_APPLICABLE' ||
-              health_data.dig(:throughput, :level) == 'NOT_APPLICABLE'
+              health_data[:throughput_level] == 'NOT_APPLICABLE'
     pending ? :pending : :not_pending
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP] Could not read the health status; not deciding registration from it: #{e.message}")
