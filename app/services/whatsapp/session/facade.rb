@@ -59,6 +59,34 @@ class Whatsapp::Session::Facade
     backend.import_session(session: session, candidate_index: candidate_index)
   end
 
+  # Says again that this account should be connected, without touching what the dashboard
+  # shows. It exists for the one-time re-assert after a connector upgrade
+  # (fazer-ai/whatsapp-connector#194), where the point is the record the connector keeps of
+  # having been asked, and not a new pairing.
+  #
+  # Deliberately NOT `setup_channel_provider`. That one claims a pairing attempt, which writes
+  # `connecting` over the stored state, and turns a refusal into `close` with `connect_failure`.
+  # For a bulk re-assert those writes are the wrong shape twice over: the inbox this asked for
+  # is the one that was recorded as `open`, so erasing that on a failure makes the retry skip
+  # exactly the inboxes that still need it, and a fleet being re-asserted has nothing to fence,
+  # because there is no QR on anybody's screen to go stale.
+  #
+  # What the dashboard ends up showing is the connector's own doing, which is the arrangement
+  # this backend already relies on: it pushes every transition it sees, which is why it declares
+  # no state polling.
+  #
+  # Always `resume`: this is only ever asked of an account that is already paired. One that is
+  # not gets the provider's own refusal, which the caller reports rather than turning into a QR
+  # nobody is watching.
+  def reassert_desired_state
+    backend.connect(
+      model::Commands::SessionConnect.new(
+        pairing: 'resume', phone: channel.phone_number.to_s.delete('+'),
+        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?
+      )
+    )
+  end
+
   # The channel calls this when an inbox is destroyed or converted to another provider,
   # so it is a teardown, not a pause: the Baileys service answers it with
   # `DELETE /connections/<phone>`. Merely disconnecting would leave the pairing and its

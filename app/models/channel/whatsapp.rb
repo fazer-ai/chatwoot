@@ -408,6 +408,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   delegate :setup_channel_provider, to: :provider_service
   delegate :import_session, to: :provider_service
+  delegate :reassert_desired_state, to: :provider_service
   delegate :presence_subscribe, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_template, to: :provider_service
