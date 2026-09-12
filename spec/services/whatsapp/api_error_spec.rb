@@ -71,8 +71,34 @@ describe Whatsapp::ApiError do
     # A second `def authorization_error?`, or a second literal 190, is the failure this guards: the
     # two copies agree on the day they are written and drift the first time Meta adds a code. The
     # scan is over the WhatsApp tree, which is where the question belongs.
-    def askers(pattern, sources)
-      sources.select { |path| Rails.root.join(path).read.match?(pattern) }
+    #
+    # Measured, because a fence is worth exactly what it catches: a second `authorization_error?`
+    # added to `HealthService::ApiError` with today's semantics fails this group and passes all 1909
+    # examples of the behavioural suite, since a copy that agrees changes no output. That is the case
+    # no behavioural spec can reach, and it is why this group exists.
+    #
+    # Two things it got wrong and that the same measurement showed. `select` answers per file, so two
+    # definitions inside one file came back as "one file" and passed -- exactly the drift being
+    # forbidden, admitted through the counting. And the scan read comment lines, so a neighbouring
+    # file that merely mentions the code in prose failed the group, which teaches the next reader to
+    # delete the spec instead of reading it. Occurrences now, over code only.
+    def without_comment_lines(text)
+      text.gsub(/^[[:space:]]*#.*$/, '')
+    end
+
+    def code_of(path)
+      without_comment_lines(Rails.root.join(path).read)
+    end
+
+    # Per file: for asking whether the scan reaches a file at all.
+    def files_with(pattern, sources)
+      sources.select { |path| code_of(path).match?(pattern) }
+    end
+
+    # Per occurrence: for asking how many times something is written, which is the actual question
+    # when the failure mode is a duplicate.
+    def occurrences(pattern, sources)
+      sources.flat_map { |path| code_of(path).scan(pattern).map { path } }
     end
 
     let(:sources) do
@@ -87,15 +113,22 @@ describe Whatsapp::ApiError do
     it 'finds what it is looking for when it is there' do
       # Against the guarded tree the scan is expected to answer "one file", and it would answer the
       # same for a pattern that matches nothing at all. This pins the scan to a pattern that does.
-      expect(askers(/AUTHORIZATION_ERROR_CODE/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
+      expect(files_with(/AUTHORIZATION_ERROR_CODE/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
+    end
+
+    it 'reads code and not prose, so a comment naming the code is not a second place that knows it' do
+      # Pinned on the helper itself: if it ever strips more than comment lines, every scan below
+      # would pass over an empty file and this group would report a clean tree it never read.
+      expect(without_comment_lines("# 190 is the authorization code\ncode.to_i == 190\n"))
+        .to eq("\ncode.to_i == 190\n")
     end
 
     it 'has one definition of the question' do
-      expect(askers(/def authorization_error\?/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
+      expect(occurrences(/def authorization_error\?/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
     end
 
     it 'has one place that knows the number' do
-      expect(askers(/\b190\b/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
+      expect(occurrences(/\b190\b/, sources)).to eq(['app/services/whatsapp/api_error.rb'])
     end
   end
 end
