@@ -34,6 +34,64 @@ RSpec.describe Instagram::CallbacksController do
       .to_return(status: 200, body: '', headers: {})
   end
 
+  # Authorizing and being subscribed are two different things. The callback used to clear
+  # the reauthorization flag on the strength of the first, which erased the only mark a
+  # failed subscription leaves, and a reconnection replaced the credentials without ever
+  # asking to be subscribed again. So the inbox that was reconnected precisely because it
+  # had stopped receiving went on not receiving, now looking connected.
+  #
+  # Through the real callback rather than a stub on the channel: the flag is cleared in
+  # the controller and set in the model, and only the two together show the hole.
+  describe 'when the webhook subscription fails during the callback' do
+    let(:subscription_url) do
+      'https://graph.instagram.com/v22.0/12345/subscribed_apps?access_token=long_lived_test_token' \
+        '&subscribed_fields%5B%5D=messages&subscribed_fields%5B%5D=message_reactions&subscribed_fields%5B%5D=messaging_seen'
+    end
+
+    before do
+      allow(auth_code_object).to receive(:get_token).and_return(access_token)
+      stub_request(:post, subscription_url).to_return(status: 400, body: '{}')
+    end
+
+    it 'leaves the new inbox asking to be reconnected' do
+      get :show, params: valid_params
+
+      channel = Channel::Instagram.find_by(instagram_id: '12345')
+      expect(channel).to be_present
+      expect(channel.reauthorization_required?).to be(true)
+    end
+
+    it 'keeps asking after a reconnection that could not subscribe either' do
+      channel = create(:channel_instagram, account: account, instagram_id: '12345')
+      channel.prompt_reauthorization!
+
+      get :show, params: valid_params
+
+      expect(channel.reload.reauthorization_required?).to be(true)
+    end
+  end
+
+  # And the other half: a reconnection has to actually subscribe again, because the
+  # subscription is usually the thing that broke.
+  describe 'when reconnecting an inbox that is already there' do
+    before do
+      allow(auth_code_object).to receive(:get_token).and_return(access_token)
+    end
+
+    it 'subscribes again instead of only replacing the credentials' do
+      channel = create(:channel_instagram, account: account, instagram_id: '12345')
+      channel.prompt_reauthorization!
+
+      get :show, params: valid_params
+
+      # Matched on the new token, because creating the channel above already subscribed
+      # once with the old one.
+      expect(WebMock).to have_requested(:post, %r{graph\.instagram\.com/.*/12345/subscribed_apps})
+        .with(query: hash_including('access_token' => 'long_lived_test_token'))
+      expect(channel.reload.reauthorization_required?).to be(false)
+    end
+  end
+
   describe '#show' do
     context 'when authorization is successful' do
       before do

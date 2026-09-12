@@ -106,13 +106,21 @@ class Instagram::CallbacksController < ApplicationController
 
     if channel_instagram
       update_channel(channel_instagram, user_details)
+      # A reconnection used to replace the credentials and stop there, so an inbox that was
+      # reconnected precisely because it had stopped receiving went on not receiving: the
+      # subscription is what had failed, and nothing here asked for it again.
+      subscribed = channel_instagram.subscribe
     else
       channel_instagram = create_channel_with_inbox(user_details)
+      # A new channel subscribes through `after_create_commit`, and the only mark it leaves
+      # when that fails is the flag below.
+      subscribed = !channel_instagram.reauthorization_required?
     end
 
-    # reauthorize channel, this code path only triggers when instagram auth is successful
-    # reauthorized will also update cache keys for the associated inbox
-    channel_instagram.reauthorized!
+    # Only when the channel can actually receive. Authorizing and being subscribed are two
+    # different things, and clearing the flag on the strength of the first would hide
+    # exactly what the flag exists to show: this is the one place that clears it.
+    channel_instagram.reauthorized! if subscribed
 
     [channel_instagram.inbox, channel_exists]
   end
