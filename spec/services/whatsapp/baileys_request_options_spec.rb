@@ -88,7 +88,20 @@ describe Whatsapp::BaileysRequestOptions do
   it 'keeps the short ceiling on the calls that chose to give up before the provider does' do
     short = calls.count { |call| call.include?('BAILEYS_SHORT_REQUEST_OPTIONS') }
 
-    expect(short).to eq(7)
+    expect(short).to eq(5)
+  end
+
+  # Named rather than counted, because the rule for this side is about the caller and not about
+  # the number: a call belongs here only when whoever asked treats silence as "I do not know" and
+  # changes nothing. `import_session` and `disconnect_channel_provider` were here and act on the
+  # outcome, which is what fazer-ai/chatwoot#600 was.
+  it 'keeps the two calls whose caller acts on the outcome off the short ceiling' do
+    %w[import_session disconnect_channel_provider].each do |method|
+      body = source[/  def #{method}\b.*?\n  end\n/m]
+
+      expect(body).to include('**BAILEYS_REQUEST_OPTIONS')
+      expect(body).not_to include('BAILEYS_SHORT_REQUEST_OPTIONS')
+    end
   end
 
   # The one claim in this change that the text scan above cannot check, because it is about what
