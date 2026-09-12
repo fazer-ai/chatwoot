@@ -22,10 +22,11 @@ describe Whatsapp::GraphRequestOptions do
   # its own ceiling to decide, which is fazer-ai/chatwoot#589.
   let(:other_families) do
     {
-      # Its own API, not Meta's, and the one place in the repo that already reasoned about a number:
-      # 10s for the control calls and 90s for the send, tied to the API's own 45s deadline and to the
-      # per-channel outgoing lock. One family constant would be wrong for it.
-      'app/services/whatsapp/providers/whatsapp_baileys_service.rb' => 'Baileys API, ceilings already reasoned per call',
+      # Its own API, not Meta's, and the one with two ceilings rather than one: 90s by default,
+      # above the cut its own proxy applies, and 10s on the reads that give up before it does.
+      # Fenced by spec/services/whatsapp/baileys_request_options_spec.rb, which also counts each
+      # side, so this entry is a pointer and not an exemption.
+      'app/services/whatsapp/providers/whatsapp_baileys_service.rb' => 'Baileys API, fenced by its own two-ceiling spec',
       'app/services/whatsapp/providers/whatsapp_zapi_service.rb' => 'Z-API, no ceiling decided yet',
       'app/services/whatsapp/providers/whatsapp_360_dialog_service.rb' => '360dialog, no ceiling decided yet',
       # uazapi, and already the most careful caller in the repo: its own TIMEOUT constant, a separate
