@@ -16,6 +16,17 @@
 #
 
 class Channel::Sms < ApplicationRecord
+  # Two ceilings, because the two calls wait on different things. An outgoing message can
+  # carry `media` as URLs pointing back at us, and Bandwidth fetches those before it
+  # answers, so the send waits on Bandwidth waiting on us. The credential check sends no
+  # body at all and is answered out of Bandwidth's own state, inside the request the
+  # operator is watching.
+  #
+  # `max_retries: 0` on both: `Net::HTTP` repeats an idempotent request once by default,
+  # and neither of these is worth sending twice in any case.
+  BANDWIDTH_SEND_OPTIONS = { timeout: 90, max_retries: 0 }.freeze
+  BANDWIDTH_REQUEST_OPTIONS = { timeout: 10, max_retries: 0 }.freeze
+
   include Channelable
 
   self.table_name = 'channel_sms'
@@ -61,7 +72,8 @@ class Channel::Sms < ApplicationRecord
       "#{api_base_path}/users/#{provider_config['account_id']}/messages",
       basic_auth: bandwidth_auth,
       headers: { 'Content-Type' => 'application/json' },
-      body: body.to_json
+      body: body.to_json,
+      **BANDWIDTH_SEND_OPTIONS
     )
 
     if response.success?
@@ -92,7 +104,8 @@ class Channel::Sms < ApplicationRecord
     response = HTTParty.post(
       "#{api_base_path}/users/#{provider_config['account_id']}/messages",
       basic_auth: bandwidth_auth,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      **BANDWIDTH_REQUEST_OPTIONS
     )
     errors.add(:provider_config, 'error setting up') unless response.success?
   end
