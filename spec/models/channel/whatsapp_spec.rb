@@ -203,6 +203,29 @@ RSpec.describe Channel::Whatsapp do
       end
     end
 
+    # `cause` is only set by raising inside a rescue, which is what the setup service does when it
+    # re-raises with a prefix. Built here rather than provoked, because provoking it would mean
+    # stubbing the Graph client instance the service builds for itself.
+    def wrapped(inner)
+      raise inner
+    rescue StandardError => e
+      begin
+        raise "Webhook setup failed: #{e.message}"
+      rescue StandardError => wrapper
+        wrapper
+      end
+    end
+
+    context 'when something inside the Graph call path raises ArgumentError' do
+      it 'leaves the channel authorized, because that one is not about a credential' do
+        allow(channel).to receive(:perform_webhook_setup).and_raise(wrapped(ArgumentError.new('bad callback url')))
+
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
     context 'when the setup cannot run because there is no access token' do
       before do
         channel.provider_config = channel.provider_config.merge('api_key' => '')

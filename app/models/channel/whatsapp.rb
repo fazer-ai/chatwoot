@@ -455,8 +455,12 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # re-raises with a prefix so the operator can see which step failed, and Ruby keeps the original
   # underneath. Asking only the outermost error would read every one of those as silence.
   def credentials_refused?(error)
+    # Read at the top and not down the chain, unlike Meta's answer: the setup service raises this one
+    # from `perform` and nothing wraps it, while an `ArgumentError` coming from inside the Graph call
+    # path would be about something else entirely and has no business speaking for the credentials.
+    return true if error.is_a?(ArgumentError)
+
     while error
-      return true if error.is_a?(ArgumentError)
       return true if error.is_a?(Whatsapp::ApiError) && error.authorization_error?
 
       error = error.cause
