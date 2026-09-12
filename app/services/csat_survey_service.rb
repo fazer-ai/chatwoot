@@ -105,6 +105,19 @@ class CsatSurveyService
     template_service = Twilio::CsatTemplateService.new(inbox.channel)
     status_result = template_service.get_template_status(content_sid)
 
+    # A read that did not happen is not a template that is not approved. Both send the
+    # survey down the same fallback, which is deliberate: changing what gets delivered on
+    # a transport blip is a much larger decision than this. What changes here is that the
+    # operator can find out which of the two happened, instead of reading a timeline that
+    # blames the messaging window for something the messaging window did not do.
+    if status_result[:unknown]
+      Rails.logger.error(
+        "[CSAT] inbox #{inbox.id} could not be told whether its Twilio template is approved, " \
+        "so the survey falls back to a plain message: #{status_result[:error]}"
+      )
+      return false
+    end
+
     status_result[:success] && status_result[:template][:status] == 'approved'
   rescue StandardError => e
     Rails.logger.error "Error checking Twilio CSAT template status: #{e.message}"
