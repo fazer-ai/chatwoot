@@ -226,8 +226,14 @@ describe('the spinner prop of the next Button has one spelling', () => {
   it('has no more attribute spreads on that tag than the one already reviewed', () => {
     const { spreads } = survey();
 
-    expect(spreads).toEqual([
-      'dashboard/components-next/Contacts/VoiceCallButton.vue:195',
+    // Compared by file, not by line: an import or a comment added above that tag shifts the line
+    // and would turn this red while the spread and the loading behaviour are untouched, and a
+    // fence that goes red for an unrelated edit is one that gets switched off. The count still
+    // bites, because a second spread anywhere, including a second one in this same file, adds an
+    // entry. Lines stay in the array that feeds the failure message, so a real one is still
+    // located.
+    expect(spreads.map(where => where.replace(/:\d+$/, ''))).toEqual([
+      'dashboard/components-next/Contacts/VoiceCallButton.vue',
     ]);
   });
 });
