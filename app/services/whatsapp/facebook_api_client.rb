@@ -70,15 +70,19 @@ class Whatsapp::FacebookApiClient
     handle_response(response, 'Phone deregistration failed')
   end
 
-  def phone_number_verified?(phone_number_id)
+  # Answers Meta's status, not a verdict on it, and `nil` when the answer did not carry one.
+  # `code_verification_status` can be absent from a perfectly good 200, and a missing field is not
+  # the same fact as `NOT_VERIFIED`. Collapsing both into `false` here is what let a read that
+  # answered nothing reach the caller looking like a read that said no (#590), and the caller
+  # writes to Meta on that.
+  def phone_number_code_verification_status(phone_number_id)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
       **GRAPH_REQUEST_OPTIONS,
       headers: request_headers
     )
 
-    data = handle_response(response, 'Phone status check failed')
-    data['code_verification_status'] == 'VERIFIED'
+    handle_response(response, 'Phone status check failed')['code_verification_status']
   end
 
   # Two calls, and only the first decides whether anything arrives at all.

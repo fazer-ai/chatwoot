@@ -355,4 +355,34 @@ describe Whatsapp::FacebookApiClient do
       expect(HTTParty).to have_received(:post).with(anything, hash_including(timeout: 10, max_retries: 0))
     end
   end
+
+  describe '#phone_number_code_verification_status' do
+    let(:phone_number_id) { '123456789' }
+
+    it "answers Meta's status verbatim" do
+      stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+        .to_return(status: 200, body: { code_verification_status: 'NOT_VERIFIED' }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+
+      expect(api_client.phone_number_code_verification_status(phone_number_id)).to eq('NOT_VERIFIED')
+    end
+
+    it 'answers nil when the field is absent, instead of deciding it means not verified' do
+      # A 200 that does not carry the field is not the same fact as Meta saying NOT_VERIFIED, and
+      # the caller writes to Meta on the difference (#590).
+      stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+        .to_return(status: 200, body: { id: phone_number_id }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+
+      expect(api_client.phone_number_code_verification_status(phone_number_id)).to be_nil
+    end
+
+    it 'raises when the read failed, so the caller can tell that apart from an answer' do
+      stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+        .to_return(status: 500, body: { error: 'boom' }.to_json)
+
+      expect { api_client.phone_number_code_verification_status(phone_number_id) }
+        .to raise_error(/Phone status check failed/)
+    end
+  end
 end

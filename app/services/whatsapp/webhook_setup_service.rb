@@ -9,10 +9,7 @@ class Whatsapp::WebhookSetupService
   def perform
     validate_parameters!
 
-    # Register phone number if either condition is met:
-    # 1. Phone number is not verified (code_verification_status != 'VERIFIED')
-    # 2. Phone number needs registration (pending provisioning state)
-    register_phone_number if !phone_number_verified? || phone_number_needs_registration?
+    register_phone_number if registration_needed?
 
     setup_webhook
   end
@@ -34,11 +31,29 @@ class Whatsapp::WebhookSetupService
   def register_phone_number
     phone_number_id = @channel.provider_config['phone_number_id']
     pin = fetch_or_create_pin
+    # Stored before the call, not after. The write can time out after Meta already received it, and
+    # then the PIN Meta may be holding is the one this attempt drew. Storing it afterwards meant an
+    # attempt whose outcome nobody saw left nothing behind, and the next one drew a different PIN,
+    # so the app could not name what might already be valid on Meta's side (#590).
+    store_pin(pin)
 
     @api_client.register_phone_number(phone_number_id, pin)
-    store_pin(pin)
+    confirm_pin
   rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP] Phone registration failed but continuing: #{e.message}")
+    # The PIN is never dropped here. A failure establishes nothing about what Meta holds: a 5xx, a
+    # rate limit and a body this code could not parse all reach this line, and so does a failure to
+    # save the confirmation AFTER a registration Meta accepted. Dropping it on any of those loses a
+    # PIN that may well be live and makes the next attempt send a different one, which is the exact
+    # disagreement this change exists to prevent.
+    Rails.logger.warn("[WHATSAPP] Phone registration #{registration_outcome(e)} but continuing " \
+                      "(phone_number_id #{phone_number_id}): #{e.message}")
+  end
+
+  # A refusal and a silence are different facts and used to share one sentence. Meta answering "no"
+  # is something the app knows; a read that never came back is something it does not, and the number
+  # may well be registered on Meta's side with the PIN this attempt stored.
+  def registration_outcome(error)
+    error.is_a?(Timeout::Error) || error.is_a?(IOError) || error.is_a?(SystemCallError) ? 'outcome unknown' : 'refused'
   end
 
   def fetch_or_create_pin
@@ -50,10 +65,27 @@ class Whatsapp::WebhookSetupService
     SecureRandom.random_number(900_000) + 100_000
   end
 
+  # `save!(validate: false)`, the way every other write to provider_config in this area does it
+  # (Channel::Whatsapp#enable_voice_calling! and friends). A plain `save!` runs
+  # `validate_provider_config`, which is itself a Graph call, and this one runs on the path where
+  # Meta is already misbehaving: a failed re-check would raise, the rescue above would swallow it,
+  # and the registration write would never leave. Writing down the PIN we are about to send must
+  # not depend on Meta answering a different question first.
   def store_pin(pin)
-    # Store the PIN in provider_config for future use
     @channel.provider_config['verification_pin'] = pin
-    @channel.save!
+    @channel.provider_config.delete('verification_pin_confirmed')
+    @channel.save!(validate: false)
+  end
+
+  # Storing the PIN before the call is what makes a retry send the same one, and it costs the field
+  # its old meaning: it used to appear only after Meta answered, so its presence was an answer. Now
+  # it says what was sent, and this marker says what came back. The three states the issue is about
+  # (#590) are readable again: no PIN means none was ever sent, a confirmed PIN means Meta answered
+  # for this one, and an unconfirmed PIN means nobody knows, which is the state that used to be
+  # unwritable. Only the middle one is a claim about Meta, and it is only ever written by an answer.
+  def confirm_pin
+    @channel.provider_config['verification_pin_confirmed'] = true
+    @channel.save!(validate: false)
   end
 
   def setup_webhook
@@ -95,47 +127,61 @@ class Whatsapp::WebhookSetupService
     "#{frontend_url}/webhooks/whatsapp/#{phone_number}"
   end
 
-  def phone_number_verified?
+  # Registering is a write to Meta plus a PIN on the channel, so it happens on a definite "no" and
+  # never on a silence. Both reads below answer three things, not two, and the third one used to be
+  # spelled with the same word as "no" (#590).
+  #
+  # The order is load-bearing and is the one the old `||` produced, so the calls stay where they
+  # were: a definite "not verified" registers without asking health at all, and anything else asks,
+  # because health names the pending state on its own. What is new is only that "could not tell"
+  # takes the second branch instead of the first.
+  def registration_needed?
+    return true if verification_state == :not_verified
+
+    pending_state == :pending
+  end
+
+  # `:verified`, `:not_verified`, `:unknown`. `:unknown` covers the read that never came back AND
+  # the 200 that came back without the field, which never reached a rescue at all: it used to turn
+  # into `false` inside the client, one layer further down than anyone was looking.
+  def verification_state
     phone_number_id = @channel.provider_config['phone_number_id']
+    status = @api_client.phone_number_code_verification_status(phone_number_id)
 
-    # Check with WhatsApp API if the phone number code verification is complete
-    # This checks code_verification_status == 'VERIFIED'
-    verified = @api_client.phone_number_verified?(phone_number_id)
-    Rails.logger.info("[WHATSAPP] Phone number #{phone_number_id} code verification status: #{verified}")
+    if status.blank?
+      Rails.logger.error("[WHATSAPP] Phone number #{phone_number_id} answered no code verification status; " \
+                         'not deciding registration from it')
+      return :unknown
+    end
 
-    verified
+    Rails.logger.info("[WHATSAPP] Phone number #{phone_number_id} code verification status: #{status}")
+    status == 'VERIFIED' ? :verified : :not_verified
   rescue StandardError => e
-    # If verification check fails, assume not verified to be safe
-    Rails.logger.error("[WHATSAPP] Phone verification status check failed: #{e.message}")
-    false
+    Rails.logger.error("[WHATSAPP] Could not read the code verification status for #{phone_number_id}; " \
+                       "not deciding registration from it: #{e.message}")
+    :unknown
   end
 
-  def phone_number_needs_registration?
-    # Check if phone is in pending provisioning state based on health data
-    # This is a separate check from phone_number_verified? which only checks code verification
+  # `:pending`, `:not_pending`, `:unknown`. Same vocabulary on purpose: this axis already defaulted
+  # the harmless way when it could not tell, and saying so out loud is what keeps the next reader
+  # from restoring the other one.
+  #
+  # `platform_type: NOT_APPLICABLE` means not fully set up, and `throughput.level: NOT_APPLICABLE`
+  # means no messaging capacity assigned. Either one is the pending provisioning state.
+  def pending_state
+    health_data = Whatsapp::HealthService.new(@channel).fetch_health_status
 
-    phone_number_in_pending_state?
-
+    # `:throughput_level`, not `dig(:throughput, :level)`. `throughput` is Meta's object kept
+    # verbatim, so its keys are strings and the symbol dig has always answered nil: the throughput
+    # half of this check never fired. It did not show because a failed verification read registered
+    # the number anyway, and the existing spec stubs the payload with symbol keys, which is not the
+    # shape HealthService produces. Now that an unread verification defers to this answer, a number
+    # pending only by throughput would have been left unregistered.
+    pending = health_data[:platform_type] == 'NOT_APPLICABLE' ||
+              health_data[:throughput_level] == 'NOT_APPLICABLE'
+    pending ? :pending : :not_pending
   rescue StandardError => e
-    Rails.logger.error("[WHATSAPP] Phone registration check failed: #{e.message}")
-    # Conservative approach: don't register if we can't determine the state
-    false
-  end
-
-  def phone_number_in_pending_state?
-    health_service = Whatsapp::HealthService.new(@channel)
-    health_data = health_service.fetch_health_status
-
-    # Check if phone number is in "not provisioned" state based on health indicators
-    # These conditions indicate the number is pending and needs registration:
-    # - platform_type: "NOT_APPLICABLE" means not fully set up
-    # - throughput.level: "NOT_APPLICABLE" means no messaging capacity assigned
-    health_data[:platform_type] == 'NOT_APPLICABLE' ||
-      health_data.dig(:throughput, :level) == 'NOT_APPLICABLE'
-
-  rescue StandardError => e
-    Rails.logger.error("[WHATSAPP] Health status check failed: #{e.message}")
-    # If health check fails, assume registration is not needed to avoid errors
-    false
+    Rails.logger.error("[WHATSAPP] Could not read the health status; not deciding registration from it: #{e.message}")
+    :unknown
   end
 end
