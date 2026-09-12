@@ -186,6 +186,131 @@ describe('AccountHealth', () => {
     });
   });
 
+  // Found by the verifier agent while measuring the screen for #588: the control that exists to
+  // repair the webhook wiring left the screen exactly when the wiring was most likely to need
+  // repairing. Presence is asserted through the event, not through markup: the only button on this
+  // screen that asks for a registration is the one that emits it, whatever the layout does.
+  describe('the register webhook control', () => {
+    // Clicks every button on the screen and asks whether any of them asked for a registration.
+    // The other buttons are harmless here (one opens a mocked window, one emits a navigation), and
+    // this way the assertion survives any reshuffling of the markup.
+    const clickRegisterWebhook = async wrapper => {
+      await Promise.all(
+        wrapper
+          .findAllComponents(ButtonV4)
+          .map(button => button.trigger('click'))
+      );
+
+      return Boolean(wrapper.emitted('registerWebhook'));
+    };
+
+    it('stays on the screen when the health read failed', async () => {
+      const wrapper = mountComponent(null, {
+        healthError: { type: 'api', message: 'Net::ReadTimeout' },
+      });
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(true);
+    });
+
+    it('stays on the screen when the read failed on credentials, over the stale card', async () => {
+      const wrapper = mountComponent(
+        { webhook_configuration: { phone_number: 'https://old.example.com' } },
+        {
+          healthError: {
+            type: 'authorization',
+            message: 'Session has expired',
+          },
+          isEmbeddedSignup: true,
+        }
+      );
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(true);
+    });
+
+    it('is absent before the screen knows anything, which is not the same as a failed read', async () => {
+      const wrapper = mountComponent(null);
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(false);
+    });
+
+    it('is absent when the webhook is configured and pointed here', async () => {
+      const wrapper = mountComponent({
+        webhook_configuration: {
+          phone_number: 'https://app.example.com/webhooks/whatsapp/+1',
+        },
+        expected_webhook_url: 'https://app.example.com/webhooks/whatsapp/+1',
+      });
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(false);
+    });
+
+    it('is present when the health read came back without a webhook configured', async () => {
+      const wrapper = mountComponent({ webhook_configuration: {} });
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(true);
+    });
+
+    // The read failed, so the payload underneath is from a moment that has passed. It cannot be
+    // read as "the webhook is fine" any more than it can be shown as the current routing.
+    it('is present when the failed read sits on top of a payload that looked fine', async () => {
+      const wrapper = mountComponent(
+        {
+          webhook_configuration: {
+            phone_number: 'https://app.example.com/webhooks/whatsapp/+1',
+          },
+          expected_webhook_url: 'https://app.example.com/webhooks/whatsapp/+1',
+        },
+        { healthError: { type: 'api', message: 'Net::ReadTimeout' } }
+      );
+
+      expect(await clickRegisterWebhook(wrapper)).toBe(true);
+    });
+
+    // The POST it fires writes to Meta, so the second click has to find the control locked. The
+    // lock is the `disabled` attribute: `loading` is not a prop of this button (the prop is
+    // `isLoading`), so it falls through as an attribute and paints nothing, here and where this
+    // control used to live.
+    it('keeps the lock that stops a second registration from leaving', () => {
+      const wrapper = mountComponent(null, {
+        healthError: { type: 'api', message: 'Net::ReadTimeout' },
+        isRegisteringWebhook: true,
+      });
+
+      const locked = wrapper
+        .findAllComponents(ButtonV4)
+        .filter(button => button.attributes('disabled') !== undefined);
+
+      expect(locked).toHaveLength(1);
+    });
+
+    // The button keeps its own name and explanation. What it must not bring along is the reading:
+    // the chip and the URLs are claims about where delivery is going now, and there was no answer.
+    it('carries its label but none of the lines built from a reading that did not happen', () => {
+      const wrapper = mountComponent(
+        {
+          webhook_configuration: {
+            phone_number: 'https://elsewhere.example.com/webhooks/whatsapp/+1',
+          },
+          expected_webhook_url: 'https://app.example.com/webhooks/whatsapp/+1',
+        },
+        { healthError: { type: 'api', message: 'Net::ReadTimeout' } }
+      );
+
+      expect(wrapper.text()).toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.TITLE'
+      );
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH'
+      );
+      expect(wrapper.text()).not.toContain(
+        'INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.CONFIGURED_SUCCESS'
+      );
+      expect(wrapper.text()).not.toContain(
+        'https://elsewhere.example.com/webhooks/whatsapp/+1'
+      );
+    });
+  });
+
   it('shows the current error instead of stale health data', () => {
     const wrapper = mountComponent(
       { verified_name: 'Stale Business Name' },
