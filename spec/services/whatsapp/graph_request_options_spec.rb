@@ -111,7 +111,11 @@ describe Whatsapp::GraphRequestOptions do
     expected = {
       'app/services/whatsapp/facebook_api_client.rb' => 10,
       'app/services/whatsapp/health_service.rb' => 1,
-      'app/services/whatsapp/providers/whatsapp_cloud_service.rb' => 10,
+      # Six rather than ten: the five sends now go through `post_outgoing`, which is the single
+      # HTTParty call on the outgoing path and carries the ceiling for all of them. That
+      # indirection is what fazer-ai/chatwoot#605 needed, and collapsing five inspected calls into
+      # one is the count moving for a reason, not a call losing its ceiling.
+      'app/services/whatsapp/providers/whatsapp_cloud_service.rb' => 6,
       'app/services/whatsapp/business_management_token_validation_service.rb' => 2,
       'app/services/whatsapp/csat_template_service.rb' => 3,
       'app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb' => 1,

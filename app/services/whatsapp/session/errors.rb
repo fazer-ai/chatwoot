@@ -118,6 +118,18 @@ module Whatsapp::Session::Errors
     CODE = 'group_participant_not_allowed'.freeze
   end
 
+  # A send that reached its deadline without an answer, and that may or may not have arrived.
+  # NOT retryable, and that is the whole point of the class: a retry of a send that did arrive
+  # puts a second copy in front of the customer, and nothing on this side can tell the two apart.
+  # The agent gets the sentence and decides.
+  #
+  # Deliberately absent from CLASSES below. It is raised here, never received: a connector that
+  # sent this code on the wire would be claiming something about our socket, and `build` must not
+  # be able to manufacture it out of a string.
+  class SendOutcomeUnknown < Error
+    CODE = 'send_outcome_unknown'.freeze
+  end
+
   # Another worker is already handling this provider message id.
   class MessageAlreadyProcessing < Error
     CODE = 'message_already_processing'.freeze
