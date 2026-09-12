@@ -3,6 +3,7 @@
 
 class Whatsapp::IncomingMessageWhatsappCloudService < Whatsapp::IncomingMessageBaseService
   include Events::Types
+  include Whatsapp::GraphRequestOptions
 
   def perform
     return if processed_params.blank?
@@ -26,7 +27,8 @@ class Whatsapp::IncomingMessageWhatsappCloudService < Whatsapp::IncomingMessageB
   def download_attachment_file(attachment_payload)
     url_response = HTTParty.get(
       inbox.channel.media_url(attachment_payload[:id]),
-      headers: inbox.channel.api_headers
+      headers: inbox.channel.api_headers,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     # This url response will be failure if the access token has expired.

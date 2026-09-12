@@ -1,4 +1,6 @@
 class Whatsapp::BusinessManagementTokenValidationService
+  include Whatsapp::GraphRequestOptions
+
   REQUIRED_PERMISSION = 'whatsapp_business_management'.freeze
 
   def initialize(business_management_token, business_account_id)
@@ -7,7 +9,7 @@ class Whatsapp::BusinessManagementTokenValidationService
   end
 
   def perform
-    response = HTTParty.get(permissions_url, headers: { 'Authorization' => "Bearer #{@business_management_token}" })
+    response = HTTParty.get(permissions_url, headers: { 'Authorization' => "Bearer #{@business_management_token}" }, **GRAPH_REQUEST_OPTIONS)
 
     raise ArgumentError, response_error(response) unless response.success?
     raise ArgumentError, "Business management token must grant the #{REQUIRED_PERMISSION} permission" unless required_permission_granted?(response)
@@ -40,7 +42,8 @@ class Whatsapp::BusinessManagementTokenValidationService
   def validate_business_account_access!
     response = HTTParty.get(
       business_account_templates_url,
-      headers: { 'Authorization' => "Bearer #{@business_management_token}" }
+      headers: { 'Authorization' => "Bearer #{@business_management_token}" },
+      **GRAPH_REQUEST_OPTIONS
     )
 
     raise ArgumentError, response_error(response) unless response.success?

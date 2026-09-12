@@ -1,4 +1,6 @@
 class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
+  include Whatsapp::GraphRequestOptions
+
   # The types WhatsApp accepts for a voice message, taken from its own rejection message:
   # "Please use one of audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac."
   # Measured live in #520: a phone renders every one of them as a voice bubble, and only opus
@@ -41,7 +43,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     response = HTTParty.post(
       "#{phone_id_path}/messages",
       headers: api_headers,
-      body: request_body.to_json
+      body: request_body.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     process_response(response, message)
@@ -62,7 +65,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   def fetch_whatsapp_templates(after: nil)
     options = { headers: { 'Authorization' => "Bearer #{whatsapp_channel.template_access_token}" } }
     options[:query] = { after: after } if after.present?
-    response = HTTParty.get("#{business_account_path}/message_templates", options)
+    response = HTTParty.get("#{business_account_path}/message_templates", **options, **GRAPH_REQUEST_OPTIONS)
     unless response.success?
       Rails.logger.warn "[WHATSAPP] Template sync failed for account #{whatsapp_channel.account_id} " \
                         "inbox #{whatsapp_channel.inbox&.id}: #{response.code} #{error_message(response)}"
@@ -78,12 +81,15 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def validate_provider_config?
     config = whatsapp_channel.provider_config
-    response = HTTParty.get("#{business_account_path}/message_templates?access_token=#{config['api_key']}")
+    response = HTTParty.get("#{business_account_path}/message_templates?access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
     return log_transfer_failure('waba_or_token_check', response) unless response.success?
     # The templates check only proves the WABA/token pair, so verify the phone_number_id belongs to this WABA when it changes.
     return true unless whatsapp_channel.provider_config_changed?
 
-    phone_response = HTTParty.get("#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}")
+    phone_response = HTTParty.get(
+      "#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}",
+      **GRAPH_REQUEST_OPTIONS
+    )
     ids = phone_response.parsed_response.is_a?(Hash) ? Array(phone_response.parsed_response['data']) : []
     return true if phone_response.success? && ids.any? { |number| number['id'] == config['phone_number_id'].to_s }
 
@@ -147,7 +153,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         status: 'read',
         # NOTE: API currently only supports "typing", no "recording" status.
         typing_indicator: { type: 'text' }
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     Rails.logger.error(response.parsed_response) unless response.success?
@@ -165,7 +172,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         messaging_product: 'whatsapp',
         message_id: message.source_id,
         status: 'read'
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     Rails.logger.error(response.parsed_response) unless response.success?
@@ -212,7 +220,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         text: { body: message.outgoing_content },
         type: 'text'
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     process_response(response, message)
@@ -231,7 +240,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         'type' => type,
         type.to_s => type_content
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     process_response(response, message)
@@ -348,7 +358,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         interactive: payload,
         type: 'interactive'
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     process_response(response, message)
@@ -367,7 +378,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
           message_id: message.content_attributes[:in_reply_to_external_id],
           emoji: message.outgoing_content
         }
-      }.to_json
+      }.to_json,
+      **GRAPH_REQUEST_OPTIONS
     )
 
     process_response(response, message)
