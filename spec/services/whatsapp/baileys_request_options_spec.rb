@@ -91,6 +91,23 @@ describe Whatsapp::BaileysRequestOptions do
     expect(short).to eq(7)
   end
 
+  # The one claim in this change that the text scan above cannot check, because it is about what
+  # Ruby does with two double-splats rather than about what the file says. `post_send_message`
+  # forwards its caller's keywords and then applies the constant, in that order, so a caller that
+  # passed a `timeout:` of its own would not get it. Written as an example because the order is
+  # invisible at the call site and reversing it is a one-character edit.
+  it 'lets the constant win over a keyword the caller forwarded' do
+    service = described_class::BAILEYS_REQUEST_OPTIONS
+    sent = nil
+    allow(HTTParty).to receive(:post) { |_url, **options| sent = options }
+
+    channel = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
+    Whatsapp::Providers::WhatsappBaileysService.new(whatsapp_channel: channel)
+                                               .send(:post_send_message, 'http://example.test', timeout: 1, max_retries: 9)
+
+    expect(sent).to include(service)
+  end
+
   it 'is the only source of a ceiling for this file' do
     # The constants live in a module of their own so that the value and its reasoning sit in one
     # place; a copy of the numbers in the service would be the thing that drifts.
