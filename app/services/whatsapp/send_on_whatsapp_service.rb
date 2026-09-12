@@ -18,13 +18,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
   end
 
   def send_template_message
-    processor = Whatsapp::TemplateProcessorService.new(
-      channel: channel,
-      template_params: template_params,
-      message: message
-    )
-
-    name, namespace, lang_code, processed_parameters = processor.call
+    name, namespace, lang_code, processed_parameters = resolved_template
 
     if name.blank?
       message.update_under_lock!(status: :failed, external_error: 'Template not found or invalid template name')
@@ -43,6 +37,18 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     # media could not be uploaded. Retrying can't fix either, so surface the reason on the message
     # instead of letting the job die silently.
     message.update_under_lock!(status: :failed, external_error: e.message)
+  rescue Whatsapp::Session::Errors::Error => e
+    # A template send reaches the provider the same way a session message does, so a transport
+    # failure here has the same two outcomes and the same rule decides between them.
+    fail_unless_retryable(e)
+  end
+
+  def resolved_template
+    Whatsapp::TemplateProcessorService.new(
+      channel: channel,
+      template_params: template_params,
+      message: message
+    ).call
   end
 
   def send_baileys_session_message
@@ -55,22 +61,7 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
       send_session_message
     end
   rescue Whatsapp::Session::Errors::Error => e
-    # A refusal the provider will repeat, or a send whose outcome nobody can determine.
-    # Letting it escape leaves the bubble reading "sent" while the job retries something
-    # that cannot work and then dies in the dead set, so the reason goes on the message
-    # instead — the agent sees it and can act. Only an error that might answer
-    # differently next time is worth raising for. Mirrors
-    # Whatsapp::Session::Outbound::MessageSender, which already does this for the
-    # session providers.
-    raise if e.retryable?
-    # A processing conflict is not retryable by the definition retryable? uses — the
-    # same command is not going to answer differently, because we are not the one
-    # running it. But the MESSAGE is still on its way out through the worker holding
-    # the lock, so failing it here would be a lie, and it would swallow the dedicated
-    # backoff SendReplyJob has for exactly this conflict.
-    raise if e.code == Whatsapp::Session::Errors::MessageAlreadyProcessing::CODE
-
-    fail_message(e)
+    fail_unless_retryable(e)
   end
 
   # Through StatusTransition, which owns the rule and applies it under the row lock.
@@ -113,9 +104,34 @@ class Whatsapp::SendOnWhatsappService < Base::SendOnChannelService
     phone_a == phone_b || (phone_a.length >= 8 && phone_b.length >= 8 && phone_a[-8..] == phone_b[-8..])
   end
 
+  # The same rule the Baileys path has had since #391, now that the other three providers raise
+  # something it can read. Before this a transport failure escaped as whatever the HTTP stack
+  # raised, matched no `retry_on` in SendReplyJob, and left Sidekiq re-sending the message three
+  # more times with the bubble still on "sent" (fazer-ai/chatwoot#605).
+  #
+  # The session providers reach this too, and it costs them nothing: their own MessageSender
+  # already applies this rule, so what arrives here is only what it chose to re-raise.
   def send_session_message
     message_id = channel.send_message(recipient_id, message)
     persist_source_id(message_id)
+  rescue Whatsapp::Session::Errors::Error => e
+    fail_unless_retryable(e)
+  end
+
+  # A refusal the provider will repeat, or a send whose outcome nobody can determine. Letting it
+  # escape leaves the bubble reading "sent" while the job retries something that cannot work and
+  # then dies in the dead set, so the reason goes on the message instead — the agent sees it and
+  # can act. Only an error that might answer differently next time is worth raising for. Mirrors
+  # Whatsapp::Session::Outbound::MessageSender, which already does this for the session providers.
+  def fail_unless_retryable(error)
+    raise error if error.retryable?
+    # A processing conflict is not retryable by the definition retryable? uses — the same command
+    # is not going to answer differently, because we are not the one running it. But the MESSAGE
+    # is still on its way out through the worker holding the lock, so failing it here would be a
+    # lie, and it would swallow the dedicated backoff SendReplyJob has for exactly this conflict.
+    raise error if error.code == Whatsapp::Session::Errors::MessageAlreadyProcessing::CODE
+
+    fail_message(error)
   end
 
   # The message may have been deleted while this send was in flight — the DELETE endpoint found no

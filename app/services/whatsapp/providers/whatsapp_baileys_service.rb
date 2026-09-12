@@ -1,6 +1,7 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include BaileysHelper
   include Whatsapp::BaileysRequestOptions
+  include Whatsapp::TransportFailure
 
   # Legacy errors inherit from the session hierarchy so every caller rescues a single
   # namespace, whatever the provider. Nothing else about this service changes: it is
@@ -15,9 +16,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # resending could deliver the message twice, and only the operator can tell. Reached
   # only when the send did not reserve a message id, since with one a resend reuses the
   # same WhatsApp key.id and WhatsApp itself dedupes it.
-  class SendOutcomeUnknownError < Whatsapp::Session::Errors::Error
-    CODE = 'send_outcome_unknown'.freeze
-  end
+  class SendOutcomeUnknownError < Whatsapp::Session::Errors::SendOutcomeUnknown; end
 
   # The API knows this connection is not accepting sends at all (its send-stall circuit
   # breaker is open) and refused without touching the socket. Retryable: the provider
@@ -907,25 +906,17 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     raise_transport_error(e)
   end
 
-  # Failures that cannot have put a single byte of the request on the wire. Everything
-  # else defaults to indeterminate, and the asymmetry is deliberate: calling a
-  # possibly-delivered send "the provider is down" marks the channel closed, which drops
-  # the inbox out of the health-check cycle, while calling a never-sent one indeterminate
-  # costs one retry that the reserved message id makes duplicate-safe anyway.
-  NEVER_TRANSMITTED_ERRORS = [
-    Net::OpenTimeout, SocketError, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH
-  ].freeze
-
+  # The list of failures that cannot have put a byte on the wire, and the predicate that reads
+  # it, come from Whatsapp::TransportFailure. What stays here is what to raise, because this
+  # provider answers differently from the other three: a possibly-delivered send here is
+  # retryable, since the reserved message id makes a second attempt duplicate-safe, and the
+  # providers that reserve nothing must not retry one at all.
   def raise_transport_error(error)
     Rails.logger.error "[WHATSAPP][BAILEYS] transport failure on send: #{error.class}: #{error.message}"
 
     raise ProviderUnavailableError, outgoing_error(:provider_unreachable) if never_transmitted?(error)
 
     raise SendTimeoutError, outgoing_error(:send_timed_out)
-  end
-
-  def never_transmitted?(error)
-    NEVER_TRANSMITTED_ERRORS.any? { |klass| error.is_a?(klass) }
   end
 
   # Every non-2xx used to collapse into a bare ProviderUnavailableError, which made it

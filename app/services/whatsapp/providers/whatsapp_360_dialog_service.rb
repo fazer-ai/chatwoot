@@ -1,4 +1,6 @@
 class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseService
+  include Whatsapp::TransportFailure
+
   def send_message(phone_number, message)
     @message = message
     if message.attachments.present?
@@ -11,7 +13,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   end
 
   def send_template(phone_number, template_info, message)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_base_path}/messages",
       headers: api_headers,
       body: {
@@ -58,7 +60,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   end
 
   def send_text_message(phone_number, message)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_base_path}/messages",
       headers: api_headers,
       body: {
@@ -80,7 +82,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
     type_content['caption'] = message.outgoing_content unless %w[audio sticker].include?(type)
     type_content['filename'] = attachment.file.filename if type == 'document'
 
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_base_path}/messages",
       headers: api_headers,
       body: {
@@ -113,7 +115,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   def send_interactive_text_message(phone_number, message)
     payload = create_payload_based_on_items(message)
 
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_base_path}/messages",
       headers: api_headers,
       body: {
@@ -124,5 +126,13 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
     )
 
     process_response(response, message)
+  end
+
+  # Every HTTP call that puts a message on its way out goes through here, and nothing else does.
+  # One line inside the `rescue`, on purpose: see Whatsapp::TransportFailure.
+  def post_outgoing(url, **)
+    HTTParty.post(url, **)
+  rescue StandardError => e
+    raise_transport_failure(e)
   end
 end

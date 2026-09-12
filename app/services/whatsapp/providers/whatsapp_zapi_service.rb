@@ -1,4 +1,6 @@
 class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
+  include Whatsapp::TransportFailure
+
   # See the note in WhatsappBaileysService: legacy errors share the session hierarchy.
   class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
 
@@ -157,7 +159,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def send_text_message(phone, message, **params)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-text",
       headers: api_headers,
       body: {
@@ -210,7 +212,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def send_image_message(phone, message, buffer, **params)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-image",
       headers: api_headers,
       body: {
@@ -227,7 +229,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def send_audio_message(phone, _message, buffer, **params)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-audio",
       headers: api_headers,
       body: {
@@ -250,7 +252,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
       file_extension = 'bin'
     end
 
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-document/#{file_extension}",
       headers: api_headers,
       body: {
@@ -268,7 +270,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def send_video_message(phone, message, buffer, **params)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-video",
       headers: api_headers,
       body: {
@@ -285,7 +287,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def send_reaction_message(phone, message, **params)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{api_instance_path_with_token}/send-reaction",
       headers: api_headers,
       body: {
@@ -299,5 +301,13 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
     raise ProviderUnavailableError unless process_response(response)
 
     response.parsed_response&.dig('messageId')
+  end
+
+  # Every HTTP call that puts a message on its way out goes through here, and nothing else does.
+  # One line inside the `rescue`, on purpose: see Whatsapp::TransportFailure.
+  def post_outgoing(url, **)
+    HTTParty.post(url, **)
+  rescue StandardError => e
+    raise_transport_failure(e)
   end
 end

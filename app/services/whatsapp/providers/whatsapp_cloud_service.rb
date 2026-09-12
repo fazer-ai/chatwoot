@@ -1,5 +1,6 @@
 class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include Whatsapp::GraphRequestOptions
+  include Whatsapp::TransportFailure
 
   # The types WhatsApp accepts for a voice message, taken from its own rejection message:
   # "Please use one of audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac."
@@ -40,11 +41,10 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
       template: template_body
     }
 
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{phone_id_path}/messages",
       headers: api_headers,
-      body: request_body.to_json,
-      **GRAPH_REQUEST_OPTIONS
+      body: request_body.to_json
     )
 
     process_response(response, message)
@@ -211,7 +211,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def send_text_message(phone_number, message)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{phone_id_path}/messages",
       headers: api_headers,
       body: {
@@ -220,8 +220,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         text: { body: message.outgoing_content },
         type: 'text'
-      }.to_json,
-      **GRAPH_REQUEST_OPTIONS
+      }.to_json
     )
 
     process_response(response, message)
@@ -231,7 +230,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     attachment = message.attachments.first
     type = %w[image audio video].include?(attachment.file_type) ? attachment.file_type : 'document'
     type_content = build_attachment_content(type, attachment, message)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{phone_id_path('v24.0')}/messages",
       headers: api_headers,
       body: {
@@ -240,8 +239,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         'type' => type,
         type.to_s => type_content
-      }.to_json,
-      **GRAPH_REQUEST_OPTIONS
+      }.to_json
     )
 
     process_response(response, message)
@@ -350,7 +348,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   def send_interactive_text_message(phone_number, message)
     payload = create_payload_based_on_items(message)
 
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{phone_id_path}/messages",
       headers: api_headers,
       body: {
@@ -358,15 +356,14 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
         **recipient_params(phone_number),
         interactive: payload,
         type: 'interactive'
-      }.to_json,
-      **GRAPH_REQUEST_OPTIONS
+      }.to_json
     )
 
     process_response(response, message)
   end
 
   def send_reaction_message(phone_number, message)
-    response = HTTParty.post(
+    response = post_outgoing(
       "#{phone_id_path('v23.0')}/messages",
       headers: api_headers,
       body: {
@@ -378,11 +375,22 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
           message_id: message.content_attributes[:in_reply_to_external_id],
           emoji: message.outgoing_content
         }
-      }.to_json,
-      **GRAPH_REQUEST_OPTIONS
+      }.to_json
     )
 
     process_response(response, message)
+  end
+
+  # Every HTTP call that puts a message on its way out goes through here, and nothing else does.
+  # One line inside the `rescue`, on purpose: see Whatsapp::TransportFailure.
+  #
+  # The ceiling lives here rather than at each call site, and AFTER the forwarded keywords, so a
+  # send cannot be added without one and a caller cannot quietly raise it. Same arrangement as the
+  # Baileys provider's `post_send_message`.
+  def post_outgoing(url, **)
+    HTTParty.post(url, **, **GRAPH_REQUEST_OPTIONS)
+  rescue StandardError => e
+    raise_transport_failure(e)
   end
 end
 
