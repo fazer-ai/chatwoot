@@ -1,5 +1,6 @@
 class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseService
   include Whatsapp::TransportFailure
+  include Whatsapp::Dialog360RequestOptions
 
   def send_message(phone_number, message)
     @message = message
@@ -29,7 +30,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   def sync_templates
     # ensuring that channels with wrong provider config wouldn't keep trying to sync templates
     whatsapp_channel.mark_message_templates_updated
-    response = HTTParty.get("#{api_base_path}/configs/templates", headers: api_headers)
+    response = HTTParty.get("#{api_base_path}/configs/templates", headers: api_headers, **DIALOG360_REQUEST_OPTIONS)
     whatsapp_channel.update!(message_templates: response['waba_templates'], message_templates_last_updated: Time.now.utc) if response.success?
   end
 
@@ -39,7 +40,8 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
       headers: { 'D360-API-KEY': whatsapp_channel.provider_config['api_key'], 'Content-Type': 'application/json' },
       body: {
         url: "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/#{whatsapp_channel.phone_number}"
-      }.to_json
+      }.to_json,
+      **DIALOG360_REQUEST_OPTIONS
     )
     response.success?
   end
@@ -131,7 +133,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   # Every HTTP call that puts a message on its way out goes through here, and nothing else does.
   # One line inside the `rescue`, on purpose: see Whatsapp::TransportFailure.
   def post_outgoing(url, **)
-    HTTParty.post(url, **)
+    HTTParty.post(url, **, **DIALOG360_REQUEST_OPTIONS)
   rescue StandardError => e
     raise_transport_failure(e)
   end

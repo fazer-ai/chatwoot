@@ -27,8 +27,8 @@ describe Whatsapp::GraphRequestOptions do
       # Fenced by spec/services/whatsapp/baileys_request_options_spec.rb, which also counts each
       # side, so this entry is a pointer and not an exemption.
       'app/services/whatsapp/providers/whatsapp_baileys_service.rb' => 'Baileys API, fenced by its own two-ceiling spec',
-      'app/services/whatsapp/providers/whatsapp_zapi_service.rb' => 'Z-API, no ceiling decided yet',
-      'app/services/whatsapp/providers/whatsapp_360_dialog_service.rb' => '360dialog, no ceiling decided yet',
+      'app/services/whatsapp/providers/whatsapp_zapi_service.rb' => 'Z-API, fenced by its own two-ceiling spec',
+      'app/services/whatsapp/providers/whatsapp_360_dialog_service.rb' => '360dialog, fenced by its own spec',
       # uazapi, and already the most careful caller in the repo: its own TIMEOUT constant, a separate
       # open_timeout, and read and write timeouts set apart because HTTParty's `timeout` sets all
       # three. It is also the one file a scan for `HTTParty.<verb>(` cannot see, because it dispatches
