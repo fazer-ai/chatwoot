@@ -269,6 +269,7 @@
         "group": { "$ref": "#/definitions/address" },
         "subject": { "type": ["string", "null"] },
         "description": { "type": ["string", "null"] },
+        "topic_id": { "type": ["string", "null"] },
         "owner": { "oneOf": [{ "$ref": "#/definitions/party" }, { "type": "null" }] },
         "created_at": { "oneOf": [{ "$ref": "#/definitions/timestamp_ms" }, { "type": "null" }] },
         "participants": { "type": "array", "items": { "$ref": "#/definitions/group_participant" } },

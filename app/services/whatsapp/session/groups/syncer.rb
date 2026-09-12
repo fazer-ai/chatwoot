@@ -117,6 +117,11 @@ class Whatsapp::Session::Groups::Syncer
       'group_last_synced_at' => Time.current.to_i
     }.compact
     attributes['description'] = info.description.presence unless info.description.nil?
+    # Written only where the provider reported the id at all. Absent is not "this
+    # description can be changed", it is "this provider does not say" -- uazapi never
+    # does -- and writing false for it would erase what a native sync of the same group
+    # legitimately learned, leaving the panel offering an edit WhatsApp refuses forever.
+    attributes['description_frozen'] = info.description_frozen? unless info.topic_id.nil?
     attributes.merge(setting_attributes(info))
   end
 

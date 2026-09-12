@@ -40,6 +40,7 @@
       "EDIT_NAME_PLACEHOLDER": "Escriba el nombre del grupo",
       "EDIT_DESCRIPTION_LABEL": "Descripción",
       "EDIT_DESCRIPTION_PLACEHOLDER": "Escriba la descripción del grupo",
+      "DESCRIPTION_FROZEN": "WhatsApp no permite cambiar la descripción de este grupo.",
       "EDIT_AVATAR_LABEL": "Foto del grupo",
       "SAVE_SUCCESS": "Información del grupo actualizada correctamente.",
       "SAVE_ERROR": "No se pudo actualizar la información del grupo. Inténtelo de nuevo."

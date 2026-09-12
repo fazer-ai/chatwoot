@@ -181,6 +181,20 @@ const canEditGroup = computed(
     hasInboxCapability(CAPABILITIES.GROUP_ADMIN)
 );
 
+// A group whose description WhatsApp refuses to change, whatever the stanza looks like.
+// The server writes this key only where the provider reported the id that says so, so an
+// absent key means "not known to be frozen" rather than "changeable": uazapi never
+// reports it. Offering the edit anyway is what this exists to stop -- every attempt comes
+// back as a conflict, and the panel could only answer "try again", which for this group
+// is false.
+const isDescriptionFrozen = computed(
+  () => props.contact.additional_attributes?.description_frozen === true
+);
+
+const canEditDescription = computed(
+  () => canEditGroup.value && !isDescriptionFrozen.value
+);
+
 // A control is gated by the capability of the endpoint IT calls, never by the coarse
 // `groups`. Uazapi is the live case: it administers groups but serves neither invite
 // links nor join requests, so anything below that reaches those two routes has to ask
@@ -242,7 +256,7 @@ const onNameKeydown = event => {
 };
 
 const startEditDescription = () => {
-  if (isGroupLeft.value || !canEditGroup.value) return;
+  if (isGroupLeft.value || !canEditDescription.value) return;
   editDescriptionValue.value = contactDescription.value;
   isEditingDescription.value = true;
 };
@@ -820,7 +834,7 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
             ref="descriptionContentRef"
             class="text-sm break-words whitespace-pre-wrap text-n-slate-12"
             :class="[
-              { 'cursor-pointer hover:text-n-brand': canEditGroup },
+              { 'cursor-pointer hover:text-n-brand': canEditDescription },
               showDescReadMore ? 'line-clamp-3' : '',
             ]"
             @click="startEditDescription"
@@ -829,6 +843,12 @@ useEventListener(sidebarScrollRef, 'scroll', closeMemberMenu);
               contactDescription ||
               t('GROUP.METADATA.EDIT_DESCRIPTION_PLACEHOLDER')
             }}
+          </p>
+          <p
+            v-if="canEditGroup && isDescriptionFrozen"
+            class="mt-1 text-xs text-n-slate-11"
+          >
+            {{ t('GROUP.METADATA.DESCRIPTION_FROZEN') }}
           </p>
           <button
             v-if="showDescReadMore"
