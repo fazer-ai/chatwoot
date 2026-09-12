@@ -488,7 +488,10 @@ describe Whatsapp::WebhookSetupService do
         end
       end
 
-      it 'says Meta refused when Meta actually answered' do
+      # This used to assert the opposite, and it was the clearest statement of the old boundary: a bare
+      # `RuntimeError` is not an answer from Meta, and calling it a refusal is the app making a claim
+      # about a system it never heard from.
+      it 'does not call it a refusal when the error is not an answer from Meta' do
         allow(api_client).to receive(:register_phone_number).and_raise('Phone registration failed: {"error":"bad pin"}')
         allow(Rails.logger).to receive(:warn)
 
@@ -496,8 +499,8 @@ describe Whatsapp::WebhookSetupService do
           service.perform
         end
 
-        expect(Rails.logger).to have_received(:warn).with(/refused/)
-        expect(Rails.logger).not_to have_received(:warn).with(/outcome unknown/)
+        expect(Rails.logger).not_to have_received(:warn).with(/refused/)
+        expect(Rails.logger).to have_received(:warn).with(/outcome unknown/)
       end
     end
 
@@ -518,8 +521,31 @@ describe Whatsapp::WebhookSetupService do
         allow(Whatsapp::FacebookApiClient).to receive(:new).and_call_original
         stub_request(:get, status_url)
           .to_return(status: 200, body: { code_verification_status: 'NOT_VERIFIED' }.to_json, headers: json_headers)
+        allow(SecureRandom).to receive(:random_number).with(900_000).and_return(123_456)
         allow(Rails.logger).to receive(:warn)
         allow(Rails.logger).to receive(:error)
+      end
+
+      # Every example below drives the real client over stubbed HTTP, because the question is what the
+      # error that reaches `registration_outcome` carries, and a double raising a hand-built exception
+      # agrees with whatever the code does. The two webhook calls answer 200 throughout, so the only
+      # failure in play is the registration.
+      def register_answering(status:, body:, headers: { 'Content-Type' => 'application/json' })
+        stub_request(:post, register_url).to_return(status: status, body: body, headers: headers)
+        stub_request(:post, waba_subscribe_url).to_return(status: 200, body: '{}', headers: json_headers)
+        stub_request(:post, status_url).to_return(status: 200, body: '{}', headers: json_headers)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+      end
+
+      def warn_lines
+        messages = []
+        expect(Rails.logger).to have_received(:warn).at_least(:once) do |line|
+          messages << line
+        end
+        messages.grep(/Phone registration/)
       end
 
       it 'says Meta refused when the refusal is the one the client raised' do
@@ -564,6 +590,97 @@ describe Whatsapp::WebhookSetupService do
           error = error.cause
         end
         expect(chain.any? { |e| e.is_a?(Whatsapp::ApiError) && e.authorization_error? }).to be(true)
+      end
+
+      # The word for the outcome is a claim, and the claim has to be backed by an answer. "Refused"
+      # says Meta holds no PIN of ours, and only an answer from Meta can say that.
+      context 'when the registration fails without Meta having answered no' do
+        it 'does not call a 500 a refusal, because an internal error can be raised after the write landed' do
+          register_answering(status: 500, body: { error: { message: 'An unknown error occurred', code: 1 } }.to_json)
+
+          expect(warn_lines.size).to eq(1)
+          expect(warn_lines.first).to include('outcome unknown').and include('phone_number_id 123456789')
+          expect(warn_lines.first).not_to include('refused')
+        end
+
+        # Something in front of Meta answering instead of Meta. No code, no verdict.
+        it 'does not call a 5xx that is not even in Meta shape a refusal' do
+          register_answering(status: 502, body: '<html><body>Bad Gateway</body></html>',
+                             headers: { 'Content-Type' => 'text/html' })
+
+          expect(warn_lines.first).to include('outcome unknown')
+          expect(warn_lines.first).not_to include('refused')
+        end
+
+        it 'does not call an answer this code could not read a refusal' do
+          register_answering(status: 200, body: 'this is not json at all')
+
+          expect(warn_lines.first).not_to include('refused')
+        end
+
+        # Our own error, raised on our side: Meta was never heard from, so nothing can be said about it.
+        # The original message stays in the line, which is what shows the operator the fault is ours.
+        [ArgumentError, NoMethodError].each do |klass|
+          it "does not turn a #{klass} of our own into a statement about Meta" do
+            allow_any_instance_of(Whatsapp::FacebookApiClient) # rubocop:disable RSpec/AnyInstance
+              .to receive(:register_phone_number).and_raise(klass, 'algo nosso quebrou')
+            register_answering(status: 200, body: '{"success":true}')
+
+            expect(warn_lines.size).to eq(1)
+            expect(warn_lines.first).to include('outcome unknown').and include('algo nosso quebrou')
+            expect(warn_lines.first).not_to include('refused')
+          end
+        end
+
+        # The strongest form: Meta accepted, and the write of our own marker is what failed. Calling
+        # that a refusal states the opposite of what happened.
+        it 'does not call it a refusal when Meta accepted and only our confirmation failed' do
+          # The first write is the PIN, before the call; the second is the confirmation marker, after
+          # Meta accepted. Only the second fails.
+          writes = 0
+          allow(channel).to receive(:save!).with(validate: false) do
+            writes += 1
+            raise ActiveRecord::RecordInvalid, channel if writes > 1
+
+            true
+          end
+          register_answering(status: 200, body: '{"success":true}')
+
+          expect(warn_lines.first).not_to include('refused')
+          expect(channel.provider_config['verification_pin']).to eq(223_456)
+        end
+      end
+
+      context 'when Meta did answer no' do
+        it 'calls a 400 about the PIN a refusal' do
+          register_answering(status: 400, body: { error: { message: 'Invalid PIN', code: 100 } }.to_json)
+
+          expect(warn_lines.first).to include('refused')
+        end
+
+        # Not a credential verdict, but Meta did answer, and the write did not land.
+        it 'calls a 403 permissions error a refusal' do
+          register_answering(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json)
+
+          expect(warn_lines.first).to include('refused')
+        end
+
+        # The only 4xx where the two honest readings diverge. The boundary here is the status class:
+        # Meta answered and this attempt did not land, which is the same fact the operator acts on.
+        it 'calls a 429 rate limit a refusal' do
+          register_answering(status: 429, body: { error: { message: '(#80007) Rate limit hit', code: 80_007 } }.to_json)
+
+          expect(warn_lines.first).to include('refused')
+        end
+      end
+
+      # Naming the outcome is a log line and nothing else. A registration that fails must not reach
+      # the reauthorization marker, which no human clears and which makes the inbound job discard
+      # every webhook.
+      it 'never marks the channel for reauthorization from a failed registration' do
+        register_answering(status: 500, body: { error: { message: 'An unknown error occurred', code: 1 } }.to_json)
+
+        expect(channel.reload.reauthorization_required?).to be(false)
       end
     end
 
