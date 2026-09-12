@@ -676,7 +676,7 @@ const handleCopyWebhookUrl = async url => {
             sm
             solid
             blue
-            :loading="isRegisteringWebhook"
+            :is-loading="isRegisteringWebhook"
             :disabled="isRegisteringWebhook"
             @click="handleRegisterWebhook"
           >

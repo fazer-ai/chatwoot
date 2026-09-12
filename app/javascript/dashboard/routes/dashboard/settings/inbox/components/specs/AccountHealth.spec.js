@@ -1,5 +1,6 @@
-import { shallowMount } from '@vue/test-utils';
+import { mount, shallowMount } from '@vue/test-utils';
 import ButtonV4 from 'next/button/Button.vue';
+import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import AccountHealth from '../AccountHealth.vue';
 
 const { locale } = vi.hoisted(() => ({ locale: { value: 'en' } }));
@@ -21,6 +22,14 @@ vi.mock('vue-i18n', () => ({
 describe('AccountHealth', () => {
   const mountComponent = (healthData, props = {}) =>
     shallowMount(AccountHealth, {
+      props: { healthData, ...props },
+    });
+
+  // `shallowMount` replaces ButtonV4 with a stub, and a stub renders no spinner no matter which
+  // prop it receives, so an assertion about the operator seeing feedback would pass on the
+  // broken code. This one mounts the real button.
+  const mountDeep = (healthData, props = {}) =>
+    mount(AccountHealth, {
       props: { healthData, ...props },
     });
 
@@ -329,6 +338,68 @@ describe('AccountHealth', () => {
       expect(wrapper.text()).not.toContain(
         'https://elsewhere.example.com/webhooks/whatsapp/+1'
       );
+    });
+  });
+
+  // The prop that draws the spinner is `isLoading`. A call site passing `loading` instead gets
+  // no error: the name is not in the prop list and not in EXCLUDED_ATTRS, so it falls through
+  // `useAttrs` onto the `<button>` element, where the browser ignores it. The registration writes
+  // to Meta and can take the whole Graph ceiling to answer, so what the operator sees for those
+  // seconds is a button that looks idle.
+  describe('while the webhook registration is in flight', () => {
+    const registering = {
+      healthError: {
+        type: 'generic',
+        message: 'The health read did not answer',
+      },
+      isRegisteringWebhook: true,
+    };
+
+    // Two buttons render in this state and both are ButtonV4, so a lookup by component or by
+    // `button[disabled]` picks whichever comes first in the tree and says nothing about the one
+    // this is about. `isLoading` cannot be the discriminator either: it defaults to false, so
+    // every button in the tree answers it.
+    const registerButton = wrapper =>
+      wrapper
+        .findAll('button')
+        .find(candidate =>
+          candidate
+            .text()
+            .includes('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON')
+        );
+
+    it('draws the spinner on the register webhook button', () => {
+      const wrapper = mountDeep(null, registering);
+
+      expect(registerButton(wrapper)).toBeDefined();
+      expect(wrapper.findComponent(Spinner).exists()).toBe(true);
+    });
+
+    it('does not leave the loading state on the element as an inert attribute', () => {
+      const wrapper = mountDeep(null, registering);
+
+      expect(registerButton(wrapper).attributes('loading')).toBeUndefined();
+    });
+
+    it('still disables that same button, which is the half that already worked', () => {
+      const wrapper = mountDeep(null, registering);
+
+      expect(registerButton(wrapper).attributes('disabled')).toBeDefined();
+    });
+
+    // The inert attribute shows up in both states, not only the busy one: a `false` bound to an
+    // undeclared attribute renders as the string "false", which is truthy to nobody but is still
+    // there in the markup. So the idle case discriminates the broken code from the fixed one on
+    // its own, without having to reach the in-flight state at all.
+    it('draws no spinner when nothing is in flight, and carries no attribute either', () => {
+      const wrapper = mountDeep(null, {
+        healthError: registering.healthError,
+        isRegisteringWebhook: false,
+      });
+
+      expect(registerButton(wrapper)).toBeDefined();
+      expect(wrapper.findComponent(Spinner).exists()).toBe(false);
+      expect(registerButton(wrapper).attributes('loading')).toBeUndefined();
     });
   });
 

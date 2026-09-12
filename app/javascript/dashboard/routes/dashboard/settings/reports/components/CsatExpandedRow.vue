@@ -122,7 +122,7 @@ const saveReviewNotes = async () => {
                   <Button
                     :label="$t('CSAT_REPORTS.REVIEW_NOTES.SAVE')"
                     :disabled="!hasChanges || isSaving"
-                    :loading="isSaving"
+                    :is-loading="isSaving"
                     size="xs"
                     @click.stop="saveReviewNotes"
                   />
