@@ -208,6 +208,64 @@ namespace :whatsapp do
       end
     end
   end
+  namespace :session do
+    # One-time, after upgrading to a connector that carries the resume sweep
+    # (fazer-ai/whatsapp-connector#183).
+    #
+    # That sweep brings back an account nobody is running, and it reads which ones should be up
+    # from `wac_session_desired`, a table written only when the connector executes a
+    # `session.connect` or a `session.disconnect`. The upgrade creates it empty and nothing seeds
+    # it: on the deploy that introduces the fix, every already-paired account has a device row
+    # and no desired row, so the sweep finds no candidate and the fleet stays orphaned exactly as
+    # before (fazer-ai/whatsapp-connector#194).
+    #
+    # The connector cannot seed it without deciding something it has no basis for: a
+    # `session.disconnect` keeps the device, so seeding from the pairing would dial back an
+    # account an operator deliberately stopped, and nothing in its store separates the two
+    # (`bound_at` is when the credential was bound, `wac_session_presence` is chat availability).
+    # This side does know: `provider_connection['connection']` is `open` for the accounts this
+    # installation wants in the air.
+    #
+    # Safe on a healthy fleet: the connector answers a resume for a session that is already up
+    # without dialling anything, and what it does do is write the row this exists to create.
+    desc 'Tell the connector again which native inboxes should be connected (one-time, after the connector upgrade)'
+    task :reassert, %i[batch pause] => :environment do |_task, args|
+      batch = (args[:batch] || 4).to_i
+      pause = (args[:pause] || 10).to_f
+      abort 'batch must be at least 1' if batch < 1
+
+      channels = Channel::Whatsapp.where(provider: 'native').select do |channel|
+        channel.provider_connection['connection'] == 'open'
+      end
+
+      if channels.empty?
+        puts 'no native inbox is recorded as connected; nothing to re-assert.'
+        next
+      end
+
+      puts "re-asserting #{channels.size} native inbox(es), #{batch} at a time, #{pause}s apart"
+      failures = 0
+      channels.each_slice(batch).with_index do |slice, index|
+        # Paced, and the pacing is the point: `wa:control` is one stream for the whole fleet, so
+        # a wake per inbox in the same second is the stampede its retention cannot absorb
+        # (fazer-ai/whatsapp-connector#170). Each account brought back also dials, in a connector
+        # process that has just started.
+        sleep(pause) unless index.zero?
+        slice.each do |channel|
+          channel.setup_channel_provider
+          puts "  inbox #{channel.inbox&.id}: asked"
+        rescue StandardError => e
+          failures += 1
+          # One inbox that cannot be reached is not a reason to leave the rest down, which is the
+          # whole failure mode this task exists to end.
+          puts "  inbox #{channel.inbox&.id}: #{e.class}: #{e.message}"
+        end
+      end
+
+      puts failures.zero? ? 'done' : "done, #{failures} inbox(es) could not be asked; run again for those"
+    end
+  end
+
 end
 # rubocop:enable Metrics/BlockLength
 
