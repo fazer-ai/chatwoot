@@ -123,7 +123,10 @@ const openingTags = (source, name) =>
 const WRONG = /(?:^|\s)(?::|v-bind:)?loading(?:\.[\w.]+)?(?=[\s=/>])/;
 const RIGHT =
   /(?:^|\s)(?::|v-bind:)?(?:is-loading|isLoading)(?:\.[\w.]+)?(?=[\s=/>])/;
-const SPREAD = /v-bind\s*=\s*["'](?:\$?attrs)["']/;
+// Any spread, not only `attrs`. A plain object works just as well: `v-bind="buttonProps"` with
+// `{ loading: true }` puts the inert attribute on the element exactly like the two call sites
+// this PR fixes, and no sweep of the source can see inside the object.
+const SPREAD = /v-bind\s*=\s*["'][^"']+["']/;
 
 // The detector takes a source string and the path it would live at, so the same code that sweeps
 // the tree can be pointed at a synthetic file. That is not a convenience: on a clean tree there is
@@ -343,6 +346,57 @@ describe('the sweep that finds it actually finds it', () => {
       expect(found.right).toHaveLength(1);
     }
   );
+
+  // Both guards below are against false positives, and the collisions they avoid are real in this
+  // tree rather than hypothetical: `:loading-message`, `:loading-placeholder` and `loading-more`
+  // all exist as attributes, and five files import this Button as `Button` while also using
+  // `<ButtonGroup>`. None of those carries a `loading` today, which is precisely why they need a
+  // planted example: without one, removing either guard changes nothing and the fence would drift
+  // into rejecting correct code the first time one of them does.
+  // The only spread in the tree today binds `attrs`, so narrowing the pattern back to that one
+  // name changes no count and would go unnoticed. A plain object is the cheaper way to reproduce
+  // the defect: `v-bind="buttonProps"` with `{ loading: true }` puts the inert attribute on the
+  // element exactly like the two call sites this PR fixes.
+  it('counts a spread of a plain object, not only one of attrs', () => {
+    const found = planted(
+      'next/button/Button.vue',
+      NAME,
+      'v-bind="buttonProps"'
+    );
+
+    expect(found.spreads).toHaveLength(1);
+    expect(found.wrong).toEqual([]);
+  });
+
+  it('does not treat a longer attribute name as the prop', () => {
+    const found = planted(
+      'next/button/Button.vue',
+      NAME,
+      ':loading-message="t(\'CHAT.WAITING\')"'
+    );
+
+    expect(found.wrong).toEqual([]);
+  });
+
+  it('does not match a different tag whose name starts with the same word', () => {
+    const found = scanSource(
+      [
+        '<script setup>',
+        "import Button from 'next/button/Button.vue';",
+        "import ButtonGroup from 'next/buttonGroup/ButtonGroup.vue';",
+        '</script>',
+        '',
+        '<template>',
+        '  <ButtonGroup :loading="busy" />',
+        '  <Button :is-loading="busy" />',
+        '</template>',
+      ].join('\n'),
+      HOME
+    );
+
+    expect(found.wrong).toEqual([]);
+    expect(found.right).toHaveLength(1);
+  });
 
   it('ignores a `loading` on a tag that is not this component', () => {
     const found = scanSource(

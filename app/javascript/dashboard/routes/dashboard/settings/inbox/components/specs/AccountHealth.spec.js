@@ -1,6 +1,5 @@
 import { mount, shallowMount } from '@vue/test-utils';
 import ButtonV4 from 'next/button/Button.vue';
-import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import AccountHealth from '../AccountHealth.vue';
 
 const { locale } = vi.hoisted(() => ({ locale: { value: 'en' } }));
@@ -368,11 +367,18 @@ describe('AccountHealth', () => {
             .includes('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON')
         );
 
+    // Scoped to the button, not to the tree. Two ButtonV4 render in this state, so a tree-wide
+    // `findComponent(Spinner)` is answered by either of them: moving the binding to the other
+    // button leaves this suite at 48 green while the operator watches a spinner on the button
+    // they did not click and gets nothing on the one they did, which is the defect this PR is
+    // about. The lookup by button text is already here for exactly that reason a few lines up.
     it('draws the spinner on the register webhook button', () => {
       const wrapper = mountDeep(null, registering);
 
       expect(registerButton(wrapper)).toBeDefined();
-      expect(wrapper.findComponent(Spinner).exists()).toBe(true);
+      expect(registerButton(wrapper).find('svg.animate-spin').exists()).toBe(
+        true
+      );
     });
 
     it('does not leave the loading state on the element as an inert attribute', () => {
@@ -398,7 +404,9 @@ describe('AccountHealth', () => {
       });
 
       expect(registerButton(wrapper)).toBeDefined();
-      expect(wrapper.findComponent(Spinner).exists()).toBe(false);
+      expect(registerButton(wrapper).find('svg.animate-spin').exists()).toBe(
+        false
+      );
       expect(registerButton(wrapper).attributes('loading')).toBeUndefined();
     });
   });

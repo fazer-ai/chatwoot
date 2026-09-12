@@ -1,6 +1,5 @@
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
-import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
 import CsatExpandedRow from '../CsatExpandedRow.vue';
 
@@ -71,11 +70,14 @@ describe('CsatExpandedRow', () => {
     await typeANote(wrapper);
 
     expect(saveButton(wrapper)).toBeDefined();
-    expect(wrapper.findComponent(Spinner).exists()).toBe(false);
+    expect(saveButton(wrapper).find('svg.animate-spin').exists()).toBe(false);
 
     await saveButton(wrapper).trigger('click');
 
-    expect(wrapper.findComponent(Spinner).exists()).toBe(true);
+    // Scoped to the button rather than to the tree. Only one button renders here today, so the
+    // two are equivalent right now; they stop being equivalent the moment a second one appears,
+    // and a tree-wide lookup would then pass with the spinner on the wrong one.
+    expect(saveButton(wrapper).find('svg.animate-spin').exists()).toBe(true);
   });
 
   it('takes the spinner away once the write comes back', async () => {
@@ -83,7 +85,7 @@ describe('CsatExpandedRow', () => {
     await typeANote(wrapper);
     await saveButton(wrapper).trigger('click');
 
-    expect(wrapper.findComponent(Spinner).exists()).toBe(true);
+    expect(saveButton(wrapper).find('svg.animate-spin').exists()).toBe(true);
 
     settle();
     await new Promise(resolve => {
@@ -91,7 +93,7 @@ describe('CsatExpandedRow', () => {
     });
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.findComponent(Spinner).exists()).toBe(false);
+    expect(saveButton(wrapper).find('svg.animate-spin').exists()).toBe(false);
   });
 
   // The loading state used to arrive as `loading`, which is not declared on the component and not
