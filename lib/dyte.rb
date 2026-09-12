@@ -1,5 +1,9 @@
 class Dyte
   BASE_URL = 'https://api.cloudflare.com/client/v4'.freeze
+  # An agent clicked a button and is waiting on the room to exist, so this is short. The
+  # API answers out of its own state: creating a meeting and adding a participant are
+  # bookkeeping, not media.
+  DYTE_REQUEST_OPTIONS = { timeout: 10, max_retries: 0 }.freeze
   API_KEY_HEADER = 'Authorization'.freeze
   PRESET_NAME = 'group-call-host'.freeze
   LEGACY_PRESET_NAME = 'group_call_host'.freeze
@@ -79,17 +83,20 @@ class Dyte
 
   def post(path, payload = nil)
     HTTParty.post(
-      "#{BASE_URL}/accounts/#{@account_id}/realtime/kit/#{@app_id}/#{path}", {
+      "#{BASE_URL}/accounts/#{@account_id}/realtime/kit/#{@app_id}/#{path}",
+      **{
         headers: { API_KEY_HEADER => "Bearer #{@api_token}", 'Content-Type' => 'application/json' },
         body: payload&.to_json
-      }.compact
+      }.compact,
+      **DYTE_REQUEST_OPTIONS
     )
   end
 
   def get(path)
     HTTParty.get(
       "#{BASE_URL}/accounts/#{@account_id}/realtime/kit/#{@app_id}/#{path}",
-      headers: { API_KEY_HEADER => "Bearer #{@api_token}", 'Content-Type' => 'application/json' }
+      headers: { API_KEY_HEADER => "Bearer #{@api_token}", 'Content-Type' => 'application/json' },
+      **DYTE_REQUEST_OPTIONS
     )
   end
 end
