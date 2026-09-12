@@ -126,7 +126,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         groupsEnabled: self.class.groups_enabled?,
         syncFullHistory: history_sync?
       }.compact.to_json,
-      **BAILEYS_SHORT_REQUEST_OPTIONS
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -150,7 +150,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
-      **BAILEYS_SHORT_REQUEST_OPTIONS
+      **BAILEYS_REQUEST_OPTIONS
     )
     # 404 is the state being asked for, not a failure: the session is already gone, so
     # reporting it as one would abort a provider conversion, block the rejected-session

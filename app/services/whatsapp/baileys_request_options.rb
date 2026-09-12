@@ -29,13 +29,17 @@
 module Whatsapp::BaileysRequestOptions
   BAILEYS_REQUEST_OPTIONS = { timeout: 90, max_retries: 0 }.freeze
 
-  # The calls that deliberately give up before the provider does. Each one is a read whose
-  # caller already treats silence as "I do not know" and changes nothing, so waiting out a
-  # wedged socket buys an answer nobody is going to act on. Two of the seven sites that
-  # carry this today are not that -- `import_session` and `disconnect_channel_provider` act
-  # on the outcome -- and keeping their existing 10s rather than raising it is deliberate:
-  # this change gives every call a ceiling and takes the silent retry away, and moving a
-  # ceiling that already exists is a decision about what a cut *means*, which is
-  # fazer-ai/chatwoot#600.
+  # The calls that deliberately give up before the provider does. Every one is a read whose
+  # caller already treats silence as "I do not know" and changes nothing: `get_profile_pic`,
+  # `fetch_reachout_timelock`, `fetch_send_health` and `fetch_new_chat_cap` answer nil, and
+  # `presence_subscribe` is rescued and logged by Conversations::PresenceSubscribeService. For
+  # those, waiting out a wedged socket buys an answer nobody is going to act on.
+  #
+  # Two calls used to sit here and no longer do. `import_session` and
+  # `disconnect_channel_provider` have callers that act on the outcome, and between 10s and the
+  # provider's own 75s cut they were giving up on an operation still in progress: the disconnect
+  # left `provider_connection` untouched, so an inbox whose session had in fact ended stayed
+  # recorded as open with nothing to correct it later, and the import answered the operator
+  # "try again" for an import that may have completed (fazer-ai/chatwoot#600).
   BAILEYS_SHORT_REQUEST_OPTIONS = { timeout: 10, max_retries: 0 }.freeze
 end
