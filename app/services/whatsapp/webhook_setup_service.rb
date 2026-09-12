@@ -52,8 +52,26 @@ class Whatsapp::WebhookSetupService
   # A refusal and a silence are different facts and used to share one sentence. Meta answering "no"
   # is something the app knows; a read that never came back is something it does not, and the number
   # may well be registered on Meta's side with the PIN this attempt stored.
+  #
+  # The boundary is what Meta answered, not the class of the exception, because the class is wrong in
+  # both directions. It used to call a `500` a refusal, and an internal error can be raised after the
+  # write took effect, so "Meta holds no PIN of ours" is exactly the claim it cannot support. It also
+  # called an error of our own a refusal: an answer this code could not parse, and the one raised
+  # while storing our own confirmation marker after a registration Meta had accepted, which states
+  # the opposite of what happened.
+  #
+  # So `refused` is reserved for an answer that came back carrying a `4xx`: the request reached Meta
+  # and Meta declined it. That includes the `403` for a WABA in another portfolio and the `429` of a
+  # rate limit, neither of which is about the PIN, because what the operator acts on is the same
+  # fact: Meta answered, and this attempt did not land.
+  #
+  # Asked of the error's own field and guarded by the class that has the field. A predicate that asks
+  # `http_status` of a `Timeout::Error` raises inside the rescue, and then the line that reports the
+  # failure becomes the failure.
   def registration_outcome(error)
-    error.is_a?(Timeout::Error) || error.is_a?(IOError) || error.is_a?(SystemCallError) ? 'outcome unknown' : 'refused'
+    return 'refused' if error.is_a?(Whatsapp::ApiError) && error.http_status.to_i.between?(400, 499)
+
+    'outcome unknown'
   end
 
   def fetch_or_create_pin
