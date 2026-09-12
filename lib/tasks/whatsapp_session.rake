@@ -252,7 +252,11 @@ namespace :whatsapp do
         # process that has just started.
         sleep(pause) unless index.zero?
         slice.each do |channel|
-          channel.setup_channel_provider
+          # `reassert_desired_state`, not `setup_channel_provider`: the latter writes `connecting`
+          # over the stored state and turns a refusal into `close`, so an inbox this could not
+          # reach would stop matching the selection above and the rerun below would skip exactly
+          # the ones that still need asking.
+          channel.reassert_desired_state
           puts "  inbox #{channel.inbox&.id}: asked"
         rescue StandardError => e
           failures += 1
@@ -265,7 +269,6 @@ namespace :whatsapp do
       puts failures.zero? ? 'done' : "done, #{failures} inbox(es) could not be asked; run again for those"
     end
   end
-
 end
 # rubocop:enable Metrics/BlockLength
 

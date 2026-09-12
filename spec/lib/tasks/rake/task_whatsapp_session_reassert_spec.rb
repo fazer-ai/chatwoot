@@ -31,7 +31,7 @@ RSpec.describe Rake::Task do
     open_channel = native_channel('open')
     closed_channel = native_channel('close')
     asked = []
-    allow_any_instance_of(Channel::Whatsapp).to receive(:setup_channel_provider) { |channel| asked << channel.id } # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Channel::Whatsapp).to receive(:reassert_desired_state) { |channel| asked << channel.id } # rubocop:disable RSpec/AnyInstance
 
     task.invoke
 
@@ -46,7 +46,7 @@ RSpec.describe Rake::Task do
     first = native_channel('open')
     second = native_channel('open')
     asked = []
-    allow_any_instance_of(Channel::Whatsapp).to receive(:setup_channel_provider) do |channel| # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Channel::Whatsapp).to receive(:reassert_desired_state) do |channel| # rubocop:disable RSpec/AnyInstance
       raise Whatsapp::Session::Errors::ProviderUnavailable, 'nope' if channel.id == first.id
 
       asked << channel.id
@@ -58,16 +58,32 @@ RSpec.describe Rake::Task do
 
   it 'says there is nothing to do rather than asking anything' do
     native_channel('close')
-    allow_any_instance_of(Channel::Whatsapp).to receive(:setup_channel_provider) # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Channel::Whatsapp).to receive(:reassert_desired_state) # rubocop:disable RSpec/AnyInstance
 
     expect { task.invoke }.to output(/nothing to re-assert/).to_stdout
+  end
+
+  # The failure this task runs in the middle of is a connector that is not answering, so what it
+  # must not do is destroy the very thing it selects on. Measured against the real facade, with
+  # no stub over its state writes: an inbox it could not reach is still recorded as `open`
+  # afterwards, and the rerun the task tells the operator to do finds it again.
+  it 'leaves an inbox it could not reach eligible for the next run' do
+    channel = native_channel('open')
+    backend = instance_double(Whatsapp::Session::Backends::Connector::Backend)
+    allow(backend).to receive(:connect).and_raise(Whatsapp::Session::Errors::ProviderUnavailable, 'down')
+    allow_any_instance_of(Whatsapp::Session::Facade).to receive(:backend).and_return(backend) # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Whatsapp::Session::Facade).to receive(:capability?).and_return(false) # rubocop:disable RSpec/AnyInstance
+
+    expect { task.invoke }.to output(/could not be asked/).to_stdout
+
+    expect(channel.reload.provider_connection['connection']).to eq('open')
   end
 
   # The control stream is one for the whole fleet, so the batch size is not a convenience: a wake
   # per inbox in the same second is the stampede it cannot absorb.
   it 'waits between batches, and not before the first one' do
     3.times { native_channel('open') }
-    allow_any_instance_of(Channel::Whatsapp).to receive(:setup_channel_provider) # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Channel::Whatsapp).to receive(:reassert_desired_state) # rubocop:disable RSpec/AnyInstance
     pauses = []
     allow_any_instance_of(Object).to receive(:sleep) { |_, seconds| pauses << seconds } # rubocop:disable RSpec/AnyInstance
 
