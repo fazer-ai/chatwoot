@@ -3,6 +3,12 @@ class Api::V1::Accounts::Contacts::GroupMetadataController < Api::V1::Accounts::
 
   def update
     authorize @contact, :update?
+    # Before deciding there is nothing to do, and not after. Resolving only when a field was sent
+    # meant an empty request was never refused: an agent on none of this group's inboxes, or one
+    # naming an inbox they are not on, got a 200 for a request that would have been refused the
+    # moment it carried a single field. Whether the answer is 404 or 200 is not the caller's to
+    # decide by leaving the body out.
+    channel
     refuse_description_removal!
     update_subject if metadata_params[:subject].present?
     update_description if metadata_params[:description].present?

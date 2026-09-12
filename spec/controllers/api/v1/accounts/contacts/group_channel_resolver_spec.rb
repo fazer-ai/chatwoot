@@ -140,6 +140,56 @@ RSpec.describe 'group actions and the inbox they run as', type: :request do
                           'app/controllers/api/v1/accounts/contacts/group_members_controller.rb')
   end
 
+  # A metadata write resolved the channel only when it had a field to write, so a request with no
+  # subject, description or avatar never reached the refusal: it answered 200 to a caller the very
+  # same request would have been refused for the moment it carried one field.
+  describe 'a metadata write with nothing in it' do
+    it 'refuses an inbox the agent is not on, as it does with a field' do
+      agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: agent, inbox: looking_at.inbox)
+
+      patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+            params: { inbox_id: other.inbox.id }, headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'refuses an agent on none of this group\'s inboxes' do
+      outsider = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: outsider,
+                            inbox: create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false,
+                                                             sync_templates: false, account: account).inbox)
+
+      patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+            headers: outsider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    # Before the body is read at all, not merely before the fields are written. A description sent
+    # empty is refused with a 422 that explains the rule, and answering that to a caller with no
+    # claim to any of this group's inboxes tells them about a group they were not to be told about,
+    # in a request that should have ended one line earlier.
+    it 'refuses before it explains why an empty description is not allowed' do
+      outsider = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: outsider,
+                            inbox: create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false,
+                                                             sync_templates: false, account: account).inbox)
+
+      patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+            params: { description: '' }, headers: outsider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it 'is still a no-op success for a caller who could have written' do
+      patch "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_metadata",
+            params: { inbox_id: looking_at.inbox.id }, headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   # The endpoints predate the parameter and are documented without it, so a group that is
   # in one inbox still answers on its own.
   it 'needs no inbox when the group is in only one' do
