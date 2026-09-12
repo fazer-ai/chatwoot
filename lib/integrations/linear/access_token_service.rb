@@ -1,4 +1,6 @@
 class Integrations::Linear::AccessTokenService
+  include Integrations::Linear::RequestOptions
+
   TOKEN_URL = 'https://api.linear.app/oauth/token'.freeze
   MIGRATE_OLD_TOKEN_URL = 'https://api.linear.app/oauth/migrate_old_token'.freeze
   TOKEN_EXPIRY_BUFFER = 1.minute
@@ -24,7 +26,8 @@ class Integrations::Linear::AccessTokenService
         refresh_token: refresh_token,
         client_id: client_id,
         client_secret: client_secret
-      }
+      },
+      **LINEAR_REQUEST_OPTIONS
     )
 
     return fallback_access_token unless response.success?
@@ -44,7 +47,8 @@ class Integrations::Linear::AccessTokenService
         access_token: hook.access_token,
         client_id: client_id,
         client_secret: client_secret
-      }
+      },
+      **LINEAR_REQUEST_OPTIONS
     )
 
     return fallback_access_token unless response.success?
