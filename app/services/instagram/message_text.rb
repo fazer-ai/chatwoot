@@ -1,4 +1,6 @@
 class Instagram::MessageText < Instagram::BaseMessageText
+  include Instagram::RequestOptions
+
   attr_reader :messaging
 
   def ensure_contact(ig_scope_id)
@@ -10,7 +12,7 @@ class Instagram::MessageText < Instagram::BaseMessageText
     fields = 'name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user,is_verified_user'
     url = "#{base_uri}/#{ig_scope_id}?fields=#{fields}&access_token=#{@inbox.channel.access_token}"
 
-    response = HTTParty.get(url)
+    response = HTTParty.get(url, **INSTAGRAM_SHORT_REQUEST_OPTIONS)
 
     return process_successful_response(response) if response.success?
 

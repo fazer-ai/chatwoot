@@ -1,4 +1,6 @@
 class Instagram::Messenger::SendOnInstagramService < Instagram::BaseSendService
+  include Instagram::RequestOptions
+
   private
 
   def channel_class
@@ -16,7 +18,8 @@ class Instagram::Messenger::SendOnInstagramService < Instagram::BaseSendService
     response = HTTParty.post(
       'https://graph.facebook.com/v11.0/me/messages',
       body: message_content,
-      query: query
+      query: query,
+      **INSTAGRAM_REQUEST_OPTIONS
     )
 
     process_response(response, message_content)

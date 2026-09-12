@@ -2,6 +2,8 @@
 # Instagram tokens are valid for 60 days and can be refreshed to extend validity
 # This service implements the refresh logic per official Instagram API guidelines
 class Instagram::RefreshOauthTokenService
+  include Instagram::RequestOptions
+
   attr_reader :channel
 
   def initialize(channel:)
@@ -55,7 +57,8 @@ class Instagram::RefreshOauthTokenService
       access_token: channel[:access_token]
     }
 
-    response = HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' })
+    response = HTTParty.get(endpoint, query: params, headers: { 'Accept' => 'application/json' },
+                                      **INSTAGRAM_SHORT_REQUEST_OPTIONS)
 
     unless response.success?
       Rails.logger.error "Failed to refresh Instagram token: #{response.body}"

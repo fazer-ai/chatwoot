@@ -1,4 +1,6 @@
 class Messages::Instagram::MessageBuilder < Messages::Instagram::BaseMessageBuilder
+  include Instagram::RequestOptions
+
   def initialize(messaging, inbox, outgoing_echo: false)
     super(messaging, inbox, outgoing_echo: outgoing_echo)
   end
@@ -8,7 +10,7 @@ class Messages::Instagram::MessageBuilder < Messages::Instagram::BaseMessageBuil
   def get_story_object_from_source_id(source_id)
     url = "#{base_uri}/#{source_id}?fields=story,from&access_token=#{@inbox.channel.access_token}"
 
-    response = HTTParty.get(url)
+    response = HTTParty.get(url, **INSTAGRAM_SHORT_REQUEST_OPTIONS)
 
     return JSON.parse(response.body).with_indifferent_access if response.success?
 

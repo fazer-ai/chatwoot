@@ -51,7 +51,8 @@ module InstagramConcern
     response = HTTParty.get(
       endpoint,
       query: params,
-      headers: { 'Accept' => 'application/json' }
+      headers: { 'Accept' => 'application/json' },
+      **Instagram::RequestOptions::INSTAGRAM_SHORT_REQUEST_OPTIONS
     )
 
     unless response.success?
