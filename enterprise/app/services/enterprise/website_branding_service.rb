@@ -28,7 +28,9 @@ module Enterprise::WebsiteBrandingService
       headers: {
         'Authorization' => "Bearer #{context_dev_api_key}",
         'Content-Type' => 'application/json'
-      }
+      },
+      timeout: 10,
+      max_retries: 0
     )
   end
 

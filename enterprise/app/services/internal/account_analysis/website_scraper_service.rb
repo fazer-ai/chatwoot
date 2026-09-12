@@ -9,7 +9,9 @@ class Internal::AccountAnalysis::WebsiteScraperService
     Rails.logger.info("Scraping website: #{external_link}")
 
     begin
-      response = HTTParty.get(external_link, follow_redirects: true)
+      # Whatever address the account put on its own record, so the wait is on a site
+      # nobody here controls and the ceiling is the only thing bounding it.
+      response = HTTParty.get(external_link, follow_redirects: true, timeout: 15, max_retries: 0)
       response.to_s
     rescue StandardError => e
       Rails.logger.error("Error scraping website for domain #{@domain}: #{e.message}")
