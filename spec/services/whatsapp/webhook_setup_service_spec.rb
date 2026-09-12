@@ -501,6 +501,72 @@ describe Whatsapp::WebhookSetupService do
       end
     end
 
+    # Every example above answers through a double of the client, so none of them exercises the
+    # client's own `handle_response`, and the class it raises is exactly what this service reads to
+    # tell a refusal from a silence. That class changed under this branch (#595 replaced the bare
+    # `raise "message"` with `Whatsapp::ApiError`) and the examples above stayed green, because a
+    # stub that raises a class of its own agrees with whatever the code does. These two go through
+    # the real client, so the naming and the reauthorization contract are pinned to what Meta's
+    # answer actually becomes.
+    context 'with the real Graph client' do
+      let(:register_url) { %r{graph\.facebook\.com/[^/]+/123456789/register} }
+      let(:status_url) { %r{graph\.facebook\.com/[^/]+/123456789\z} }
+      let(:waba_subscribe_url) { %r{graph\.facebook\.com/[^/]+/test_waba_id/subscribed_apps} }
+      let(:json_headers) { { 'Content-Type' => 'application/json' } }
+
+      before do
+        allow(Whatsapp::FacebookApiClient).to receive(:new).and_call_original
+        stub_request(:get, status_url)
+          .to_return(status: 200, body: { code_verification_status: 'NOT_VERIFIED' }.to_json, headers: json_headers)
+        allow(Rails.logger).to receive(:warn)
+        allow(Rails.logger).to receive(:error)
+      end
+
+      it 'says Meta refused when the refusal is the one the client raised' do
+        stub_request(:post, register_url)
+          .to_return(status: 400, body: { error: { message: 'Invalid PIN', code: 100 } }.to_json, headers: json_headers)
+        stub_request(:post, waba_subscribe_url).to_return(status: 200, body: '{}', headers: json_headers)
+        stub_request(:post, status_url).to_return(status: 200, body: '{}', headers: json_headers)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        expect(Rails.logger).to have_received(:warn).with(/refused/)
+        expect(Rails.logger).not_to have_received(:warn).with(/outcome unknown/)
+      end
+
+      # The read of the verification status now swallows its own failure to keep a silence from
+      # deciding the registration, and a dead token fails that read too. What must survive is Meta's
+      # answer about the credentials: it reaches `Channel::Whatsapp#credentials_refused?` through the
+      # required half of the webhook setup, which is the only call here that still raises. Asserted in
+      # that method's own vocabulary (down `cause`, `authorization_error?`) so a later change making
+      # the setup best effort too shows up here instead of in a channel that nobody reauthorizes.
+      it 'still carries Meta answer about the credentials out of perform' do
+        body = { error: { message: 'Session has expired', code: 190 } }.to_json
+        stub_request(:post, register_url).to_return(status: 401, body: body, headers: json_headers)
+        stub_request(:get, status_url).to_return(status: 401, body: body, headers: json_headers)
+        stub_request(:post, waba_subscribe_url).to_return(status: 401, body: body, headers: json_headers)
+
+        raised = nil
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        rescue StandardError => e
+          raised = e
+        end
+
+        expect(raised).to be_present
+
+        chain = []
+        error = raised
+        while error
+          chain << error
+          error = error.cause
+        end
+        expect(chain.any? { |e| e.is_a?(Whatsapp::ApiError) && e.authorization_error? }).to be(true)
+      end
+    end
+
     context 'when webhook setup fails (should raise)' do
       before do
         allow(api_client).to receive(:phone_number_code_verification_status).with('123456789').and_return('NOT_VERIFIED')
