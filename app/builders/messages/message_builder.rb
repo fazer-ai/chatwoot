@@ -113,8 +113,19 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     blob_for(uploaded_attachment)&.filename&.to_s
   end
 
+  # The top-level flag is about the message and the metadata entry is about one attachment, so the
+  # entry is the more specific of the two and wins. It used to lose: this ran after the metadata
+  # merge and wrote `true` over a refusal that had just been read and cast, which left a caller
+  # sending several attachments with no way at all to say "this one is not a voice note".
+  #
+  # Said as a skip rather than by moving the call, because `should_transcode?` reads the same
+  # `file_type` this does and moving one of them changes the order they see. Only the key decides:
+  # an entry that mentions the flag has answered, whatever it answered, and the absence of the key
+  # is what leaves the message-level flag standing -- which is the dashboard's case, one recording
+  # with the flag on the message.
   def tag_voice_message(attachment)
     return unless @is_voice_message && attachment.file_type == 'audio'
+    return if attachment.meta.to_h.key?('is_voice_message')
 
     attachment.meta = (attachment.meta || {}).merge('is_voice_message' => true)
   end
