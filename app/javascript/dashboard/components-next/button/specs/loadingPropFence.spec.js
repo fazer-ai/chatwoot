@@ -230,11 +230,16 @@ describe('the spinner prop of the next Button has one spelling', () => {
     // and would turn this red while the spread and the loading behaviour are untouched, and a
     // fence that goes red for an unrelated edit is one that gets switched off. The count still
     // bites, because a second spread anywhere, including a second one in this same file, adds an
-    // entry. Lines stay in the array that feeds the failure message, so a real one is still
-    // located.
-    expect(spreads.map(where => where.replace(/:\d+$/, ''))).toEqual([
-      'dashboard/components-next/Contacts/VoiceCallButton.vue',
-    ]);
+    // entry: the comparison maps, it does not deduplicate.
+    //
+    // The lines are carried in the failure message rather than in the compared value, because the
+    // compared value is exactly where they had to stop mattering. Without that, a second spread in
+    // this same file prints the same name twice with no way to tell which tag is the new one,
+    // which is the one case where locating it is what the reader needs.
+    expect(
+      spreads.map(where => where.replace(/:\d+$/, '')),
+      `spreads found: ${spreads.join(', ')}`
+    ).toEqual(['dashboard/components-next/Contacts/VoiceCallButton.vue']);
   });
 });
 
