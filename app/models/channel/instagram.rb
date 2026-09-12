@@ -17,6 +17,7 @@
 class Channel::Instagram < ApplicationRecord
   include Channelable
   include Reauthorizable
+  include Instagram::RequestOptions
   self.table_name = 'channel_instagram'
 
   # TODO: Remove guard once encryption keys become mandatory (target 3-4 releases out).
@@ -49,7 +50,8 @@ class Channel::Instagram < ApplicationRecord
       query: {
         subscribed_fields: %w[messages message_reactions messaging_seen],
         access_token: access_token
-      }
+      },
+      **INSTAGRAM_SHORT_REQUEST_OPTIONS
     )
   rescue StandardError => e
     Rails.logger.debug { "Rescued: #{e.inspect}" }
@@ -61,7 +63,8 @@ class Channel::Instagram < ApplicationRecord
       "#{base_uri}/#{instagram_id}/subscribed_apps",
       query: {
         access_token: access_token
-      }
+      },
+      **INSTAGRAM_SHORT_REQUEST_OPTIONS
     )
     true
   rescue StandardError => e
