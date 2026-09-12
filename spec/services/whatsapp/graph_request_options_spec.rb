@@ -84,8 +84,18 @@ describe Whatsapp::GraphRequestOptions do
     expect(described_class::GRAPH_REQUEST_OPTIONS).to eq(timeout: 10, max_retries: 0)
   end
 
+  # The CE suite runs with `rm -rf enterprise spec/enterprise` in front of it, so a guarded path in
+  # that tree is legitimately absent there and reading it would fail the fence for a reason that has
+  # nothing to do with a missing ceiling. Absence is only ever expected for that tree: a CE file that
+  # has gone missing is a real change and reads as one.
+  def present_sources(paths)
+    present, missing = paths.partition { |path| Rails.root.join(path).exist? }
+    expect(missing.grep_v(%r{\Aenterprise/})).to be_empty
+    present
+  end
+
   it 'leaves no Graph call in the guarded files without the ceiling' do
-    without_ceiling = guarded_sources.flat_map do |path|
+    without_ceiling = present_sources(guarded_sources).flat_map do |path|
       graph_calls(Rails.root.join(path).read)
         .reject { |call| call.include?('GRAPH_REQUEST_OPTIONS') }
         .map { |call| "#{path}: #{call.lines.first.strip} #{call.lines[1].to_s.strip}" }
@@ -97,9 +107,7 @@ describe Whatsapp::GraphRequestOptions do
   it 'reads every call in the guarded files, so an empty result cannot pass as a clean one' do
     # The check above answers "nothing without a ceiling", and it answers that for zero calls too.
     # This one measures that the scan actually reached the calls it was supposed to inspect.
-    counts = guarded_sources.index_with { |path| graph_calls(Rails.root.join(path).read).size }
-
-    expect(counts).to eq(
+    expected = {
       'app/services/whatsapp/facebook_api_client.rb' => 10,
       'app/services/whatsapp/health_service.rb' => 1,
       'app/services/whatsapp/providers/whatsapp_cloud_service.rb' => 10,
@@ -107,7 +115,11 @@ describe Whatsapp::GraphRequestOptions do
       'app/services/whatsapp/csat_template_service.rb' => 3,
       'app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb' => 1,
       'enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb' => 4
-    )
+    }
+    present = present_sources(guarded_sources)
+    counts = present.index_with { |path| graph_calls(Rails.root.join(path).read).size }
+
+    expect(counts).to eq(expected.slice(*present))
   end
 
   # The list above is written by hand, and a hand-written list has one failure mode: a new file that
