@@ -1,5 +1,6 @@
 class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include BaileysHelper
+  include Whatsapp::BaileysRequestOptions
 
   # Legacy errors inherit from the session hierarchy so every caller rescues a single
   # namespace, whatever the provider. Nothing else about this service changes: it is
@@ -58,7 +59,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     response = HTTParty.get(
       "#{DEFAULT_URL}/status",
-      headers: { 'x-api-key' => DEFAULT_API_KEY }
+      headers: { 'x-api-key' => DEFAULT_API_KEY },
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     unless response.success?
@@ -95,7 +97,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         includeMedia: false,
         groupsEnabled: self.class.groups_enabled?,
         syncFullHistory: history_sync?
-      }.compact.to_json
+      }.compact.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -124,7 +127,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         groupsEnabled: self.class.groups_enabled?,
         syncFullHistory: history_sync?
       }.compact.to_json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -148,7 +151,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
       headers: api_headers,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
     # 404 is the state being asked for, not a failure: the session is already gone, so
     # reporting it as one would abort a provider conversion, block the rejected-session
@@ -208,7 +211,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-create",
       headers: api_headers,
-      body: { subject: subject, participants: participants }.to_json
+      body: { subject: subject, participants: participants }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -220,7 +224,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-subject",
       headers: api_headers,
-      body: { jid: group_jid, subject: subject }.to_json
+      body: { jid: group_jid, subject: subject }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -230,7 +235,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-description",
       headers: api_headers,
-      body: { jid: group_jid, description: description }.to_json
+      body: { jid: group_jid, description: description }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -240,7 +246,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/update-profile-picture",
       headers: api_headers,
-      body: { jid: group_jid, image: image_base64 }.to_json
+      body: { jid: group_jid, image: image_base64 }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -251,7 +258,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       response = HTTParty.post(
         "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-participants",
         headers: api_headers,
-        body: { jid: group_jid, participant: participant, action: action }.to_json
+        body: { jid: group_jid, participant: participant, action: action }.to_json,
+        **BAILEYS_REQUEST_OPTIONS
       )
 
       raise ProviderUnavailableError unless process_response(response)
@@ -265,7 +273,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-invite-code",
       headers: api_headers,
       query: { jid: group_jid },
-      format: :json
+      format: :json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -277,7 +286,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-revoke-invite",
       headers: api_headers,
-      body: { jid: group_jid }.to_json
+      body: { jid: group_jid }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -290,7 +300,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-request-participants-list",
       headers: api_headers,
       query: { jid: group_jid },
-      format: :json
+      format: :json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     return [] if response.code == 403
@@ -305,7 +316,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-request-participants-update",
       headers: api_headers,
-      body: { jid: group_jid, participants: participants, action: action }.to_json
+      body: { jid: group_jid, participants: participants, action: action }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -315,7 +327,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-leave",
       headers: api_headers,
-      body: { jid: group_jid }.to_json
+      body: { jid: group_jid }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -333,7 +346,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-setting-update",
       headers: api_headers,
-      body: { jid: group_jid, setting: setting }.to_json
+      body: { jid: group_jid, setting: setting }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -343,7 +357,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-join-approval-mode",
       headers: api_headers,
-      body: { jid: group_jid, mode: mode }.to_json
+      body: { jid: group_jid, mode: mode }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -353,7 +368,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.post(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-member-add-mode",
       headers: api_headers,
-      body: { jid: group_jid, mode: mode }.to_json
+      body: { jid: group_jid, mode: mode }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -392,7 +408,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   def validate_provider_config?
     response = HTTParty.get(
       "#{provider_url}/status/auth",
-      headers: api_headers
+      headers: api_headers,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     process_response(response)
@@ -412,7 +429,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         toJid: remote_jid,
         type: status_map[typing_status]
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -425,7 +443,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/presence-subscribe",
       headers: api_headers,
       body: { jids: Array(jids) }.to_json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -445,7 +463,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         type: status_map[status]
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -461,7 +480,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         keys: messages.map { |message| message_key_for(message) }
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -484,7 +504,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
             messageTimestamp: message.content_attributes[:external_created_at]
           }]
         }
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -500,7 +521,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         keys: messages.map { |message| message_key_for(message) }
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -536,7 +558,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         count: (count || HISTORY_REQUEST_COUNT).to_i.clamp(1, HISTORY_REQUEST_COUNT),
         oldestMsgKey: { id: anchor.source_id, remoteJid: jid, fromMe: anchor.outgoing? },
         oldestMsgTimestamp: history_anchor_timestamp(anchor)
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -550,7 +573,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       query: { jid: jid },
       format: :json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     return nil unless process_response(response)
@@ -563,7 +586,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/group-metadata",
       headers: api_headers,
       query: { jid: group_jid },
-      format: :json
+      format: :json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -579,7 +603,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         jids: [remote_jid]
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -598,7 +623,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         jid: remote_jid,
         key: message_key_for(message)
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -616,7 +642,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         jid: remote_jid,
         key: message_key_for(message),
         messageContent: { text: new_content }
-      }.to_json
+      }.to_json,
+      **BAILEYS_REQUEST_OPTIONS
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -634,7 +661,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/reachout-timelock",
       headers: api_headers,
       format: :json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     return nil if response.code == 404
@@ -662,7 +689,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/health",
       headers: api_headers,
       format: :json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     return nil if response.code == 404
@@ -686,7 +713,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/new-chat-cap",
       headers: api_headers,
       format: :json,
-      timeout: 10
+      **BAILEYS_SHORT_REQUEST_OPTIONS
     )
 
     return nil if response.code == 404
@@ -847,14 +874,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         # key while still letting Sidekiq retries of the same attempt dedupe.
         chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}",
         messageId: message_id
-      }.to_json,
-      # Above the API's own 45s send deadline plus its slower paths (audio
-      # transcoding, media upload) and above a proxy's 75s cut, so we get its
-      # structured 504/503 rather than a bare Net::ReadTimeout. Below the old
-      # 120s because this request holds the per-channel outgoing lock
-      # (BaileysHelper::CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT, 130s) and every
-      # other send on the inbox queues behind it.
-      timeout: 90
+      }.to_json
     )
 
     raise_send_error(response) unless response.success?
@@ -873,8 +893,16 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # way a socket can fail, and it will be wrong (Net::WriteTimeout on a large media body,
   # OpenSSL::SSL::SSLError on a handshake, whatever the next TLS or HTTP gem raises).
   # Anything StandardError can be here is a transport failure by construction.
+  # The ceiling goes on this call and not on the caller, so that the one HTTParty call on the
+  # send path cannot be reached without it, and it goes AFTER the forwarded keywords so a
+  # caller cannot quietly raise it. The constant's 90s is the number this call chose first:
+  # above the API's own 45s send deadline plus its slower paths (audio transcoding, media
+  # upload) and above its proxy's 75s cut, so what comes back is its structured 504/503 and
+  # not a bare Net::ReadTimeout. The ceiling above it is the per-channel outgoing lock
+  # (BaileysHelper::CHANNEL_LOCK_ON_OUTGOING_MESSAGE_TIMEOUT, 130s), which every other send on
+  # the inbox queues behind.
   def post_send_message(url, **)
-    HTTParty.post(url, **)
+    HTTParty.post(url, **, **BAILEYS_REQUEST_OPTIONS)
   rescue StandardError => e
     raise_transport_error(e)
   end
