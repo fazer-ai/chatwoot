@@ -49,6 +49,10 @@ describe Whatsapp::ApiError do
       expect(described_class.new(message: 'x', http_status: 403, code: 200)).not_to be_authorization_error
     end
 
+    it 'reads a code that arrived as a string, which is what the cast is there for' do
+      expect(described_class.new(message: 'x', http_status: 401, code: '190')).to be_authorization_error
+    end
+
     it 'is false when there is no code at all, which is what silence leaves behind' do
       expect(described_class.new(message: 'x', http_status: 500)).not_to be_authorization_error
     end
