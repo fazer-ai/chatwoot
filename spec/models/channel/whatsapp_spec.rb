@@ -226,6 +226,36 @@ RSpec.describe Channel::Whatsapp do
       end
     end
 
+    # The line is the only place a diagnosis starts from, and the two ways in are not the same fact:
+    # one of them never reached Meta at all. Saying Meta refused there would be the same trade this
+    # change exists to stop, one layer down.
+    describe 'the line that says why reauthorization was asked for' do
+      it 'says Meta answered, when Meta answered' do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+          .to_return(status: 401, body: { error: { message: 'Error validating access token', code: 190 } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+        allow(Rails.logger).to receive(:error)
+
+        channel.setup_webhooks
+
+        expect(Rails.logger).to have_received(:error)
+          .with("[WHATSAPP] Asking for reauthorization on channel #{channel.id}: " \
+                'Meta answered that the credentials are the problem')
+      end
+
+      it 'says the setup could not run, when nothing ever left' do
+        channel.provider_config = channel.provider_config.merge('api_key' => '')
+        channel.save!(validate: false)
+        allow(Rails.logger).to receive(:error)
+
+        channel.setup_webhooks
+
+        expect(Rails.logger).to have_received(:error)
+          .with("[WHATSAPP] Asking for reauthorization on channel #{channel.id}: " \
+                'the setup could not run without a credential')
+      end
+    end
+
     context 'when the setup cannot run because there is no access token' do
       before do
         channel.provider_config = channel.provider_config.merge('api_key' => '')
