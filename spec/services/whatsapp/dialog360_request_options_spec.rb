@@ -55,7 +55,7 @@ describe Whatsapp::Dialog360RequestOptions do
   end
 
   it 'sends only through the helper that also classifies a transport failure' do
-    expect(source.scan(/HTTParty\.post\(url, \*\*, \*\*DIALOG360_REQUEST_OPTIONS\)/).size).to eq(1)
+    expect(source.scan('HTTParty.post(url, **, **DIALOG360_REQUEST_OPTIONS)').size).to eq(1)
     expect(source).to include('include Whatsapp::Dialog360RequestOptions')
   end
 end

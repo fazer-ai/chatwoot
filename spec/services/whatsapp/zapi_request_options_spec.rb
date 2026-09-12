@@ -65,7 +65,7 @@ describe Whatsapp::ZapiRequestOptions do
   it 'sends only through that helper' do
     # `post_outgoing` is where the ceiling and the transport classification both live, so a send
     # written straight against HTTParty would miss both at once.
-    expect(source.scan(/HTTParty\.post\(url, \*\*, \*\*ZAPI_SEND_OPTIONS\)/).size).to eq(1)
+    expect(source.scan('HTTParty.post(url, **, **ZAPI_SEND_OPTIONS)').size).to eq(1)
     expect(source).to include('include Whatsapp::ZapiRequestOptions')
   end
 end
