@@ -42,6 +42,21 @@ RSpec.describe Internal::CheckNewVersionsJob do
       end
     end
 
+    # `Net::HTTP` repeats an idempotent request once by default, so this job's five seconds
+    # were ten against a GitHub that accepts the connection and then stalls, on a schedule.
+    it 'asks once, so the ceiling it advertises is the one it spends' do
+      options = nil
+      allow(HTTParty).to receive(:get) do |_url, **kwargs|
+        options = kwargs
+        instance_double(HTTParty::Response, success?: false, code: 500, body: '')
+      end
+      allow(Rails.logger).to receive(:error)
+
+      job
+
+      expect(options).to eq(timeout: 5, max_retries: 0)
+    end
+
     context 'when GitHub API returns failed response' do
       before do
         stub_request(:get, 'https://api.github.com/repos/fazer-ai/chatwoot/releases/latest')

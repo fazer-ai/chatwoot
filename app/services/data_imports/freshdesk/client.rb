@@ -91,12 +91,16 @@ class DataImports::Freshdesk::Client
   def request(path, query: {})
     response =
       begin
+        # `max_retries: 0` alongside the ceiling: `Net::HTTP` repeats an idempotent request
+        # once by default, so a page this import waits 30 seconds for cost 60 against a
+        # server that accepts the connection and then stops answering.
         HTTParty.get(
           "https://#{@domain}/api/v2#{path}",
           query: query,
           basic_auth: { username: @api_key, password: 'X' },
           headers: { 'Accept' => 'application/json', 'Content-Type' => 'application/json' },
-          timeout: 30
+          timeout: 30,
+          max_retries: 0
         )
       rescue StandardError => e
         raise Error.new(

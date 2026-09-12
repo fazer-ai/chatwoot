@@ -11,7 +11,9 @@ class Internal::CheckNewVersionsJob < ApplicationJob
   private
 
   def fetch_latest_github_release
-    response = HTTParty.get('https://api.github.com/repos/fazer-ai/chatwoot/releases/latest', timeout: 5)
+    # `max_retries: 0` alongside the ceiling: `Net::HTTP` repeats an idempotent request
+    # once by default, so 5 seconds was 10 against a GitHub that accepts and stalls.
+    response = HTTParty.get('https://api.github.com/repos/fazer-ai/chatwoot/releases/latest', timeout: 5, max_retries: 0)
     unless response.success?
       Rails.logger.error "Failed to fetch latest GitHub release: HTTP #{response.code} - #{response.body}"
       return nil
