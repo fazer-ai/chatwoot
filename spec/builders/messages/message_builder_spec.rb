@@ -218,6 +218,47 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.meta).to include('is_recorded_audio' => false)
       end
 
+      # The same sentence for the sibling flag, and it was not true for it. `tag_voice_message` ran
+      # after the metadata merge and wrote `true` over the refusal that had just been read and cast,
+      # so the two flags disagreed about who wins with nothing saying so. An audio attachment,
+      # because the top-level flag only reaches one.
+      it 'lets a per-attachment refusal beat the top-level voice flag too' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+        params[:is_voice_message] = true
+        params[:attachments_metadata] = { 'sample.mp3' => { is_voice_message: 'false' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('is_voice_message' => false)
+      end
+
+      # Mentioning the key is answering, whatever the answer is. An explicit null is the case that
+      # separates "the entry has an opinion" from "the entry refuses", and it goes the same way as
+      # the sibling flag: there the entry merges last, so a null lands on top of the message-level
+      # value. Reading only a `false` here would put the two flags back out of step on exactly the
+      # input nobody thinks about.
+      it 'treats an explicit null in the entry as the entry having answered' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+        params[:is_voice_message] = true
+        params[:attachments_metadata] = { 'sample.mp3' => { is_voice_message: nil } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta['is_voice_message']).to be_nil
+      end
+
+      # And the top-level flag still reaches an attachment whose metadata says nothing about it,
+      # which is the case the dashboard sends: one recording, the flag on the message.
+      it 'still tags an attachment whose metadata does not mention the voice flag' do
+        params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+        params[:is_voice_message] = true
+        params[:attachments_metadata] = { 'sample.mp3' => { description: 'recado' } }
+
+        message = message_builder
+
+        expect(message.attachments.first.meta).to include('is_voice_message' => true, 'description' => 'recado')
+      end
+
       # What the cast covers is `ActiveModel::Type::Boolean`'s own list, and no more. Widening it
       # would be inventing a second truth table one line from the sibling parameter that uses the
       # standard one, which is the inconsistency this exists to remove.
@@ -407,6 +448,19 @@ describe Messages::MessageBuilder do
           message = message_builder
 
           expect(message.attachments.first.meta).to include('is_recorded_audio' => false)
+        end
+
+        # Same sentence for the voice flag, measured here too rather than inferred from multipart:
+        # the defect was in `tag_voice_message`, which both upload paths run, so both wrote `true`
+        # over the refusal.
+        it 'lets a per-attachment refusal beat the top-level voice flag, as multipart does' do
+          params[:attachments] = [get_blob_for('spec/assets/sample.ogg', 'audio/ogg').signed_id]
+          params[:is_voice_message] = true
+          params[:attachments_metadata] = { 'sample.ogg' => { is_voice_message: 'false' } }
+
+          message = message_builder
+
+          expect(message.attachments.first.meta).to include('is_voice_message' => false)
         end
 
         # The sibling reader in the same `process_metadata` has no `respond_to?` guard at all, so
