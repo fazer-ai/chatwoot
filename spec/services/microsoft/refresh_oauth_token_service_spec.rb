@@ -86,4 +86,55 @@ RSpec.describe Microsoft::RefreshOauthTokenService do
       end
     end
   end
+
+  # A escrita de terceiro que entra DURANTE a chamada de rede. Sem thread: a copia em memoria
+  # ja esta velha quando volta para a linha, e e por isso que o defeito reproduz com um stub.
+  describe 'when another writer lands on provider_config during the refresh' do
+    let(:channel) do
+      create(:channel_email, :microsoft_email, provider_config: {
+               expires_on: Time.zone.now - 3600,
+               access_token: SecureRandom.hex,
+               refresh_token: SecureRandom.hex,
+               imap_login_hint: 'someone@example.com'
+             })
+    end
+
+    before do
+      stub_request(:post, 'https://login.microsoftonline.com/common/oauth2/v2.0/token').to_return do
+        # Uma chave que nenhum dos dois lados do refresh escreve, gravada direto na linha para
+        # simular o outro escritor: a API de migracao de canal de e-mail (que aceita
+        # `provider_config` como hash aberto) e o unico caminho por onde ela chega hoje.
+        Channel::Email.where(id: channel.id)
+                      .update_all("provider_config = provider_config || '{\"migrated_by\":\"platform-api\"}'::jsonb")  # rubocop:disable Rails/SkipsModelValidations
+        { status: 200, body: new_tokens.to_json, headers: { 'Content-Type' => 'application/json' } }
+      end
+    end
+
+    it 'keeps the key that landed while the provider was answering' do
+      with_modified_env AZURE_APP_ID: SecureRandom.uuid, AZURE_APP_SECRET: SecureRandom.hex do
+        described_class.new(channel: channel).access_token
+      end
+
+      expect(channel.reload.provider_config['migrated_by']).to eq('platform-api')
+    end
+
+    it 'keeps the keys the refresh does not own' do
+      with_modified_env AZURE_APP_ID: SecureRandom.uuid, AZURE_APP_SECRET: SecureRandom.hex do
+        described_class.new(channel: channel).access_token
+      end
+
+      expect(channel.reload.provider_config['imap_login_hint']).to eq('someone@example.com')
+    end
+
+    it 'still writes the three keys it does own' do
+      with_modified_env AZURE_APP_ID: SecureRandom.uuid, AZURE_APP_SECRET: SecureRandom.hex do
+        described_class.new(channel: channel).access_token
+      end
+
+      config = channel.reload.provider_config
+      expect(config['access_token']).to eq(new_tokens[:access_token])
+      expect(config['refresh_token']).to eq(new_tokens[:refresh_token])
+      expect(config['expires_on']).to eq(Time.at(new_tokens[:expires_at]).utc.to_s)
+    end
+  end
 end

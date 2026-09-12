@@ -60,22 +60,29 @@ class Integrations::Linear::AccessTokenService
     fallback_access_token
   end
 
+  # Only the keys this response carries, merged into the row. It used to read `hook.settings` off
+  # this object -- loaded before the token call -- and write that copy back, so anything written to
+  # the hook while Linear was answering was erased. The `|| current_settings[...]` fallbacks are
+  # gone with it: a key the response does not carry is simply not in the merge, which leaves the
+  # stored one standing without having to read it first.
+  #
+  # `merge_json_column!` deliberately leaves this object untouched, so the reload is what lets the
+  # callers read the token they just persisted.
   def persist_tokens(token_data)
     raise ArgumentError, 'Missing access token in Linear token response' if token_data['access_token'].blank?
 
-    current_settings = hook_settings
-    updated_settings = current_settings.merge(
-      token_type: token_data['token_type'] || current_settings[:token_type],
-      expires_in: token_data['expires_in'] || current_settings[:expires_in],
-      expires_on: expires_on(token_data['expires_in']),
-      scope: token_data['scope'] || current_settings[:scope],
-      refresh_token: token_data['refresh_token'] || current_settings[:refresh_token]
-    ).compact
-
-    hook.update!(
-      access_token: token_data['access_token'],
-      settings: updated_settings
+    hook.merge_json_column!(
+      :settings,
+      merge: {
+        token_type: token_data['token_type'],
+        expires_in: token_data['expires_in'],
+        expires_on: (expires_on(token_data['expires_in']) if token_data['expires_in'].present?),
+        scope: token_data['scope'],
+        refresh_token: token_data['refresh_token']
+      }.compact,
+      attributes: { access_token: token_data['access_token'] }
     )
+    hook.reload
   end
 
   def token_valid?

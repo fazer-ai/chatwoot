@@ -37,6 +37,7 @@
 
 class Channel::Email < ApplicationRecord
   include Channelable
+  include JsonColumnMerge
   include Reauthorizable
 
   AUTHORIZATION_ERROR_THRESHOLD = 10

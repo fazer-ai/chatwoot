@@ -15,6 +15,7 @@
 #  reference_id :string
 #
 class Integrations::Hook < ApplicationRecord
+  include JsonColumnMerge
   include Reauthorizable
 
   attr_readonly :app_id, :account_id, :inbox_id, :hook_type

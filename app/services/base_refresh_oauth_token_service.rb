@@ -34,13 +34,26 @@ class BaseRefreshOauthTokenService
     channel.reload.provider_config
   end
 
+  # The three keys the refresh owns, merged into the row rather than assigned over it. What used to
+  # happen is that the whole column was replaced: anything else stored in `provider_config` was
+  # erased on the first refresh, silently. Not hypothetical -- `Platform::Api::V1::EmailChannelMigrationsController`
+  # writes this column from a payload that permits an open hash, so a migrated channel can hold keys
+  # that nobody here knows about.
+  #
+  # This does NOT make two concurrent refreshes safe, and the merge is not what would make them
+  # safe: both exchanged the same refresh token before either wrote, so both hold a token the
+  # provider issued, and the row cannot tell which one the provider still honours. That needs one
+  # refresh in flight per channel, which is a lock held across a network round trip, and it is
+  # filed separately.
   def update_channel_provider_config(new_tokens)
-    channel.provider_config = {
-      access_token: new_tokens[:access_token],
-      refresh_token: new_tokens[:refresh_token],
-      expires_on: Time.at(new_tokens[:expires_at]).utc.to_s
-    }
-    channel.save!
+    channel.merge_json_column!(
+      :provider_config,
+      merge: {
+        access_token: new_tokens[:access_token],
+        refresh_token: new_tokens[:refresh_token],
+        expires_on: Time.at(new_tokens[:expires_at]).utc.to_s
+      }
+    )
   end
 
   private
