@@ -373,6 +373,32 @@ const webhookUrlMismatch = computed(
     webhookUrl.value !== props.healthData?.expected_webhook_url
 );
 
+// Whether anything on this screen is an answer from Meta about where delivery is going right now.
+// A read that failed leaves the previous payload in place, and every line built from it is a claim
+// about a reading that did not happen.
+const hasReading = computed(
+  () => Boolean(props.healthData) && !errorState.value
+);
+
+// Registering a webhook needs the channel's `provider_config`, which the endpoint already has, and
+// never the health payload, so this control is not part of the card's state.
+//
+// A failed read is the case the issue is about: it says nothing about the wiring, and that is
+// exactly when the wiring is the most plausible thing to repair, so the control stays. The one
+// state that must stay quiet is "nothing is known yet", which is a different condition from "the
+// read failed": no data and no error.
+const showRegisterWebhook = computed(() => {
+  if (errorState.value) return true;
+  if (!props.healthData) return false;
+
+  return !webhookConfigured.value || webhookUrlMismatch.value;
+});
+
+const showWebhookCard = computed(
+  () =>
+    (hasReading.value && showWebhookSection.value) || showRegisterWebhook.value
+);
+
 // A number with no override of its own rides on the app's own callback, which belongs to the
 // installation and can be pointed elsewhere at any time. The chip above cannot say that: green
 // whenever the effective URL is ours, amber "mismatch" whenever it is not, and both readings are
@@ -492,116 +518,6 @@ const handleCopyWebhookUrl = async url => {
             </div>
           </div>
         </section>
-
-        <!-- Webhook configuration card -->
-        <div
-          v-if="showWebhookSection"
-          class="flex flex-col gap-2 p-4 rounded-lg border border-n-weak bg-n-solid-1"
-        >
-          <div class="flex gap-2 items-center">
-            <span class="text-body-main font-medium text-n-slate-11">
-              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.TITLE') }}
-            </span>
-            <Icon
-              v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.DESCRIPTION')"
-              icon="i-lucide-info"
-              class="flex-shrink-0 w-4 h-4 cursor-help text-n-slate-9"
-            />
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <span
-              v-if="webhookConfigured && !webhookUrlMismatch"
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 min-h-6 text-label-small rounded-md bg-n-alpha-2 text-n-teal-11"
-            >
-              <Icon icon="i-lucide-check-circle" class="w-3.5 h-3.5" />
-              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.CONFIGURED_SUCCESS') }}
-            </span>
-            <span
-              v-else
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 min-h-6 text-label-small rounded-md bg-n-alpha-2 text-n-amber-11"
-            >
-              <Icon icon="i-lucide-alert-triangle" class="w-3.5 h-3.5" />
-              {{
-                webhookUrlMismatch
-                  ? t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH')
-                  : t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.ACTION_REQUIRED')
-              }}
-            </span>
-            <ButtonV4
-              v-if="!webhookConfigured || webhookUrlMismatch"
-              sm
-              solid
-              blue
-              :loading="isRegisteringWebhook"
-              :disabled="isRegisteringWebhook"
-              class="flex-shrink-0"
-              @click="handleRegisterWebhook"
-            >
-              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON') }}
-            </ButtonV4>
-          </div>
-          <div
-            v-if="appCallbackRoutingMessage"
-            class="flex gap-1.5 items-start text-label-small text-n-amber-11"
-          >
-            <Icon
-              icon="i-lucide-alert-triangle"
-              class="flex-shrink-0 mt-0.5 w-3.5 h-3.5"
-            />
-            <span>
-              {{ t(appCallbackRoutingMessage) }}
-            </span>
-          </div>
-          <div v-if="webhookConfigured" class="pt-1 space-y-2">
-            <div class="flex items-center gap-3 min-w-0">
-              <span class="flex-shrink-0 text-label-small text-n-slate-10">
-                {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.CONFIGURED_URL') }}
-              </span>
-              <span
-                v-tooltip.top="webhookUrl"
-                class="flex-1 min-w-0 font-mono text-label-small truncate text-n-slate-12"
-              >
-                {{ webhookUrl }}
-              </span>
-              <ButtonV4
-                v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
-                type="button"
-                ghost
-                sm
-                slate
-                icon="i-lucide-copy"
-                class="flex-shrink-0"
-                :aria-label="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
-                @click="handleCopyWebhookUrl(webhookUrl)"
-              />
-            </div>
-            <div
-              v-if="webhookUrlMismatch"
-              class="flex items-center gap-3 min-w-0"
-            >
-              <span class="flex-shrink-0 text-label-small text-n-slate-10">
-                {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.EXPECTED_URL') }}
-              </span>
-              <span
-                v-tooltip.top="healthData.expected_webhook_url"
-                class="flex-1 min-w-0 font-mono text-label-small truncate text-n-slate-12"
-              >
-                {{ healthData.expected_webhook_url }}
-              </span>
-              <ButtonV4
-                v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
-                type="button"
-                ghost
-                sm
-                slate
-                icon="i-lucide-copy"
-                class="flex-shrink-0"
-                :aria-label="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
-                @click="handleCopyWebhookUrl(healthData.expected_webhook_url)"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       <div v-else-if="errorState" class="pt-2">
@@ -646,6 +562,126 @@ const handleCopyWebhookUrl = async url => {
               {{ t('INBOX_MGMT.ACCOUNT_HEALTH.NO_DATA') }}
             </p>
           </div>
+        </div>
+      </div>
+
+      <!-- Webhook configuration card. Outside the three states on purpose: registering a webhook
+           needs the channel's provider_config, which the endpoint already has, and never the health
+           payload. Inside the data branch, the control left the screen exactly when the health read
+           failed, which is when the wiring is the most plausible thing to repair (#593).
+
+           What the reading produced stays behind `hasReading`: the chip, the URLs and the app
+           callback lines are claims about where delivery is going now, and a read that did not
+           answer leaves them describing a moment that has passed. -->
+      <div
+        v-if="showWebhookCard"
+        class="flex flex-col gap-2 p-4 mt-6 rounded-lg border border-n-weak bg-n-solid-1"
+      >
+        <div class="flex gap-2 items-center">
+          <span class="text-body-main font-medium text-n-slate-11">
+            {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.TITLE') }}
+          </span>
+          <Icon
+            v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.DESCRIPTION')"
+            icon="i-lucide-info"
+            class="flex-shrink-0 w-4 h-4 cursor-help text-n-slate-9"
+          />
+        </div>
+        <div
+          v-if="hasReading && showWebhookSection"
+          class="flex items-center justify-between gap-3"
+        >
+          <span
+            v-if="webhookConfigured && !webhookUrlMismatch"
+            class="inline-flex items-center gap-1.5 px-2 py-0.5 min-h-6 text-label-small rounded-md bg-n-alpha-2 text-n-teal-11"
+          >
+            <Icon icon="i-lucide-check-circle" class="w-3.5 h-3.5" />
+            {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.CONFIGURED_SUCCESS') }}
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center gap-1.5 px-2 py-0.5 min-h-6 text-label-small rounded-md bg-n-alpha-2 text-n-amber-11"
+          >
+            <Icon icon="i-lucide-alert-triangle" class="w-3.5 h-3.5" />
+            {{
+              webhookUrlMismatch
+                ? t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.URL_MISMATCH')
+                : t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.ACTION_REQUIRED')
+            }}
+          </span>
+        </div>
+        <div
+          v-if="hasReading && appCallbackRoutingMessage"
+          class="flex gap-1.5 items-start text-label-small text-n-amber-11"
+        >
+          <Icon
+            icon="i-lucide-alert-triangle"
+            class="flex-shrink-0 mt-0.5 w-3.5 h-3.5"
+          />
+          <span>
+            {{ t(appCallbackRoutingMessage) }}
+          </span>
+        </div>
+        <div v-if="hasReading && webhookConfigured" class="pt-1 space-y-2">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="flex-shrink-0 text-label-small text-n-slate-10">
+              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.CONFIGURED_URL') }}
+            </span>
+            <span
+              v-tooltip.top="webhookUrl"
+              class="flex-1 min-w-0 font-mono text-label-small truncate text-n-slate-12"
+            >
+              {{ webhookUrl }}
+            </span>
+            <ButtonV4
+              v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
+              type="button"
+              ghost
+              sm
+              slate
+              icon="i-lucide-copy"
+              class="flex-shrink-0"
+              :aria-label="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
+              @click="handleCopyWebhookUrl(webhookUrl)"
+            />
+          </div>
+          <div
+            v-if="webhookUrlMismatch"
+            class="flex items-center gap-3 min-w-0"
+          >
+            <span class="flex-shrink-0 text-label-small text-n-slate-10">
+              {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.EXPECTED_URL') }}
+            </span>
+            <span
+              v-tooltip.top="healthData.expected_webhook_url"
+              class="flex-1 min-w-0 font-mono text-label-small truncate text-n-slate-12"
+            >
+              {{ healthData.expected_webhook_url }}
+            </span>
+            <ButtonV4
+              v-tooltip.top="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
+              type="button"
+              ghost
+              sm
+              slate
+              icon="i-lucide-copy"
+              class="flex-shrink-0"
+              :aria-label="t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.COPY_URL')"
+              @click="handleCopyWebhookUrl(healthData.expected_webhook_url)"
+            />
+          </div>
+        </div>
+        <div v-if="showRegisterWebhook" class="pt-1">
+          <ButtonV4
+            sm
+            solid
+            blue
+            :loading="isRegisteringWebhook"
+            :disabled="isRegisteringWebhook"
+            @click="handleRegisterWebhook"
+          >
+            {{ t('INBOX_MGMT.ACCOUNT_HEALTH.WEBHOOK.REGISTER_BUTTON') }}
+          </ButtonV4>
         </div>
       </div>
     </div>
