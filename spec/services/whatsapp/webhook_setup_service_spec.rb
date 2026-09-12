@@ -212,6 +212,22 @@ describe Whatsapp::WebhookSetupService do
         end
       end
 
+      # The decision has two outcomes, so `:unknown` and `:verified` produce the same one and no
+      # mutation of the decision can be caught here. This line is the whole surface of the third
+      # state: without it asserted, a cleanup can put the app back in a two-state world where "could
+      # not tell" is indistinguishable from "verified", and nothing turns red.
+      it 'says the read did not answer, which is the only place that state is visible' do
+        allow(Rails.logger).to receive(:error)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        expect(Rails.logger).to have_received(:error)
+          .with('[WHATSAPP] Could not read the code verification status for 123456789; ' \
+                'not deciding registration from it: API down')
+      end
+
       it 'does not raise, because the caller turns any raise into a reauthorization prompt' do
         # Channel::Whatsapp#setup_webhooks rescues everything out of #perform and calls
         # prompt_reauthorization!, and WhatsappEventsJob then discards every inbound webhook for
@@ -240,6 +256,25 @@ describe Whatsapp::WebhookSetupService do
             expect(api_client).not_to receive(:register_phone_number)
             service.perform
           end
+        end
+
+        it "says so, because #{shape} decides nothing and the log is where that shows" do
+          allow(api_client).to receive(:phone_number_code_verification_status)
+            .with('123456789').and_return(shape == 'nil' ? nil : '')
+          allow(health_service).to receive(:fetch_health_status).and_return({
+                                                                              platform_type: 'APPLICABLE',
+                                                                              throughput: { level: 'APPLICABLE' }
+                                                                            })
+          allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+          allow(Rails.logger).to receive(:error)
+
+          with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+            service.perform
+          end
+
+          expect(Rails.logger).to have_received(:error)
+            .with('[WHATSAPP] Phone number 123456789 answered no code verification status; ' \
+                  'not deciding registration from it')
         end
       end
     end
@@ -296,6 +331,19 @@ describe Whatsapp::WebhookSetupService do
           expect(api_client).to receive(:subscribe_phone_number_webhook)
           expect { service.perform }.not_to raise_error
         end
+      end
+
+      # Same hole on the other axis: `:unknown` and `:not_pending` lead to the same decision, so the
+      # line is the only thing that separates "health said no" from "health did not say".
+      it 'says the health read did not answer' do
+        allow(Rails.logger).to receive(:error)
+
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          service.perform
+        end
+
+        expect(Rails.logger).to have_received(:error)
+          .with('[WHATSAPP] Could not read the health status; not deciding registration from it: Health API down')
       end
     end
 
