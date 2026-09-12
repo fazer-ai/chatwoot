@@ -12,11 +12,17 @@ class Captain::Tools::FirecrawlService
     raise 'Missing API key' if @api_key.blank?
   end
 
+  # `crawl` only registers the job and answers, so it waits on Firecrawl's own state.
+  # `scrape` fetches the page before answering, so it waits on whatever site was named.
+  CRAWL_REQUEST_OPTIONS = { timeout: 20, max_retries: 0 }.freeze
+  SCRAPE_REQUEST_OPTIONS = { timeout: 60, max_retries: 0 }.freeze
+
   def perform(url, webhook_url, crawl_limit = 10)
     HTTParty.post(
       "#{BASE_URL}/crawl",
       body: crawl_payload(url, webhook_url, crawl_limit),
-      headers: headers
+      headers: headers,
+      **CRAWL_REQUEST_OPTIONS
     )
   rescue StandardError => e
     raise "Failed to crawl URL: #{e.message}"
@@ -26,7 +32,8 @@ class Captain::Tools::FirecrawlService
     HTTParty.post(
       "#{BASE_URL}/scrape",
       body: scrape_payload(url),
-      headers: headers
+      headers: headers,
+      **SCRAPE_REQUEST_OPTIONS
     )
   end
 

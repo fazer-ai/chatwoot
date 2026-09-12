@@ -70,7 +70,9 @@ module Enterprise::Concerns::Article
     headers = { 'Content-Type' => 'application/json', 'Authorization' => "Bearer #{openai_api_key}" }
     body = { model: 'gpt-4o', messages: messages, response_format: { type: 'json_object' } }.to_json
     Rails.logger.info "Requesting Chat GPT with body: #{body}"
-    response = HTTParty.post(openai_api_url, headers: headers, body: body)
+    # A chat completion: the thinking time before the first byte is the point of the call.
+    # `max_retries: 0` because a repeat is a second answer and a second bill.
+    response = HTTParty.post(openai_api_url, headers: headers, body: body, timeout: 120, max_retries: 0)
     Rails.logger.info "Chat GPT response: #{response.body}"
     JSON.parse(response.parsed_response['choices'][0]['message']['content'])['search_terms']
   end

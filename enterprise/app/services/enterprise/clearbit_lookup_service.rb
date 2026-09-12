@@ -34,12 +34,13 @@ class Enterprise::ClearbitLookupService
   # @param email [String] The email address to lookup.
   # @return [HTTParty::Response] The response from the Clearbit API.
   def self.perform_request(email)
-    options = {
+    HTTParty.get(
+      CLEARBIT_ENDPOINT,
       headers: { 'Authorization' => "Bearer #{clearbit_token}" },
-      query: { email: email }
-    }
-
-    HTTParty.get(CLEARBIT_ENDPOINT, options)
+      query: { email: email },
+      timeout: 10,
+      max_retries: 0
+    )
   end
 
   # Handles an error response from the Clearbit API.
