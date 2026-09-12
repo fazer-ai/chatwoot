@@ -123,10 +123,15 @@ const openingTags = (source, name) =>
 const WRONG = /(?:^|\s)(?::|v-bind:)?loading(?:\.[\w.]+)?(?=[\s=/>])/;
 const RIGHT =
   /(?:^|\s)(?::|v-bind:)?(?:is-loading|isLoading)(?:\.[\w.]+)?(?=[\s=/>])/;
-// Any spread, not only `attrs`. A plain object works just as well: `v-bind="buttonProps"` with
-// `{ loading: true }` puts the inert attribute on the element exactly like the two call sites
+// Any spread, not only one of `attrs`. A plain object works just as well: `v-bind="buttonProps"`
+// with `{ loading: true }` puts the inert attribute on the element exactly like the two call sites
 // this PR fixes, and no sweep of the source can see inside the object.
-const SPREAD = /v-bind\s*=\s*["'][^"']+["']/;
+//
+// Matched by attribute NAME, on the skeleton, for the same reason the wrong-prop matcher is: the
+// value is data. Reading the raw tag to find the value turns a correct tag carrying the string
+// `v-bind="..."` inside a label or a doc link into a rejection, which is the false positive on
+// the other side of the one this pattern was widened to fix.
+const SPREAD = /(?:^|\s)v-bind\s*=/;
 
 // The detector takes a source string and the path it would live at, so the same code that sweeps
 // the tree can be pointed at a synthetic file. That is not a convenience: on a clean tree there is
@@ -147,9 +152,7 @@ const scanSource = (source, file) => {
     names,
     wrong: tags.filter(tag => WRONG.test(tag.text)).map(tag => tag.where),
     right: tags.filter(tag => RIGHT.test(tag.text)).map(tag => tag.where),
-    // The spread's discriminator is its value, `attrs`, which the skeleton blanks out along with
-    // every other value, so this one reads the raw tag.
-    spreads: tags.filter(tag => SPREAD.test(tag.raw)).map(tag => tag.where),
+    spreads: tags.filter(tag => SPREAD.test(tag.text)).map(tag => tag.where),
   };
 };
 
@@ -366,6 +369,30 @@ describe('the sweep that finds it actually finds it', () => {
 
     expect(found.spreads).toHaveLength(1);
     expect(found.wrong).toEqual([]);
+  });
+
+  // The mirror of the example above. A value can legitimately contain the text `v-bind="..."`, in a
+  // label or a link to the docs, and counting spreads off the raw tag turns that into a rejection.
+  it('does not count a spread that is only mentioned inside a value', () => {
+    const found = scanSource(
+      [
+        '<script setup>',
+        `import ${NAME} from 'next/button/Button.vue';`,
+        '</script>',
+        '',
+        '<template>',
+        `  <${NAME}`,
+        '    title=\'see v-bind="something" in the docs\'',
+        '    :is-loading="busy"',
+        '  />',
+        '</template>',
+      ].join('\n'),
+      HOME
+    );
+
+    expect(found.spreads).toEqual([]);
+    expect(found.wrong).toEqual([]);
+    expect(found.right).toHaveLength(1);
   });
 
   it('does not treat a longer attribute name as the prop', () => {
