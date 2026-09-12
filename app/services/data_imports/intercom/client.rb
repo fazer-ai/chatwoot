@@ -53,11 +53,15 @@ class DataImports::Intercom::Client
   def get(path, query: {})
     response =
       begin
+        # `max_retries: 0` alongside the ceiling: `Net::HTTP` repeats an idempotent request
+        # once by default, so a page this import waits 30 seconds for cost 60 against a
+        # server that accepts the connection and then stops answering.
         HTTParty.get(
           "#{BASE_URL}#{path}",
           query: query,
           headers: headers,
-          timeout: 30
+          timeout: 30,
+          max_retries: 0
         )
       rescue StandardError => e
         raise Error.new(

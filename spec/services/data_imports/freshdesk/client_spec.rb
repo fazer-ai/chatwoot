@@ -39,7 +39,8 @@ RSpec.describe DataImports::Freshdesk::Client do
         },
         basic_auth: { username: 'secret', password: 'X' },
         headers: { 'Accept' => 'application/json', 'Content-Type' => 'application/json' },
-        timeout: 30
+        timeout: 30,
+        max_retries: 0
       )
       expect(page.data).to eq([{ 'id' => 2001 }])
       expect(page.next_page).to eq(3)
