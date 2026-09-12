@@ -124,14 +124,145 @@ RSpec.describe Channel::Whatsapp do
       end
     end
 
-    context 'when the WABA subscription itself fails' do
+    context 'when Meta answers that the credentials are the problem' do
       before do
         stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
-          .to_return(status: 400, body: { error: { message: 'App subscription to WABA failed' } }.to_json,
+          .to_return(status: 401,
+                     body: { error: { message: 'Error validating access token', type: 'OAuthException', code: 190 } }.to_json,
                      headers: { 'Content-Type' => 'application/json' })
       end
 
       it 'marks the channel for reauthorization' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(true)
+      end
+
+      it 'tells the operator, because a revoked token only gets fixed by hand' do
+        admin_mailer = double
+        mailer_double = double
+        allow(AdministratorNotifications::ChannelNotificationsMailer).to receive(:with).and_return(admin_mailer)
+        allow(admin_mailer).to receive(:whatsapp_disconnect).and_return(mailer_double)
+        allow(mailer_double).to receive(:deliver_later)
+
+        channel.setup_webhooks
+
+        expect(admin_mailer).to have_received(:whatsapp_disconnect).with(channel.inbox)
+      end
+    end
+
+    # A ceiling that stops the wait says nothing about the credentials, and `prompt_reauthorization!`
+    # is not a log line: it writes the marker, runs the handler that emails the operator, invalidates
+    # the inbox cache and fires the event, and `Webhooks::WhatsappEventsJob` discards every inbound
+    # webhook while the marker stands. So the alarm has to come from an answer, never from silence.
+    context 'when the WABA subscription never answers' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps}).to_timeout
+      end
+
+      it 'leaves the channel authorized' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+
+      it 'does not email the operator about a disconnection that was never established' do
+        expect(AdministratorNotifications::ChannelNotificationsMailer).not_to receive(:with)
+
+        channel.setup_webhooks
+      end
+    end
+
+    context 'when the WABA subscription answers with a server error' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+          .to_return(status: 500, body: { error: { message: 'Internal error', code: 1 } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'leaves the channel authorized, because a bad minute at Meta is not a bad credential' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
+    # The refusal a coexistence number gets every time its WABA sits in the customer's own Business
+    # Manager. The optional half already survives it; the required half used to mark the channel.
+    context 'when Meta refuses the WABA subscription with a permissions error' do
+      before do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+          .to_return(status: 403, body: { error: { message: '(#200) Permissions error', code: 200 } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'leaves the channel authorized' do
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
+    # `cause` is only set by raising inside a rescue, which is what the setup service does when it
+    # re-raises with a prefix. Built here rather than provoked, because provoking it would mean
+    # stubbing the Graph client instance the service builds for itself.
+    def wrapped(inner)
+      raise inner
+    rescue StandardError => e
+      begin
+        raise "Webhook setup failed: #{e.message}"
+      rescue StandardError => wrapper
+        wrapper
+      end
+    end
+
+    context 'when something inside the Graph call path raises ArgumentError' do
+      it 'leaves the channel authorized, because that one is not about a credential' do
+        allow(channel).to receive(:perform_webhook_setup).and_raise(wrapped(ArgumentError.new('bad callback url')))
+
+        channel.setup_webhooks
+
+        expect(channel.reauthorization_required?).to be(false)
+      end
+    end
+
+    # The line is the only place a diagnosis starts from, and the two ways in are not the same fact:
+    # one of them never reached Meta at all. Saying Meta refused there would be the same trade this
+    # change exists to stop, one layer down.
+    describe 'the line that says why reauthorization was asked for' do
+      it 'says Meta answered, when Meta answered' do
+        stub_request(:post, %r{graph\.facebook\.com/.*/#{waba_id}/subscribed_apps})
+          .to_return(status: 401, body: { error: { message: 'Error validating access token', code: 190 } }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+        allow(Rails.logger).to receive(:error)
+
+        channel.setup_webhooks
+
+        expect(Rails.logger).to have_received(:error)
+          .with("[WHATSAPP] Asking for reauthorization on channel #{channel.id}: " \
+                'Meta answered that the credentials are the problem')
+      end
+
+      it 'says the setup could not run, when nothing ever left' do
+        channel.provider_config = channel.provider_config.merge('api_key' => '')
+        channel.save!(validate: false)
+        allow(Rails.logger).to receive(:error)
+
+        channel.setup_webhooks
+
+        expect(Rails.logger).to have_received(:error)
+          .with("[WHATSAPP] Asking for reauthorization on channel #{channel.id}: " \
+                'the setup could not run without a credential')
+      end
+    end
+
+    context 'when the setup cannot run because there is no access token' do
+      before do
+        channel.provider_config = channel.provider_config.merge('api_key' => '')
+        channel.save!(validate: false)
+      end
+
+      it 'marks the channel for reauthorization, because a missing credential is not silence' do
         channel.setup_webhooks
 
         expect(channel.reauthorization_required?).to be(true)

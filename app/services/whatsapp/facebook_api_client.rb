@@ -193,8 +193,11 @@ class Whatsapp::FacebookApiClient
     "#{app_id}|#{app_secret}"
   end
 
+  # The message is unchanged, because it is what reaches the operator through the register-webhook
+  # endpoint. What is new is that the error also carries Meta's code, which is the only thing that
+  # separates "this token is no good" from "this request was refused" for whoever rescues it.
   def handle_response(response, error_message)
-    raise "#{error_message}: #{response.body}" unless response.success?
+    raise Whatsapp::ApiError.from_response(response, message: "#{error_message}: #{response.body}") unless response.success?
 
     response.parsed_response
   end
