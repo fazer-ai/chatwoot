@@ -126,18 +126,53 @@ RSpec.describe 'group actions and the inbox they run as', type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
-  # A fence, not a checklist. `channel` refusing is what keeps a new group endpoint from
-  # answering 500 the way this one did, and the tolerant reader exists for the two reads
-  # that are meant to degrade. Adding a third without meaning to is the way back in.
-  it 'is read tolerantly in exactly the two places that mean to' do
+  # A fence, not a checklist. There used to be a nil-tolerant reader beside `channel`, for the
+  # roster read, and what it produced was one endpoint answering the same question two ways
+  # depending on whether an optional parameter was typed. Its absence is what keeps the next
+  # group endpoint from reaching for one because it happens to be nearby.
+  it 'has no nil-tolerant way to resolve the channel' do
     roots = %w[app enterprise lib].select { |dir| Rails.root.join(dir).directory? }
-    readers = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb")).select do |path|
-      File.read(path).include?('channel_if_any')
+    sources = Dir.glob(Rails.root.join("{#{roots.join(',')}}/**/*.rb"))
+    readers = sources.select { |path| File.read(path).include?('channel_if_any') }
+
+    expect(sources).not_to be_empty
+    expect(readers.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s }).to be_empty
+  end
+
+  # The half of #535 this closes: same caller, same contact, same authorisation question, and
+  # until now two answers depending on whether `inbox_id` was typed.
+  describe 'the roster read' do
+    let(:outsider) do
+      agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: agent,
+                            inbox: create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false,
+                                                             sync_templates: false, account: account).inbox)
+      agent
     end
 
-    expect(readers.map { |path| Pathname.new(path).relative_path_from(Rails.root).to_s })
-      .to contain_exactly('app/controllers/concerns/group_channel_resolver.rb',
-                          'app/controllers/api/v1/accounts/contacts/group_members_controller.rb')
+    it 'answers an agent on none of this group\'s inboxes the same way, named or not' do
+      get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+          headers: outsider.create_new_auth_token, as: :json
+      unnamed = [response.status, response.parsed_body]
+
+      get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+          params: { inbox_id: looking_at.inbox.id }, headers: outsider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+      expect(unnamed).to eq([response.status, response.parsed_body])
+    end
+
+    # And it still answers the agent who has a claim, without being told which inbox to use, which
+    # is the case the parameter was made optional for.
+    it 'still answers an agent who is on one of them, without being told which' do
+      insider = create(:user, account: account, role: :agent)
+      create(:inbox_member, user: insider, inbox: looking_at.inbox)
+
+      get "/api/v1/accounts/#{account.id}/contacts/#{group_contact.id}/group_members",
+          headers: insider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:ok)
+    end
   end
 
   # A metadata write resolved the channel only when it had a field to write, so a request with no
