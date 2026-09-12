@@ -2,7 +2,7 @@ import Settings from '../Settings.vue';
 import InboxHealthAPI from 'dashboard/api/inboxHealth';
 
 vi.mock('dashboard/api/inboxHealth', () => ({
-  default: { registerWebhook: vi.fn() },
+  default: { registerWebhook: vi.fn(), getHealthStatus: vi.fn() },
 }));
 
 vi.mock('dashboard/composables', () => ({
@@ -64,5 +64,56 @@ describe('Settings registerWebhook', () => {
       message: 'Net::ReadTimeout',
     });
     expect(context.isRegisteringWebhook).toBe(false);
+  });
+});
+
+describe('Settings fetchHealthData', () => {
+  const contextWith = overrides => ({
+    inbox: { id: 7 },
+    isAWhatsAppCloudChannel: true,
+    isLoadingHealth: false,
+    healthData: null,
+    healthError: { type: 'api', message: 'Net::ReadTimeout' },
+    ...overrides,
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Clearing the error before asking drops the screen into the "nothing is known" state for the
+  // length of the read, which with a quiet Meta is the whole ceiling. Nobody could see that gap
+  // until #593 put a control in the error state for the operator to press.
+  it('keeps the error on the screen while the re-read is in flight', async () => {
+    let answer;
+    InboxHealthAPI.getHealthStatus.mockReturnValue(
+      new Promise(resolve => {
+        answer = resolve;
+      })
+    );
+    const context = contextWith({});
+
+    const pending = Settings.methods.fetchHealthData.call(context);
+
+    expect(context.healthError).not.toBeNull();
+    expect(context.healthData).toBeNull();
+
+    answer({ data: { status: 'CONNECTED' } });
+    await pending;
+
+    expect(context.healthError).toBeNull();
+    expect(context.healthData).toEqual({ status: 'CONNECTED' });
+  });
+
+  it('replaces the error when the re-read fails too', async () => {
+    InboxHealthAPI.getHealthStatus.mockRejectedValue(new Error('still quiet'));
+    const context = contextWith({});
+
+    await Settings.methods.fetchHealthData.call(context);
+
+    expect(context.healthError).toEqual({
+      type: 'generic',
+      message: 'still quiet',
+    });
   });
 });

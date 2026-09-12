@@ -610,9 +610,15 @@ export default {
 
       try {
         this.isLoadingHealth = true;
-        this.healthError = null;
+        // Cleared with the answer, not before asking. Until #593 there was nothing to press in the
+        // error state, so the gap between the two never had a viewer; now the operator presses
+        // Register, the re-read starts, and clearing the error here would drop the screen into the
+        // "nothing is known" state for as long as the read takes, which with a quiet Meta is the
+        // whole 10s ceiling: the error card, the provider message and the button all disappear and
+        // come back.
         const response = await InboxHealthAPI.getHealthStatus(this.inbox.id);
         this.healthData = response.data;
+        this.healthError = null;
       } catch (error) {
         const apiError = error.response?.data?.error;
         this.healthError =

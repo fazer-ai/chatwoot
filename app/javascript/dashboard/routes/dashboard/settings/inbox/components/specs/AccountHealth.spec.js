@@ -284,9 +284,24 @@ describe('AccountHealth', () => {
 
       const locked = wrapper
         .findAllComponents(ButtonV4)
-        .filter(button => button.attributes('disabled') !== undefined);
+        .filter(button => button.attributes('disabled') === 'true');
 
       expect(locked).toHaveLength(1);
+    });
+
+    // The attribute is on the element in both states, so asking whether it exists says only that
+    // the binding was written. What has to be true is that it answers.
+    it('does not lock the control when no registration is in flight', () => {
+      const wrapper = mountComponent(null, {
+        healthError: { type: 'api', message: 'Net::ReadTimeout' },
+        isRegisteringWebhook: false,
+      });
+
+      const locked = wrapper
+        .findAllComponents(ButtonV4)
+        .filter(button => button.attributes('disabled') === 'true');
+
+      expect(locked).toHaveLength(0);
     });
 
     // The button keeps its own name and explanation. What it must not bring along is the reading:
