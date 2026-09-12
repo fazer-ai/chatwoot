@@ -1,18 +1,8 @@
 class Whatsapp::HealthService
-  class ApiError < StandardError
-    attr_reader :http_status, :code, :subcode
-
-    def initialize(message:, http_status:, code: nil, subcode: nil)
-      super(message)
-      @http_status = http_status
-      @code = code
-      @subcode = subcode
-    end
-
-    def authorization_error?
-      code.to_i == 190
-    end
-  end
+  # Kept as a name of its own so `rescue Whatsapp::HealthService::ApiError` still means "reading the
+  # health failed" and not "any Graph call failed". What it is, including what counts as an
+  # authorization error, lives in the parent.
+  class ApiError < Whatsapp::ApiError; end
 
   BASE_URI = 'https://graph.facebook.com'.freeze
   MINIMUM_HEALTH_API_VERSION = 24.0
@@ -126,14 +116,7 @@ class Whatsapp::HealthService
   def handle_response(response)
     return response.parsed_response if response.success?
 
-    parsed_response = response.parsed_response
-    error_data = parsed_response.is_a?(Hash) ? parsed_response['error'].to_h : {}
-    error = ApiError.new(
-      message: error_data['message'].presence || 'WhatsApp API request failed',
-      http_status: response.code,
-      code: error_data['code'],
-      subcode: error_data['error_subcode']
-    )
+    error = ApiError.from_response(response)
 
     Rails.logger.error(
       "[WHATSAPP HEALTH] WhatsApp API request failed: http_status=#{error.http_status} " \

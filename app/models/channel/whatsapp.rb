@@ -432,10 +432,38 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     perform_webhook_setup
   rescue StandardError => e
     Rails.logger.error "[WHATSAPP] Webhook setup failed: #{e.message}"
+    return unless credentials_refused?(e)
+
+    Rails.logger.error "[WHATSAPP] Meta refused the credentials for inbox #{inbox&.id}; asking for reauthorization"
     prompt_reauthorization!
   end
 
   private
+
+  # `prompt_reauthorization!` is not a log line: it writes the marker, runs the handler that emails
+  # the operator, invalidates the inbox cache and fires the event, and `Webhooks::WhatsappEventsJob`
+  # discards every inbound webhook while the marker stands. Nothing clears it but a human. So it
+  # takes an answer that says the credentials are the problem, and a Meta that accepts the
+  # connection and stays quiet is not one: measured on `main`, three ceiling-capped calls in a row
+  # marked a perfectly good channel in 30s.
+  #
+  # `ArgumentError` is the opposite case rather than an exception to the rule. It is what
+  # `Whatsapp::WebhookSetupService` raises when the access token or the WABA id is blank, and a
+  # credential that is not there is as definite an answer as one Meta rejected.
+  #
+  # The walk down `cause` is what makes this survive the layers in between: the setup service
+  # re-raises with a prefix so the operator can see which step failed, and Ruby keeps the original
+  # underneath. Asking only the outermost error would read every one of those as silence.
+  def credentials_refused?(error)
+    while error
+      return true if error.is_a?(ArgumentError)
+      return true if error.is_a?(Whatsapp::ApiError) && error.authorization_error?
+
+      error = error.cause
+    end
+
+    false
+  end
 
   # Whether anything on the way in will read the marker back. Written by exactly the two
   # inbound paths that can mistake our own receipt for a device read: the canonical session
