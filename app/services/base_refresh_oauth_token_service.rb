@@ -23,15 +23,22 @@ class BaseRefreshOauthTokenService
   # Refresh the access tokens using the refresh token
   # Refer: https://github.com/microsoftgraph/msgraph-sample-rubyrailsapp/tree/b4a6869fe4a438cde42b161196484a929f1bee46
   def refresh_tokens
-    raise 'A refresh_token is not available' if provider_config[:refresh_token].blank?
+    spent_refresh_token = provider_config[:refresh_token]
+    raise 'A refresh_token is not available' if spent_refresh_token.blank?
 
     oauth_strategy = build_oauth_strategy
     token_service = build_token_service(oauth_strategy)
 
     new_tokens = token_service.refresh!.to_hash.slice(:access_token, :refresh_token, :expires_at)
 
-    update_channel_provider_config(new_tokens)
-    channel.reload.provider_config
+    update_channel_provider_config(new_tokens, spent_refresh_token: spent_refresh_token)
+    # Re-read, and replace the memo with it. Two things depend on this being the row rather than the
+    # copy this object started with: the caller reads `[:access_token]` off what comes back, and when
+    # the write did not land, what comes back has to be the token set that did. `with_indifferent_access`
+    # because the column is a jsonb read back with String keys, and every reader here asks with symbols;
+    # handing the raw hash up made `access_token` answer nil, which is what
+    # `Imap::MicrosoftFetchEmailService` passes as the IMAP password.
+    @provider_config = channel.reload.provider_config.with_indifferent_access
   end
 
   # The three keys the refresh owns, merged into the row rather than assigned over it. What used to
@@ -40,20 +47,33 @@ class BaseRefreshOauthTokenService
   # writes this column from a payload that permits an open hash, so a migrated channel can hold keys
   # that nobody here knows about.
   #
-  # This does NOT make two concurrent refreshes safe, and the merge is not what would make them
-  # safe: both exchanged the same refresh token before either wrote, so both hold a token the
-  # provider issued, and the row cannot tell which one the provider still honours. That needs one
-  # refresh in flight per channel, which is a lock held across a network round trip, and it is
-  # filed separately.
-  def update_channel_provider_config(new_tokens)
-    channel.merge_json_column!(
+  # The merge alone does not make two concurrent refreshes safe, and it never could: both exchanged
+  # the same refresh token before either wrote, so the keys the loser writes are the keys the winner
+  # already wrote and there is nothing to merge them with. A provider that rotates refresh tokens
+  # invalidates the one it just replaced, so only one of the two pairs is live, and last writer wins
+  # can leave the row holding the dead one. The channel then stops fetching until somebody reconnects
+  # it by hand.
+  #
+  # So the write is conditional on the row still holding the refresh token this call spent. Losing is
+  # not an error and does not raise: the other refresh already stored a live pair, the caller re-reads
+  # and gets it. What losing must not be is silent, because the rotation this call spent is gone and
+  # the provider has seen a token the row never held.
+  def update_channel_provider_config(new_tokens, spent_refresh_token:)
+    result = channel.swap_json_column!(
       :provider_config,
+      expect: { refresh_token: spent_refresh_token },
       merge: {
         access_token: new_tokens[:access_token],
         refresh_token: new_tokens[:refresh_token],
         expires_on: Time.at(new_tokens[:expires_at]).utc.to_s
       }
     )
+
+    return result unless result == :stale
+
+    Rails.logger.warn("[OAUTH] Refresh for #{channel.class.name} #{channel.id} was not stored: the row no longer " \
+                      'holds the refresh token this call spent, so another refresh rotated it first')
+    result
   end
 
   private

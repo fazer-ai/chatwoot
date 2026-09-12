@@ -62,6 +62,37 @@ module JsonColumnMerge
     false
   end
 
+  # The case the merge above cannot cover: the key being written is the key another writer just
+  # wrote. Two OAuth refreshes of the same row both write `refresh_token`, both exchanged the same
+  # one, and a provider that rotates refresh tokens invalidates the old one, so only one of the two
+  # pairs is live. Merging leaves whichever wrote last, which can be the dead one, and then the row
+  # holds a token the provider will not honour. Last writer wins is the wrong rule here, and no
+  # amount of merging changes that: the loser has to notice.
+  #
+  # `expect` is read under the same lock as the write, so it is a compare-and-set and not a check
+  # followed by a hope: each key's stored value has to still be what the caller based its call on.
+  # An empty `expect` is a write with no precondition, which is what `merge_json_column!` already is.
+  #
+  # Answers what happened, unlike the merge, which answers only whether it wrote. A caller that has
+  # to log a rotation it spent and hand back the value that won needs the three cases apart, and a
+  # boolean would collapse "someone else got there first" into "there was nothing to write".
+  def swap_json_column!(column, expect:, merge: {}, attributes: {})
+    self.class.transaction do
+      row = self.class.lock.find(id)
+      current = row[column] || {}
+
+      next :stale unless expect.deep_stringify_keys.all? { |key, value| current[key] == value }
+
+      params = attributes.to_h.merge(column => merged_attributes(current, merge: merge, remove: [], under: nil))
+      next :unchanged if params.all? { |name, value| row[name] == value }
+
+      row.update!(params)
+      :written
+    end
+  rescue ActiveRecord::RecordNotFound
+    :gone
+  end
+
   private
 
   def merged_attributes(current, merge:, remove:, under:)

@@ -225,6 +225,63 @@ describe Integrations::Linear::AccessTokenService do
       end
     end
 
+    # Same shape, other axis, and the one the merge cannot reach: the writer that lands during the
+    # POST is an OAuth reconnection, so it writes the very keys this refresh is about to write. Its
+    # tokens are the live ones, because the admin just authorised them, and the refresh is holding a
+    # pair derived from a refresh token the row no longer has. Writing it back undoes the
+    # reconnection and leaves the integration on a token Linear has already invalidated.
+    context 'when an OAuth reconnection lands on the hook during the token call' do
+      let(:hook) do
+        create(
+          :integrations_hook,
+          :linear,
+          account: account,
+          access_token: 'old_access_token',
+          settings: {
+            refresh_token: 'refresh_token',
+            token_type: 'Bearer',
+            expires_on: 1.minute.from_now.utc.to_s
+          }
+        )
+      end
+
+      before do
+        allow(Rails.logger).to receive(:warn)
+        stub_request(:post, 'https://api.linear.app/oauth/token').to_return do
+          # `Linear::CallbacksController#handle_response`: the admin reconnected, so the row gets a
+          # new access token in its column and a new refresh token in its settings. Through its own
+          # AR object, which is what the controller does, and `access_token` is an encrypted column,
+          # so a raw UPDATE would write something the reader cannot decrypt.
+          reconnected = Integrations::Hook.find(hook.id)
+          reconnected.access_token = 'reconnected_access_token'
+          reconnected.settings = reconnected.settings.merge('refresh_token' => 'reconnected_refresh_token')
+          reconnected.save!
+          {
+            status: 200,
+            body: { access_token: 'new_access_token', refresh_token: 'new_refresh_token', expires_in: 3600 }.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          }
+        end
+      end
+
+      it 'does not undo the reconnection' do
+        described_class.new(hook: hook).access_token
+
+        expect(hook.reload.access_token).to eq('reconnected_access_token')
+        expect(hook.reload.settings['refresh_token']).to eq('reconnected_refresh_token')
+      end
+
+      it 'hands the caller the token that is in the row' do
+        expect(described_class.new(hook: hook).access_token).to eq('reconnected_access_token')
+      end
+
+      it 'says the rotation it spent was not stored' do
+        described_class.new(hook: hook).access_token
+
+        expect(Rails.logger).to have_received(:warn).with(/refresh token this call spent/)
+      end
+    end
+
     context 'when the response leaves out the keys the hook already has' do
       let(:hook) do
         create(
