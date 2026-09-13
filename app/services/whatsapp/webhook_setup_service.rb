@@ -1,9 +1,9 @@
 class Whatsapp::WebhookSetupService
-  def initialize(channel, waba_id = nil, access_token = nil)
+  def initialize(channel, waba_id = nil, access_token = nil, deadline: Whatsapp::GraphDeadline::NONE)
     @channel = channel
     @waba_id = waba_id || channel.provider_config['business_account_id']
     @access_token = access_token || channel.provider_config['api_key']
-    @api_client = Whatsapp::FacebookApiClient.new(@access_token)
+    @api_client = Whatsapp::FacebookApiClient.new(@access_token, deadline: deadline)
   end
 
   def perform
