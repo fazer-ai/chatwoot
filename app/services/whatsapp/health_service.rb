@@ -49,6 +49,13 @@ class Whatsapp::HealthService
     log_risky_transition(previous_health, health_status) if persist_health_status(health_status, attempted_at, error)
 
     health_status.merge(health_checked_at: attempted_at)
+  rescue Whatsapp::GraphDeadline::Exceeded
+    # Nothing was asked of Meta: this side's own clock refused the call before it went out,
+    # so there is no answer to record and no attempt to date. Recording it as a check
+    # anyway would move `phone_number_health_checked_at` to now, and the scheduler leaves a
+    # channel alone for six hours after that stamp -- so one refusal buys the number six
+    # hours of nobody looking at it, on a request that was about a webhook (#644).
+    raise
   rescue StandardError => e
     persist_health_error(e, attempted_at)
     raise

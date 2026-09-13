@@ -179,6 +179,98 @@ RSpec.describe Whatsapp::HealthService do
       end
     end
 
+    # A read the request's own clock refused never reached Meta, so nothing about this
+    # number was checked. Recording it as a check anyway moves `phone_number_health_checked_at`
+    # to now, and `HealthSyncSchedulerJob` only picks a channel up six hours after that
+    # stamp: one refusal buys the number six hours of nobody looking at it (#644).
+    context 'when the request has no time left for the first Graph call' do
+      subject(:service) { described_class.new(channel, deadline: Whatsapp::GraphDeadline.in(0.1)) }
+
+      let(:previous_health) { { 'quality_rating' => 'GREEN', 'status' => 'CONNECTED' } }
+
+      before do
+        channel.update!(phone_number_health_checked_at: 7.hours.ago, phone_number_health_error: 'Falha anterior da Meta')
+      end
+
+      it 'leaves the stamp where the last real check left it' do
+        stamped_at = channel.reload.phone_number_health_checked_at
+
+        expect { service.sync_health_status! }.to raise_error(Whatsapp::GraphDeadline::Exceeded)
+
+        expect(channel.reload.phone_number_health_checked_at).to eq(stamped_at)
+        expect(channel.phone_number_health).to eq('quality_rating' => 'GREEN', 'status' => 'CONNECTED')
+      end
+
+      # The column says what Meta answered last, and a refusal by this side's own clock is
+      # not an answer. Overwriting it would replace the provider's diagnosis with a
+      # sentence about our request.
+      it 'leaves the provider error that was already recorded' do
+        expect { service.sync_health_status! }.to raise_error(Whatsapp::GraphDeadline::Exceeded)
+
+        expect(channel.reload.phone_number_health_error).to eq('Falha anterior da Meta')
+      end
+
+      it 'leaves the channel where the scheduler still picks it up' do
+        expect { service.sync_health_status! }.to raise_error(Whatsapp::GraphDeadline::Exceeded)
+
+        expect { Channels::Whatsapp::HealthSyncSchedulerJob.perform_now }
+          .to have_enqueued_job(Channels::Whatsapp::HealthSyncJob).with(channel).on_queue('low')
+      end
+    end
+
+    # The criterion is the refusal's class, and where it is caught decides what a partial read is
+    # worth. A request that got the phone number's answer and only then ran out of time did check
+    # this number: it keeps the stamp and records the refusal as the attempt's error. Moving the
+    # rescue down into `fetch_health_status_with_error` would throw that answer away instead (#644).
+    context 'when the deadline refuses the second call after the first one answered' do
+      subject(:service) { described_class.new(channel, deadline: deadline) }
+
+      let(:previous_health) { { 'business_account_name' => 'WABA Antiga', 'business_account_id' => 'waba_antiga' } }
+      let(:deadline) do
+        calls = 0
+        instance_double(Whatsapp::GraphDeadline).tap do |clock|
+          allow(clock).to receive(:cut) do |options|
+            calls += 1
+            raise Whatsapp::GraphDeadline::Exceeded, "no time left for another Graph call (-0.01s of the request's deadline)" if calls > 1
+
+            { timeout: options[:timeout] }
+          end
+        end
+      end
+
+      before { channel.update!(phone_number_health_checked_at: 7.hours.ago) }
+
+      it 'keeps the answer that arrived and dates the attempt' do
+        stamped_at = channel.reload.phone_number_health_checked_at
+
+        expect { service.sync_health_status! }.not_to raise_error
+
+        channel.reload
+        expect(channel.phone_number_health_checked_at).to be > stamped_at
+        expect(channel.phone_number_health).to include('quality_rating' => 'GREEN', 'business_account_name' => 'WABA Antiga')
+        expect(channel.phone_number_health_error).to include('no time left for another Graph call')
+        expect(a_request(:get, %r{graph\.facebook\.com/v24\.0/test_waba_id})).not_to have_been_made
+      end
+    end
+
+    # The fence on the other side of the same fix: "no Graph call was made" is not the
+    # criterion, the refusal's own class is. A channel missing its credentials also makes
+    # no call, and it must keep being stamped -- otherwise it comes back to the scheduler
+    # every cycle, forever, for a failure no retry can fix.
+    context 'when the channel has no credentials to call with' do
+      let(:provider_config) { super().merge('api_key' => '') }
+
+      before { channel.update!(phone_number_health_checked_at: 7.hours.ago) }
+
+      it 'records the attempt so the scheduler stops asking' do
+        stamped_at = channel.reload.phone_number_health_checked_at
+
+        expect { service.sync_health_status! }.to raise_error(ArgumentError, 'API key is missing')
+
+        expect(channel.reload.phone_number_health_checked_at).to be > stamped_at
+      end
+    end
+
     context 'when business account enrichment fails' do
       before do
         stub_request(:get, %r{graph\.facebook\.com/v24\.0/test_waba_id})

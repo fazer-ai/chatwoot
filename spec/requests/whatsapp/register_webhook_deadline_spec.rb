@@ -109,6 +109,22 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
       expect(calls_seen).to eq(%i[subscribe override])
     end
 
+    # The same refusal, seen from where it hurts: the endpoint answers 200 without the routing, and
+    # nothing about this number was checked. Six hours of nobody looking at it is what recording it
+    # as a check anyway would cost, because that is the scheduler's own window (#644).
+    it 'leaves the number where the background sync still picks it up when the read is refused' do
+      %i[subscribe override health].each { |kind| delays[kind] = 1.0 }
+      channel.update!(phone_number_health_checked_at: 7.hours.ago)
+      stamped_at = channel.reload.phone_number_health_checked_at
+
+      register_webhook
+
+      expect(response.parsed_body['routing_read_back']).to be(false)
+      expect(channel.reload.phone_number_health_checked_at).to eq(stamped_at)
+      expect { Channels::Whatsapp::HealthSyncSchedulerJob.perform_now }
+        .to have_enqueued_job(Channels::Whatsapp::HealthSyncJob).with(channel).on_queue('low')
+    end
+
     it 'cuts an optional call that hangs to what is left, instead of giving it a whole ceiling' do
       delays[:subscribe] = 1.0
       delays[:override] = 5.0
