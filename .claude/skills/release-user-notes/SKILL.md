@@ -224,7 +224,18 @@ When invoked for a release (new or backfill):
 7. Run the quality checklist on all three blocks.
 8. Show the full proposed body to the user for approval **before** editing the release.
 9. Only after approval, write the body to a temp file and apply it:
-   - **For new releases**, pass the file via `gh release create <tag> --notes-file <file>`.
+   - **For new releases**, first prove the tag is free, then pass the file via `gh release create <tag> --notes-file <file>`:
+
+     ```sh
+     git ls-remote --tags <remote> "<tag>"   # must be empty; a tag can exist with no release
+     gh release create <tag> --target <sha> --notes-file <file>
+     git fetch <remote> "refs/tags/<tag>:refs/tags/<tag>" --force
+     git rev-parse "<tag>^{commit}"          # must equal <sha>
+     ```
+
+     `--target` is **silently ignored when the tag already exists** (the API documents `target_commitish` as unused then), and `gh release list` cannot warn you, because it only lists tags that already carry a release.
+
+     A tag can be sitting there with an image already published under it, because the publish workflows also answer `workflow_dispatch`. Publishing that way is not allowed — **a published image comes from a cut release and from nothing else**, and the dispatch exists to validate the workflow with `-f push=false` — but the trap survives whoever broke the rule, so the check above runs every time.
    - **For backfills / edits**, this version of `gh` does not have a `release edit` subcommand. Use the API directly:
      ```bash
      RELEASE_ID=$(gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.id')

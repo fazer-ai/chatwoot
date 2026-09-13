@@ -82,6 +82,23 @@ Automate this with your worktree tool's create hook (e.g. worktrunk's `pre-start
 - Every GitHub release cut from this repo must include a `user-notes` block per shipped language (en, pt-BR, es) in the release body, written for non-technical end users.
 - Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-user-notes` skill at `.claude/skills/release-user-notes/SKILL.md` to draft and validate the blocks.
 
+## Cutting a release
+
+**A published image comes from a cut release, and from nothing else.** The publish workflows fire on `release: [released]`, so cutting the release is what builds and pushes the image, including `:latest`. `workflow_dispatch` is there to validate the workflow itself with `-f push=false`; dispatching it with `push=true` is the one way to put an image in front of users without a release, and it must not be used for that, no matter how much faster it looks when you only want an image for a test. Need an image in production? Cut the release.
+
+The rest of this section exists because that rule was broken once, and the damage landed two days later.
+
+- **A tag can exist with no release attached, so never derive the next number from `gh release list`.** Ask the tags instead, and require an empty answer: `git ls-remote --tags <remote> "<tag>"`.
+- **`gh release create --target <sha>` silently ignores `--target` when the tag already exists.** The API documents `target_commitish` as unused in that case, so the command succeeds, prints the release URL, and attaches the release to whatever commit the old tag names. The publish workflow then builds that tree.
+- **Dereference the tag after cutting and compare it with what you aimed at**, before trusting anything built from it:
+
+  ```sh
+  git fetch <remote> "refs/tags/<tag>:refs/tags/<tag>" --force
+  git rev-parse "<tag>^{commit}"   # must equal the SHA passed to --target
+  ```
+
+- Measured on `v4.17.0-fazer-ai-pro.133`: on 2026-09-10 the tag was pushed and the publish dispatched with `-f push=true`, to get a Pro image for a live test without cutting a release. `gh release list` therefore still showed `.132` as the latest. On 09-12 the release for the merge of `v4.17.0-fazer-ai.113` was cut with that same number, `--target` was dropped on the floor, and the two-day-old tree shipped to production under the new number, with the new number stamped inside it.
+
 ## Commit Messages
 
 - Prefer Conventional Commits: `type(scope): subject` (scope optional)
