@@ -187,6 +187,22 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
       expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
     end
 
+    # Two writers can hold the same inbox one after the other, and what each does once its
+    # row lock is released runs in no particular order between them. Here a newer wrong
+    # account lands in exactly that gap, after the unlink was accepted.
+    it 'is not put back by an unlink that finished after a newer wrong account' do
+      older = described_class.new(channel)
+      allow(older).to receive(:ensure_logout).and_wrap_original do |original, *args|
+        writer.apply(wrong)
+        original.call(*args)
+      end
+
+      older.apply(state.new(connection: 'close', error: 'logged_out', epoch: 1))
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
+
     it 'is forgotten when a wrong account is reported again' do
       writer.apply(state.new(connection: 'close', error: 'logged_out', epoch: 1))
 

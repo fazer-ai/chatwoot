@@ -87,6 +87,7 @@ class Whatsapp::Session::ConnectionStateWriter
       persisted = channel.provider_connection.presence || {}
       next :stale if refuse?(written, persisted, attempt: attempt, provider: provider, instance: instance)
 
+      remember_unlink(state, written)
       payload = merge(written, persisted)
       next :unchanged if payload == persisted
 
@@ -126,17 +127,32 @@ class Whatsapp::Session::ConnectionStateWriter
     Whatsapp::Session::HistoryBackfill.close!(channel)
   end
 
+  # An account that already left needs no logout.
+  def ensure_logout(received, written)
+    return unless written.error == WRONG_PHONE_ERROR
+    return if UNLINKED.include?(received.error)
+
+    Whatsapp::Session::LogoutJob.perform_later(channel)
+  end
+
   # Read off the state as it arrived, because the quarantine has already rewritten the one
   # being persisted: what it was before is the only place that says whether the account
   # left or is still on the session.
-  def ensure_logout(received, written)
+  #
+  # Under the row lock, in the order the states are accepted. After it, an unlink and a
+  # newer wrong account applied at the same time could reach Redis the other way round, and
+  # the mark the older one leaves would stand the new account's logout down before it was
+  # ever sent.
+  def remember_unlink(received, written)
     return unless written.error == WRONG_PHONE_ERROR
-    return Redis::Alfred.set(self.class.unlinked_key(channel), '1', ex: UNLINKED_TTL) if UNLINKED.include?(received.error)
 
-    # A wrong account on the session again, and the mark a previous one left says nothing
-    # about this one.
-    Redis::Alfred.delete(self.class.unlinked_key(channel)) if wrong_phone?(received)
-    Whatsapp::Session::LogoutJob.perform_later(channel)
+    if UNLINKED.include?(received.error)
+      Redis::Alfred.set(self.class.unlinked_key(channel), '1', ex: UNLINKED_TTL)
+    elsif wrong_phone?(received)
+      # A wrong account on the session again, and the mark a previous one left says nothing
+      # about this one.
+      Redis::Alfred.delete(self.class.unlinked_key(channel))
+    end
   end
 
   # Two ways a state can belong to the wrong account. It can name the wrong number, which
