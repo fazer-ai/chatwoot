@@ -204,9 +204,9 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   # The verdict is already a refusal by the time this runs, and a log line about it must not overturn
   # it: an unreadable 401 body used to raise here and turn a recognised refusal into a 500.
   def refusal_body_error_message(response)
-    body = response.parsed_response
+    body = credential_check_body(response)
     body.is_a?(Hash) ? body.dig('error', 'message') : nil
-  rescue JSON::ParserError
+  rescue Whatsapp::CredentialCheck::Unavailable
     nil
   end
 

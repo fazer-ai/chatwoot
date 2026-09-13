@@ -37,11 +37,14 @@ module Whatsapp::CredentialCheck
     raise Unavailable, "HTTP #{response.code}"
   end
 
-  # For a body the verdict depends on. When the answer is already known, as with a refusal whose body
-  # only feeds a log line, an unreadable body must not change it: read it with a rescue of your own.
+  # For a body the verdict depends on. HTTParty parses lazily and by the Content-Type it was given, so
+  # bad JSON is not the only way to fail here: a gateway answering broken XML raises MultiXML::ParseError.
+  # Only the parse sits under the rescue, so it is wide for the same reason as the request's. When the
+  # answer is already known, as with a refusal whose body only feeds a log line, an unreadable body must
+  # not change it: rescue Unavailable around this call.
   def credential_check_body(response)
     response.parsed_response
-  rescue JSON::ParserError
-    raise Unavailable, 'unreadable body'
+  rescue StandardError => e
+    raise Unavailable, "unreadable body: #{e.class.name}"
   end
 end

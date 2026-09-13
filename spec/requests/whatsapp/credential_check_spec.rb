@@ -153,15 +153,21 @@ RSpec.describe 'WhatsApp credential check', type: :request do
       expect(message).not_to include('Invalid Credentials')
     end
 
-    it 'does not bring the request down when Meta answers 200 with a body this side cannot read' do
-      graph_answers(templates: templates_ok,
-                    phone_numbers: { status: 200, body: 'not json at all', headers: { 'Content-Type' => 'application/json' } })
+    # HTTParty parses by the Content-Type it is given, so an unreadable body is not only bad JSON: a
+    # gateway answering XML raises a parser error of another class.
+    {
+      'JSON' => { body: 'not json at all', headers: { 'Content-Type' => 'application/json' } },
+      'XML' => { body: '<data><id>123456789</id', headers: { 'Content-Type' => 'application/xml' } }
+    }.each do |format, unreadable|
+      it "does not bring the request down when Meta answers 200 with #{format} this side cannot read" do
+        graph_answers(templates: templates_ok, phone_numbers: { status: 200, **unreadable })
 
-      create_cloud_inbox
+        create_cloud_inbox
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(message).not_to include('Invalid Credentials')
-      expect(rows).to eq(0)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(message).to include(I18n.t('errors.inboxes.channel.credential_check_unavailable'))
+        expect(rows).to eq(0)
+      end
     end
 
     # The rescue that turns silence into a sentence must not also swallow a defect of our own. A
@@ -219,17 +225,35 @@ RSpec.describe 'WhatsApp credential check', type: :request do
     # The embedded-to-manual transfer is the one path where the refusal log parses Meta's body. When that
     # body is unreadable, building the log line raised, and a refusal the app had already recognised came
     # out as a 500. Meta answered 401: the verdict is a refusal, and a log line must not change it.
-    it 'keeps a 401 a refusal when its body cannot be read' do
-      # The factory writes `source: 'embedded_signup'` whenever the config does not name a source, so the
-      # channel is already on the embedded path and sending the config without it is the transfer.
-      expect(channel.reload.provider_config['source']).to eq('embedded_signup')
+    {
+      'JSON' => { body: 'not json at all', headers: { 'Content-Type' => 'application/json' } },
+      'XML' => { body: '<error><message>bad token</message', headers: { 'Content-Type' => 'application/xml' } }
+    }.each do |format, unreadable|
+      it "keeps a 401 a refusal when its #{format} body cannot be read" do
+        # The factory writes `source: 'embedded_signup'` whenever the config does not name a source, so the
+        # channel is already on the embedded path and sending the config without it is the transfer.
+        expect(channel.reload.provider_config['source']).to eq('embedded_signup')
+        stub_request(:get, %r{graph\.facebook\.com/v14\.0/.+/message_templates}).to_return(status: 401, **unreadable)
+
+        update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key'))
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(message).to eq('Provider config Invalid Credentials')
+      end
+    end
+
+    # Tolerating an unreadable body in that log line must not grow into tolerating a defect of ours there.
+    it 'lets a defect of our own in the refusal log escape as itself' do
       stub_request(:get, %r{graph\.facebook\.com/v14\.0/.+/message_templates})
-        .to_return(status: 401, body: 'not json at all', headers: { 'Content-Type' => 'application/json' })
+        .to_return(status: 401, body: { error: { message: 'bad token' } }.to_json, headers: { 'Content-Type' => 'application/json' })
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_wrap_original do |original, **kwargs|
+        original.call(**kwargs).tap { |provider| allow(provider).to receive(:credential_check_body).and_raise(NoMethodError, 'planted 598') }
+      end
 
       update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key'))
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(message).to eq('Provider config Invalid Credentials')
+      expect(response).to have_http_status(:internal_server_error)
+      expect(response.body).to include('planted 598')
     end
   end
 
@@ -359,6 +383,20 @@ RSpec.describe 'WhatsApp credential check', type: :request do
     it 'escapes as itself from between the two whatsapp_cloud calls' do
       graph_answers(templates: templates_ok, phone_numbers: owned_number)
       plant(Whatsapp::Providers::WhatsappCloudService, :phone_number_belongs_to_waba?)
+
+      create_cloud_inbox
+
+      expect_the_defect_to_escape
+    end
+
+    # The other expression between the two calls reads the channel, not the provider, so the defect is
+    # planted on the channel the provider was built with.
+    it 'escapes as itself from the channel read between the two whatsapp_cloud calls' do
+      graph_answers(templates: templates_ok, phone_numbers: owned_number)
+      allow(Whatsapp::Providers::WhatsappCloudService).to receive(:new).and_wrap_original do |original, **kwargs|
+        allow(kwargs[:whatsapp_channel]).to receive(:provider_config_changed?).and_raise(NoMethodError, 'planted 598')
+        original.call(**kwargs)
+      end
 
       create_cloud_inbox
 
