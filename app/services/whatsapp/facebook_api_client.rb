@@ -5,15 +5,16 @@ class Whatsapp::FacebookApiClient
   # Base webhook fields resent on every subscribe so Meta won't reset to defaults. `calls` is added by callers only when voice is enabled.
   WEBHOOK_DEFAULT_FIELDS = %w[messages smb_message_echoes].freeze
 
-  def initialize(access_token = nil)
+  def initialize(access_token = nil, deadline: Whatsapp::GraphDeadline::NONE)
     @access_token = access_token
+    @deadline = deadline
     @api_version = GlobalConfigService.load('WHATSAPP_API_VERSION', 'v22.0')
   end
 
   def exchange_code_for_token(code)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/oauth/access_token",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       query: {
         client_id: GlobalConfigService.load('WHATSAPP_APP_ID', ''),
         client_secret: GlobalConfigService.load('WHATSAPP_APP_SECRET', ''),
@@ -27,7 +28,7 @@ class Whatsapp::FacebookApiClient
   def fetch_phone_numbers(waba_id)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{waba_id}/phone_numbers",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       query: { access_token: @access_token }
     )
 
@@ -37,7 +38,7 @@ class Whatsapp::FacebookApiClient
   def debug_token(input_token)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/debug_token",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       query: {
         input_token: input_token,
         access_token: build_app_access_token
@@ -50,7 +51,7 @@ class Whatsapp::FacebookApiClient
   def register_phone_number(phone_number_id, pin)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}/register",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers,
       body: { messaging_product: 'whatsapp', pin: pin.to_s }.to_json
     )
@@ -63,7 +64,7 @@ class Whatsapp::FacebookApiClient
   def deregister_phone_number(phone_number_id)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}/deregister",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers
     )
 
@@ -78,7 +79,7 @@ class Whatsapp::FacebookApiClient
   def phone_number_code_verification_status(phone_number_id)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers
     )
 
@@ -113,7 +114,7 @@ class Whatsapp::FacebookApiClient
   def subscribe_app_to_waba(waba_id, subscribed_fields: WEBHOOK_DEFAULT_FIELDS)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers,
       body: { subscribed_fields: subscribed_fields }.to_json
     )
@@ -124,7 +125,7 @@ class Whatsapp::FacebookApiClient
   def override_phone_number_callback(phone_number_id, callback_url, verify_token)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers,
       body: {
         webhook_configuration: {
@@ -140,7 +141,7 @@ class Whatsapp::FacebookApiClient
   def clear_phone_number_callback_override(phone_number_id)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers,
       body: {
         webhook_configuration: {
@@ -156,7 +157,7 @@ class Whatsapp::FacebookApiClient
   def unsubscribe_app_from_waba(waba_id)
     response = HTTParty.delete(
       "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
-      **GRAPH_REQUEST_OPTIONS,
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
       headers: request_headers
     )
 

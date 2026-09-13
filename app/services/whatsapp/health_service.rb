@@ -29,8 +29,9 @@ class Whatsapp::HealthService
   RISKY_QUALITY_RATINGS = %w[YELLOW RED].freeze
   RISKY_STATUSES = %w[BANNED RESTRICTED RATE_LIMITED FLAGGED DISCONNECTED DELETED].freeze
 
-  def initialize(channel)
+  def initialize(channel, deadline: Whatsapp::GraphDeadline::NONE)
     @channel = channel
+    @deadline = deadline
     @access_token = channel.provider_config['api_key']
     # TODO: Remove this health-specific minimum when all WhatsApp integrations are consolidated on the latest Graph API version.
     configured_api_version = GlobalConfigService.load('WHATSAPP_API_VERSION', 'v22.0').delete_prefix('v').to_f
@@ -77,7 +78,7 @@ class Whatsapp::HealthService
   def fetch_graph_data(resource_id, fields)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{resource_id}",
-      **Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS,
+      **Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS, **@deadline.cut(Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS),
       query: {
         fields: fields,
         access_token: @access_token

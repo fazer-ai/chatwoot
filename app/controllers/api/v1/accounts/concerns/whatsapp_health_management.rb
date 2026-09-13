@@ -1,6 +1,15 @@
 module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   extend ActiveSupport::Concern
 
+  # The whole of `register_webhook`, across its four Graph calls (fazer-ai/chatwoot#592). Under 15s because
+  # that is where `rack-timeout` cuts a request in production unless an installation sets
+  # RACK_TIMEOUT_SERVICE_TIMEOUT, and it cuts with a Thread#raise the rescue below never sees: the operator
+  # gets a 500 from wherever the thread happened to be, possibly after Meta stored the subscription.
+  # Answering first, with what landed, is the point. At least a full ceiling plus one more call, because the
+  # subscription is the half that decides whether anything arrives, and a slow but healthy Meta must still
+  # get its whole ceiling for it.
+  REGISTER_WEBHOOK_DEADLINE = 12
+
   included do
     skip_before_action :check_authorization, only: [:health, :register_webhook]
     before_action :check_admin_authorization?, only: [:register_webhook]
@@ -53,10 +62,11 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
     # The per-number override is allowed to be refused without taking the channel down, so
     # "registered successfully" on its own would be the whole answer for a number Meta refused to
     # point here. The answer says which half landed, and then where delivery goes.
-    applied = Whatsapp::WebhookSetupService.new(@inbox.channel).register_callback
+    deadline = Whatsapp::GraphDeadline.in(REGISTER_WEBHOOK_DEADLINE)
+    applied = Whatsapp::WebhookSetupService.new(@inbox.channel, deadline: deadline).register_callback
 
     render json: { message: 'Webhook registered successfully', callback_override_applied: applied }
-      .merge(routing_after_attempt), status: :ok
+      .merge(routing_after_attempt(deadline)), status: :ok
   rescue StandardError => e
     Rails.logger.error "[INBOX WEBHOOK] Webhook registration failed: #{e.message}"
     render json: { error: e.message }, status: :unprocessable_entity
@@ -82,8 +92,8 @@ module Api::V1::Accounts::Concerns::WhatsappHealthManagement
   # Best effort, and `routing_read_back` is why it is stated rather than implied: the write may
   # well have landed, so a read that did not come back must not turn a registration into an error,
   # and must not be answered as a routing nobody read.
-  def routing_after_attempt
-    health_data = Whatsapp::HealthService.new(@inbox.channel).sync_health_status!
+  def routing_after_attempt(deadline)
+    health_data = Whatsapp::HealthService.new(@inbox.channel, deadline: deadline).sync_health_status!
 
     {
       routing_read_back: true,
