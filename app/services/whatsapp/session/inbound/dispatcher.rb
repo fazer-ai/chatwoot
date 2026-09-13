@@ -34,8 +34,6 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.picture_changed' => 'GroupPictureChanged',
     'group.activity' => 'GroupActivity',
     'history.sync' => 'HistorySync',
-    'account.reachout_timelock' => 'AccountLimits',
-    'account.new_chat_cap' => 'AccountLimits',
     'raw' => 'Raw'
   }.freeze
 

@@ -225,16 +225,6 @@ module Whatsapp::Session::Model::Events
     coerce groups: [Address]
   end
 
-  class AccountReachoutTimelock < Data.define(:reachout_time_lock)
-    include Serializable
-    wire_type 'account.reachout_timelock'
-  end
-
-  class AccountNewChatCap < Data.define(:new_chat_cap)
-    include Serializable
-    wire_type 'account.new_chat_cap'
-  end
-
   class CallOffer < Data.define(:call_id, :from, :video, :timestamp)
     include Serializable
     wire_type 'call.offer'
@@ -272,8 +262,7 @@ module Whatsapp::Session::Model::Events
     PairingQr, PairingCode, PairingSuccess, PairingError, PairingPasskeyRequest,
     PairingPasskeyConfirmation, MessageReceived, MessageReceipt, MessageEdited, MessageRevoked, MessageReaction,
     MediaDownloadFailed, CommandFailed, ChatPresence, PresenceUpdate, ContactPictureChanged, ContactIdentityChanged,
-    GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity, AccountReachoutTimelock, AccountNewChatCap,
-    CallOffer, CallTerminate, HistorySync, Raw
+    GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity, CallOffer, CallTerminate, HistorySync, Raw
   ].freeze
 
   BY_TYPE = CLASSES.index_by(&:wire_type).freeze

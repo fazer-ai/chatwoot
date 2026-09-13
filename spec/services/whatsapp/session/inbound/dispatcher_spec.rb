@@ -88,6 +88,24 @@ RSpec.describe Whatsapp::Session::Inbound::Dispatcher do
     expect(described_class.dispatch(channel, event)).to eq(:ignored)
   end
 
+  # The two account limit events left the contract (#481) without any producer having sent
+  # one. A frame of either that still turns up is a type this build does not know, and the
+  # limits on the connection record stay the polling's to write.
+  %w[account.reachout_timelock account.new_chat_cap].each do |type|
+    it "ignores an #{type} frame and leaves the stored limits alone" do
+      stored = { 'connection' => 'open', 'reachout_time_lock' => { 'status' => 'UNLOCKED' },
+                 'new_chat_cap' => { 'total_quota' => 500, 'used_quota' => 10 } }
+      channel.update_provider_connection!(stored)
+      event = model::Event.from_frame(
+        { 'v' => 1, 'type' => type,
+          'payload' => { 'reachout_time_lock' => { 'status' => 'LOCKED' }, 'new_chat_cap' => { 'total_quota' => 1000, 'used_quota' => 1000 } } }
+      )
+
+      expect(described_class.dispatch(channel, event)).to eq(:ignored)
+      expect(channel.reload.provider_connection).to eq(stored)
+    end
+  end
+
   it 'ignores a type the catalog knows but this layer does not act on' do
     event = model::Event.build(model::Events::HistorySync.new(kind: 'recent', progress: 10))
 
