@@ -11,18 +11,24 @@
 # The rescue here is wide on purpose and narrow in scope, the same arrangement as
 # Whatsapp::TransportFailure: anything StandardError can be at the HTTP call is a transport failure by
 # construction, and an enumerated list would be a promise to have thought of every way a socket can
-# fail. What keeps it honest is that nothing but the call sits under the rescue, which is why this takes
-# the call's arguments instead of a block: they are evaluated by the caller, so the code of ours that
-# builds the URL, the headers or the body runs outside it, as in `post_outgoing`. A defect of our own,
-# a NoMethodError while building the request, between the requests or while reading an answer, is not a
-# check that failed to conclude, and must not reach the operator as one: it escapes as itself.
+# fail. What keeps it honest is that nothing but the call sits under the rescue: the caller builds the URL,
+# the headers and the body into locals first, and hands over a block holding only the HTTParty call. A
+# defect of our own, a NoMethodError while building the request, between the requests or while reading an
+# answer, is not a check that failed to conclude, and must not reach the operator as one: it escapes as
+# itself.
+#
+# A block holding the call, rather than a helper that takes the verb and dispatches it, because the call
+# has to stay where the ceiling fences can read it. `graph_request_options_spec`, the per-provider
+# `*_request_options_spec` files and `spec/lib/request_ceilings_spec` each read the verb call on HTTParty and
+# check the ceiling inside it; a `public_send` hid the four checks from all of them, and the ceilings those
+# fences exist to guarantee were no longer being read.
 module Whatsapp::CredentialCheck
   class Unavailable < StandardError; end
 
   private
 
-  def credential_check_request(verb, url, **)
-    HTTParty.public_send(verb, url, **)
+  def credential_check_request
+    yield
   rescue StandardError => e
     # The class only. A message can carry the request URL, and Z-API puts the token in the path.
     raise Unavailable, e.class.name
