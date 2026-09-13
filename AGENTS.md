@@ -82,6 +82,20 @@ Automate this with your worktree tool's create hook (e.g. worktrunk's `pre-start
 - Every GitHub release cut from this repo must include a `user-notes` block per shipped language (en, pt-BR, es) in the release body, written for non-technical end users.
 - Before running `gh release create`, `gh release edit`, the `release` skill from `fazer-ai-tools`, or any flow that touches a release body (including retroactive backfills), invoke the `release-user-notes` skill at `.claude/skills/release-user-notes/SKILL.md` to draft and validate the blocks.
 
+## Cutting a release: the tag decides, not the release list
+
+- **A tag can exist with no release attached, so never derive the next number from `gh release list`.** Ask the tags instead, and require an empty answer: `git ls-remote --tags <remote> "<tag>"`.
+- **`gh release create --target <sha>` silently ignores `--target` when the tag already exists.** The API documents `target_commitish` as unused in that case, so the command succeeds, prints the release URL, and attaches the release to whatever commit the old tag names. The publish workflow then builds that tree.
+- **Dereference the tag after cutting and compare it with what you aimed at**, before trusting anything built from it:
+
+  ```sh
+  git fetch <remote> "refs/tags/<tag>:refs/tags/<tag>" --force
+  git rev-parse "<tag>^{commit}"   # must equal the SHA passed to --target
+  ```
+
+- **A tag pushed only to get an image built is a release nobody wrote down.** Cut the release in the same move, or that number is burned and the next cut collides with it silently.
+- Measured on `v4.17.0-fazer-ai-pro.133`: the tag was pushed on 2026-09-10 to build an image for a live test and no release was cut, so `gh release list` still showed `.132` as the latest. The release published on 09-12 for the merge of `v4.17.0-fazer-ai.113` landed on the old tag, and the two-day-old tree shipped to production under the new number.
+
 ## Commit Messages
 
 - Prefer Conventional Commits: `type(scope): subject` (scope optional)
