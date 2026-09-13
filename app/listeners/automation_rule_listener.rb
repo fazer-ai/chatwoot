@@ -65,9 +65,9 @@ class AutomationRuleListener < BaseListener
       # The claim is asked for after the conditions and only when they match, never before: a rule that
       # did not match while the row was a placeholder has to be left free to run when the content
       # arrives.
-      next if conditions_match.blank?
-
-      token = claim(rule, message)
+      # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
+      # the two differ for anything that defines only one of them.
+      token = claim(rule, message) if conditions_match.present?
       execute_claimed_rule(rule, account, message, token) if token
     end
   end
