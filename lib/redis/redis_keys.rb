@@ -83,6 +83,9 @@ module Redis::RedisKeys
   # The provider message ids this app has just acknowledged to WhatsApp, per conversation, so the
   # provider's echo of that receipt is not read back as a device of this account opening the chat.
   WHATSAPP_SELF_READ_RECEIPT = 'WHATSAPP_SELF_READ_RECEIPT::%<conversation_id>s::%<source_id>s'.freeze
+  # An automation rule that has already acted on one message, so the content arriving after the
+  # placeholder it was stored as does not run that rule a second time.
+  AUTOMATION_RULE_MESSAGE_RUN = 'AUTOMATION_RULE_MESSAGE_RUN::%<rule_id>d::%<message_id>d'.freeze
 
   ## Sempahores / Locks
   # We don't want to process messages from the same sender concurrently to prevent creating double conversations

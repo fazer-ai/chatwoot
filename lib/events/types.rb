@@ -47,6 +47,10 @@ module Events::Types
   FIRST_REPLY_CREATED = 'first.reply.created'
   REPLY_CREATED = 'reply.created'
   MESSAGE_UPDATED = 'message.updated'
+  # The body of a message that was stored before it could be read arriving into the row it was stored
+  # as. Not an update of an existing message: it is the first time anything can be asked about this
+  # message's content. Only the automation listener answers it (fazer-ai/chatwoot#491).
+  MESSAGE_RECOVERED = 'message.recovered'
   MESSAGES_READ = 'messages.read'
 
   # scheduled message events

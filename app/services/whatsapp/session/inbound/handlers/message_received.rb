@@ -82,6 +82,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # queues it through `fetch_media_for`, which is the path that exists for exactly this.
   def recovered(stored)
     inbound::ChatList.refresh(stored.conversation)
+    # The content is readable for the first time, so the automations that were asked about it while the
+    # row was a placeholder are asked again (#491). Its own event rather than MESSAGE_CREATED: every
+    # other subscriber already ran the arrival, and a second one would double a webhook and an auto-reply.
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: stored)
     :handled
   end
 

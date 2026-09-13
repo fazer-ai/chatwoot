@@ -1,4 +1,10 @@
 class AutomationRuleListener < BaseListener
+  # How long a rule execution on a message is remembered, which is what a later recovery of that message
+  # reads to know the rule already ran. The message a placeholder stands for arrives when the sender's
+  # phone comes back online to encrypt it again, so days later is normal and there is no upper bound
+  # worth honouring: past this, a recovery may run that one rule a second time.
+  RULE_RUN_CLAIM_EXPIRY = 30.days
+
   def conversation_updated(event)
     process_conversation_event(event, 'conversation_updated')
   end
@@ -16,6 +22,22 @@ class AutomationRuleListener < BaseListener
   end
 
   def message_created(event)
+    process_message_event(event)
+  end
+
+  # The body of a message that was stored before it could be read has arrived into that same row. Rules
+  # are evaluated again, against the content this time: a rule filtered on it never saw a body at the
+  # arrival, and MESSAGE_UPDATED reaches no automation (fazer-ai/chatwoot#491).
+  #
+  # Re-firing `message_created` instead would run every rule that does not filter on content a second
+  # time, which is worse than the miss: an auto-reply answering twice, a webhook delivered twice.
+  def message_recovered(event)
+    process_message_event(event)
+  end
+
+  private
+
+  def process_message_event(event)
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
@@ -30,11 +52,27 @@ class AutomationRuleListener < BaseListener
     rules.each do |rule|
       conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
                                                                         { message: message, changed_attributes: changed_attributes }).perform
-      execute_rule(rule, account, message.conversation, message: message) if conditions_match.present?
+      # The claim is asked for after the conditions and only when they match, never before: a rule that
+      # did not match while the row was a placeholder has to be left free to run when the content
+      # arrives.
+      execute_rule(rule, account, message.conversation, message: message) if conditions_match.present? && claim(rule, message)
     end
   end
 
-  private
+  # At most one execution of this rule for this message, counting the arrival and the recovery that
+  # filled a placeholder in. Claimed on both paths and not only on the recovery: nothing orders the two
+  # jobs, so the arrival may well be the one that evaluates after the content landed, and a claim it
+  # skipped is one the recovery would take for a rule that already ran.
+  #
+  # Atomic, because both may find the same rule matching; the one that takes the key is the one that
+  # acts. Answers false when the key is already there. A key lost before the recovery (an expiry, a
+  # Redis that was replaced) costs a second run of that one rule, which is why the window is long.
+  def claim(rule, message)
+    Redis::Alfred.set(
+      format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: rule.id, message_id: message.id),
+      Time.current.to_i, nx: true, ex: RULE_RUN_CLAIM_EXPIRY
+    )
+  end
 
   def process_conversation_event(event, event_name)
     return if performed_by_automation?(event)
