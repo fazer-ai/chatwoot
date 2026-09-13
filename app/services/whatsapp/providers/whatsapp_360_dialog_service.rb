@@ -1,5 +1,6 @@
 class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseService
   include Whatsapp::TransportFailure
+  include Whatsapp::CredentialCheck
   include Whatsapp::Dialog360RequestOptions
 
   def send_message(phone_number, message)
@@ -35,7 +36,8 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
   end
 
   def validate_provider_config?
-    response = HTTParty.post(
+    response = credential_check_request(
+      :post,
       "#{api_base_path}/configs/webhook",
       headers: { 'D360-API-KEY': whatsapp_channel.provider_config['api_key'], 'Content-Type': 'application/json' },
       body: {
@@ -43,6 +45,7 @@ class Whatsapp::Providers::Whatsapp360DialogService < Whatsapp::Providers::BaseS
       }.to_json,
       **DIALOG360_REQUEST_OPTIONS
     )
+    ensure_credential_verdict!(response)
     response.success?
   end
 

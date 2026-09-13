@@ -1,6 +1,7 @@
 class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include Whatsapp::GraphRequestOptions
   include Whatsapp::TransportFailure
+  include Whatsapp::CredentialCheck
 
   # The types WhatsApp accepts for a voice message, taken from its own rejection message:
   # "Please use one of audio/ogg; codecs=opus, audio/mpeg, audio/amr, audio/mp4, audio/aac."
@@ -81,19 +82,13 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def validate_provider_config?
     config = whatsapp_channel.provider_config
-    response = HTTParty.get("#{business_account_path}/message_templates?access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
+    response = credential_check_request(:get, "#{business_account_path}/message_templates?access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
+    ensure_credential_verdict!(response)
     return log_transfer_failure('waba_or_token_check', response) unless response.success?
     # The templates check only proves the WABA/token pair, so verify the phone_number_id belongs to this WABA when it changes.
     return true unless whatsapp_channel.provider_config_changed?
 
-    phone_response = HTTParty.get(
-      "#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}",
-      **GRAPH_REQUEST_OPTIONS
-    )
-    ids = phone_response.parsed_response.is_a?(Hash) ? Array(phone_response.parsed_response['data']) : []
-    return true if phone_response.success? && ids.any? { |number| number['id'] == config['phone_number_id'].to_s }
-
-    log_transfer_failure('phone_number_id_check', phone_response)
+    phone_number_belongs_to_waba?(config)
   end
 
   def api_headers
@@ -184,13 +179,35 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   private
 
   # Only saves dropping the embedded_signup source marker are transfer attempts; creation/rotation failures are setup errors. Returns false.
+  def phone_number_belongs_to_waba?(config)
+    response = credential_check_request(:get, "#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}",
+                                        **GRAPH_REQUEST_OPTIONS)
+    ensure_credential_verdict!(response)
+    return log_transfer_failure('phone_number_id_check', response) unless response.success?
+
+    body = credential_check_body(response)
+    ids = body.is_a?(Hash) ? Array(body['data']) : []
+    return true if ids.any? { |number| number['id'] == config['phone_number_id'].to_s }
+
+    log_transfer_failure('phone_number_id_check', response)
+  end
+
   def log_transfer_failure(check, response)
     return false unless whatsapp_channel.embedded_to_manual_transfer_pending?
 
-    error_message = response.parsed_response.is_a?(Hash) ? response.parsed_response.dig('error', 'message') : nil
+    error_message = refusal_body_error_message(response)
     Rails.logger.warn("[WHATSAPP_EMBEDDED_TO_MANUAL] failure account_id=#{whatsapp_channel.account_id} channel_id=#{whatsapp_channel.id} " \
                       "check=#{check} http_status=#{response.code} meta_error=#{error_message}")
     false
+  end
+
+  # The verdict is already a refusal by the time this runs, and a log line about it must not overturn
+  # it: an unreadable 401 body used to raise here and turn a recognised refusal into a 500.
+  def refusal_body_error_message(response)
+    body = credential_check_body(response)
+    body.is_a?(Hash) ? body.dig('error', 'message') : nil
+  rescue Whatsapp::CredentialCheck::Unavailable
+    nil
   end
 
   def csat_template_service

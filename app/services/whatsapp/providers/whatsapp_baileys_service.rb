@@ -2,6 +2,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   include BaileysHelper
   include Whatsapp::BaileysRequestOptions
   include Whatsapp::TransportFailure
+  include Whatsapp::CredentialCheck
 
   # Legacy errors inherit from the session hierarchy so every caller rescues a single
   # namespace, whatever the provider. Nothing else about this service changes: it is
@@ -405,11 +406,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def validate_provider_config?
-    response = HTTParty.get(
-      "#{provider_url}/status/auth",
-      headers: api_headers,
-      **BAILEYS_REQUEST_OPTIONS
-    )
+    response = credential_check_request(:get, "#{provider_url}/status/auth", headers: api_headers, **BAILEYS_REQUEST_OPTIONS)
+    ensure_credential_verdict!(response)
 
     process_response(response)
   end
