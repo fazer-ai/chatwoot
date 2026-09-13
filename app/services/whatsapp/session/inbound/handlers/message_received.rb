@@ -94,6 +94,10 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # and the content of an archived message is not a message arriving: rules would answer traffic from
     # weeks ago.
     dispatch_recovery(stored) unless stored.content_attributes['imported']
+    # Both of these are repaired by a redelivery and the announcement above is not, which is the whole
+    # reason it goes first: `fetch_media_for` is what the duplicate path queues anyway, and the next
+    # event on the conversation refreshes the list.
+    inbound::MessageWriter.fetch_media_for(stored, message)
     inbound::ChatList.refresh(stored.conversation)
     :handled
   end

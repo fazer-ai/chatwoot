@@ -166,6 +166,18 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     expect(ran(on_content)).to eq(1)
   end
 
+  # Queueing the bytes is the other thing that happens after the content is saved, and the redelivery
+  # queues them again on its own. The announcement has no second chance, so it cannot sit behind this.
+  it 'dispatches the recovery even when queueing the media fetch fails' do
+    arrive_and_settle(placeholder)
+    allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:fetch_media_for).and_raise('the queue is away')
+
+    expect { deliver(recovered) }.to raise_error('the queue is away')
+    perform_enqueued_jobs
+
+    expect(ran(on_content)).to eq(1)
+  end
+
   # The history import writes its rows with every callback suppressed, so nothing ran when they landed.
   # The content of an archived message is not a message arriving, and rules answering traffic from weeks
   # ago is the one thing the import is careful never to do.

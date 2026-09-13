@@ -57,6 +57,12 @@ class Whatsapp::Session::Inbound::MessageWriter
   # keeping its id, its place in the thread, and anything that quotes it.
   #
   # Answers whether it did, because a caller it says no to still has a duplicate to report.
+  #
+  # The media fetch is the caller's to queue, after the save and after it has announced the recovery
+  # (Handlers::MessageReceived#recovered). Queued here it would sit between the content write and that
+  # announcement, and a failure in between loses the announcement for good: the redelivery finds the row
+  # written and comes back as a duplicate. The bytes are the other way round, repaired by that same
+  # duplicate through `fetch_media_for`.
   def reconcile(message)
     written = false
     # Under the row lock and off the row the lock reloads, which is what every other
@@ -69,12 +75,7 @@ class Whatsapp::Session::Inbound::MessageWriter
 
       written = content_type == 'contacts' ? reconcile_as_a_share(message) : reconcile_in_place(message)
     end
-    return false unless written
-
-    # After the save, as on the writing path: the job takes the row by reference and a
-    # save that raised would have it fetch bytes for content nobody stored.
-    enqueue_media_fetch(message)
-    true
+    written
   end
 
   def reconcile_in_place(message)
