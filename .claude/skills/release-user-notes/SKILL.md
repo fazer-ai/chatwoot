@@ -234,6 +234,8 @@ When invoked for a release (new or backfill):
      ```
 
      `--target` is **silently ignored when the tag already exists** (the API documents `target_commitish` as unused then), and `gh release list` cannot warn you, because it only lists tags that already carry a release.
+
+     A tag can be sitting there with an image already published under it, because the publish workflows also answer `workflow_dispatch`. Publishing that way is not allowed — **a published image comes from a cut release and from nothing else**, and the dispatch exists to validate the workflow with `-f push=false` — but the trap survives whoever broke the rule, so the check above runs every time.
    - **For backfills / edits**, this version of `gh` does not have a `release edit` subcommand. Use the API directly:
      ```bash
      RELEASE_ID=$(gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.id')
