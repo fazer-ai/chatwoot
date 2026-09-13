@@ -32,9 +32,32 @@ class Whatsapp::Session::ConnectionStateWriter
   # The two ways a pairing really ends. Everything else is a connection that may come back.
   PAIRING_ENDED = [WRONG_PHONE_ERROR, 'logged_out', 'logged_out_by_request'].freeze
 
+  # The account itself gone, by a logout or by its owner removing the device on the phone:
+  # PAIRING_ENDED without the quarantine, which says whose account it was and not that it
+  # left.
+  UNLINKED = %w[logged_out logged_out_by_request].freeze
+
+  # Only has to outlive the retries of the logout that are still scheduled, and the repeats
+  # of the quarantine that can still arrive behind them. A mark that expires on an inbox
+  # left quarantined for longer costs one more round of logouts nobody needed.
+  UNLINKED_TTL = 1.day
+
   # Quarantined: the connection belongs to somebody else's WhatsApp account.
   def self.disowned?(channel)
     channel.provider_connection.to_h['error_code'] == WRONG_PHONE_ERROR
+  end
+
+  # The account under quarantine has been unlinked since. Kept apart from the record because
+  # the record cannot say it: a close names no number, so the event that reports the
+  # unlink is written as the same quarantine it arrived into, and the logout job would
+  # otherwise go on retrying against an account that is gone, unable to tell that from a
+  # connector that is not answering.
+  def self.unlinked?(channel)
+    Redis::Alfred.get(unlinked_key(channel)).present?
+  end
+
+  def self.unlinked_key(channel)
+    "WHATSAPP::SESSION::UNLINKED::#{channel.id}"
   end
 
   attr_reader :channel
@@ -64,6 +87,7 @@ class Whatsapp::Session::ConnectionStateWriter
       persisted = channel.provider_connection.presence || {}
       next :stale if refuse?(written, persisted, attempt: attempt, provider: provider, instance: instance)
 
+      remember_unlink(state, written)
       payload = merge(written, persisted)
       next :unchanged if payload == persisted
 
@@ -80,7 +104,7 @@ class Whatsapp::Session::ConnectionStateWriter
     # unchanged and the logout is never asked for again. The job re-reads the quarantine
     # and stands down when it is gone, so asking twice costs nothing.
     if %i[written unchanged].include?(result)
-      ensure_logout(written)
+      ensure_logout(state, written)
       end_backfill
     end
     result
@@ -103,10 +127,32 @@ class Whatsapp::Session::ConnectionStateWriter
     Whatsapp::Session::HistoryBackfill.close!(channel)
   end
 
-  def ensure_logout(written)
+  # An account that already left needs no logout.
+  def ensure_logout(received, written)
     return unless written.error == WRONG_PHONE_ERROR
+    return if UNLINKED.include?(received.error)
 
     Whatsapp::Session::LogoutJob.perform_later(channel)
+  end
+
+  # Read off the state as it arrived, because the quarantine has already rewritten the one
+  # being persisted: what it was before is the only place that says whether the account
+  # left or is still on the session.
+  #
+  # Under the row lock, in the order the states are accepted. After it, an unlink and a
+  # newer wrong account applied at the same time could reach Redis the other way round, and
+  # the mark the older one leaves would stand the new account's logout down before it was
+  # ever sent.
+  def remember_unlink(received, written)
+    return unless written.error == WRONG_PHONE_ERROR
+
+    if UNLINKED.include?(received.error)
+      Redis::Alfred.set(self.class.unlinked_key(channel), '1', ex: UNLINKED_TTL)
+    elsif wrong_phone?(received)
+      # A wrong account on the session again, and the mark a previous one left says nothing
+      # about this one.
+      Redis::Alfred.delete(self.class.unlinked_key(channel))
+    end
   end
 
   # Two ways a state can belong to the wrong account. It can name the wrong number, which
