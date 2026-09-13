@@ -406,7 +406,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   def validate_provider_config?
-    response = credential_check_request(:get, "#{provider_url}/status/auth", headers: api_headers, **BAILEYS_REQUEST_OPTIONS)
+    url = "#{provider_url}/status/auth"
+    headers = api_headers
+    response = credential_check_request { HTTParty.get(url, headers: headers, **BAILEYS_REQUEST_OPTIONS) }
     ensure_credential_verdict!(response)
 
     process_response(response)
