@@ -11,16 +11,18 @@
 # The rescue here is wide on purpose and narrow in scope, the same arrangement as
 # Whatsapp::TransportFailure: anything StandardError can be at the HTTP call is a transport failure by
 # construction, and an enumerated list would be a promise to have thought of every way a socket can
-# fail. What keeps it honest is that nothing but the call goes inside the block. A defect of our own
-# around the call, a NoMethodError before or between the requests, is not a check that failed to
-# conclude, and must not reach the operator as one: it stays out of the block and escapes as itself.
+# fail. What keeps it honest is that nothing but the call sits under the rescue, which is why this takes
+# the call's arguments instead of a block: they are evaluated by the caller, so the code of ours that
+# builds the URL, the headers or the body runs outside it, as in `post_outgoing`. A defect of our own,
+# a NoMethodError while building the request, between the requests or while reading an answer, is not a
+# check that failed to conclude, and must not reach the operator as one: it escapes as itself.
 module Whatsapp::CredentialCheck
   class Unavailable < StandardError; end
 
   private
 
-  def credential_check_request
-    yield
+  def credential_check_request(verb, url, **)
+    HTTParty.public_send(verb, url, **)
   rescue StandardError => e
     # The class only. A message can carry the request URL, and Z-API puts the token in the path.
     raise Unavailable, e.class.name

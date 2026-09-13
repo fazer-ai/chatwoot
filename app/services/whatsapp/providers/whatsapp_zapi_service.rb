@@ -31,9 +31,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def validate_provider_config?
-    response = credential_check_request do
-      HTTParty.get("#{api_instance_path_with_token}/status", headers: api_headers, **ZAPI_REQUEST_OPTIONS)
-    end
+    response = credential_check_request(:get, "#{api_instance_path_with_token}/status", headers: api_headers, **ZAPI_REQUEST_OPTIONS)
     ensure_credential_verdict!(response)
 
     process_response(response)

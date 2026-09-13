@@ -82,9 +82,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def validate_provider_config?
     config = whatsapp_channel.provider_config
-    response = credential_check_request do
-      HTTParty.get("#{business_account_path}/message_templates?access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
-    end
+    response = credential_check_request(:get, "#{business_account_path}/message_templates?access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
     ensure_credential_verdict!(response)
     return log_transfer_failure('waba_or_token_check', response) unless response.success?
     # The templates check only proves the WABA/token pair, so verify the phone_number_id belongs to this WABA when it changes.
@@ -182,9 +180,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   # Only saves dropping the embedded_signup source marker are transfer attempts; creation/rotation failures are setup errors. Returns false.
   def phone_number_belongs_to_waba?(config)
-    response = credential_check_request do
-      HTTParty.get("#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}", **GRAPH_REQUEST_OPTIONS)
-    end
+    response = credential_check_request(:get, "#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}",
+                                        **GRAPH_REQUEST_OPTIONS)
     ensure_credential_verdict!(response)
     return log_transfer_failure('phone_number_id_check', response) unless response.success?
 

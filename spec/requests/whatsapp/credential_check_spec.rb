@@ -326,4 +326,94 @@ RSpec.describe 'WhatsApp credential check', type: :request do
       expect(message).to eq('Provider config Invalid Credentials')
     end
   end
+
+  # The defect planted on `.new` above sits before the provider runs at all, so it cannot tell a rescue
+  # around the HTTP call from one that grew to cover the whole check. These sit where a grown rescue
+  # would reach: the code of ours that builds the request, the code between Meta's two calls, and the
+  # code that reads an answer that did come back.
+  #
+  # What is asserted is the defect itself reaching the response. Checking only that neither sentence
+  # appears in the body cannot work here: the test environment renders the exception page with the
+  # model's source around the failing line, and that source contains the refusal string.
+  describe 'a defect of our own inside the check' do
+    def plant(service, method_name)
+      allow(service).to receive(:new).and_wrap_original do |original, *args, **kwargs|
+        original.call(*args, **kwargs).tap { |provider| allow(provider).to receive(method_name).and_raise(NoMethodError, 'planted 598') }
+      end
+    end
+
+    def expect_the_defect_to_escape
+      expect(response).to have_http_status(:internal_server_error)
+      expect(response.body).to include('planted 598')
+      expect(rows).to eq(0)
+    end
+
+    it 'escapes as itself from the code that builds the whatsapp_cloud request' do
+      plant(Whatsapp::Providers::WhatsappCloudService, :business_account_path)
+
+      create_cloud_inbox
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from between the two whatsapp_cloud calls' do
+      graph_answers(templates: templates_ok, phone_numbers: owned_number)
+      plant(Whatsapp::Providers::WhatsappCloudService, :phone_number_belongs_to_waba?)
+
+      create_cloud_inbox
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that reads the second whatsapp_cloud answer' do
+      graph_answers(templates: templates_ok, phone_numbers: owned_number)
+      plant(Whatsapp::Providers::WhatsappCloudService, :credential_check_body)
+
+      create_cloud_inbox
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that builds the zapi request' do
+      plant(Whatsapp::Providers::WhatsappZapiService, :api_instance_path_with_token)
+
+      create_inbox(provider: 'zapi', provider_config: { instance_id: 'inst598', token: 'tok598segredo', client_token: 'ct' })
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that reads the zapi answer' do
+      stub_request(:get, %r{api\.z-api\.io/instances/.+/status}).to_return(json(200, { connected: true }))
+      plant(Whatsapp::Providers::WhatsappZapiService, :process_response)
+
+      create_inbox(provider: 'zapi', provider_config: { instance_id: 'inst598', token: 'tok598segredo', client_token: 'ct' })
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that builds the baileys request' do
+      plant(Whatsapp::Providers::WhatsappBaileysService, :provider_url)
+
+      create_inbox(provider: 'baileys', provider_config: { provider_url: 'https://baileys.test', api_key: 'k' })
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that reads the baileys answer' do
+      stub_request(:get, %r{baileys\.test/status/auth}).to_return(json(200, { data: { connection: 'open' } }))
+      plant(Whatsapp::Providers::WhatsappBaileysService, :process_response)
+
+      create_inbox(provider: 'baileys', provider_config: { provider_url: 'https://baileys.test', api_key: 'k' })
+
+      expect_the_defect_to_escape
+    end
+
+    it 'escapes as itself from the code that builds the 360dialog request' do
+      plant(Whatsapp::Providers::Whatsapp360DialogService, :api_base_path)
+
+      create_inbox(provider: 'default', provider_config: { api_key: 'k' })
+
+      expect_the_defect_to_escape
+    end
+  end
 end
