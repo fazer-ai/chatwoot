@@ -1,5 +1,6 @@
 class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseService # rubocop:disable Metrics/ClassLength
   include Whatsapp::TransportFailure
+  include Whatsapp::CredentialCheck
   include Whatsapp::ZapiRequestOptions
 
   # See the note in WhatsappBaileysService: legacy errors share the session hierarchy.
@@ -30,11 +31,10 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def validate_provider_config?
-    response = HTTParty.get(
-      "#{api_instance_path_with_token}/status",
-      headers: api_headers,
-      **ZAPI_REQUEST_OPTIONS
-    )
+    response = credential_check_request do
+      HTTParty.get("#{api_instance_path_with_token}/status", headers: api_headers, **ZAPI_REQUEST_OPTIONS)
+    end
+    ensure_credential_verdict!(response)
 
     process_response(response)
   end

@@ -509,8 +509,14 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])
   end
 
+  # A check that could not reach a verdict is neither a refusal nor a broken application, so it gets a
+  # sentence of its own. Only that one class is rescued: a defect of ours inside the check escapes as
+  # itself, because telling the operator to try again is no use when the thing to fix is the code.
   def validate_provider_config
     errors.add(:provider_config, 'Invalid Credentials') unless provider_service.validate_provider_config?
+  rescue Whatsapp::CredentialCheck::Unavailable => e
+    Rails.logger.warn("[WHATSAPP] Credential check could not be completed for #{provider} channel #{id || 'new'}: #{e.message}")
+    errors.add(:provider_config, I18n.t('errors.inboxes.channel.credential_check_unavailable'))
   end
 
   # Logs only the embedded signup → manual migration (the save drops the
