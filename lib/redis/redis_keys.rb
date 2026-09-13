@@ -86,6 +86,9 @@ module Redis::RedisKeys
   # An automation rule that has already acted on one message, so the content arriving after the
   # placeholder it was stored as does not run that rule a second time.
   AUTOMATION_RULE_MESSAGE_RUN = 'AUTOMATION_RULE_MESSAGE_RUN::%<rule_id>d::%<message_id>d'.freeze
+  # The arrival of a placeholder whose rules were evaluated with those claims written, which is what says
+  # a later recovery of that row may evaluate them again.
+  AUTOMATION_MESSAGE_ARRIVAL_TRACKED = 'AUTOMATION_MESSAGE_ARRIVAL_TRACKED::%<message_id>d'.freeze
 
   ## Sempahores / Locks
   # We don't want to process messages from the same sender concurrently to prevent creating double conversations

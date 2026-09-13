@@ -178,6 +178,22 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     expect(ran(on_content)).to eq(1)
   end
 
+  # A placeholder stored before this was deployed ran its rules with no claim written, so evaluating them
+  # again would run the ones that do not filter on content a second time. Upgrading must not answer a
+  # message from before it twice; missing the content is what that row had already settled for.
+  it 'runs nothing for a placeholder whose arrival was never tracked' do
+    arrive_and_settle(placeholder)
+    stored = inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    Redis::Alfred.delete(format(Redis::RedisKeys::AUTOMATION_MESSAGE_ARRIVAL_TRACKED, message_id: stored.id))
+    Redis::Alfred.delete(format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: on_anything.id, message_id: stored.id))
+
+    arrive_and_settle(recovered)
+
+    expect(stored.reload.content).to eq('Quero um orçamento')
+    expect(ran(on_anything)).to eq(1)
+    expect(ran(on_content)).to eq(0)
+  end
+
   # The history import writes its rows with every callback suppressed, so nothing ran when they landed.
   # The content of an archived message is not a message arriving, and rules answering traffic from weeks
   # ago is the one thing the import is careful never to do.

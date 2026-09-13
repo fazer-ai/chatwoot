@@ -22,6 +22,9 @@ class AutomationRuleListener < BaseListener
   end
 
   def message_created(event)
+    # Before the rules, not after: a recovery arriving in between has to find the arrival on record, and
+    # the claims are what keep it from repeating whatever this evaluation is about to do.
+    track_arrival(event.data[:message])
     process_message_event(event)
   end
 
@@ -31,7 +34,14 @@ class AutomationRuleListener < BaseListener
   #
   # Re-firing `message_created` instead would run every rule that does not filter on content a second
   # time, which is worse than the miss: an auto-reply answering twice, a webhook delivered twice.
+  # Only for a placeholder whose arrival this mechanism handled. A row stored before this was deployed,
+  # or before its record expired, ran its rules with no claim written, so evaluating again would run the
+  # ones that do not filter on content a second time: an auto-reply answering a message from before the
+  # upgrade, which is the outcome this whole design exists to avoid. Then the content is the only thing
+  # missed, which is what every such row had already settled for.
   def message_recovered(event)
+    return unless arrival_tracked?(event.data[:message])
+
     process_message_event(event)
   end
 
@@ -84,6 +94,28 @@ class AutomationRuleListener < BaseListener
 
   def claim_key(rule, message)
     format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: rule.id, message_id: message.id)
+  end
+
+  # Recorded for a placeholder only, which is the only row a recovery can follow, so the ordinary message
+  # pays nothing for this.
+  def track_arrival(message)
+    return unless placeholder?(message)
+
+    Redis::Alfred.set(arrival_key(message), Time.current.to_i, ex: RULE_RUN_CLAIM_EXPIRY)
+  end
+
+  def arrival_tracked?(message)
+    Redis::Alfred.exists?(arrival_key(message))
+  end
+
+  def arrival_key(message)
+    format(Redis::RedisKeys::AUTOMATION_MESSAGE_ARRIVAL_TRACKED, message_id: message.id)
+  end
+
+  # A row stored for a message this side could not read yet. `unsupported_reason` is written by the
+  # WhatsApp session layer alone, and only for a body that may still arrive under the same id.
+  def placeholder?(message)
+    message.try(:content_attributes).to_h['unsupported_reason'].present?
   end
 
   def process_conversation_event(event, event_name)

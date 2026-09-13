@@ -90,10 +90,11 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # written and comes back through the duplicate path. That is the behaviour this whole change is
     # about, so it must not be what a refresh of a chat list costs.
     #
-    # Not for a row the history import wrote. Its arrival ran no automations at all (Import::SilentWrite),
-    # and the content of an archived message is not a message arriving: rules would answer traffic from
-    # weeks ago.
-    dispatch_recovery(stored) unless stored.content_attributes['imported']
+    # Announced for a row the history import wrote as well, and the listener is what stands that one
+    # down: an imported arrival dispatches nothing at all (Import::SilentWrite), so it left no record of
+    # having been evaluated, and a recovery without that record runs no rules. One mechanism rather than
+    # a guard here repeating it.
+    dispatch_recovery(stored)
     # Both of these are repaired by a redelivery and the announcement above is not, which is the whole
     # reason it goes first: `fetch_media_for` is what the duplicate path queues anyway, and the next
     # event on the conversation refreshes the list.
