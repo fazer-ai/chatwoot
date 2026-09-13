@@ -201,6 +201,33 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     expect(ran(on_anything)).to eq(1)
   end
 
+  # The same lost answer, with the key already held by the arrival's own execution. Releasing that one
+  # would hand the retry a rule that already answered the contact.
+  it 'leaves a claim an earlier execution owns when its own acquisition could not be read back' do
+    arrive_and_settle(placeholder)
+    expect(ran(on_anything)).to eq(1)
+
+    # Only the claim of the rule the arrival already ran: that key is the one a release must not touch.
+    write = Redis::Alfred.method(:set)
+    allow(Redis::Alfred).to receive(:set) do |key, *args, **options|
+      written = write.call(key, *args, **options)
+      raise 'the answer was lost' if key.include?("AUTOMATION_RULE_MESSAGE_RUN::#{on_anything.id}::")
+
+      written
+    end
+
+    deliver(recovered)
+    expect { perform_enqueued_jobs }.to raise_error('the answer was lost')
+    allow(Redis::Alfred).to receive(:set).and_call_original
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    )
+    perform_enqueued_jobs
+
+    expect(ran(on_anything)).to eq(1)
+    expect(ran(on_content)).to eq(1)
+  end
+
   # A placeholder stored before this was deployed ran its rules with no claim written, so evaluating them
   # again would run the ones that do not filter on content a second time. Upgrading must not answer a
   # message from before it twice; missing the content is what that row had already settled for.

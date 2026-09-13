@@ -65,7 +65,10 @@ class AutomationRuleListener < BaseListener
       # The claim is asked for after the conditions and only when they match, never before: a rule that
       # did not match while the row was a placeholder has to be left free to run when the content
       # arrives.
-      execute_claimed_rule(rule, account, message) if conditions_match.present? && claim(rule, message)
+      next if conditions_match.blank?
+
+      token = claim(rule, message)
+      execute_claimed_rule(rule, account, message, token) if token
     end
   end
 
@@ -77,13 +80,21 @@ class AutomationRuleListener < BaseListener
   # Atomic, because both may find the same rule matching; the one that takes the key is the one that
   # acts. Answers false when the key is already there. A key lost before the recovery (an expiry, a
   # Redis that was replaced) costs a second run of that one rule, which is why the window is long.
-  # Released when the answer to the write is what was lost: Redis may well have taken the key, and a claim
-  # nobody could read is a rule that never ran holding its own record for thirty days. Releasing puts the
-  # retry back where it is today, which is evaluating and acting again.
+  # Answers this attempt's own token when it took the key, and nothing when the key was already there,
+  # which is the rule having run.
+  #
+  # The token is what makes the release safe. When the answer to the write is what was lost, Redis may
+  # well have taken the key, and a claim nobody could read is a rule that never ran holding its own
+  # record for thirty days. But the key may equally belong to an execution that already happened -- the
+  # arrival's, with the recovery now asking -- and deleting that one would let the retry run the rule a
+  # second time. So only a key carrying this attempt's token is released.
   def claim(rule, message)
-    Redis::Alfred.set(claim_key(rule, message), Time.current.to_i, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+    token = SecureRandom.uuid
+    taken = Redis::Alfred.set(claim_key(rule, message), token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+
+    token if taken
   rescue StandardError
-    release_claim(rule, message)
+    release_claim(rule, message, token)
     raise
   end
 
@@ -91,17 +102,17 @@ class AutomationRuleListener < BaseListener
   # holding the claim would spend the whole window on an attempt that never acted, and for a delayed rule
   # the attempt is only a row in `automation_rule_pending_executions`, which failed to be written.
   # Releasing restores exactly what happens today, where a retry evaluates and acts again.
-  def execute_claimed_rule(rule, account, message)
+  def execute_claimed_rule(rule, account, message, token)
     execute_rule(rule, account, message.conversation, message: message)
   rescue StandardError
-    release_claim(rule, message)
+    release_claim(rule, message, token)
     raise
   end
 
   # Best effort on the way out of a failure that is already being raised: a delete that fails too would
   # replace the error the caller needs to see with one about Redis.
-  def release_claim(rule, message)
-    Redis::Alfred.delete(claim_key(rule, message))
+  def release_claim(rule, message, token)
+    Redis::Alfred.delete_if_equals(claim_key(rule, message), token)
   rescue StandardError => e
     Rails.logger.warn("[AUTOMATION] could not release the run claim of rule #{rule.id} on message #{message.id}: #{e.message}")
   end
