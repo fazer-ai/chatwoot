@@ -158,6 +158,45 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
     expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
   end
 
+  # A quarantined account WhatsApp has since unlinked, by the logout or by its owner removing
+  # the device on the phone, is written as the same quarantine, because a close names no
+  # number. That event is the only thing that tells a logout that landed from a connector
+  # that is not answering, so it has to be kept somewhere the quarantine does not overwrite.
+  describe 'a quarantined account that was unlinked' do
+    let(:wrong) { state.new(connection: 'open', phone_number: '5541988887777', epoch: 1) }
+
+    before do
+      writer.apply(wrong)
+      clear_enqueued_jobs
+    end
+
+    %w[logged_out logged_out_by_request].each do |error|
+      it "is remembered on #{error}, and asks for no further logout" do
+        writer.apply(state.new(connection: 'close', error: error, epoch: 1))
+
+        expect(Whatsapp::Session::LogoutJob).not_to have_been_enqueued
+        expect(described_class.unlinked?(channel)).to be(true)
+        expect(channel.reload.provider_connection['error_code']).to eq('wrong_phone_number')
+      end
+    end
+
+    it 'is not read into a close that says nothing about the account' do
+      writer.apply(state.new(connection: 'close', error: 'disconnected', epoch: 1))
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
+
+    it 'is forgotten when a wrong account is reported again' do
+      writer.apply(state.new(connection: 'close', error: 'logged_out', epoch: 1))
+
+      writer.apply(wrong)
+
+      expect(described_class.unlinked?(channel)).to be(false)
+      expect(Whatsapp::Session::LogoutJob).to have_been_enqueued.with(channel)
+    end
+  end
+
   # A history request travels to the phone through the session, so a session that ends
   # takes any outstanding request with it. Without this the dump that follows the next
   # pairing would be filed as if somebody had asked for it, and tuning the window's length
