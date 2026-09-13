@@ -55,7 +55,7 @@ class AutomationRuleListener < BaseListener
       # The claim is asked for after the conditions and only when they match, never before: a rule that
       # did not match while the row was a placeholder has to be left free to run when the content
       # arrives.
-      execute_rule(rule, account, message.conversation, message: message) if conditions_match.present? && claim(rule, message)
+      execute_claimed_rule(rule, account, message) if conditions_match.present? && claim(rule, message)
     end
   end
 
@@ -68,10 +68,22 @@ class AutomationRuleListener < BaseListener
   # acts. Answers false when the key is already there. A key lost before the recovery (an expiry, a
   # Redis that was replaced) costs a second run of that one rule, which is why the window is long.
   def claim(rule, message)
-    Redis::Alfred.set(
-      format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: rule.id, message_id: message.id),
-      Time.current.to_i, nx: true, ex: RULE_RUN_CLAIM_EXPIRY
-    )
+    Redis::Alfred.set(claim_key(rule, message), Time.current.to_i, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+  end
+
+  # A rule whose execution raised before it did anything must be free to run on the retry of this job:
+  # holding the claim would spend the whole window on an attempt that never acted, and for a delayed rule
+  # the attempt is only a row in `automation_rule_pending_executions`, which failed to be written.
+  # Releasing restores exactly what happens today, where a retry evaluates and acts again.
+  def execute_claimed_rule(rule, account, message)
+    execute_rule(rule, account, message.conversation, message: message)
+  rescue StandardError
+    Redis::Alfred.delete(claim_key(rule, message))
+    raise
+  end
+
+  def claim_key(rule, message)
+    format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: rule.id, message_id: message.id)
   end
 
   def process_conversation_event(event, event_name)

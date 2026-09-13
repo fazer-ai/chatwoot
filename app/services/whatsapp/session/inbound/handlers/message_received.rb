@@ -81,12 +81,25 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # position and is not lost either way: a redelivery that finds the row already written
   # queues it through `fetch_media_for`, which is the path that exists for exactly this.
   def recovered(stored)
-    inbound::ChatList.refresh(stored.conversation)
     # The content is readable for the first time, so the automations that were asked about it while the
     # row was a placeholder are asked again (#491). Its own event rather than MESSAGE_CREATED: every
     # other subscriber already ran the arrival, and a second one would double a webhook and an auto-reply.
-    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: stored)
+    #
+    # Before the preview refresh, which is the cheaper of the two to lose: a failure between the content
+    # write and here leaves the automations unrun for good, because the redelivery finds the row already
+    # written and comes back through the duplicate path. That is the behaviour this whole change is
+    # about, so it must not be what a refresh of a chat list costs.
+    #
+    # Not for a row the history import wrote. Its arrival ran no automations at all (Import::SilentWrite),
+    # and the content of an archived message is not a message arriving: rules would answer traffic from
+    # weeks ago.
+    dispatch_recovery(stored) unless stored.content_attributes['imported']
+    inbound::ChatList.refresh(stored.conversation)
     :handled
+  end
+
+  def dispatch_recovery(stored)
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: stored)
   end
 
   # The row already names the conversation and the sender this message belongs to: it was

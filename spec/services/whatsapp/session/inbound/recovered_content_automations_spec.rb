@@ -153,6 +153,65 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     expect(dispatched.count([Events::Types::MESSAGE_RECOVERED, '3EB0RECOVER01'])).to eq(1)
   end
 
+  # A failure between the content write and the dispatch loses the automations for good: the redelivery
+  # finds the row already written and comes back as a duplicate. So the dispatch goes before the chat
+  # list refresh, which is the one of the two that a later event repairs on its own.
+  it 'dispatches the recovery even when refreshing the chat list fails' do
+    arrive_and_settle(placeholder)
+    allow(Whatsapp::Session::Inbound::ChatList).to receive(:refresh).and_raise('the chat list is away')
+
+    expect { deliver(recovered) }.to raise_error('the chat list is away')
+    perform_enqueued_jobs
+
+    expect(ran(on_content)).to eq(1)
+  end
+
+  # The history import writes its rows with every callback suppressed, so nothing ran when they landed.
+  # The content of an archived message is not a message arriving, and rules answering traffic from weeks
+  # ago is the one thing the import is careful never to do.
+  it 'runs nothing for a placeholder the history import wrote' do
+    contact = create(:contact, account: account, phone_number: '+5541999990000')
+    contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5541999990000')
+    conversation = create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox)
+    Import::SilentWrite.wrap do
+      Whatsapp::Session::Inbound::MessageWriter.new(
+        conversation: conversation, inbound: inbound, sender: contact, imported: true
+      ).perform
+    end
+    perform_enqueued_jobs
+
+    arrive_and_settle(recovered)
+
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content).to eq('Quero um orçamento')
+    expect(ran(on_content)).to eq(0)
+    expect(ran(on_anything)).to eq(0)
+  end
+
+  # The claim is there to stop a second run, not to spend a rule's only chance on an attempt that never
+  # acted: a rule whose execution raised (the database gone while a delayed rule is being scheduled) has
+  # to be free again for the retry, which is what happens today.
+  it 'frees a rule whose execution raised, so the retry still runs it' do
+    attempts = 0
+    build_action_service = AutomationRules::ActionService.method(:new)
+    allow(AutomationRules::ActionService).to receive(:new) do |*args|
+      attempts += 1
+      raise 'the database went away' if attempts == 1
+
+      build_action_service.call(*args)
+    end
+
+    deliver(placeholder)
+    expect { perform_enqueued_jobs }.to raise_error('the database went away')
+
+    # What Sidekiq does with the event whose job raised, which nothing else here stands in for.
+    Rails.configuration.dispatcher.dispatch(
+      Events::Types::MESSAGE_CREATED, Time.zone.now, message: inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    )
+    perform_enqueued_jobs
+
+    expect(ran(on_anything)).to eq(1)
+  end
+
   # A placeholder that is never recovered is not held back: the arrival is what the agent sees, and a
   # content rule has nothing to match.
   it 'keeps the placeholder arrival immediate' do
