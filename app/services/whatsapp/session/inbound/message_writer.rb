@@ -147,7 +147,14 @@ class Whatsapp::Session::Inbound::MessageWriter
     # re-evaluated the rules against whatever the row says by then, and an edit landing in between
     # would run rules on a body they never matched -- a reply to the contact that no arrival and no
     # recovery asked for.
-    recovered[Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED] = Time.current.to_i
+    #
+    # It names the body it owes the announcement for, as a fingerprint of what this save is about to
+    # commit. The redelivery that pays the debt is a different delivery and must not rebuild that body
+    # from its own payload: `message_content` resolves mentions against the contacts as they are now, so
+    # a contact renamed in between would rebuild a different string and the debt would be settled
+    # announcing nothing. A fingerprint taken here is of the body that was actually stored, and nothing
+    # but an edit changes a stored body afterwards.
+    recovered[RECOVERY_OWED] = { 'at' => Time.current.to_i, 'body' => Digest::SHA256.hexdigest(message.content.to_s) }
 
     message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')
@@ -174,12 +181,6 @@ class Whatsapp::Session::Inbound::MessageWriter
 
     message_content
   end
-
-  # Whether this delivery carries anything to recover, which is a different question from what that
-  # something says: a media message with no caption recovers a body that is empty, and recovers it all
-  # the same. The unsupported stanza a placeholder is published from carries nothing, so a redelivery of
-  # that one speaks for no recovery at all.
-  def recovers_content? = content.present? && !unsupported?
 
   def perform
     return build_contact_messages if content_type == 'contacts'
@@ -269,7 +270,8 @@ class Whatsapp::Session::Inbound::MessageWriter
   # like any other, and the attribution the caller records either way. #492.
   #
   def reconcilable?(message)
-    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) && recovers_content?
+    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
+      content.present? && !unsupported?
   end
 
   def convert_mentions(text)

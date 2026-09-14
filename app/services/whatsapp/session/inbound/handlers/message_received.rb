@@ -76,18 +76,29 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # the way the defect did. The window that leaves is a process that dies between the two, which costs
   # one more announcement later, and that is the direction worth being wrong in.
   #
-  # A delivery that recovers nothing pays nothing, and the redelivered placeholder is the ordinary shape
-  # of that rather than a curiosity: the consumer's session cursor only moves forwards, so a debt is
-  # only ever reached once that cursor is gone, and then the whole backlog replays in order with the
-  # placeholder ahead of the message. Settling on its way past would clear the debt and leave the real
-  # message, replaying a moment later, with nothing owed -- the automations lost exactly the way #646
-  # describes. It cannot announce either: it carries no body, and the debt is about one.
+  # What it announces comes off the row, not off this delivery. The debt names the body it owes, and any
+  # delivery that reaches here can pay it: the redelivered placeholder is the ordinary shape of this,
+  # because the consumer's session cursor only moves forwards, so a debt is only ever reached once that
+  # cursor is gone, and then the whole backlog replays in order with the placeholder ahead of the
+  # message that recovered it. Rebuilding the body from whichever delivery got here would announce
+  # nothing for that one and settle the debt on its way past.
   def announce_owed_recovery(stored)
-    writer = writer_for(stored)
-    return unless writer.recovers_content?
-
-    dispatch_recovery(stored, writer.recovered_body)
+    dispatch_recovery(stored, stored.content) if owed_body_still_on_row?(stored)
     settle_recovery_debt(stored)
+  end
+
+  # Nothing but an edit changes a body that is already stored, so a row whose fingerprint still matches
+  # is a row still showing what the recovery wrote, and that is what the announcement owed. A row that
+  # no longer matches is showing the editor's text: the body the debt is about is gone, the announcement
+  # it owed can no longer be made, and settling is all that is left (#661).
+  #
+  # A marker written before this shipped carries the instant alone and has nothing to compare with, so
+  # it announces what the row says, which is what it was written to do.
+  def owed_body_still_on_row?(stored)
+    owed = stored.content_attributes.to_h[inbound::MessageWriter::RECOVERY_OWED]
+    return true unless owed.is_a?(Hash)
+
+    owed['body'] == Digest::SHA256.hexdigest(stored.content.to_s)
   end
 
   # Read off the row the lock reloads, and written without waking anything up. Both halves matter and

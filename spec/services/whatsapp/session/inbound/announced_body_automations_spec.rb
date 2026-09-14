@@ -60,14 +60,14 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     account.messages.where("((content_attributes#>>'{}')::jsonb)->>'automation_rule_id' = ?", automation_rule.id.to_s).count
   end
 
-  def deliver(content, id: inbound.id)
+  def deliver(content, id: inbound.id, mentions: [])
     Whatsapp::Session::Inbound::Dispatcher.dispatch(
-      channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(id: id, content: content)))
+      channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(id: id, content: content, mentions: mentions)))
     )
   end
 
-  def arrive(content, id: inbound.id)
-    deliver(content, id: id)
+  def arrive(content, id: inbound.id, mentions: [])
+    deliver(content, id: id, mentions: mentions)
     perform_enqueued_jobs
   end
 
@@ -150,9 +150,9 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
 
   # The consumer's session cursor only moves forwards, so a debt is only ever reached once that cursor
   # is gone -- and then the whole backlog replays in order, with the placeholder ahead of the message
-  # that recovered it. A delivery carrying no body cannot say what the announcement owes, so it leaves
-  # the debt where it is for the one that can.
-  it 'leaves the debt for the delivery that can name the body when the placeholder replays first' do
+  # that recovered it. The placeholder carries no body of its own, and it pays the debt all the same,
+  # because the debt names the body rather than asking whoever turns up to rebuild it.
+  it 'pays the debt from the replayed placeholder, which carries no body of its own' do
     arrive(placeholder)
 
     refusing = true
@@ -166,12 +166,40 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     refusing = false
 
     arrive(placeholder)
-    expect(ran(on_preco)).to eq(0)
-
-    arrive(recovered)
 
     expect(ran(on_preco)).to eq(1)
     expect(ran(on_anything)).to eq(1)
+    expect(ran(on_orcamento)).to eq(0)
+  end
+
+  # And what the debt owes is the body that was stored, not one rebuilt from whichever delivery gets
+  # here: `MessageWriter#message_content` resolves mentions against the contacts as they are now, so a
+  # contact renamed in between rebuilds a different string for a message nobody edited.
+  it 'pays the debt on a body with a mention after the mentioned contact is renamed' do
+    mentioned = create(:contact, account: account, name: 'Bruno Antigo', phone_number: '+5541988887777')
+    create(:contact_inbox, inbox: inbox, contact: mentioned, source_id: '5541988887777')
+    mention = model::Content::Text.new(body: 'quero saber o preço @5541988887777')
+    mentions = [model::Address.phone('5541988887777')]
+
+    arrive(placeholder)
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+    expect { deliver(mention, mentions: mentions) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    refusing = false
+    # The premise: the body that was stored carries the name the contact had, so rebuilding it after
+    # the rename produces a different string for a message nobody edited.
+    expect(stored.content).to include('Bruno Antigo')
+
+    mentioned.update!(name: 'Bruno Novo')
+    arrive(mention, mentions: mentions)
+
+    expect(stored.content).to include('Bruno Antigo')
+    expect(ran(on_preco)).to eq(1)
   end
 
   it 'adds nothing on the redeliveries that follow' do

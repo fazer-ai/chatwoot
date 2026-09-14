@@ -90,8 +90,16 @@ class AutomationRuleListener < BaseListener
   # `MESSAGE_CREATED` is deliberately not one of these. An arrival is about the row appearing, not about a
   # body: it names none, and it keeps answering about whatever the row says by the time the work runs. A
   # content rule that found nothing there is what `MESSAGE_RECOVERED` exists to ask a second time.
+  #
+  # An announcement that carries no `content` at all named no body, and there is nothing to check. That
+  # is what every one of these dispatched before this shipped looks like, and they are sitting in the
+  # queue and in the retry set while it deploys: reading their silence as an empty body would compare it
+  # with a message that says something, and discard the lot of them without a trace. What keeps that
+  # silence from also meaning a caller who forgot is a fence over the source, in
+  # `spec/listeners/announced_body_dispatch_fence_spec.rb`: every dispatch of one of these names a body.
   def announced_body_current?(event, message)
     return true unless BODY_SCOPED_EVENTS.include?(event.name.to_s)
+    return true unless event.data.key?(:content)
 
     message.content.to_s == event.data[:content].to_s
   end
