@@ -5,6 +5,10 @@ class AutomationRuleListener < BaseListener
   # worth honouring: past this, a recovery may run that one rule a second time.
   RULE_RUN_CLAIM_EXPIRY = 30.days
 
+  # The events that speak of a body rather than of a row appearing. Each of them names the body it is
+  # about, and `announced_body_current?` is what makes that name mean something.
+  BODY_SCOPED_EVENTS = [Events::Types::MESSAGE_RECOVERED, Events::Types::MESSAGE_EDITED].freeze
+
   def conversation_updated(event)
     process_conversation_event(event, 'conversation_updated')
   end
@@ -59,6 +63,7 @@ class AutomationRuleListener < BaseListener
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
+    return unless announced_body_current?(event, message)
 
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
@@ -72,6 +77,23 @@ class AutomationRuleListener < BaseListener
 
       execute_claimed_rule(rule, account, message, claimed[:key], claimed[:token]) if claimed[:token]
     end
+  end
+
+  # An announcement that speaks of a body says which body, and this is where the row is asked whether it
+  # is still showing it. The conditions are evaluated against the row (`ConditionsFilterService` queries
+  # it), never against the payload, and this job runs long after the dispatch: a write that landed in
+  # between would have the rules answer about a body the announcement is not about -- the body a recovery
+  # carried, on a row an edit has since replaced (#661), or the first of two edits on a row the second
+  # already wrote over (#660). The write that won carries its own announcement, so the one that lost has
+  # nothing left to do and leaves quietly.
+  #
+  # `MESSAGE_CREATED` is deliberately not one of these. An arrival is about the row appearing, not about a
+  # body: it names none, and it keeps answering about whatever the row says by the time the work runs. A
+  # content rule that found nothing there is what `MESSAGE_RECOVERED` exists to ask a second time.
+  def announced_body_current?(event, message)
+    return true unless BODY_SCOPED_EVENTS.include?(event.name.to_s)
+
+    message.content.to_s == event.data[:content].to_s
   end
 
   # The body the conditions answered about and the body the claim is taken on have to be the same one.

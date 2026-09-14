@@ -164,6 +164,17 @@ class Whatsapp::Session::Inbound::MessageWriter
     seen.compact.presence
   end
 
+  # The body this delivery carries, and so the body a recovery of it speaks of (#661). Not the body the
+  # row ends up showing: an edit that reached the row first keeps its own (`reconcile_in_place`), and
+  # whether the two say the same thing is exactly what the reader of that announcement has to be able to
+  # ask. Read again by the redelivery that pays an announcement debt, which is the same message and
+  # therefore carries the same body.
+  def recovered_body
+    return single_card_line if content_type == 'contacts'
+
+    message_content
+  end
+
   def perform
     return build_contact_messages if content_type == 'contacts'
 
@@ -343,15 +354,31 @@ class Whatsapp::Session::Inbound::MessageWriter
 
   # Fills a row, new or already stored, with one card. Answers nil for a card that says
   # nothing, which is what keeps an empty one from taking a row.
-  def apply_contact_card(message, card)
+  # The line a share of exactly one readable card is stored as, which is what `reconcile_as_a_share`
+  # writes and therefore what a recovery of that share is about. Nothing for a share of several or of
+  # none: that one stays the unsupported bubble it already was, and recovers nothing.
+  def single_card_line
+    cards = Array(content.contacts).select { |card| Whatsapp::Session::Inbound::ContactCard.readable?(card) }
+    return unless cards.one?
+
+    name, phone = card_identity(cards.first)
+    Whatsapp::Session::Inbound::ContactCard.line(name, phone) if phone.present? || name.present?
+  end
+
+  # `display_name` is what the contract calls it. Reading `name` found nothing, so a
+  # card with a phone lost its name and a name-only card was dropped entirely, leaving
+  # the conversation that had just been opened with no message in it. Both fields are
+  # optional on the wire and a card may arrive as nothing but its vCard, which is why
+  # that is read too rather than dropping the share.
+  def card_identity(card)
     card = card.to_h.stringify_keys
-    # `display_name` is what the contract calls it. Reading `name` found nothing, so a
-    # card with a phone lost its name and a name-only card was dropped entirely, leaving
-    # the conversation that had just been opened with no message in it. Both fields are
-    # optional on the wire and a card may arrive as nothing but its vCard, which is why
-    # that is read too rather than dropping the share.
-    phone = card['phone'].presence || Whatsapp::Session::Inbound::ContactCard.phone_in(card['vcard'])
-    name = card['display_name'].presence || Whatsapp::Session::Inbound::ContactCard.name_in(card['vcard'])
+
+    [card['display_name'].presence || Whatsapp::Session::Inbound::ContactCard.name_in(card['vcard']),
+     card['phone'].presence || Whatsapp::Session::Inbound::ContactCard.phone_in(card['vcard'])]
+  end
+
+  def apply_contact_card(message, card)
+    name, phone = card_identity(card)
     return if phone.blank? && name.blank?
 
     message.content = Whatsapp::Session::Inbound::ContactCard.line(name, phone)

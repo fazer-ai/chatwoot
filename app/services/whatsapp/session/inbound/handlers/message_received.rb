@@ -154,8 +154,16 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     :handled
   end
 
+  # The announcement names the body this delivery recovered, so the listener can ask whether the row is
+  # still showing it: an edit that reached the row first keeps its own body, and the arrival's rules have
+  # no business answering about one no arrival and no recovery ever carried (#661).
+  #
+  # The body and not the edit marker. A contact who corrects a placeholder into the same text the
+  # encrypted original turns out to carry leaves a row that is marked as edited and is showing exactly
+  # what this delivery recovered, and that is a recovery like any other.
   def dispatch_recovery(stored)
-    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: stored)
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now,
+                                            message: stored, content: writer_for(stored).recovered_body)
   end
 
   # The row already names the conversation and the sender this message belongs to: it was
