@@ -98,5 +98,51 @@ describe ConversationBuilder do
         expect(conversation.id).to eq(existing_conversation.id)
       end
     end
+
+    # An inbox with an active bot starts its conversations pending, which is what gives the bot the
+    # first turn. The caller that says otherwise is the one creating a conversation on purpose: an
+    # agent reaching out proactively through the API, where a pending conversation is invisible under
+    # the dashboard's default filter and the person it was created for cannot find it.
+    context 'when the inbox has an active bot' do
+      let(:agent_bot) { create(:agent_bot, account: account) }
+
+      before { create(:agent_bot_inbox, inbox: api_inbox, agent_bot: agent_bot) }
+
+      it 'honours the status the caller asked for' do
+        conversation = described_class.new(contact_inbox: contact_api_inbox, params: { status: 'open' }).perform
+
+        expect(conversation.status).to eq('open')
+      end
+
+      it 'still hands the conversation to the bot when a status was asked for' do
+        conversation = described_class.new(contact_inbox: contact_api_inbox, params: { status: 'open' }).perform
+
+        expect(conversation.assignee_agent_bot).to eq(agent_bot)
+      end
+
+      it 'starts pending when no status was asked for' do
+        conversation = described_class.new(contact_inbox: contact_api_inbox, params: {}).perform
+
+        expect(conversation.status).to eq('pending')
+        expect(conversation.assignee_agent_bot).to eq(agent_bot)
+      end
+
+      # A form that sends every field sends this one empty, and an empty string is not a request:
+      # refusing it would turn a caller that never cared about the status into a 422.
+      it 'treats an empty status as no status at all' do
+        conversation = described_class.new(contact_inbox: contact_api_inbox, params: { status: '' }).perform
+
+        expect(conversation.status).to eq('pending')
+      end
+
+      # The parameter only started being read here, and a value the enum cannot take used to reach
+      # the assignment and raise ArgumentError, which the API answers as a 500.
+      it 'refuses a status the enum does not have' do
+        builder = described_class.new(contact_inbox: contact_api_inbox, params: { status: 'bogus' })
+
+        expect { builder.perform }.to raise_error(CustomExceptions::Conversation::InvalidStatus)
+        expect(api_inbox.conversations.count).to eq(0)
+      end
+    end
   end
 end

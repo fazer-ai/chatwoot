@@ -12,6 +12,7 @@ module RequestExceptionHandler
     rescue_from CustomExceptions::Inbox::LimitExceeded,
                 CustomExceptions::Account::EmailLimitExceeded,
                 CustomExceptions::Conversation::AlreadyAssigned,
+                CustomExceptions::Conversation::InvalidStatus,
                 with: :render_error_response
   end
 

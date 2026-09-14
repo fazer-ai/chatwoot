@@ -595,6 +595,21 @@ RSpec.describe 'Conversations API', type: :request do
           expect(response_data[:additional_attributes]).to eq(additional_attributes)
         end
 
+        # The status a caller sends is read now, which makes it user input: a value the enum does
+        # not have used to reach the assignment and come back as a 500.
+        it 'refuses a status the enum does not have' do
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+          post "/api/v1/accounts/#{account.id}/conversations",
+               headers: agent.create_new_auth_token,
+               params: { source_id: contact_inbox.source_id, status: 'bogus' },
+               as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(response.parsed_body['message']).to include('bogus')
+          expect(inbox.conversations.count).to eq(0)
+        end
+
         it 'does not create a new conversation if source_id is not unique' do
           new_contact = create(:contact, account: account)
 
