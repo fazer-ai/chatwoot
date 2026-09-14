@@ -127,6 +127,14 @@ describe ConversationBuilder do
         expect(conversation.assignee_agent_bot).to eq(agent_bot)
       end
 
+      # A form that sends every field sends this one empty, and an empty string is not a request:
+      # refusing it would turn a caller that never cared about the status into a 422.
+      it 'treats an empty status as no status at all' do
+        conversation = described_class.new(contact_inbox: contact_api_inbox, params: { status: '' }).perform
+
+        expect(conversation.status).to eq('pending')
+      end
+
       # The parameter only started being read here, and a value the enum cannot take used to reach
       # the assignment and raise ArgumentError, which the API answers as a 500.
       it 'refuses a status the enum does not have' do
