@@ -182,3 +182,12 @@ app/finders/message_finder.rb: Use the same tie-breaker when ordering message pa
 app/services/whatsapp/baileys_handlers/messaging_history_set.rb: Resolve exhausted chats through phone and LID aliases  # PR#500 → #503
 app/jobs/avatar/avatar_from_url_job.rb: Do not stamp markers for superseded avatar jobs  # PR#500 → #504
 app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group inboxes explicitly  # PR#500 → #505
+
+# A recuperação anunciada por MESSAGE_RECOVERED (#491, PR #645): se o próprio enfileiramento
+# do evento falha, a reentrega acha a linha escrita e não anuncia de novo, e as automações de
+# conteúdo daquela mensagem se perdem. O caminho cai no comportamento anterior à #645, nunca em
+# ação dobrada, e exige o transporte de jobs recusar exatamente aquela chamada com o banco de pé.
+# O conserto (marca durável na linha mais anúncio em toda reentrega) está na issue #646.
+app/services/whatsapp/session/inbound/handlers/message_received.rb: Make the recovery announcement retryable after saving content  # PR#645 → #646
+app/services/whatsapp/session/inbound/handlers/message_received.rb: Make recovery dispatch retryable after the content is saved  # PR#645 → #646
+app/services/whatsapp/session/inbound/handlers/message_received.rb: Preserve recovery dispatch across enqueue failures  # PR#645 → #646

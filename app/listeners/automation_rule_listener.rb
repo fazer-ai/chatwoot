@@ -1,4 +1,10 @@
 class AutomationRuleListener < BaseListener
+  # How long a rule execution on a message is remembered, which is what a later recovery of that message
+  # reads to know the rule already ran. The message a placeholder stands for arrives when the sender's
+  # phone comes back online to encrypt it again, so days later is normal and there is no upper bound
+  # worth honouring: past this, a recovery may run that one rule a second time.
+  RULE_RUN_CLAIM_EXPIRY = 30.days
+
   def conversation_updated(event)
     process_conversation_event(event, 'conversation_updated')
   end
@@ -16,6 +22,32 @@ class AutomationRuleListener < BaseListener
   end
 
   def message_created(event)
+    # Before the rules, not after: a recovery arriving in between has to find the arrival on record, and
+    # the claims are what keep it from repeating whatever this evaluation is about to do.
+    track_arrival(event.data[:message])
+    process_message_event(event)
+  end
+
+  # The body of a message that was stored before it could be read has arrived into that same row. Rules
+  # are evaluated again, against the content this time: a rule filtered on it never saw a body at the
+  # arrival, and MESSAGE_UPDATED reaches no automation (fazer-ai/chatwoot#491).
+  #
+  # Re-firing `message_created` instead would run every rule that does not filter on content a second
+  # time, which is worse than the miss: an auto-reply answering twice, a webhook delivered twice.
+  # Only for a placeholder whose arrival this mechanism handled. A row stored before this was deployed,
+  # or before its record expired, ran its rules with no claim written, so evaluating again would run the
+  # ones that do not filter on content a second time: an auto-reply answering a message from before the
+  # upgrade, which is the outcome this whole design exists to avoid. Then the content is the only thing
+  # missed, which is what every such row had already settled for.
+  def message_recovered(event)
+    return unless arrival_tracked?(event.data[:message])
+
+    process_message_event(event)
+  end
+
+  private
+
+  def process_message_event(event)
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
@@ -30,11 +62,86 @@ class AutomationRuleListener < BaseListener
     rules.each do |rule|
       conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
                                                                         { message: message, changed_attributes: changed_attributes }).perform
-      execute_rule(rule, account, message.conversation, message: message) if conditions_match.present?
+      # The claim is asked for after the conditions and only when they match, never before: a rule that
+      # did not match while the row was a placeholder has to be left free to run when the content
+      # arrives.
+      # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
+      # the two differ for anything that defines only one of them.
+      token = claim(rule, message) if conditions_match.present?
+      execute_claimed_rule(rule, account, message, token) if token
     end
   end
 
-  private
+  # At most one execution of this rule for this message, counting the arrival and the recovery that
+  # filled a placeholder in. Claimed on both paths and not only on the recovery: nothing orders the two
+  # jobs, so the arrival may well be the one that evaluates after the content landed, and a claim it
+  # skipped is one the recovery would take for a rule that already ran.
+  #
+  # Atomic, because both may find the same rule matching; the one that takes the key is the one that
+  # acts. Answers false when the key is already there. A key lost before the recovery (an expiry, a
+  # Redis that was replaced) costs a second run of that one rule, which is why the window is long.
+  # Answers this attempt's own token when it took the key, and nothing when the key was already there,
+  # which is the rule having run.
+  #
+  # The token is what makes the release safe. When the answer to the write is what was lost, Redis may
+  # well have taken the key, and a claim nobody could read is a rule that never ran holding its own
+  # record for thirty days. But the key may equally belong to an execution that already happened -- the
+  # arrival's, with the recovery now asking -- and deleting that one would let the retry run the rule a
+  # second time. So only a key carrying this attempt's token is released.
+  def claim(rule, message)
+    token = SecureRandom.uuid
+    taken = Redis::Alfred.set(claim_key(rule, message), token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+
+    token if taken
+  rescue StandardError
+    release_claim(rule, message, token)
+    raise
+  end
+
+  # A rule whose execution raised before it did anything must be free to run on the retry of this job:
+  # holding the claim would spend the whole window on an attempt that never acted, and for a delayed rule
+  # the attempt is only a row in `automation_rule_pending_executions`, which failed to be written.
+  # Releasing restores exactly what happens today, where a retry evaluates and acts again.
+  def execute_claimed_rule(rule, account, message, token)
+    execute_rule(rule, account, message.conversation, message: message)
+  rescue StandardError
+    release_claim(rule, message, token)
+    raise
+  end
+
+  # Best effort on the way out of a failure that is already being raised: a delete that fails too would
+  # replace the error the caller needs to see with one about Redis.
+  def release_claim(rule, message, token)
+    Redis::Alfred.delete_if_equals(claim_key(rule, message), token)
+  rescue StandardError => e
+    Rails.logger.warn("[AUTOMATION] could not release the run claim of rule #{rule.id} on message #{message.id}: #{e.message}")
+  end
+
+  def claim_key(rule, message)
+    format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_RUN, rule_id: rule.id, message_id: message.id)
+  end
+
+  # Recorded for a placeholder only, which is the only row a recovery can follow, so the ordinary message
+  # pays nothing for this.
+  def track_arrival(message)
+    return unless placeholder?(message)
+
+    Redis::Alfred.set(arrival_key(message), Time.current.to_i, ex: RULE_RUN_CLAIM_EXPIRY)
+  end
+
+  def arrival_tracked?(message)
+    Redis::Alfred.exists?(arrival_key(message))
+  end
+
+  def arrival_key(message)
+    format(Redis::RedisKeys::AUTOMATION_MESSAGE_ARRIVAL_TRACKED, message_id: message.id)
+  end
+
+  # A row stored for a message this side could not read yet. `unsupported_reason` is written by the
+  # WhatsApp session layer alone, and only for a body that may still arrive under the same id.
+  def placeholder?(message)
+    message.try(:content_attributes).to_h['unsupported_reason'].present?
+  end
 
   def process_conversation_event(event, event_name)
     return if performed_by_automation?(event)
