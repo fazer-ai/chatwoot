@@ -17,7 +17,6 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
   let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
   let(:inbox) { channel.inbox }
   let(:account) { inbox.account }
-  let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
 
   let(:model) { Whatsapp::Session::Model }
   let(:sender) { model::Party.new(phone: '5541999990000', lid: '182736451928374', push_name: 'Ana Souza') }
@@ -38,7 +37,7 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
   let!(:on_card) { rule('CR_CARTAO', 'message_created', [condition('content', 'contains', ['Carlos'])]) }
 
   before do
-    allow(channel).to receive(:provider_service).and_return(backend)
+    allow(channel).to receive(:provider_service).and_return(Whatsapp::Session::Backends::Fake.new(channel))
     # The same chat delivered three times or more goes looking for the avatar behind a connector that is
     # not there, and nothing here measures a contact photo.
     allow(Whatsapp::Session::UpdateContactAvatarJob).to receive(:perform_later)
