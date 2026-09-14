@@ -35,6 +35,7 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
   let!(:on_preco) { rule('CR_PRECO', 'message_created', [condition('content', 'contains', ['preço'])]) }
   let!(:on_anything) { rule('CR_QUALQUER', 'message_created', [condition('inbox_id', 'equal_to', [inbox.id])]) }
   let!(:on_edit_orcamento) { rule('ED_ORC', 'message_edited', [condition('content', 'contains', ['orçamento'])]) }
+  let!(:on_card) { rule('CR_CARTAO', 'message_created', [condition('content', 'contains', ['Carlos'])]) }
 
   before do
     allow(channel).to receive(:provider_service).and_return(backend)
@@ -159,6 +160,19 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     expect(ran(on_anything)).to eq(1)
     expect(ran(on_edit_orcamento)).to eq(1)
     expect(inbox.messages.where(source_id: inbound.id).count).to eq(1)
+  end
+
+  # A share of one contact recovers into the card's line rather than into any text the message carries,
+  # so the body it announces is that line. Reading the text would announce nothing here, and the rules
+  # that were asked about the placeholder would never be asked again.
+  it 'names the line a shared card recovers into' do
+    arrive(placeholder)
+
+    arrive(model::Content::Contacts.new(contacts: [{ 'display_name' => 'Carlos Dias', 'phone' => '+5541988881111' }]))
+
+    expect(stored.content).to eq('Carlos Dias - +5541988881111')
+    expect(ran(on_card)).to eq(1)
+    expect(ran(on_anything)).to eq(1)
   end
 
   # The fence on the event that is not part of any of this. An arrival's evaluation reads the row when it
