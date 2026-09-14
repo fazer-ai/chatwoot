@@ -470,6 +470,28 @@ class Message < ApplicationRecord
     return if previous_changes.blank?
 
     send_update_event
+    send_edited_event if edited_in_place?
+  end
+
+  # The body changed and the row says an edit is what changed it. Both halves are load-bearing.
+  #
+  # `content` and not `content_attributes`: a delayed recovery landing on a row an edit already settled
+  # writes everything around the body and leaves the body alone (`MessageWriter#reconcile_in_place`),
+  # and that row still carries `is_edited` from the earlier edit, so the marker alone would announce an
+  # edit nobody made. And `is_edited` and not the content change alone, because the send failure of an
+  # edit writes the original body back with the marker off (`MessagesController#edit_content`): that is
+  # an undo, and announcing it would run the rules on a body the contact never saw.
+  #
+  # Nothing here has to deduplicate a redelivery. The providers resend events, and an edit applied a
+  # second time writes the same body: Rails sees no change, `previous_changes` comes back empty and this
+  # callback returns above. Measured, not assumed.
+  def edited_in_place?
+    previous_changes.key?('content') && is_edited
+  end
+
+  def send_edited_event
+    Rails.configuration.dispatcher.dispatch(MESSAGE_EDITED, Time.zone.now, message: self, performed_by: Current.executed_by,
+                                                                           previous_changes: previous_changes)
   end
 
   def send_reply

@@ -233,6 +233,17 @@ RSpec.describe AutomationRule do
       expect(rule.errors[:execution_delay]).to include('only supports status and inbox conditions for conversation-level events.')
     end
 
+    # The restriction above exists for episodes keyed on a status that moves. A rule triggered by an
+    # edit keys its episode on that message, exactly like `message_created`, so a content condition is
+    # as safe there as it is on a creation. Without this the trigger would offer a delay the API then
+    # refuses (fazer-ai/chatwoot#648).
+    it 'allows a delayed message_edited rule with a content condition' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'content', 'filter_operator' => 'contains', 'values' => ['orçamento'], 'query_operator' => nil }]
+      expect(rule).to be_valid
+    end
+
     it 'allows a delayed conversation-level rule with only status conditions' do
       rule.event_name = 'conversation_updated'
       rule.execution_delay = 60

@@ -718,6 +718,11 @@ export const AUTOMATIONS = {
   },
 };
 
+// An edit asks the same thing about the same subject as a creation does -- one message, its body, its
+// sender, its conversation -- so the trigger offers exactly the same conditions and the same actions.
+// Aliased rather than copied, so the two cannot drift apart in a later edit of one of them. #648
+AUTOMATIONS.message_edited = AUTOMATIONS.message_created;
+
 export const AUTOMATION_RULE_EVENTS = [
   {
     key: 'conversation_created',
@@ -734,6 +739,10 @@ export const AUTOMATION_RULE_EVENTS = [
   {
     key: 'message_created',
     value: 'MESSAGE_CREATED',
+  },
+  {
+    key: 'message_edited',
+    value: 'MESSAGE_EDITED',
   },
   {
     key: 'conversation_opened',

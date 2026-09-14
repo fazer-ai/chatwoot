@@ -27,6 +27,10 @@ class AutomationRule < ApplicationRecord
   # Conversation-level delayed rules key their episode on status; only status and attributes
   # that never change after the delay (inbox) are safe to also filter on.
   DELAYED_CONVERSATION_ATTRIBUTES = %w[status inbox_id].freeze
+  # Events about one message rather than about the conversation. A delayed rule on one of these keys its
+  # episode on that message, so the restriction below, which exists for episodes keyed on a status that
+  # moves, does not apply to them.
+  MESSAGE_LEVEL_EVENTS = %w[message_created message_edited].freeze
 
   belongs_to :account
   has_many :scheduled_messages, as: :author, dependent: :nullify
@@ -122,7 +126,7 @@ class AutomationRule < ApplicationRecord
   # Conversation-level episodes key on status_changed_at alone. Mutable attributes would collapse
   # distinct periods into one episode, so only status and immutable filters (inbox) are allowed.
   def execution_delay_supported_event
-    return if execution_delay.blank? || conditions.blank? || event_name == 'message_created'
+    return if execution_delay.blank? || conditions.blank? || MESSAGE_LEVEL_EVENTS.include?(event_name)
     return if conditions.all? { |obj| DELAYED_CONVERSATION_ATTRIBUTES.include?(obj['attribute_key']) }
 
     errors.add(:execution_delay, 'only supports status and inbox conditions for conversation-level events.')

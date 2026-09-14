@@ -45,9 +45,17 @@ class AutomationRuleListener < BaseListener
     process_message_event(event)
   end
 
+  # Somebody changed what a message says, and the rules that answer to it are the ones whose trigger is
+  # this event: a rule opts in, rather than every `message_created` rule being asked a second question.
+  # An edit is not a second arrival, and the difference is visible in the actions -- an auto-reply
+  # answering a typo correction is the outcome that keeps this off `message_created` (#648).
+  def message_edited(event)
+    process_message_event(event, 'message_edited')
+  end
+
   private
 
-  def process_message_event(event)
+  def process_message_event(event, event_name = 'message_created')
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
@@ -55,9 +63,9 @@ class AutomationRuleListener < BaseListener
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
 
-    return unless rule_present?('message_created', account)
+    return unless rule_present?(event_name, account)
 
-    rules = current_account_rules('message_created', account)
+    rules = current_account_rules(event_name, account)
 
     rules.each do |rule|
       conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
@@ -67,9 +75,21 @@ class AutomationRuleListener < BaseListener
       # arrives.
       # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
       # the two differ for anything that defines only one of them.
-      token = claim(rule, message) if conditions_match.present?
-      execute_claimed_rule(rule, account, message, token) if token
+      run_matched_rule(rule, account, message, claimed: event_name != 'message_edited') if conditions_match.present?
     end
+  end
+
+  # The claim answers "has this rule already run for this message", which is the right question for the
+  # arrival and the recovery, because the two are the same message becoming readable once. It is the
+  # wrong question for an edit: two edits of the same message are two events, and the claim would let
+  # only the first of them run. An edit needs no record of its own, because the announcement itself is
+  # already once per edit -- a redelivery writes the same body, and a row that did not change announces
+  # nothing (`Message#edited_in_place?`).
+  def run_matched_rule(rule, account, message, claimed:)
+    return execute_rule(rule, account, message.conversation, message: message) unless claimed
+
+    token = claim(rule, message)
+    execute_claimed_rule(rule, account, message, token) if token
   end
 
   # At most one execution of this rule for this message, counting the arrival and the recovery that
