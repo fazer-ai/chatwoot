@@ -88,7 +88,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     # this message carries is the text that edit superseded. Everything around the body
     # is still only here, so the row takes that and keeps what it is showing.
     unless message.is_edited
-      message.content = message_content
+      message.content = recovered_body
       attach_location(message)
     end
     settle(message)
@@ -180,10 +180,14 @@ class Whatsapp::Session::Inbound::MessageWriter
   # whether the two say the same thing is exactly what the reader of that announcement has to be able to
   # ask. Read again by the redelivery that pays an announcement debt, which is the same message and
   # therefore carries the same body.
+  # Worked out once and kept: it is the body that gets written, the body the debt is fingerprinted on and
+  # the body the announcement names, and `message_content` resolves mentions against the contacts as they
+  # are now. Three calls are three chances for a rename landing between them to make those three disagree,
+  # which reads downstream as a message somebody edited.
   def recovered_body
-    return single_card_line if content_type == 'contacts'
+    return @recovered_body if defined?(@recovered_body)
 
-    message_content
+    @recovered_body = content_type == 'contacts' ? single_card_line : message_content
   end
 
   def perform

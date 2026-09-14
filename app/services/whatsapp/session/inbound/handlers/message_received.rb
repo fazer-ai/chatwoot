@@ -190,8 +190,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # The row already names the conversation and the sender this message belongs to: it was
   # resolved when the placeholder was stored, from the same chat and the same author, and
   # only the content was ever missing.
+  # One writer for the whole of this delivery, which is what makes the body it recovered a single value
+  # rather than three computations of one: the write, the fingerprint the debt carries and the body the
+  # announcement names all come off this object. Every caller passes the same row, because there is only
+  # one row in play.
   def writer_for(stored)
-    inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
+    @writer_for ||= inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
   end
 
   def actionable?

@@ -220,6 +220,30 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     expect(ran(on_orcamento)).to eq(0)
   end
 
+  # The same question one step earlier, in the delivery that recovers rather than in the one that pays a
+  # debt: the body is written, fingerprinted and announced by one delivery, and working it out three
+  # times means a rename landing between any two of them makes them disagree. Then the row shows what was
+  # stored, the announcement names something else, and the rules are never asked -- about a message
+  # nobody edited.
+  it 'announces the body it wrote when the mentioned contact is renamed right after the write' do
+    mentioned = create(:contact, account: account, name: 'Bruno Antigo', phone_number: '+5541988887777')
+    create(:contact_inbox, inbox: inbox, contact: mentioned, source_id: '5541988887777')
+    mention = model::Content::Text.new(body: 'quero saber o preço @5541988887777')
+    mentions = [model::Address.phone('5541988887777')]
+
+    arrive(placeholder)
+    allow_any_instance_of(Whatsapp::Session::Inbound::MessageWriter).to receive(:reconcile).and_wrap_original do |original, row| # rubocop:disable RSpec/AnyInstance
+      written = original.call(row)
+      mentioned.update!(name: 'Bruno Novo')
+      written
+    end
+
+    arrive(mention, mentions: mentions)
+
+    expect(stored.content).to include('Bruno Antigo')
+    expect(ran(on_preco)).to eq(1)
+  end
+
   # And what the debt owes is the body that was stored, not one rebuilt from whichever delivery gets
   # here: `MessageWriter#message_content` resolves mentions against the contacts as they are now, so a
   # contact renamed in between rebuilds a different string for a message nobody edited.
