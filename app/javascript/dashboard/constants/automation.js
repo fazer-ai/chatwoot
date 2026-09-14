@@ -1,3 +1,9 @@
+// The events that are about one message rather than about the conversation. Anything keyed on the
+// shape of a message -- the default condition the form starts with, the custom attributes offered
+// alongside it -- asks this instead of naming one of them, which is how the edit trigger came to be
+// offered the conversation's own default condition. #648
+export const MESSAGE_LEVEL_EVENTS = ['message_created', 'message_edited'];
+
 export const DEFAULT_MESSAGE_CREATED_CONDITION = [
   {
     attribute_key: 'message_type',

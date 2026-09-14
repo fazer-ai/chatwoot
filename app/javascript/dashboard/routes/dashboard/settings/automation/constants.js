@@ -720,7 +720,12 @@ export const AUTOMATIONS = {
 
 // An edit asks the same thing about the same subject as a creation does -- one message, its body, its
 // sender, its conversation -- so the trigger offers exactly the same conditions and the same actions.
-// Aliased rather than copied, so the two cannot drift apart in a later edit of one of them. #648
+//
+// One object under two names, not a copy, so the two cannot drift apart in a later edit of one of
+// them. `structuredClone` preserves that identity (measured), which is why the pass in
+// `useAutomation` that appends the account's custom attributes reaches this trigger without naming
+// it: the array it edits is the same array. A copy here would silently cost the new trigger its
+// custom attributes. #648
 AUTOMATIONS.message_edited = AUTOMATIONS.message_created;
 
 export const AUTOMATION_RULE_EVENTS = [
