@@ -84,6 +84,18 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
       Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     end
 
+    # The first request in the process pays for routing, authorization, the controller and the
+    # first query on each table, and none of that is what the deadline governs. Production runs
+    # these numbers four times larger, so there that fixed cost is a small share of the margin;
+    # at this scale it is most of it, and on a loaded CI runner it is all of it: the example
+    # below measured 3.39s against its 3.0s ceiling on `main`, and 3.28s and 3.36s on the branch
+    # that added this comment, while the same example takes 2.5s on a warm laptop. An example
+    # that measures a wall clock pays that cost before it starts measuring.
+    def warm_up
+      register_webhook
+      calls_seen
+    end
+
     before do
       stub_const('Whatsapp::FacebookApiClient::BASE_URI', graph[:url])
       stub_const('Whatsapp::HealthService::BASE_URI', graph[:url])
@@ -97,6 +109,7 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
     end
 
     it 'answers inside the deadline when every call answers correctly but slowly' do
+      warm_up
       %i[subscribe override health].each { |kind| delays[kind] = 1.0 }
 
       elapsed = register_webhook
@@ -126,6 +139,7 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
     end
 
     it 'cuts an optional call that hangs to what is left, instead of giving it a whole ceiling' do
+      warm_up
       delays[:subscribe] = 1.0
       delays[:override] = 5.0
 
