@@ -198,21 +198,20 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     expect(stored.content).to eq('quero um orçamento')
   end
 
-  # The window between the check and the conditions. The check reads the row this job loaded and the
-  # conditions query the row as it is now, so an edit committing in between would have the rules answer
-  # about a body the announcement is not about -- which is what the check exists to stop. Closed by
-  # asking inside the lock, against the row that lock reloads.
-  it 'stands down on an edit that commits between the check and the conditions' do
+  # The window between the job picking the work up and the conditions being asked. The job holds the row
+  # as it was when it loaded it, and the conditions query the row as it is now, so an edit committing in
+  # between would have the rules answer about a body the announcement is not about -- which is what the
+  # check exists to stop. Closed by asking inside the lock, against the row that lock reloads.
+  #
+  # The edit is committed at the top of the listener rather than around the lock, on purpose: hanging it
+  # on the lock would make the test depend on the very mechanism under test, and a version that took no
+  # lock would pass by never opening the window at all.
+  it 'stands down on an edit that commits after the work is picked up' do
     arrive(placeholder)
 
-    # Not the first lock taken on this row: that one is the writer's, and the content is not written yet
-    # inside it. The one to get in front of is the lock the evaluation takes, which is the first to find
-    # the recovered body already committed.
-    allow_any_instance_of(Message).to receive(:with_lock).and_wrap_original do |original, &block| # rubocop:disable RSpec/AnyInstance
-      if Message.exists?(source_id: inbound.id, content: 'quero saber o preço')
-        Message.where(source_id: inbound.id).update_all(content: 'quero um orçamento') # rubocop:disable Rails/SkipsModelValidations
-      end
-      original.call(&block)
+    allow(AutomationRuleListener.instance).to receive(:message_recovered).and_wrap_original do |original, event|
+      Message.where(source_id: inbound.id).update_all(content: 'quero um orçamento') # rubocop:disable Rails/SkipsModelValidations
+      original.call(event)
     end
 
     arrive(recovered)

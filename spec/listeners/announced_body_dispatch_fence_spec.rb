@@ -87,4 +87,31 @@ RSpec.describe 'every announcement of a body-scoped event names its body' do # r
       expect(ran).to eq(1)
     end
   end
+
+  # That an arrival is outside all of this is a product decision (fazer-ai/chatwoot#648): an edit never
+  # re-opens `message_created`. Nothing dispatched today names a body on an arrival, so the decision is
+  # invisible in behaviour -- which is why it is pinned here, by handing one a body the row does not have
+  # and asking for the rules anyway.
+  describe 'an arrival that somehow names a body' do
+    let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
+    let(:inbox) { channel.inbox }
+    let(:account) { inbox.account }
+    let(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let!(:message) { create(:message, conversation: conversation, account: account, inbox: inbox, content: 'quero um orçamento') }
+    let!(:on_create) do
+      create(:automation_rule, account: account, name: 'CR_ORC', event_name: 'message_created',
+                               conditions: [{ 'attribute_key' => 'content', 'filter_operator' => 'contains',
+                                              'values' => ['orçamento'], 'query_operator' => nil }],
+                               actions: [{ 'action_name' => 'send_message', 'action_params' => ['CR_ORC'] }])
+    end
+
+    it 'is evaluated against the row all the same' do
+      event = Events::Base.new(Events::Types::MESSAGE_CREATED, Time.zone.now, message: message, content: 'um corpo que a linha não tem')
+
+      AutomationRuleListener.instance.message_created(event)
+
+      ran = account.messages.where("((content_attributes#>>'{}')::jsonb)->>'automation_rule_id' = ?", on_create.id.to_s).count
+      expect(ran).to eq(1)
+    end
+  end
 end
