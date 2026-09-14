@@ -209,7 +209,7 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     # inside it. The one to get in front of is the lock the evaluation takes, which is the first to find
     # the recovered body already committed.
     allow_any_instance_of(Message).to receive(:with_lock).and_wrap_original do |original, &block| # rubocop:disable RSpec/AnyInstance
-      if Message.where(source_id: inbound.id, content: 'quero saber o preço').exists?
+      if Message.exists?(source_id: inbound.id, content: 'quero saber o preço')
         Message.where(source_id: inbound.id).update_all(content: 'quero um orçamento') # rubocop:disable Rails/SkipsModelValidations
       end
       original.call(&block)
