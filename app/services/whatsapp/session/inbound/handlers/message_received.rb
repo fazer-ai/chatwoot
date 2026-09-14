@@ -47,8 +47,28 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     record_first_touch(stored)
     return recovered(stored) if writer_for(stored).reconcile(stored)
 
+    # A row that was recovered and is being delivered again: the announcement is asked for once more,
+    # because this is the only place it can be. The content write and the announcement are not one act
+    # -- the write commits, and an announcement that fails after it leaves a row nothing marks as
+    # owing anything, because committing the content is exactly what stops it being reconcilable. So
+    # the row carries the recovery itself, and every redelivery of one announces (#646).
+    #
+    # What keeps that from answering a contact twice is not this decision but the claim the listener
+    # takes per rule and per message: a rule that already ran finds its key there and stands down. The
+    # cost is an announcement that usually finds nothing to do, which is the cheap direction to be
+    # wrong in -- the other one loses the automations of that message for good.
+    #
+    # Before the bytes, for the same reason the recovery path puts it first: the fetch is what a
+    # redelivery queues anyway.
+    dispatch_recovery(stored) if recovered_before?(stored)
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
+  end
+
+  # The row says so itself, and it has to: the instant is written in the same save as the content, so
+  # there is no moment where the content is committed and this is not.
+  def recovered_before?(stored)
+    stored.content_attributes.to_h['recovered_at'].present?
   end
 
   # The attribution is the part only the recovery carries: an undecryptable stanza has no

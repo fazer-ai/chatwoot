@@ -132,6 +132,12 @@ class Whatsapp::Session::Inbound::MessageWriter
     recovered = content_attributes.stringify_keys
     recovered = recovered.except('rich') if message.is_edited
     recovered['external_author'] = every_alias_seen(message, recovered['external_author'])
+    # Written here, in the same save as the content, because it is what the announcement after it has
+    # no other way to owe. Once the content is committed the row stops being reconcilable, so a
+    # redelivery reads it as an ordinary duplicate and announces nothing -- and the announcement is the
+    # one thing a redelivery cannot repair on its own (#646). This says the row was recovered, and the
+    # handler announces again for as long as it says so.
+    recovered['recovered_at'] = Time.current.to_i
 
     message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')

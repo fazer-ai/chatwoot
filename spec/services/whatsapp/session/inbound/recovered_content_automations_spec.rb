@@ -66,6 +66,17 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     perform_enqueued_jobs
   end
 
+  # Every recovery announcement that goes out from here on, in order. Installed before the deliveries
+  # it is about, because it wraps the dispatcher rather than reading anything back.
+  def recoveries_announced
+    seen = []
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      seen << data[:message].try(:source_id) if name == Events::Types::MESSAGE_RECOVERED
+      original.call(name, timestamp, data)
+    end
+    seen
+  end
+
   # The window has to outlast the recovery it is there to remember. WhatsApp re-encrypts when the
   # sender's phone comes back online, so hours are ordinary and a day is not unusual; a window measured
   # in minutes would be a rule running twice on the message it was supposed to protect.
@@ -172,6 +183,147 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     arrive_and_settle(placeholder)
     allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:fetch_media_for).and_raise('the queue is away')
 
+    expect { deliver(recovered) }.to raise_error('the queue is away')
+    perform_enqueued_jobs
+
+    expect(ran(on_content)).to eq(1)
+  end
+
+  # And the one failure that has no second chance today: the announcement's own enqueue. The content is
+  # committed by then, so the redelivery finds the row already written, comes back through the duplicate
+  # path and announces nothing -- the content automations of that one message are missed for good (#646).
+  it 'announces the recovery on the redelivery when the announcement itself failed to enqueue' do
+    arrive_and_settle(placeholder)
+
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+
+    # The row is already right: the content is committed and the bubble the agent sees is the message.
+    # Only the announcement was lost, which is why nothing about the row says anything is owed.
+    stored = inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    expect(stored.content).to eq('Quero um orçamento')
+    expect(stored.content_attributes).not_to include('is_unsupported', 'unsupported_reason')
+    expect(ran(on_content)).to eq(0)
+
+    refusing = false
+    arrive_and_settle(recovered)
+
+    expect(ran(on_content)).to eq(1)
+    expect(ran(on_anything)).to eq(1)
+    expect(ran(on_other_content)).to eq(0)
+  end
+
+  # What the row owes is written by the recovery and by nothing else. The placeholder must not carry it:
+  # it is not a row that was recovered, and a redelivery of one announces nothing.
+  it 'marks the row as recovered only when the content is written, never on the arrival' do
+    arrive_and_settle(placeholder)
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes).not_to have_key('recovered_at')
+
+    arrive_and_settle(recovered)
+
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes).to have_key('recovered_at')
+  end
+
+  # And the redelivery of a placeholder that is still waiting announces nothing: there is no recovery
+  # to owe an announcement for, and running the rules again would answer the contact twice for an
+  # arrival they already answered.
+  it 'announces nothing when a placeholder that was never recovered is delivered again' do
+    dispatched = recoveries_announced
+
+    arrive_and_settle(placeholder)
+    arrive_and_settle(placeholder)
+
+    expect(dispatched.count).to eq(0)
+    expect(ran(on_anything)).to eq(1)
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes).to include('unsupported_reason' => 'undecryptable')
+  end
+
+  # An ordinary message pays nothing for any of this: it was never a placeholder, so it is never marked
+  # and its redelivery announces nothing.
+  it 'leaves an ordinary message unmarked and unannounced' do
+    dispatched = recoveries_announced
+
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(
+      channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(id: '3EB0PLAIN01', content: recovered)))
+    )
+    perform_enqueued_jobs
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(
+      channel, model::Event.build(model::Events::MessageReceived.new(message: inbound.with(id: '3EB0PLAIN01', content: recovered)))
+    )
+    perform_enqueued_jobs
+
+    expect(dispatched.count).to eq(0)
+    expect(inbox.messages.find_by(source_id: '3EB0PLAIN01').content_attributes.keys)
+      .to match_array(%w[external_created_at external_author])
+    expect(ran(on_content)).to eq(1)
+  end
+
+  # The cost this design pays, in the open: every redelivery of a recovered row announces again, and
+  # what keeps that from answering the contact twice is the claim the listener holds per rule and per
+  # message, not the count of announcements.
+  it 'announces on every redelivery, and the rule still runs once' do
+    dispatched = recoveries_announced
+    # Not what this example measures, and it is the one job in the drained queue that reaches the
+    # connector: a third delivery refreshes the avatar, and there is no connector behind this channel.
+    allow(Whatsapp::Session::UpdateContactAvatarJob).to receive(:perform_later)
+
+    arrive_and_settle(placeholder)
+    arrive_and_settle(recovered)
+    arrive_and_settle(recovered)
+    arrive_and_settle(recovered)
+
+    expect(dispatched.count).to eq(3)
+    expect(ran(on_content)).to eq(1)
+    expect(ran(on_anything)).to eq(1)
+    expect(ran(on_other_content)).to eq(0)
+  end
+
+  # And the fence on the other side: a write that failed is not a recovery. Announcing before the
+  # content is committed would need no mark at all and would pass every example above, while telling
+  # the automations about a body the row does not have.
+  it 'announces nothing when the content write itself fails' do
+    dispatched = recoveries_announced
+    arrive_and_settle(placeholder)
+    allow_any_instance_of(Whatsapp::Session::Inbound::MessageWriter) # rubocop:disable RSpec/AnyInstance
+      .to receive(:reconcile).and_raise('the row would not save')
+
+    expect { deliver(recovered) }.to raise_error('the row would not save')
+    perform_enqueued_jobs
+
+    expect(dispatched.count).to eq(0)
+    stored = inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    expect(stored.content).to be_nil
+    expect(stored.content_attributes).to include('unsupported_reason' => 'undecryptable')
+    expect(stored.content_attributes).not_to have_key('recovered_at')
+    expect(ran(on_content)).to eq(0)
+  end
+
+  # The announcement goes before the bytes on the redelivery too, and for the same reason it does on the
+  # recovery itself: a media fetch that will not queue must not be what keeps the automations waiting
+  # for the next delivery, which may not come.
+  it 'announces the recovery on the redelivery even when queueing the media fetch fails' do
+    dispatched = recoveries_announced
+    arrive_and_settle(placeholder)
+
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      dispatched << data[:message].try(:source_id) if name == Events::Types::MESSAGE_RECOVERED
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    refusing = false
+
+    allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:fetch_media_for).and_raise('the queue is away')
     expect { deliver(recovered) }.to raise_error('the queue is away')
     perform_enqueued_jobs
 
