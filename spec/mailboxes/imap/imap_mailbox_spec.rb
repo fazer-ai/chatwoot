@@ -340,5 +340,75 @@ RSpec.describe Imap::ImapMailbox do
         expect(agent_conversation.messages.last.content_attributes['email']['from']).to eq(reply_mail_with_multiple_references.mail.from)
       end
     end
+
+    # An inbox that continues the contact's open case. Headers still decide first: what changes is
+    # only the mail that references nothing, which used to open a second conversation about a case
+    # nobody had closed.
+    context 'when the inbox continues the contact\'s open case' do
+      let(:channel) { create(:channel_email, :imap_email, continue_open_conversation: true) }
+      let(:fresh_mail) do
+        create_inbound_email_from_mail(from: 'email@gmail.com', to: 'imap@gmail.com', subject: 'Reembolso')
+      end
+
+      it 'lands in the open conversation instead of starting another one' do
+        open_conversation = create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :open)
+
+        expect { class_instance.process(fresh_mail.mail, channel) }.not_to change(Conversation, :count)
+
+        expect(open_conversation.reload.messages.size).to eq(1)
+      end
+
+      it 'starts a new conversation when the previous one is resolved' do
+        create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :resolved)
+
+        expect { class_instance.process(fresh_mail.mail, channel) }.to change(Conversation, :count).by(1)
+      end
+
+      it 'lands in the most recent open conversation when the contact has several' do
+        create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :open)
+        newest = create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :open)
+
+        class_instance.process(fresh_mail.mail, channel)
+
+        expect(newest.reload.messages.size).to eq(1)
+      end
+
+      # The header is positive proof of which case this is, and it outranks the policy. A reply to
+      # a resolved thread goes back to that thread, which is also what reopens it.
+      it 'still follows in-reply-to into a resolved conversation' do
+        resolved = create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :resolved)
+        create(:message, content: 'Outgoing', message_type: 'outgoing', inbox: inbox, source_id: 'ref-to-resolved',
+                         account: account, conversation: resolved)
+        create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :open)
+        reply = create_inbound_email_from_mail(from: 'email@gmail.com', to: 'imap@gmail.com', subject: 'Re: Reembolso',
+                                               in_reply_to: 'ref-to-resolved')
+
+        expect { class_instance.process(reply.mail, channel) }.not_to change(Conversation, :count)
+
+        expect(resolved.reload.messages.size).to eq(2)
+        expect(resolved).to be_open
+      end
+
+      it 'ignores conversations the contact has in another inbox' do
+        other_channel = create(:channel_email, :imap_email, continue_open_conversation: true)
+        create(:contact_inbox, contact_id: contact.id, inbox_id: other_channel.inbox.id)
+        create(:conversation, account: account, inbox: other_channel.inbox, contact: contact, status: :open)
+
+        expect { class_instance.process(fresh_mail.mail, channel) }.to change(Conversation, :count).by(1)
+      end
+    end
+
+    # The default, which is every inbox that has not asked for anything else.
+    context 'when the inbox does not continue the open case' do
+      let(:fresh_mail) do
+        create_inbound_email_from_mail(from: 'email@gmail.com', to: 'imap@gmail.com', subject: 'Reembolso')
+      end
+
+      it 'starts a new conversation even with one open' do
+        create(:conversation, account: account, inbox: channel.inbox, contact: contact, status: :open)
+
+        expect { class_instance.process(fresh_mail.mail, channel) }.to change(Conversation, :count).by(1)
+      end
+    end
   end
 end

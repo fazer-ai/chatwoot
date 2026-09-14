@@ -725,5 +725,41 @@ RSpec.describe ReplyMailbox do
         expect(conversation.present?).to be(false)
       end
     end
+
+    # The push path (relay/ingress) has to answer the inbox setting the same way the IMAP path does,
+    # otherwise the behaviour would depend on how the mailbox happens to receive its mail.
+    describe "continuing the contact's open case" do
+      let(:sender) { create(:contact, email: 'sony@chatwoot.com', account: account) }
+
+      before do
+        create(:contact_inbox, contact: sender, inbox: channel_email.inbox)
+      end
+
+      context 'when the inbox continues the open case' do
+        before { channel_email.update!(continue_open_conversation: true) }
+
+        it 'lands in the open conversation instead of starting another one' do
+          open_conversation = create(:conversation, account: account, inbox: channel_email.inbox, contact: sender, status: :open)
+
+          expect { described_class.receive support_mail }.not_to change(Conversation, :count)
+
+          expect(open_conversation.reload.messages.size).to eq(1)
+        end
+
+        it 'starts a new conversation when the previous one is resolved' do
+          create(:conversation, account: account, inbox: channel_email.inbox, contact: sender, status: :resolved)
+
+          expect { described_class.receive support_mail }.to change(Conversation, :count).by(1)
+        end
+      end
+
+      context 'when the inbox does not continue the open case' do
+        it 'starts a new conversation even with one open' do
+          create(:conversation, account: account, inbox: channel_email.inbox, contact: sender, status: :open)
+
+          expect { described_class.receive support_mail }.to change(Conversation, :count).by(1)
+        end
+      end
+    end
   end
 end

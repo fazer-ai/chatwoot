@@ -186,6 +186,16 @@
         "RIDES_ON_APP_CALLBACK": "La entrega sigue la URL de callback de la aplicación: ni este número ni su cuenta de WhatsApp Business apuntan a esta instalación, así que deja de llegar si esa URL cambia.",
         "APP_CALLBACK_POINTS_ELSEWHERE": "Este número no tiene enrutamiento propio, así que la entrega sigue la URL de callback de la aplicación, mostrada abajo, que no es la esperada para este número. Registrar el webhook apunta este número aquí; si Meta lo rechaza en esta cuenta, lo que hay que cambiar es el callback de la aplicación."
       }
+    },
+    "CONVERSATION_CONTINUITY": {
+      "TITLE": "Continuidad de la conversación",
+      "NOTE_TEXT": "Decide dónde llega un correo nuevo cuando no responde a ningún hilo existente. Una respuesta siempre se queda en el hilo al que responde, sin importar esta configuración.",
+      "TOGGLE_AVAILABILITY": "Continuar el caso abierto del contacto",
+      "TOGGLE_HELP": "Cuando el contacto escribe un correo nuevo mientras una de sus conversaciones sigue abierta, el mensaje entra en esa conversación en lugar de abrir otra. Una vez resuelta la conversación, el siguiente correo abre una nueva. Déjalo desactivado para mantener una conversación por hilo de correo.",
+      "EDIT": {
+        "BUTTON_TEXT": "Actualizar",
+        "SUCCESS_MESSAGE": "Continuidad de la conversación actualizada correctamente"
+      }
     }
   }
 }

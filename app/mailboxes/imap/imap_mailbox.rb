@@ -87,7 +87,17 @@ class Imap::ImapMailbox
   end
 
   def find_or_create_conversation
-    @conversation = find_conversation_by_in_reply_to || find_conversation_by_reference_ids || ::Conversation.create!(
+    # The headers decide first: they are positive proof of which thread this is. The inbox policy
+    # only answers for mail that references nothing, which is what used to open a second
+    # conversation about a case that was still open.
+    @conversation = find_conversation_by_in_reply_to ||
+                    find_conversation_by_reference_ids ||
+                    Email::ConversationPolicy.existing_for(inbox: @inbox, contact: @contact) ||
+                    create_conversation
+  end
+
+  def create_conversation
+    ::Conversation.create!(
       {
         account_id: @account.id,
         inbox_id: @inbox.id,

@@ -186,6 +186,16 @@
         "RIDES_ON_APP_CALLBACK": "A entrega segue a URL de callback do aplicativo: nem este número nem a conta do WhatsApp Business dele estão apontados para esta instalação, então ela para se aquela URL mudar.",
         "APP_CALLBACK_POINTS_ELSEWHERE": "Este número não tem roteamento próprio, então a entrega segue a URL de callback do aplicativo, mostrada abaixo, que não é a esperada para este número. Registrar o webhook aponta este número para cá; se a Meta recusar isso nesta conta, o que precisa mudar é o callback do aplicativo."
       }
+    },
+    "CONVERSATION_CONTINUITY": {
+      "TITLE": "Continuidade da conversa",
+      "NOTE_TEXT": "Decide onde um e-mail novo vai parar quando ele não responde a nenhuma thread existente. Uma resposta sempre fica na thread que ela responde, independentemente desta configuração.",
+      "TOGGLE_AVAILABILITY": "Continuar o caso em aberto do contato",
+      "TOGGLE_HELP": "Quando o contato escreve um e-mail novo enquanto uma conversa dele ainda está aberta, a mensagem entra nessa conversa em vez de abrir outra. Depois que a conversa é resolvida, o próximo e-mail abre uma nova. Deixe desligado para manter uma conversa por thread de e-mail.",
+      "EDIT": {
+        "BUTTON_TEXT": "Atualizar",
+        "SUCCESS_MESSAGE": "Continuidade da conversa atualizada com sucesso"
+      }
     }
   }
 }

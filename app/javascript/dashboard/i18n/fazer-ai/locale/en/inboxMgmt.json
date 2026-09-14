@@ -186,6 +186,16 @@
         "RIDES_ON_APP_CALLBACK": "Delivery follows the app callback URL: neither this number nor its WhatsApp Business Account is pointed at this installation, so it stops arriving if that URL changes.",
         "APP_CALLBACK_POINTS_ELSEWHERE": "This number has no routing of its own, so delivery follows the app callback URL shown below, which is not the one expected for this number. Registering the webhook points this number here; if Meta refuses that for this account, the app callback is what has to change."
       }
+    },
+    "CONVERSATION_CONTINUITY": {
+      "TITLE": "Conversation continuity",
+      "NOTE_TEXT": "Decides where a new email lands when it does not reply to an existing thread. A reply always stays in the thread it answers, whatever this setting says.",
+      "TOGGLE_AVAILABILITY": "Continue the contact's open case",
+      "TOGGLE_HELP": "When a contact writes a fresh email while one of their conversations is still open, the message joins that conversation instead of starting another one. Once the conversation is resolved, the next email opens a new one. Leave this off to keep one conversation per email thread.",
+      "EDIT": {
+        "BUTTON_TEXT": "Update",
+        "SUCCESS_MESSAGE": "Conversation continuity updated successfully"
+      }
     }
   }
 }
