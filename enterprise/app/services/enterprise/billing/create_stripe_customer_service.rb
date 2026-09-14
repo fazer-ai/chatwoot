@@ -88,7 +88,11 @@ class Enterprise::Billing::CreateStripeCustomerService
       'plan_name' => default_plan['name'],
       'subscribed_quantity' => subscription['quantity'],
       'subscription_status' => subscription['status'],
-      'subscription_ends_on' => subscription_ends_on(subscription),
+      # Serialized here rather than left as a Time. The column stores it as this same string, so the
+      # value is unchanged, but the merge compares what it is about to write against what the row
+      # holds: a Time never equals the string that came back, and every run would write again and
+      # fire the account's callbacks for nothing.
+      'subscription_ends_on' => subscription_ends_on(subscription).as_json,
       'billing_currency' => billing_currency_for(subscription)
     }
   end

@@ -295,6 +295,19 @@ describe Enterprise::Billing::CreateStripeCustomerService do
       expect { account.with_lock { nil } }.not_to raise_error
     end
 
+    # The retry of a run that wrote the row and then failed before reconciling: the merge finds the
+    # keys already there and writes nothing, and the features are still the ones of the plan that
+    # ended. Reconciling only when the row changed leaves them that way for good.
+    it 'reconciles the features even when the row already says the plan' do
+      create_stripe_customer_service.new(account: account).perform
+      account.reload.enable_features!(:sla, :companies)
+
+      create_stripe_customer_service.new(account: account).perform
+
+      expect(account.reload).not_to be_feature_enabled('sla')
+      expect(account).not_to be_feature_enabled('companies')
+    end
+
     # `process_subscription_deleted` reads the answer as `return unless ... perform`, so a run that
     # found everything already written must still say it worked.
     it 'still answers true on a second run that writes nothing' do
