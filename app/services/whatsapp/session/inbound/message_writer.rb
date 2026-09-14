@@ -175,6 +175,12 @@ class Whatsapp::Session::Inbound::MessageWriter
     message_content
   end
 
+  # Whether this delivery carries anything to recover, which is a different question from what that
+  # something says: a media message with no caption recovers a body that is empty, and recovers it all
+  # the same. The unsupported stanza a placeholder is published from carries nothing, so a redelivery of
+  # that one speaks for no recovery at all.
+  def recovers_content? = content.present? && !unsupported?
+
   def perform
     return build_contact_messages if content_type == 'contacts'
 
@@ -263,8 +269,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   # like any other, and the attribution the caller records either way. #492.
   #
   def reconcilable?(message)
-    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
-      content.present? && !unsupported?
+    RECOVERABLE.include?(message.content_attributes['unsupported_reason']) && recovers_content?
   end
 
   def convert_mentions(text)

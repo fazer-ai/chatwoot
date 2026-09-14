@@ -75,8 +75,18 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # marked anything: a dispatch that fails with the debt already cleared loses the automations exactly
   # the way the defect did. The window that leaves is a process that dies between the two, which costs
   # one more announcement later, and that is the direction worth being wrong in.
+  #
+  # A delivery that recovers nothing pays nothing, and the redelivered placeholder is the ordinary shape
+  # of that rather than a curiosity: the consumer's session cursor only moves forwards, so a debt is
+  # only ever reached once that cursor is gone, and then the whole backlog replays in order with the
+  # placeholder ahead of the message. Settling on its way past would clear the debt and leave the real
+  # message, replaying a moment later, with nothing owed -- the automations lost exactly the way #646
+  # describes. It cannot announce either: it carries no body, and the debt is about one.
   def announce_owed_recovery(stored)
-    dispatch_recovery(stored)
+    writer = writer_for(stored)
+    return unless writer.recovers_content?
+
+    dispatch_recovery(stored, writer.recovered_body)
     settle_recovery_debt(stored)
   end
 
@@ -142,7 +152,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # down: an imported arrival dispatches nothing at all (Import::SilentWrite), so it left no record of
     # having been evaluated, and a recovery without that record runs no rules. One mechanism rather than
     # a guard here repeating it.
-    dispatch_recovery(stored)
+    dispatch_recovery(stored, writer_for(stored).recovered_body)
     # The debt the write recorded, paid now that the announcement is on the queue. Same order as the
     # redelivery path and for the same reason (#646).
     settle_recovery_debt(stored)
@@ -161,9 +171,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # The body and not the edit marker. A contact who corrects a placeholder into the same text the
   # encrypted original turns out to carry leaves a row that is marked as edited and is showing exactly
   # what this delivery recovered, and that is a recovery like any other.
-  def dispatch_recovery(stored)
+  def dispatch_recovery(stored, body)
     Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now,
-                                            message: stored, content: writer_for(stored).recovered_body)
+                                            message: stored, content: body)
   end
 
   # The row already names the conversation and the sender this message belongs to: it was

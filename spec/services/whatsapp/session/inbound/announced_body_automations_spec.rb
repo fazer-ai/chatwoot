@@ -148,6 +148,32 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     expect(stored.content).to eq('quero um orçamento')
   end
 
+  # The consumer's session cursor only moves forwards, so a debt is only ever reached once that cursor
+  # is gone -- and then the whole backlog replays in order, with the placeholder ahead of the message
+  # that recovered it. A delivery carrying no body cannot say what the announcement owes, so it leaves
+  # the debt where it is for the one that can.
+  it 'leaves the debt for the delivery that can name the body when the placeholder replays first' do
+    arrive(placeholder)
+
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    refusing = false
+
+    arrive(placeholder)
+    expect(ran(on_preco)).to eq(0)
+
+    arrive(recovered)
+
+    expect(ran(on_preco)).to eq(1)
+    expect(ran(on_anything)).to eq(1)
+  end
+
   it 'adds nothing on the redeliveries that follow' do
     arrive(placeholder)
     edit('quero um orçamento')
