@@ -363,6 +363,46 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
       .not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
   end
 
+  # Paying the debt is bookkeeping, and bookkeeping is not news. `update!` here would dispatch
+  # MESSAGE_UPDATED, which the agent bot and the webhook listeners forward without looking at what
+  # changed: every recovery would deliver a second update to everyone subscribed, which is the doubled
+  # external action this design exists to avoid.
+  it 'pays the debt without publishing another update' do
+    updates = []
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      updates << data[:message].try(:source_id) if name == Events::Types::MESSAGE_UPDATED
+      original.call(name, timestamp, data)
+    end
+
+    arrive_and_settle(placeholder)
+    before_recovery = updates.count('3EB0RECOVER01')
+    arrive_and_settle(recovered)
+
+    expect(updates.count('3EB0RECOVER01') - before_recovery).to eq(1)
+  end
+
+  # And the copy written back is read after the lock is held. `content_attributes` is one JSON hash, so
+  # a revoke, an edit or a media failure landing between the content write and the settlement is a
+  # change that a hash read beforehand would write away.
+  it 'does not write away a change that landed while the announcement was going out' do
+    arrive_and_settle(placeholder)
+
+    # The row is changed by somebody else in the window this settlement spans.
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      if name == Events::Types::MESSAGE_RECOVERED
+        row = Message.find_by(source_id: '3EB0RECOVER01')
+        row.update_columns(content_attributes: row.content_attributes.merge('deleted_by_contact' => true)) # rubocop:disable Rails/SkipsModelValidations
+      end
+      original.call(name, timestamp, data)
+    end
+
+    arrive_and_settle(recovered)
+
+    stored = inbox.messages.find_by(source_id: '3EB0RECOVER01')
+    expect(stored.content_attributes).to include('deleted_by_contact' => true)
+    expect(stored.content_attributes).not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
+  end
+
   # Why the debt is cleared rather than kept, stated as the case keeping it would open. A row that was
   # recovered and announced can still be edited, and a connector redelivery can arrive after that. An
   # announcement then would offer the rules a body that neither the arrival nor the recovery ever

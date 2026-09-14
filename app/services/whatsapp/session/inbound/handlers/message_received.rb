@@ -80,12 +80,22 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     settle_recovery_debt(stored)
   end
 
-  # Off the row the lock reloads, like every other writer of this column: `content_attributes` is one
-  # JSON hash, and a merge computed off a stale copy writes away whatever landed in between.
+  # Read off the row the lock reloads, and written without waking anything up. Both halves matter and
+  # neither is about this key.
+  #
+  # `content_attributes` is one JSON hash, so the copy to write back has to be read after the lock is
+  # held: a revoke, an edit or a media failure landing between the content write and here is a change
+  # a hash read beforehand would write away. And this is bookkeeping, not news: `update!` would
+  # dispatch MESSAGE_UPDATED, which the agent bot and the webhook listeners forward without looking at
+  # what changed, so every recovery would deliver a second update to anyone subscribed -- a doubled
+  # webhook, which is the thing this whole design goes out of its way not to do.
   def settle_recovery_debt(stored)
-    stored.update_under_lock!(
-      content_attributes: stored.content_attributes.except(inbound::MessageWriter::RECOVERY_OWED)
-    )
+    stored.class.transaction do
+      row = stored.class.lock.find(stored.id)
+      # rubocop:disable Rails/SkipsModelValidations
+      row.update_columns(content_attributes: row.content_attributes.except(inbound::MessageWriter::RECOVERY_OWED))
+      # rubocop:enable Rails/SkipsModelValidations
+    end
   end
 
   # The attribution is the part only the recovery carries: an undecryptable stanza has no
