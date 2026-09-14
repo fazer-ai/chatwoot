@@ -86,6 +86,10 @@ module Redis::RedisKeys
   # An automation rule that has already acted on one message, so the content arriving after the
   # placeholder it was stored as does not run that rule a second time.
   AUTOMATION_RULE_MESSAGE_RUN = 'AUTOMATION_RULE_MESSAGE_RUN::%<rule_id>d::%<message_id>d'.freeze
+  # The same record, for a rule that answers to edits. The body it was evaluated against is part of the
+  # key: two announcements of one body, which is what two edits committing before their jobs run leaves
+  # behind, are the same run; a body nobody has offered this rule yet is a new one.
+  AUTOMATION_RULE_MESSAGE_BODY_RUN = 'AUTOMATION_RULE_MESSAGE_RUN::%<rule_id>d::%<message_id>d::%<body>s'.freeze
   # The arrival of a placeholder whose rules were evaluated with those claims written, which is what says
   # a later recovery of that row may evaluate them again.
   AUTOMATION_MESSAGE_ARRIVAL_TRACKED = 'AUTOMATION_MESSAGE_ARRIVAL_TRACKED::%<message_id>d'.freeze

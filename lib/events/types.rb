@@ -51,6 +51,12 @@ module Events::Types
   # as. Not an update of an existing message: it is the first time anything can be asked about this
   # message's content. Only the automation listener answers it (fazer-ai/chatwoot#491).
   MESSAGE_RECOVERED = 'message.recovered'
+  # The body of a stored message replaced by a new one the sender wrote in its place. A different
+  # question from the two above: a creation and a recovery are both the first readable body a row ever
+  # had, and an edit is somebody changing what was said. Announced from the row itself
+  # (`Message#dispatch_update_event`), so every channel that edits in place is covered by one dispatch
+  # (fazer-ai/chatwoot#648).
+  MESSAGE_EDITED = 'message.edited'
   MESSAGES_READ = 'messages.read'
 
   # scheduled message events

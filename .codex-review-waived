@@ -182,3 +182,15 @@ app/finders/message_finder.rb: Use the same tie-breaker when ordering message pa
 app/services/whatsapp/baileys_handlers/messaging_history_set.rb: Resolve exhausted chats through phone and LID aliases  # PR#500 → #503
 app/jobs/avatar/avatar_from_url_job.rb: Do not stamp markers for superseded avatar jobs  # PR#500 → #504
 app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group inboxes explicitly  # PR#500 → #505
+
+# PR#658: os dois achados da rodada 3 são adjacentes, não defeitos desta entrega, e cada um
+# tem issue com a medição e o custo. O do Telegram é `Telegram::UpdateMessageService`, que
+# escreve o corpo sem marcar `is_edited` e é arquivo do upstream sem nenhuma divergência
+# nossa: marcar ali abre superfície de conflito nova e muda o que a caixa do Telegram mostra,
+# que ninguém pediu (fazer-ai/chatwoot#659). O da gravação otimista é o resto do desenho do
+# `edit_content`, que grava antes de o canal aceitar: a #648 tirou o anúncio de cima dessa
+# gravação, e o que sobra é um job em fila ler a linha enquanto uma segunda edição está
+# pendente. Consertar de raiz é pedir ao canal antes de gravar, o que muda a tela do agente
+# (fazer-ai/chatwoot#660).
+app/models/message.rb: Include Telegram edits in the new trigger  # PR#658
+app/controllers/api/v1/accounts/conversations/messages_controller.rb: Keep pending edits out of queued automation evaluations  # PR#658

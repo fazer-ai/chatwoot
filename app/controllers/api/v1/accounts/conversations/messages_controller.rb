@@ -81,9 +81,15 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     original_content = message.content
     # Only save previous_content on first edit to preserve the original message
     previous_content_to_save = message.is_edited ? message.previous_content : original_content
+    # The write below is optimistic: the channel has not taken the edit yet, and the rescue in
+    # `edit_message_on_channel` writes the body back when it refuses. An automation must not run on a
+    # body the contact never received, so the row's own announcement is deferred and made here, once
+    # the channel has accepted (fazer-ai/chatwoot#648).
+    message.defer_edit_announcement = true
     message.update!(content: new_content, is_edited: true, previous_content: previous_content_to_save)
 
     edit_message_on_channel(new_content, original_content)
+    message.announce_edit
 
     @message = message.reload
   end

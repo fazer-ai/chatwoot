@@ -90,6 +90,10 @@ class Message < ApplicationRecord
   # NOTE: Allow skipping message flooding validation for bulk operations like imports/cloning
   attr_accessor :skip_message_flooding_validation
 
+  # Set by a caller that writes an edit before the channel has taken it, so the announcement waits for
+  # the channel's answer instead of going out on the optimistic write. See `#announce_edit`.
+  attr_accessor :defer_edit_announcement
+
   enum message_type: { incoming: 0, outgoing: 1, activity: 2, template: 3 }
   enum content_type: {
     text: 0,
@@ -347,6 +351,15 @@ class Message < ApplicationRecord
     '[Attachment]' if attachments.any?
   end
 
+  # An edit typed by an agent is written before the channel has taken it (`MessagesController#edit_content`
+  # writes, then asks), and written back when the channel refuses. Neither of those is an edit anybody
+  # made: the contact still has the body they always had. The caller that writes optimistically sets this
+  # and announces itself once the channel has accepted, and the write-back is covered by the same flag,
+  # which would otherwise announce a second time on a rollback that restores an already edited body.
+  def announce_edit
+    send_edited_event if edited_in_place?
+  end
+
   private
 
   def prevent_message_flooding
@@ -470,6 +483,28 @@ class Message < ApplicationRecord
     return if previous_changes.blank?
 
     send_update_event
+    send_edited_event if edited_in_place? && !defer_edit_announcement
+  end
+
+  # The body changed and the row says an edit is what changed it. Both halves are load-bearing.
+  #
+  # `content` and not `content_attributes`: a delayed recovery landing on a row an edit already settled
+  # writes everything around the body and leaves the body alone (`MessageWriter#reconcile_in_place`),
+  # and that row still carries `is_edited` from the earlier edit, so the marker alone would announce an
+  # edit nobody made. And `is_edited` and not the content change alone, because the send failure of an
+  # edit writes the original body back with the marker off (`MessagesController#edit_content`): that is
+  # an undo, and announcing it would run the rules on a body the contact never saw.
+  #
+  # Nothing here has to deduplicate a redelivery. The providers resend events, and an edit applied a
+  # second time writes the same body: Rails sees no change, `previous_changes` comes back empty and this
+  # callback returns above. Measured, not assumed.
+  def edited_in_place?
+    previous_changes.key?('content') && is_edited
+  end
+
+  def send_edited_event
+    Rails.configuration.dispatcher.dispatch(MESSAGE_EDITED, Time.zone.now, message: self, performed_by: Current.executed_by,
+                                                                           previous_changes: previous_changes)
   end
 
   def send_reply

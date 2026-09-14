@@ -122,7 +122,15 @@ class AutomationRule < ApplicationRecord
   # Conversation-level episodes key on status_changed_at alone. Mutable attributes would collapse
   # distinct periods into one episode, so only status and immutable filters (inbox) are allowed.
   def execution_delay_supported_event
-    return if execution_delay.blank? || conditions.blank? || event_name == 'message_created'
+    return if execution_delay.blank?
+    # Refused outright, whatever the conditions say, and before the whitelist below can let it through on
+    # an inbox or status filter. A delayed rule anchors its due time on `waiting_since` or on the message's
+    # creation and dedupes its episode by message id; an edit has neither, so an edit of an hour-old
+    # message would be overdue the moment it armed and a second edit of the same message could not arm at
+    # all. Refused until the scheduling knows what an edit is (fazer-ai/chatwoot#648).
+    return errors.add(:execution_delay, 'is not supported for rules triggered by an edit.') if event_name == 'message_edited'
+
+    return if conditions.blank? || event_name == 'message_created'
     return if conditions.all? { |obj| DELAYED_CONVERSATION_ATTRIBUTES.include?(obj['attribute_key']) }
 
     errors.add(:execution_delay, 'only supports status and inbox conditions for conversation-level events.')

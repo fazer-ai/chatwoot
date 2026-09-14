@@ -19,6 +19,9 @@
       "USER": "Agent",
       "AGENT_BOT": "Bot",
       "CAPTAIN": "Captain"
+    },
+    "EVENTS": {
+      "MESSAGE_EDITED": "Message Edited"
     }
   }
 }

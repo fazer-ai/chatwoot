@@ -45,9 +45,17 @@ class AutomationRuleListener < BaseListener
     process_message_event(event)
   end
 
+  # Somebody changed what a message says, and the rules that answer to it are the ones whose trigger is
+  # this event: a rule opts in, rather than every `message_created` rule being asked a second question.
+  # An edit is not a second arrival, and the difference is visible in the actions -- an auto-reply
+  # answering a typo correction is the outcome that keeps this off `message_created` (#648).
+  def message_edited(event)
+    process_message_event(event, 'message_edited')
+  end
+
   private
 
-  def process_message_event(event)
+  def process_message_event(event, event_name = 'message_created')
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
@@ -55,21 +63,62 @@ class AutomationRuleListener < BaseListener
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
 
-    return unless rule_present?('message_created', account)
+    return unless rule_present?(event_name, account)
 
-    rules = current_account_rules('message_created', account)
+    rules = current_account_rules(event_name, account)
 
     rules.each do |rule|
-      conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
-                                                                        { message: message, changed_attributes: changed_attributes }).perform
-      # The claim is asked for after the conditions and only when they match, never before: a rule that
-      # did not match while the row was a placeholder has to be left free to run when the content
-      # arrives.
-      # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
-      # the two differ for anything that defines only one of them.
-      token = claim(rule, message) if conditions_match.present?
-      execute_claimed_rule(rule, account, message, token) if token
+      claimed = claim_matching_rule(rule, message, event_name, changed_attributes)
+
+      execute_claimed_rule(rule, account, message, claimed[:key], claimed[:token]) if claimed[:token]
     end
+  end
+
+  # The body the conditions answered about and the body the claim is taken on have to be the same one.
+  # They are read separately -- the conditions by a query, the key off the row this job loaded -- and an
+  # edit committing between the two would have this execution claim the older body's key while acting on
+  # the newer one, leaving the newer body's own key free for a second run of the same rule.
+  #
+  # The row lock is held for that pair only, and only where the key is about the body: the arrival and
+  # the recovery key on the message, which does not move, and pay nothing. The actions always run
+  # outside it, because they send messages and call webhooks.
+  def claim_matching_rule(rule, message, event_name, changed_attributes)
+    return evaluate_and_claim(rule, message, event_name, changed_attributes) unless event_name == 'message_edited'
+
+    message.with_lock { evaluate_and_claim(rule, message, event_name, changed_attributes) }
+  end
+
+  # The claim is asked for after the conditions and only when they match, never before: a rule that did
+  # not match while the row was a placeholder has to be left free to run when the content arrives.
+  #
+  # `present?` rather than `blank?`, because that is the question the rule's own filter answers and the
+  # two differ for anything that defines only one of them.
+  def evaluate_and_claim(rule, message, event_name, changed_attributes)
+    conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
+                                                                      { message: message, changed_attributes: changed_attributes }).perform
+    return {} unless conditions_match.present? # rubocop:disable Rails/Blank -- see the note above: not the same question
+
+    key = claim_key_for(event_name, rule, message)
+
+    { key: key, token: claim(key) }
+  end
+
+  # What the claim is about, and the two events answer it differently.
+  #
+  # For the arrival and the recovery it is the message: the two are one message becoming readable once,
+  # so a rule runs for it once.
+  #
+  # For an edit it is the body. "Has this rule already run for this message" would let only the first of
+  # two edits run, and two edits are two events. "Has this rule already run for this message against
+  # this body" keeps both of those and still answers for the case that costs a duplicate action: two
+  # edits committing before either job runs leave both evaluations reading the same stored body, since
+  # the conditions are asked of the row and not of the event, and they are then the same run. The cost
+  # is an edit that restores a body this rule already ran on, which does not run again.
+  def claim_key_for(event_name, rule, message)
+    return claim_key(rule, message) unless event_name == 'message_edited'
+
+    format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_BODY_RUN, rule_id: rule.id, message_id: message.id,
+                                                               body: Digest::SHA256.hexdigest(message.content.to_s)[0, 16])
   end
 
   # At most one execution of this rule for this message, counting the arrival and the recovery that
@@ -88,13 +137,13 @@ class AutomationRuleListener < BaseListener
   # record for thirty days. But the key may equally belong to an execution that already happened -- the
   # arrival's, with the recovery now asking -- and deleting that one would let the retry run the rule a
   # second time. So only a key carrying this attempt's token is released.
-  def claim(rule, message)
+  def claim(key)
     token = SecureRandom.uuid
-    taken = Redis::Alfred.set(claim_key(rule, message), token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+    taken = Redis::Alfred.set(key, token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
 
     token if taken
   rescue StandardError
-    release_claim(rule, message, token)
+    release_claim(key, token)
     raise
   end
 
@@ -102,19 +151,19 @@ class AutomationRuleListener < BaseListener
   # holding the claim would spend the whole window on an attempt that never acted, and for a delayed rule
   # the attempt is only a row in `automation_rule_pending_executions`, which failed to be written.
   # Releasing restores exactly what happens today, where a retry evaluates and acts again.
-  def execute_claimed_rule(rule, account, message, token)
+  def execute_claimed_rule(rule, account, message, key, token)
     execute_rule(rule, account, message.conversation, message: message)
   rescue StandardError
-    release_claim(rule, message, token)
+    release_claim(key, token)
     raise
   end
 
   # Best effort on the way out of a failure that is already being raised: a delete that fails too would
   # replace the error the caller needs to see with one about Redis.
-  def release_claim(rule, message, token)
-    Redis::Alfred.delete_if_equals(claim_key(rule, message), token)
+  def release_claim(key, token)
+    Redis::Alfred.delete_if_equals(key, token)
   rescue StandardError => e
-    Rails.logger.warn("[AUTOMATION] could not release the run claim of rule #{rule.id} on message #{message.id}: #{e.message}")
+    Rails.logger.warn("[AUTOMATION] could not release the run claim #{key}: #{e.message}")
   end
 
   def claim_key(rule, message)
