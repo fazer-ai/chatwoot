@@ -56,13 +56,17 @@ RSpec.describe 'automations on a message that was edited' do # rubocop:disable R
     perform_enqueued_jobs
   end
 
-  def edit(body, timestamp: 1_755_440_500_000)
+  def deliver_edit(body, timestamp: 1_755_440_500_000)
     Whatsapp::Session::Inbound::Dispatcher.dispatch(
       channel, model::Event.build(model::Events::MessageEdited.new(
                                     chat: chat, message_id: inbound.id, timestamp: timestamp,
                                     content: model::Content::Text.new(body: body)
                                   ))
     )
+  end
+
+  def edit(body, timestamp: 1_755_440_500_000)
+    deliver_edit(body, timestamp: timestamp)
     perform_enqueued_jobs
   end
 
@@ -122,6 +126,19 @@ RSpec.describe 'automations on a message that was edited' do # rubocop:disable R
     edit('quero um orçamento hoje', timestamp: 1_755_440_600_000)
 
     expect(ran(on_edit)).to eq(2)
+  end
+
+  # Nothing orders the announcement against the job that evaluates it. Two edits committing before
+  # either job runs leave both evaluations reading the same stored body, because the conditions are
+  # asked of the row and not of the event, and two runs of one rule would send the reply twice.
+  it 'runs once when two edits commit before either evaluation' do
+    arrive
+    deliver_edit('deixa pra lá', timestamp: 1_755_440_500_000)
+    deliver_edit('quero um orçamento', timestamp: 1_755_440_600_000)
+
+    perform_enqueued_jobs
+
+    expect(ran(on_edit)).to eq(1)
   end
 
   # The provider resends events, and an edit applied twice writes the same body. Nothing changed, so

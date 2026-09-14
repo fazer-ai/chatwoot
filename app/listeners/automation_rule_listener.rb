@@ -75,21 +75,32 @@ class AutomationRuleListener < BaseListener
       # arrives.
       # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
       # the two differ for anything that defines only one of them.
-      run_matched_rule(rule, account, message, claimed: event_name != 'message_edited') if conditions_match.present?
+      run_matched_rule(rule, account, message, key: claim_key_for(event_name, rule, message)) if conditions_match.present?
     end
   end
 
-  # The claim answers "has this rule already run for this message", which is the right question for the
-  # arrival and the recovery, because the two are the same message becoming readable once. It is the
-  # wrong question for an edit: two edits of the same message are two events, and the claim would let
-  # only the first of them run. An edit needs no record of its own, because the announcement itself is
-  # already once per edit -- a redelivery writes the same body, and a row that did not change announces
-  # nothing (`Message#edited_in_place?`).
-  def run_matched_rule(rule, account, message, claimed:)
-    return execute_rule(rule, account, message.conversation, message: message) unless claimed
+  # What the claim is about, and the two events answer it differently.
+  #
+  # For the arrival and the recovery it is the message: the two are one message becoming readable once,
+  # so a rule runs for it once.
+  #
+  # For an edit it is the body. "Has this rule already run for this message" would let only the first of
+  # two edits run, and two edits are two events. "Has this rule already run for this message against
+  # this body" keeps both of those and still answers for the case that costs a duplicate action: two
+  # edits committing before either job runs leave both evaluations reading the same stored body, since
+  # the conditions are asked of the row and not of the event, and they are then the same run. The cost
+  # is an edit that restores a body this rule already ran on, which does not run again.
+  def claim_key_for(event_name, rule, message)
+    return claim_key(rule, message) unless event_name == 'message_edited'
 
-    token = claim(rule, message)
-    execute_claimed_rule(rule, account, message, token) if token
+    format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_BODY_RUN, rule_id: rule.id, message_id: message.id,
+                                                               body: Digest::SHA256.hexdigest(message.content.to_s)[0, 16])
+  end
+
+  def run_matched_rule(rule, account, message, key:)
+    token = claim(key)
+
+    execute_claimed_rule(rule, account, message, key, token) if token
   end
 
   # At most one execution of this rule for this message, counting the arrival and the recovery that
@@ -108,13 +119,13 @@ class AutomationRuleListener < BaseListener
   # record for thirty days. But the key may equally belong to an execution that already happened -- the
   # arrival's, with the recovery now asking -- and deleting that one would let the retry run the rule a
   # second time. So only a key carrying this attempt's token is released.
-  def claim(rule, message)
+  def claim(key)
     token = SecureRandom.uuid
-    taken = Redis::Alfred.set(claim_key(rule, message), token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
+    taken = Redis::Alfred.set(key, token, nx: true, ex: RULE_RUN_CLAIM_EXPIRY)
 
     token if taken
   rescue StandardError
-    release_claim(rule, message, token)
+    release_claim(key, token)
     raise
   end
 
@@ -122,19 +133,19 @@ class AutomationRuleListener < BaseListener
   # holding the claim would spend the whole window on an attempt that never acted, and for a delayed rule
   # the attempt is only a row in `automation_rule_pending_executions`, which failed to be written.
   # Releasing restores exactly what happens today, where a retry evaluates and acts again.
-  def execute_claimed_rule(rule, account, message, token)
+  def execute_claimed_rule(rule, account, message, key, token)
     execute_rule(rule, account, message.conversation, message: message)
   rescue StandardError
-    release_claim(rule, message, token)
+    release_claim(key, token)
     raise
   end
 
   # Best effort on the way out of a failure that is already being raised: a delete that fails too would
   # replace the error the caller needs to see with one about Redis.
-  def release_claim(rule, message, token)
-    Redis::Alfred.delete_if_equals(claim_key(rule, message), token)
+  def release_claim(key, token)
+    Redis::Alfred.delete_if_equals(key, token)
   rescue StandardError => e
-    Rails.logger.warn("[AUTOMATION] could not release the run claim of rule #{rule.id} on message #{message.id}: #{e.message}")
+    Rails.logger.warn("[AUTOMATION] could not release the run claim #{key}: #{e.message}")
   end
 
   def claim_key(rule, message)

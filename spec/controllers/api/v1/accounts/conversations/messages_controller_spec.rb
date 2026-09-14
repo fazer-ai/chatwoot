@@ -744,4 +744,50 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
     end
   end
+
+  # The edit an agent types is written before the channel has taken it, and written back when the channel
+  # refuses. Only the edit the channel accepted is an edit anybody made (fazer-ai/chatwoot#648).
+  describe 'PATCH /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/edit_content' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+    let(:inbox) { channel.inbox }
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let!(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let!(:message) do
+      create(:message, conversation: conversation, account: account, inbox: inbox,
+                       message_type: :outgoing, content: 'preço sob consulta', source_id: 'WAMID.1')
+    end
+
+    before do
+      create(:inbox_member, inbox: inbox, user: agent)
+      allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+    end
+
+    def edit(content)
+      patch edit_content_api_v1_account_conversation_message_url(
+        account_id: account.id, conversation_id: conversation.display_id, id: message.id
+      ), params: { content: content }, headers: agent.create_new_auth_token, as: :json
+    end
+
+    it 'announces the edit once the channel has taken it' do
+      allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message).and_return(true) # rubocop:disable RSpec/AnyInstance
+
+      edit('orçamento em 24h')
+
+      expect(response).to have_http_status(:success)
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Events::Types::MESSAGE_EDITED, anything, anything).once
+    end
+
+    # The body the contact has is still the original one, and the controller has already written the new
+    # one and then written it back. Neither of those two commits is an edit anybody made.
+    it 'announces nothing when the channel refuses the edit' do
+      allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message).and_raise(StandardError, 'channel refused') # rubocop:disable RSpec/AnyInstance
+
+      edit('orçamento em 24h')
+
+      expect(message.reload.content).to eq('preço sob consulta')
+      expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
+        .with(Events::Types::MESSAGE_EDITED, anything, anything)
+    end
+  end
 end
