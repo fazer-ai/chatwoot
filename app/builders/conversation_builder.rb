@@ -21,7 +21,30 @@ class ConversationBuilder
   # conversation on the customer's behalf (an escalation from another channel, an integration)
   # starts a second thread beside the case the customer is already in.
   def conversation_to_continue
-    Email::ConversationPolicy.existing_for(inbox: @contact_inbox.inbox, contact: @contact_inbox.contact)
+    conversation = Email::ConversationPolicy.existing_for(inbox: @contact_inbox.inbox, contact: @contact_inbox.contact)
+    return if conversation.blank?
+    return unless caller_may_act_on?(conversation)
+
+    conversation
+  end
+
+  # A case the caller may not open is a case they may not continue. Continuing writes to the
+  # conversation and hands it back with its latest message, so without this an agent whose custom
+  # role limits them to their own conversations would reach, and change, a case belonging to
+  # somebody else, through an endpoint that only checks access to the inbox. Refusing falls through
+  # to the ordinary path and opens a conversation of their own, which is what the same request
+  # would have got with the mode off.
+  #
+  # `show?` is the gate the dashboard already uses to update a conversation, so this asks the same
+  # question, not a stricter one. No user in `Current` means nothing to authorize: the mail paths
+  # and the rake task act for the contact, not for an agent.
+  def caller_may_act_on?(conversation)
+    return true if Current.user.blank?
+
+    ConversationPolicy.new(
+      { user: Current.user, account: Current.account, account_user: Current.account_user },
+      conversation
+    ).show?
   end
 
   # What the caller asked for is merged into the conversation it landed in: keys that came in the

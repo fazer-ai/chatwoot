@@ -193,6 +193,53 @@ describe ConversationBuilder do
 
         expect(snoozed.reload).to be_open
       end
+
+      # Continuing writes to the conversation and hands it back with its latest message, so a
+      # caller who could not read it through any other endpoint must not reach it through this one.
+      context 'when the caller may not act on the open conversation' do
+        let(:outsider) { create(:user, account: account, role: :agent) }
+        let!(:open_conversation) do
+          create(:conversation, account: account, inbox: email_inbox, contact: contact, status: :open)
+        end
+
+        before do
+          Current.user = outsider
+          Current.account = account
+          Current.account_user = outsider.account_users.find_by(account: account)
+        end
+
+        after { Current.reset }
+
+        it 'creates its own conversation instead of continuing that one' do
+          expect do
+            described_class.new(contact_inbox: contact_email_inbox, params: {}).perform
+          end.to change(Conversation, :count).by(1)
+        end
+
+        it 'leaves the conversation it refused untouched' do
+          described_class.new(
+            contact_inbox: contact_email_inbox,
+            params: ActionController::Parameters.new(custom_attributes: { escalation: 'second' })
+          ).perform
+
+          expect(open_conversation.reload.custom_attributes).to be_empty
+        end
+      end
+
+      it 'continues the open conversation for a caller who has access to the inbox' do
+        member = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: member, inbox: email_inbox)
+        open_conversation = create(:conversation, account: account, inbox: email_inbox, contact: contact, status: :open)
+        Current.user = member
+        Current.account = account
+        Current.account_user = member.account_users.find_by(account: account)
+
+        conversation = described_class.new(contact_inbox: contact_email_inbox, params: {}).perform
+
+        expect(conversation.id).to eq(open_conversation.id)
+      ensure
+        Current.reset
+      end
     end
 
     # The setting belongs to the email channel, and nothing about the other channels moves.
