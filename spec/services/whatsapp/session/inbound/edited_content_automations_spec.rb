@@ -180,6 +180,55 @@ RSpec.describe 'automations on a message that was edited' do # rubocop:disable R
     expect(ran(on_edit)).to eq(1)
   end
 
+  # The announcement itself, and not only what it costs downstream. The claim keyed on the body hides a
+  # wrong announcement whenever the body is one this rule already ran on, which is exactly the case
+  # below: the rule count stays right while an edit nobody made is published to every listener.
+  describe 'what is announced as an edit' do
+    before { allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original }
+
+    def announced
+      Rails.configuration.dispatcher
+    end
+
+    it 'announces the contact edit, once' do
+      arrive
+      edit('quero um orçamento')
+
+      expect(announced).to have_received(:dispatch).with(Events::Types::MESSAGE_EDITED, anything, anything).once
+    end
+
+    it 'announces nothing when a placeholder recovers with no edit involved' do
+      arrive(model::Content::Unsupported.new(reason: 'undecryptable'))
+
+      arrive(model::Content::Text.new(body: 'quero um orçamento'))
+
+      expect(announced).not_to have_received(:dispatch).with(Events::Types::MESSAGE_EDITED, anything, anything)
+    end
+
+    it 'announces nothing when the recovery lands on a row that was edited first' do
+      arrive(model::Content::Unsupported.new(reason: 'undecryptable'))
+      edit('quero um orçamento')
+
+      arrive(model::Content::Text.new(body: 'quero saber o preço'))
+
+      expect(announced).to have_received(:dispatch).with(Events::Types::MESSAGE_EDITED, anything, anything).once
+    end
+
+    it 'announces nothing on a delivery receipt' do
+      arrive
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(
+        channel, model::Event.build(model::Events::MessageReceipt.new(
+                                      chat: chat, message_ids: [inbound.id], type: 'read',
+                                      timestamp: 1_755_440_700_000
+                                    ))
+      )
+      perform_enqueued_jobs
+
+      expect(announced).not_to have_received(:dispatch).with(Events::Types::MESSAGE_EDITED, anything, anything)
+    end
+  end
+
   # The delayed recovery of a row an edit already settled writes everything around the body and leaves
   # the body alone, on a row that still carries the edit marker. Guarding on the marker alone would
   # announce an edit nobody made.

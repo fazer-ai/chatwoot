@@ -242,7 +242,25 @@ RSpec.describe AutomationRule do
       rule.execution_delay = 60
       rule.conditions = [{ 'attribute_key' => 'content', 'filter_operator' => 'contains', 'values' => ['orçamento'], 'query_operator' => nil }]
       expect(rule).not_to be_valid
-      expect(rule.errors[:execution_delay]).to include('only supports status and inbox conditions for conversation-level events.')
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
+    end
+
+    # The conditions are not what makes it unsupported: the anchor is. An inbox filter would otherwise
+    # walk through the whitelist written for conversation-level events.
+    it 'rejects a delayed message_edited rule whose conditions are all whitelisted' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = [{ 'attribute_key' => 'inbox_id', 'filter_operator' => 'equal_to', 'values' => [1], 'query_operator' => nil }]
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
+    end
+
+    it 'rejects a delayed message_edited rule with no conditions at all' do
+      rule.event_name = 'message_edited'
+      rule.execution_delay = 60
+      rule.conditions = []
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
     end
 
     it 'allows a delayed conversation-level rule with only status conditions' do

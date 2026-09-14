@@ -68,15 +68,39 @@ class AutomationRuleListener < BaseListener
     rules = current_account_rules(event_name, account)
 
     rules.each do |rule|
-      conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
-                                                                        { message: message, changed_attributes: changed_attributes }).perform
-      # The claim is asked for after the conditions and only when they match, never before: a rule that
-      # did not match while the row was a placeholder has to be left free to run when the content
-      # arrives.
-      # `present?` rather than `blank?`, because that is the question the rule's own filter answers and
-      # the two differ for anything that defines only one of them.
-      run_matched_rule(rule, account, message, key: claim_key_for(event_name, rule, message)) if conditions_match.present?
+      claimed = claim_matching_rule(rule, message, event_name, changed_attributes)
+
+      execute_claimed_rule(rule, account, message, claimed[:key], claimed[:token]) if claimed[:token]
     end
+  end
+
+  # The body the conditions answered about and the body the claim is taken on have to be the same one.
+  # They are read separately -- the conditions by a query, the key off the row this job loaded -- and an
+  # edit committing between the two would have this execution claim the older body's key while acting on
+  # the newer one, leaving the newer body's own key free for a second run of the same rule.
+  #
+  # The row lock is held for that pair only, and only where the key is about the body: the arrival and
+  # the recovery key on the message, which does not move, and pay nothing. The actions always run
+  # outside it, because they send messages and call webhooks.
+  def claim_matching_rule(rule, message, event_name, changed_attributes)
+    return evaluate_and_claim(rule, message, event_name, changed_attributes) unless event_name == 'message_edited'
+
+    message.with_lock { evaluate_and_claim(rule, message, event_name, changed_attributes) }
+  end
+
+  # The claim is asked for after the conditions and only when they match, never before: a rule that did
+  # not match while the row was a placeholder has to be left free to run when the content arrives.
+  #
+  # `present?` rather than `blank?`, because that is the question the rule's own filter answers and the
+  # two differ for anything that defines only one of them.
+  def evaluate_and_claim(rule, message, event_name, changed_attributes)
+    conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
+                                                                      { message: message, changed_attributes: changed_attributes }).perform
+    return {} unless conditions_match.present? # rubocop:disable Rails/Blank -- see the note above: not the same question
+
+    key = claim_key_for(event_name, rule, message)
+
+    { key: key, token: claim(key) }
   end
 
   # What the claim is about, and the two events answer it differently.
@@ -95,12 +119,6 @@ class AutomationRuleListener < BaseListener
 
     format(Redis::RedisKeys::AUTOMATION_RULE_MESSAGE_BODY_RUN, rule_id: rule.id, message_id: message.id,
                                                                body: Digest::SHA256.hexdigest(message.content.to_s)[0, 16])
-  end
-
-  def run_matched_rule(rule, account, message, key:)
-    token = claim(key)
-
-    execute_claimed_rule(rule, account, message, key, token) if token
   end
 
   # At most one execution of this rule for this message, counting the arrival and the recovery that
