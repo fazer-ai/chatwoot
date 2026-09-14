@@ -30,7 +30,6 @@ es:
       cannot_delete_processed: No se puede eliminar un mensaje programado que ya se envió o que falló
     conversations:
       already_assigned: "%{agent_name} ya está atendiendo esta conversación."
-      invalid_status: "'%{status}' no es un estado de conversación. Usa uno de estos: %{statuses}"
     conversation_pins:
       limit_reached: Puede fijar hasta %{limit} conversaciones.
       conversation_resolved: No se puede fijar una conversación resuelta.
