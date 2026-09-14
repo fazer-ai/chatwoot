@@ -95,6 +95,12 @@ class Conversation < ApplicationRecord
   validate :validate_referer_url
 
   enum status: { open: 0, resolved: 1, pending: 2, snoozed: 3 }
+
+  # Written by ConversationBuilder when the caller sent `status`, and never persisted: the column's
+  # default is `open`, so an explicit `open` changes no attribute and `status_changed?` cannot tell
+  # the request from the default.
+  attr_accessor :status_requested_by_caller
+
   enum priority: { low: 0, medium: 1, high: 2, urgent: 3 }
   enum group_type: { individual: 0, group: 1 }, _prefix: true
 
@@ -389,9 +395,13 @@ class Conversation < ApplicationRecord
     set_active_bot_conversation if campaign.sender_id.nil? && inbox.active_bot?
   end
 
+  # Pending is what gives the bot the first turn, and it is also what keeps the conversation out of
+  # the dashboard's default filter, so a caller that asked for a status keeps it: an agent reaching
+  # out through the API creates a conversation for a person to answer, and one nobody can find is
+  # the bug this answers (#633). The bot is still handed the conversation either way, because that
+  # is about who owns it and not about where it shows up.
   def set_active_bot_conversation
-    # TODO: make this an inbox config instead of assuming bot conversations should start as pending
-    self.status = :pending
+    self.status = :pending unless status_requested_by_caller
     return unless inbox.agent_bot_inbox&.active? && assignee_id.blank?
 
     self.assignee_agent_bot = inbox.agent_bot
