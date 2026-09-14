@@ -56,11 +56,12 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # the message that finally arrives is the first and only chance to record them.
   #
   # Asked of every duplicate rather than only of the ones about to be written over, for
-  # two reasons. It is about the conversation and not about the row, so nothing that
-  # happened to the row disqualifies it -- an edit that reached the placeholder first
-  # settles the body and takes the marker off, and the attribution would go down with it.
-  # And it costs nothing to ask: it returns on the spot when the message carries no
-  # attribution, and otherwise fills only the keys that are still missing.
+  # two reasons. It is about the conversation and not about the row, so a row that is no
+  # longer eligible still carries one worth recording: a recovery that already landed took
+  # the marker with it (`MessageWriter#settle`), and a redelivery after that writes nothing
+  # and would be skipped by a check scoped to the rows being written. And it costs nothing
+  # to ask: it returns on the spot when the message carries no attribution, and otherwise
+  # fills only the keys that are still missing.
   #
   # Before the write, and that ordering is the point. Writing the content is what takes
   # the recovery marker off the row, so a failure after it would find the redelivery no
