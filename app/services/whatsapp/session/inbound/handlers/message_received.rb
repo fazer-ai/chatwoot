@@ -47,28 +47,45 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     record_first_touch(stored)
     return recovered(stored) if writer_for(stored).reconcile(stored)
 
-    # A row that was recovered and is being delivered again: the announcement is asked for once more,
-    # because this is the only place it can be. The content write and the announcement are not one act
-    # -- the write commits, and an announcement that fails after it leaves a row nothing marks as
-    # owing anything, because committing the content is exactly what stops it being reconcilable. So
-    # the row carries the recovery itself, and every redelivery of one announces (#646).
-    #
-    # What keeps that from answering a contact twice is not this decision but the claim the listener
-    # takes per rule and per message: a rule that already ran finds its key there and stands down. The
-    # cost is an announcement that usually finds nothing to do, which is the cheap direction to be
-    # wrong in -- the other one loses the automations of that message for good.
+    # A row that still owes an announcement, being delivered again: this is the only place that debt
+    # can be paid. The content write and the announcement are not one act -- the write commits, and an
+    # announcement that fails after it leaves a row nothing marks as owing anything, because
+    # committing the content is exactly what stops it being reconcilable. So the row carries the debt
+    # itself, and a redelivery of one pays it (#646).
     #
     # Before the bytes, for the same reason the recovery path puts it first: the fetch is what a
-    # redelivery queues anyway.
-    dispatch_recovery(stored) if recovered_before?(stored)
+    # redelivery queues anyway, and a queue that will not take the bytes must not be what keeps the
+    # automations waiting for a delivery that may not come.
+    announce_owed_recovery(stored) if recovery_owed?(stored)
     inbound::MessageWriter.fetch_media_for(stored, message)
     :duplicate
   end
 
   # The row says so itself, and it has to: the instant is written in the same save as the content, so
-  # there is no moment where the content is committed and this is not.
-  def recovered_before?(stored)
-    stored.content_attributes.to_h['recovered_at'].present?
+  # there is no moment where the content is committed and the debt is not on record.
+  def recovery_owed?(stored)
+    stored.content_attributes.to_h[inbound::MessageWriter::RECOVERY_OWED].present?
+  end
+
+  # Announce, then clear, and never the other way round. The clearing is what keeps this from
+  # evaluating the rules again on every later delivery: a row whose debt is paid says so, and a rule
+  # that never matched the recovered body is not offered the body an edit left behind afterwards.
+  #
+  # Cleared after the enqueue and not before it, because before is indistinguishable from not having
+  # marked anything: a dispatch that fails with the debt already cleared loses the automations exactly
+  # the way the defect did. The window that leaves is a process that dies between the two, which costs
+  # one more announcement later, and that is the direction worth being wrong in.
+  def announce_owed_recovery(stored)
+    dispatch_recovery(stored)
+    settle_recovery_debt(stored)
+  end
+
+  # Off the row the lock reloads, like every other writer of this column: `content_attributes` is one
+  # JSON hash, and a merge computed off a stale copy writes away whatever landed in between.
+  def settle_recovery_debt(stored)
+    stored.update_under_lock!(
+      content_attributes: stored.content_attributes.except(inbound::MessageWriter::RECOVERY_OWED)
+    )
   end
 
   # The attribution is the part only the recovery carries: an undecryptable stanza has no
@@ -115,6 +132,9 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # having been evaluated, and a recovery without that record runs no rules. One mechanism rather than
     # a guard here repeating it.
     dispatch_recovery(stored)
+    # The debt the write recorded, paid now that the announcement is on the queue. Same order as the
+    # redelivery path and for the same reason (#646).
+    settle_recovery_debt(stored)
     # Both of these are repaired by a redelivery and the announcement above is not, which is the whole
     # reason it goes first: `fetch_media_for` is what the duplicate path queues anyway, and the next
     # event on the conversation refreshes the list.

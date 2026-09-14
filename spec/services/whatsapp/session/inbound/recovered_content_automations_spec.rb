@@ -33,7 +33,13 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
   let!(:on_anything) { rule('R_QUALQUER', [condition('inbox_id', 'equal_to', [inbox.id])]) }
   let!(:on_other_content) { rule('R_OUTRO', [condition('content', 'contains', ['cancelar'])]) }
 
-  before { allow(channel).to receive(:provider_service).and_return(backend) }
+  before do
+    allow(channel).to receive(:provider_service).and_return(backend)
+    # The one job in the drained queue that reaches the connector: from the third delivery of a chat on
+    # it asks for the contact's picture, and there is no connector behind this channel. Nothing here
+    # measures avatars.
+    allow(Whatsapp::Session::UpdateContactAvatarJob).to receive(:perform_later)
+  end
 
   def condition(key, operator, values)
     { 'attribute_key' => key, 'filter_operator' => operator, 'values' => values, 'query_operator' => nil }
@@ -224,11 +230,14 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
   # it is not a row that was recovered, and a redelivery of one announces nothing.
   it 'marks the row as recovered only when the content is written, never on the arrival' do
     arrive_and_settle(placeholder)
-    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes).not_to have_key('recovered_at')
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes)
+      .not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
 
+    # And an announcement that went out pays the debt off, so nothing is owed once it is enqueued.
     arrive_and_settle(recovered)
 
-    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes).to have_key('recovered_at')
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes)
+      .not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
   end
 
   # And the redelivery of a placeholder that is still waiting announces nothing: there is no recovery
@@ -265,21 +274,17 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     expect(ran(on_content)).to eq(1)
   end
 
-  # The cost this design pays, in the open: every redelivery of a recovered row announces again, and
-  # what keeps that from answering the contact twice is the claim the listener holds per rule and per
-  # message, not the count of announcements.
-  it 'announces on every redelivery, and the rule still runs once' do
+  # A redelivery of a row that owes nothing announces nothing, and that is what keeps the rules from
+  # being re-evaluated against a body they were never asked about.
+  it 'announces once and stops, because the debt is paid when the announcement is enqueued' do
     dispatched = recoveries_announced
-    # Not what this example measures, and it is the one job in the drained queue that reaches the
-    # connector: a third delivery refreshes the avatar, and there is no connector behind this channel.
-    allow(Whatsapp::Session::UpdateContactAvatarJob).to receive(:perform_later)
 
     arrive_and_settle(placeholder)
     arrive_and_settle(recovered)
     arrive_and_settle(recovered)
     arrive_and_settle(recovered)
 
-    expect(dispatched.count).to eq(3)
+    expect(dispatched.count).to eq(1)
     expect(ran(on_content)).to eq(1)
     expect(ran(on_anything)).to eq(1)
     expect(ran(on_other_content)).to eq(0)
@@ -301,7 +306,7 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     stored = inbox.messages.find_by(source_id: '3EB0RECOVER01')
     expect(stored.content).to be_nil
     expect(stored.content_attributes).to include('unsupported_reason' => 'undecryptable')
-    expect(stored.content_attributes).not_to have_key('recovered_at')
+    expect(stored.content_attributes).not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
     expect(ran(on_content)).to eq(0)
   end
 
@@ -328,6 +333,64 @@ RSpec.describe 'automations on the content that arrives after its own placeholde
     perform_enqueued_jobs
 
     expect(ran(on_content)).to eq(1)
+  end
+
+  # The debt is cleared after the announcement is enqueued and never before it. Cleared first, the
+  # redelivery is indistinguishable from having marked nothing at all: a dispatch that fails with the
+  # row already paid off loses the automations exactly the way the defect did, and the delivery after
+  # it has nothing left to tell it anything is owed.
+  it 'keeps the debt when the redelivery cannot enqueue the announcement either' do
+    arrive_and_settle(placeholder)
+
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    expect(ran(on_content)).to eq(0)
+
+    refusing = false
+    arrive_and_settle(recovered)
+
+    expect(ran(on_content)).to eq(1)
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content_attributes)
+      .not_to have_key(Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED)
+  end
+
+  # Why the debt is cleared rather than kept, stated as the case keeping it would open. A row that was
+  # recovered and announced can still be edited, and a connector redelivery can arrive after that. An
+  # announcement then would offer the rules a body that neither the arrival nor the recovery ever
+  # carried, and a rule that matched neither of those has no claim to stand down on: it would answer
+  # the contact for a message nobody sent twice.
+  it 'does not run a rule that matches only what an edit left behind' do
+    dispatched = recoveries_announced
+    arrive_and_settle(placeholder)
+    arrive_and_settle(recovered)
+    expect(ran(on_content)).to eq(1)
+    expect(ran(on_other_content)).to eq(0)
+
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(
+      channel, model::Event.build(
+                 model::Events::MessageEdited.new(
+                   chat: chat, sender: sender, message_id: '3EB0RECOVER01',
+                   content: model::Content::Text.new(body: 'quero cancelar'), timestamp: 1_755_450_000_123
+                 )
+               )
+    )
+    perform_enqueued_jobs
+
+    arrive_and_settle(recovered)
+
+    expect(dispatched.count).to eq(1)
+    expect(ran(on_other_content)).to eq(0)
+    expect(ran(on_content)).to eq(1)
+    expect(inbox.messages.find_by(source_id: '3EB0RECOVER01').content).to eq('quero cancelar')
   end
 
   # Redis taking the key and the answer never arriving looks the same from here as a rule that already ran.

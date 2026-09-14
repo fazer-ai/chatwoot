@@ -6,6 +6,11 @@
 # afterwards. Downloading inline would stall the consumer thread that keeps a session's
 # events in order, and the attachment lands within seconds either way.
 class Whatsapp::Session::Inbound::MessageWriter
+  # The key a recovered row carries while it still owes an announcement. Written in the same save as
+  # the content and taken off once the announcement is enqueued, so it names a debt rather than a fact
+  # about the row's past (#646).
+  RECOVERY_OWED = 'recovery_announcement_owed_at'.freeze
+
   attr_reader :conversation, :inbound, :sender, :imported
 
   # `imported` marks a row the history import is writing rather than one that just
@@ -135,9 +140,14 @@ class Whatsapp::Session::Inbound::MessageWriter
     # Written here, in the same save as the content, because it is what the announcement after it has
     # no other way to owe. Once the content is committed the row stops being reconcilable, so a
     # redelivery reads it as an ordinary duplicate and announces nothing -- and the announcement is the
-    # one thing a redelivery cannot repair on its own (#646). This says the row was recovered, and the
-    # handler announces again for as long as it says so.
-    recovered['recovered_at'] = Time.current.to_i
+    # one thing a redelivery cannot repair on its own (#646).
+    #
+    # A debt and not a history: the handler takes it off as soon as the announcement is enqueued, so
+    # a row that owes nothing announces nothing. Keeping it would mean every later redelivery
+    # re-evaluated the rules against whatever the row says by then, and an edit landing in between
+    # would run rules on a body they never matched -- a reply to the contact that no arrival and no
+    # recovery asked for.
+    recovered[Whatsapp::Session::Inbound::MessageWriter::RECOVERY_OWED] = Time.current.to_i
 
     message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')
