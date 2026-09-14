@@ -813,8 +813,9 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
         expect(placeholder.content_attributes).not_to have_key('rich')
       end
 
-      # The edit settles the body and takes the recovery marker off the row. The
-      # attribution is not about the row, though, and nothing else ever records it.
+      # The edit settles the body and the recovery still lands, because the marker only
+      # comes off in `settle`. The attribution is not about the row, though, and nothing
+      # else ever records it.
       it 'still records the attribution the recovery carries' do
         Whatsapp::Session::Inbound::Dispatcher.dispatch(
           channel,

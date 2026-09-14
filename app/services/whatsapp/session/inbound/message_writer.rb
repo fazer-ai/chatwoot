@@ -226,10 +226,14 @@ class Whatsapp::Session::Inbound::MessageWriter
   # sender all raise it on messages that arrived intact, and writing content over one of
   # those would clear a failure the agent is looking at and ask for the bytes again.
   #
-  # An edit that landed first takes the marker off the row (`MessageEdited#apply`), which
-  # is what stops a delayed recovery from writing the original body over an edit of it.
-  # It also costs that recovery the metadata only it carries, the quoted link and the
-  # rich attributes -- not the attribution, which the caller records either way. #492.
+  # An edit that landed first leaves this marker where it is: `MessageEdited#apply` takes
+  # only `is_unsupported` off, so the row stays eligible and the delayed recovery still
+  # lands on it, which is the point -- everything the message carried around the body is
+  # still only on the recovery. What stops it from writing the original body over an edit
+  # of it is the `unless message.is_edited` guard in `reconcile_in_place`, and the marker
+  # comes off in `settle`, on the recovery itself. The edit costs that recovery the `rich`
+  # attributes alone, because they describe a body it replaced; the quoted link is taken
+  # like any other, and the attribution the caller records either way. #492.
   #
   def reconcilable?(message)
     RECOVERABLE.include?(message.content_attributes['unsupported_reason']) &&
