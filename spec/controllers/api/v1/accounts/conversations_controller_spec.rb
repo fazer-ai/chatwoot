@@ -606,7 +606,7 @@ RSpec.describe 'Conversations API', type: :request do
                as: :json
 
           expect(response).to have_http_status(:unprocessable_entity)
-          expect(JSON.parse(response.body)['message']).to include('bogus')
+          expect(response.parsed_body['message']).to include('bogus')
           expect(inbox.conversations.count).to eq(0)
         end
 
