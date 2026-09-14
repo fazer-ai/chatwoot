@@ -172,6 +172,55 @@ RSpec.describe 'automations and the body an announcement is about' do # rubocop:
     expect(ran(on_orcamento)).to eq(0)
   end
 
+  # The debt owes an announcement for the body this delivery recovered, and on a row an edit reached
+  # first that is not the body the row is showing: `reconcile_in_place` keeps the edit. A debt that
+  # named the row's body instead would have the redelivery announce the editor's text as recovered
+  # content, which is the defect this whole change is about.
+  it 'owes nothing it can announce when the edit that got there first is still what the row shows' do
+    arrive(placeholder)
+    edit('quero um orçamento')
+
+    refusing = true
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_wrap_original do |original, name, timestamp, data|
+      raise 'the job transport is away' if refusing && name == Events::Types::MESSAGE_RECOVERED
+
+      original.call(name, timestamp, data)
+    end
+    expect { deliver(recovered) }.to raise_error('the job transport is away')
+    perform_enqueued_jobs
+    refusing = false
+
+    arrive(recovered)
+
+    expect(ran(on_orcamento)).to eq(0)
+    expect(ran(on_preco)).to eq(0)
+    expect(ran(on_anything)).to eq(1)
+    expect(stored.content).to eq('quero um orçamento')
+  end
+
+  # The window between the check and the conditions. The check reads the row this job loaded and the
+  # conditions query the row as it is now, so an edit committing in between would have the rules answer
+  # about a body the announcement is not about -- which is what the check exists to stop. Closed by
+  # asking inside the lock, against the row that lock reloads.
+  it 'stands down on an edit that commits between the check and the conditions' do
+    arrive(placeholder)
+
+    # Not the first lock taken on this row: that one is the writer's, and the content is not written yet
+    # inside it. The one to get in front of is the lock the evaluation takes, which is the first to find
+    # the recovered body already committed.
+    allow_any_instance_of(Message).to receive(:with_lock).and_wrap_original do |original, &block| # rubocop:disable RSpec/AnyInstance
+      if Message.where(source_id: inbound.id, content: 'quero saber o preço').exists?
+        Message.where(source_id: inbound.id).update_all(content: 'quero um orçamento') # rubocop:disable Rails/SkipsModelValidations
+      end
+      original.call(&block)
+    end
+
+    arrive(recovered)
+
+    expect(ran(on_preco)).to eq(0)
+    expect(ran(on_orcamento)).to eq(0)
+  end
+
   # And what the debt owes is the body that was stored, not one rebuilt from whichever delivery gets
   # here: `MessageWriter#message_content` resolves mentions against the contacts as they are now, so a
   # contact renamed in between rebuilds a different string for a message nobody edited.

@@ -63,7 +63,6 @@ class AutomationRuleListener < BaseListener
     message = event.data[:message]
 
     return if ignore_message_created_event?(event)
-    return unless announced_body_current?(event, message)
 
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
@@ -73,7 +72,7 @@ class AutomationRuleListener < BaseListener
     rules = current_account_rules(event_name, account)
 
     rules.each do |rule|
-      claimed = claim_matching_rule(rule, message, event_name, changed_attributes)
+      claimed = claim_matching_rule(rule, message, event, event_name, changed_attributes)
 
       execute_claimed_rule(rule, account, message, claimed[:key], claimed[:token]) if claimed[:token]
     end
@@ -85,7 +84,9 @@ class AutomationRuleListener < BaseListener
   # between would have the rules answer about a body the announcement is not about -- the body a recovery
   # carried, on a row an edit has since replaced (#661), or the first of two edits on a row the second
   # already wrote over (#660). The write that won carries its own announcement, so the one that lost has
-  # nothing left to do and leaves quietly.
+  # nothing left to do and leaves quietly. Asked inside the row lock its caller holds, against the row
+  # that lock reloaded: asked once on the way in, an edit committing before the lock would pass it with
+  # the old body and then be evaluated with the new one.
   #
   # `MESSAGE_CREATED` is deliberately not one of these. An arrival is about the row appearing, not about a
   # body: it names none, and it keeps answering about whatever the row says by the time the work runs. A
@@ -98,32 +99,39 @@ class AutomationRuleListener < BaseListener
   # silence from also meaning a caller who forgot is a fence over the source, in
   # `spec/listeners/announced_body_dispatch_fence_spec.rb`: every dispatch of one of these names a body.
   def announced_body_current?(event, message)
-    return true unless BODY_SCOPED_EVENTS.include?(event.name.to_s)
+    return true unless body_scoped?(event)
     return true unless event.data.key?(:content)
 
     message.content.to_s == event.data[:content].to_s
   end
 
-  # The body the conditions answered about and the body the claim is taken on have to be the same one.
-  # They are read separately -- the conditions by a query, the key off the row this job loaded -- and an
-  # edit committing between the two would have this execution claim the older body's key while acting on
-  # the newer one, leaving the newer body's own key free for a second run of the same rule.
+  # The body the announcement named, the body the conditions answer about and the body the claim is taken
+  # on all have to be the same one. They are read separately -- the conditions by a query, the key off the
+  # row this job loaded -- and a write committing between any two of them would have this execution
+  # answer about one body while claiming another: the older body's key taken while acting on the newer,
+  # leaving the newer body's own key free for a second run of the same rule, or a check that passed
+  # against the row as it was loaded and conditions that read the row as it is now.
   #
-  # The row lock is held for that pair only, and only where the key is about the body: the arrival and
-  # the recovery key on the message, which does not move, and pay nothing. The actions always run
-  # outside it, because they send messages and call webhooks.
-  def claim_matching_rule(rule, message, event_name, changed_attributes)
-    return evaluate_and_claim(rule, message, event_name, changed_attributes) unless event_name == 'message_edited'
+  # So the row is locked for every event that names a body, and `with_lock` reloads it, which is what
+  # makes the check inside worth anything. An arrival names none and keys on the message, which does not
+  # move, so it pays nothing. The actions always run outside the lock, because they send messages and
+  # call webhooks.
+  def claim_matching_rule(rule, message, event, event_name, changed_attributes)
+    return evaluate_and_claim(rule, message, event, event_name, changed_attributes) unless body_scoped?(event)
 
-    message.with_lock { evaluate_and_claim(rule, message, event_name, changed_attributes) }
+    message.with_lock { evaluate_and_claim(rule, message, event, event_name, changed_attributes) }
   end
+
+  def body_scoped?(event) = BODY_SCOPED_EVENTS.include?(event.name.to_s)
 
   # The claim is asked for after the conditions and only when they match, never before: a rule that did
   # not match while the row was a placeholder has to be left free to run when the content arrives.
   #
   # `present?` rather than `blank?`, because that is the question the rule's own filter answers and the
   # two differ for anything that defines only one of them.
-  def evaluate_and_claim(rule, message, event_name, changed_attributes)
+  def evaluate_and_claim(rule, message, event, event_name, changed_attributes)
+    return {} unless announced_body_current?(event, message)
+
     conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
                                                                       { message: message, changed_attributes: changed_attributes }).perform
     return {} unless conditions_match.present? # rubocop:disable Rails/Blank -- see the note above: not the same question

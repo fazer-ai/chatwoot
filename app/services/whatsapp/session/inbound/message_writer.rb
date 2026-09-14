@@ -148,13 +148,17 @@ class Whatsapp::Session::Inbound::MessageWriter
     # would run rules on a body they never matched -- a reply to the contact that no arrival and no
     # recovery asked for.
     #
-    # It names the body it owes the announcement for, as a fingerprint of what this save is about to
-    # commit. The redelivery that pays the debt is a different delivery and must not rebuild that body
-    # from its own payload: `message_content` resolves mentions against the contacts as they are now, so
-    # a contact renamed in between would rebuild a different string and the debt would be settled
-    # announcing nothing. A fingerprint taken here is of the body that was actually stored, and nothing
-    # but an edit changes a stored body afterwards.
-    recovered[RECOVERY_OWED] = { 'at' => Time.current.to_i, 'body' => Digest::SHA256.hexdigest(message.content.to_s) }
+    # It names the body it owes the announcement for, as a fingerprint taken here and never rebuilt. The
+    # redelivery that pays the debt is a different delivery and must not work it out from its own
+    # payload: `message_content` resolves mentions against the contacts as they are now, so a contact
+    # renamed in between would produce a different string for a message nobody edited, and the debt
+    # would be settled announcing nothing.
+    #
+    # Of what this delivery recovered, not of what the row is about to show. An edit that got here first
+    # keeps its own body above, and fingerprinting that would have the redelivery announce the editor's
+    # text as recovered content -- the arrival's rules answering about a body no recovery ever carried,
+    # which is the whole of #661.
+    recovered[RECOVERY_OWED] = { 'at' => Time.current.to_i, 'body' => Digest::SHA256.hexdigest(recovered_body.to_s) }
 
     message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')
