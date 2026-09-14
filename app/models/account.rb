@@ -32,6 +32,7 @@ class Account < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include CaptainFeaturable
   include AccountEmailRateLimitable
   include AccountSettingsSchema
+  include JsonColumnMerge
 
   DEFAULT_QUERY_SETTING = {
     flag_query_mode: :bit_operator,
