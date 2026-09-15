@@ -720,13 +720,16 @@ export const AUTOMATIONS = {
 
 // An edit asks the same thing about the same subject as a creation does -- one message, its body, its
 // sender, its conversation -- so the trigger offers exactly the same conditions and the same actions.
+// Derived from the creation trigger rather than written out again, so the two cannot drift. #648
 //
-// One object under two names, not a copy, so the two cannot drift apart in a later edit of one of
-// them. `structuredClone` preserves that identity (measured), which is why the pass in
-// `useAutomation` that appends the account's custom attributes reaches this trigger without naming
-// it: the array it edits is the same array. A copy here would silently cost the new trigger its
-// custom attributes. #648
-AUTOMATIONS.message_edited = AUTOMATIONS.message_created;
+// A copy and not the same object under two names. It used to be the same object, and that identity
+// was load-bearing: it was the only thing that carried the account's custom attributes to this
+// trigger, because the pass in `useAutomation` named `message_created` alone. Nothing said so, and
+// any assignment to `AUTOMATIONS.message_created` or to its clone detached the two silently -- which
+// is exactly what a test did, and how the frontend suite went red. The pass now names both triggers
+// through `CUSTOM_ATTRIBUTE_EVENTS`, so the coupling is written down instead of being carried by a
+// reference. #667
+AUTOMATIONS.message_edited = structuredClone(AUTOMATIONS.message_created);
 
 export const AUTOMATION_RULE_EVENTS = [
   {
