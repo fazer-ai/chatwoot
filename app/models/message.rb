@@ -352,10 +352,16 @@ class Message < ApplicationRecord
   end
 
   # An edit typed by an agent is written before the channel has taken it (`MessagesController#edit_content`
-  # writes, then asks), and written back when the channel refuses. Neither of those is an edit anybody
-  # made: the contact still has the body they always had. The caller that writes optimistically sets this
-  # and announces itself once the channel has accepted, and the write-back is covered by the same flag,
-  # which would otherwise announce a second time on a rollback that restores an already edited body.
+  # writes, then asks), and written back when the channel refuses. The optimistic write is not an edit
+  # anybody made -- the contact still has the body they always had -- so the caller sets the flag above and
+  # calls this once the channel has accepted.
+  #
+  # The write-back calls it too, and that is deliberate. When it restores a body an earlier edit had put
+  # there, that body is the one the contact has, and the rules for it may never have run: the announcement
+  # that named it found the refused body on the row and stood down (#660). Announcing it again costs
+  # nothing, because the claim is taken on the body and a rule that already ran for it does not run twice.
+  # A write-back that undoes a first edit announces nothing, and `edited_in_place?` is what says so: the
+  # marker comes off in the same write.
   def announce_edit
     send_edited_event if edited_in_place?
   end
@@ -502,8 +508,12 @@ class Message < ApplicationRecord
     previous_changes.key?('content') && is_edited
   end
 
+  # `content` is the body this announcement speaks of, and the listener only evaluates the rules while the
+  # row is still showing it: the work runs long after the dispatch, and a second edit committing in
+  # between would otherwise have the rules answer about a body this announcement is not about (#660).
   def send_edited_event
-    Rails.configuration.dispatcher.dispatch(MESSAGE_EDITED, Time.zone.now, message: self, performed_by: Current.executed_by,
+    Rails.configuration.dispatcher.dispatch(MESSAGE_EDITED, Time.zone.now, message: self, content: content,
+                                                                           performed_by: Current.executed_by,
                                                                            previous_changes: previous_changes)
   end
 

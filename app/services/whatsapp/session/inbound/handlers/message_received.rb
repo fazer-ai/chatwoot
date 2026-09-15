@@ -75,9 +75,30 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # marked anything: a dispatch that fails with the debt already cleared loses the automations exactly
   # the way the defect did. The window that leaves is a process that dies between the two, which costs
   # one more announcement later, and that is the direction worth being wrong in.
+  #
+  # What it announces comes off the row, not off this delivery. The debt names the body it owes, and any
+  # delivery that reaches here can pay it: the redelivered placeholder is the ordinary shape of this,
+  # because the consumer's session cursor only moves forwards, so a debt is only ever reached once that
+  # cursor is gone, and then the whole backlog replays in order with the placeholder ahead of the
+  # message that recovered it. Rebuilding the body from whichever delivery got here would announce
+  # nothing for that one and settle the debt on its way past.
   def announce_owed_recovery(stored)
-    dispatch_recovery(stored)
+    dispatch_recovery(stored, stored.content) if owed_body_still_on_row?(stored)
     settle_recovery_debt(stored)
+  end
+
+  # Nothing but an edit changes a body that is already stored, so a row whose fingerprint still matches
+  # is a row still showing what the recovery wrote, and that is what the announcement owed. A row that
+  # no longer matches is showing the editor's text: the body the debt is about is gone, the announcement
+  # it owed can no longer be made, and settling is all that is left (#661).
+  #
+  # A marker written before this shipped carries the instant alone and has nothing to compare with, so
+  # it announces what the row says, which is what it was written to do.
+  def owed_body_still_on_row?(stored)
+    owed = stored.content_attributes.to_h[inbound::MessageWriter::RECOVERY_OWED]
+    return true unless owed.is_a?(Hash)
+
+    owed['body'] == Digest::SHA256.hexdigest(stored.content.to_s)
   end
 
   # Read off the row the lock reloads, and written without waking anything up. Both halves matter and
@@ -142,7 +163,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     # down: an imported arrival dispatches nothing at all (Import::SilentWrite), so it left no record of
     # having been evaluated, and a recovery without that record runs no rules. One mechanism rather than
     # a guard here repeating it.
-    dispatch_recovery(stored)
+    dispatch_recovery(stored, writer_for(stored).recovered_body)
     # The debt the write recorded, paid now that the announcement is on the queue. Same order as the
     # redelivery path and for the same reason (#646).
     settle_recovery_debt(stored)
@@ -154,15 +175,27 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     :handled
   end
 
-  def dispatch_recovery(stored)
-    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now, message: stored)
+  # The announcement names the body this delivery recovered, so the listener can ask whether the row is
+  # still showing it: an edit that reached the row first keeps its own body, and the arrival's rules have
+  # no business answering about one no arrival and no recovery ever carried (#661).
+  #
+  # The body and not the edit marker. A contact who corrects a placeholder into the same text the
+  # encrypted original turns out to carry leaves a row that is marked as edited and is showing exactly
+  # what this delivery recovered, and that is a recovery like any other.
+  def dispatch_recovery(stored, body)
+    Rails.configuration.dispatcher.dispatch(Events::Types::MESSAGE_RECOVERED, Time.zone.now,
+                                            message: stored, content: body)
   end
 
   # The row already names the conversation and the sender this message belongs to: it was
   # resolved when the placeholder was stored, from the same chat and the same author, and
   # only the content was ever missing.
+  # One writer for the whole of this delivery, which is what makes the body it recovered a single value
+  # rather than three computations of one: the write, the fingerprint the debt carries and the body the
+  # announcement names all come off this object. Every caller passes the same row, because there is only
+  # one row in play.
   def writer_for(stored)
-    inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
+    @writer_for ||= inbound::MessageWriter.new(conversation: stored.conversation, inbound: message, sender: stored.sender)
   end
 
   def actionable?

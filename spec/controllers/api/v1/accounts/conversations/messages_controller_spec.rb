@@ -789,5 +789,54 @@ RSpec.describe 'Conversation Messages API', type: :request do
       expect(Rails.configuration.dispatcher).not_to have_received(:dispatch)
         .with(Events::Types::MESSAGE_EDITED, anything, anything)
     end
+
+    # The write is optimistic, so between it and the channel's answer the row shows a body the contact
+    # may never receive. An evaluation queued by an earlier edit reads the row when it runs, not when it
+    # was announced, and would answer about that body (fazer-ai/chatwoot#660).
+    context 'with rules waiting on an edit of their own' do
+      include ActiveJob::TestHelper
+
+      let!(:on_orcamento) { edit_rule('ED_ORC', 'orçamento') }
+      let!(:on_desconto) { edit_rule('ED_DESCONTO', 'desconto') }
+
+      def edit_rule(name, word)
+        create(:automation_rule, account: account, name: name, event_name: 'message_edited',
+                                 conditions: [{ 'attribute_key' => 'content', 'filter_operator' => 'contains',
+                                                'values' => [word], 'query_operator' => nil }],
+                                 actions: [{ 'action_name' => 'send_message', 'action_params' => [name] }])
+      end
+
+      def ran(automation_rule)
+        account.messages.where("((content_attributes#>>'{}')::jsonb)->>'automation_rule_id' = ?", automation_rule.id.to_s).count
+      end
+
+      # Everything but the avatar fetch, which the agent and the contact queue on creation and which
+      # would go out to gravatar from inside the example.
+      def drain
+        perform_enqueued_jobs(except: Avatar::AvatarFromUrlJob)
+      end
+
+      # The refusal is made to land while the queued work is running, which is the whole window the issue
+      # is about: the first edit's evaluation reaches the row with the second edit's body on it.
+      it 'keeps a queued evaluation off the refused body, and announces the body it put back' do
+        accepted = true
+        allow_any_instance_of(Channel::Whatsapp).to receive(:edit_message) do # rubocop:disable RSpec/AnyInstance
+          next true if accepted
+
+          drain
+          raise StandardError, 'channel refused'
+        end
+
+        edit('orçamento em 24h')
+        accepted = false
+        edit('desconto de 30%')
+        drain
+
+        expect(ran(on_desconto)).to eq(0)
+        expect(ran(on_orcamento)).to eq(1)
+        expect(message.reload.content).to eq('orçamento em 24h')
+        expect(message.reload.is_edited).to be(true)
+      end
+    end
   end
 end
