@@ -194,8 +194,3 @@ app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group
 # (fazer-ai/chatwoot#660).
 app/models/message.rb: Include Telegram edits in the new trigger  # PR#658
 app/controllers/api/v1/accounts/conversations/messages_controller.rb: Keep pending edits out of queued automation evaluations  # PR#658
-# PR#662: measured, and it predates this PR. Same sequence on 24d56b1df1 and on the PR
-# head: the recovered body gets 0 arrival-rule runs on both, and the base additionally
-# runs a rule against the body the channel refused. The guard removes a wrong run and
-# adds no missing one. The gap itself is real and is fazer-ai/chatwoot#666.
-app/listeners/automation_rule_listener.rb: Preserve recovery evaluations across refused optimistic edits  # PR#662 -> #666
