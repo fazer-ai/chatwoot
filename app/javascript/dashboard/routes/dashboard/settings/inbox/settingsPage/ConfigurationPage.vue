@@ -10,6 +10,7 @@ import SettingsFieldSection from 'dashboard/components-next/Settings/SettingsFie
 import SettingsToggleSection from 'dashboard/components-next/Settings/SettingsToggleSection.vue';
 import SettingsAccordion from 'dashboard/components-next/Settings/SettingsAccordion.vue';
 import ImapSettings from '../ImapSettings.vue';
+import ConversationContinuitySettings from '../ConversationContinuitySettings.vue';
 import SmtpSettings from '../SmtpSettings.vue';
 import { useVuelidate } from '@vuelidate/core';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -30,6 +31,7 @@ export default {
     SettingsToggleSection,
     SettingsAccordion,
     ImapSettings,
+    ConversationContinuitySettings,
     SmtpSettings,
     NextButton,
     TextArea,
@@ -543,6 +545,7 @@ export default {
         </div>
       </SettingsFieldSection>
     </div>
+    <ConversationContinuitySettings :inbox="inbox" />
     <ImapSettings :inbox="inbox" />
     <SmtpSettings v-if="inbox.imap_enabled" :inbox="inbox" />
   </div>

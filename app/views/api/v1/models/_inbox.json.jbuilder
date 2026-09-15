@@ -88,6 +88,8 @@ if resource.email?
     json.branded_email_layout resource.branded_email_layout
   end
 
+  json.continue_open_conversation resource.channel.try(:continue_open_conversation)
+
   ## IMAP
   if Current.account_user&.administrator?
     json.imap_login resource.channel.try(:imap_login)

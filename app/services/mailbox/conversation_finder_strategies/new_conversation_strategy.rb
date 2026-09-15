@@ -53,6 +53,12 @@ class Mailbox::ConversationFinderStrategies::NewConversationStrategy < Mailbox::
   end
 
   def build_conversation
+    # An inbox that continues the contact's open case answers before a new thread is built. The
+    # conversation that comes back is persisted, which ReplyMailbox already handles: it saves only
+    # when the record is new.
+    existing = Email::ConversationPolicy.existing_for(inbox: @inbox, contact: @contact)
+    return @conversation = existing if existing
+
     # Build but don't persist - ReplyMailbox will save in transaction with message
     @conversation = ::Conversation.new(
       account_id: @account.id,
