@@ -4,6 +4,20 @@
 // offered the conversation's own default condition. #648
 export const MESSAGE_LEVEL_EVENTS = ['message_created', 'message_edited'];
 
+// The triggers whose conditions the account's own custom attributes are appended to, which is a
+// question about the subject the trigger asks about rather than about the trigger itself: every
+// message-level event, plus the conversation events that offer conversation-shaped conditions.
+// `conversation_resolved` is deliberately absent, as it has been since upstream wrote this pass.
+//
+// Named here, and read by both the pass and its spec, so that adding a trigger is one edit in one
+// place and the spec cannot fall behind the list it is asserting over. #667
+export const CUSTOM_ATTRIBUTE_EVENTS = [
+  ...MESSAGE_LEVEL_EVENTS,
+  'conversation_created',
+  'conversation_updated',
+  'conversation_opened',
+];
+
 export const DEFAULT_MESSAGE_CREATED_CONDITION = [
   {
     attribute_key: 'message_type',
