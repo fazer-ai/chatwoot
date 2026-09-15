@@ -158,7 +158,13 @@ class Whatsapp::Session::Inbound::MessageWriter
     # keeps its own body above, and fingerprinting that would have the redelivery announce the editor's
     # text as recovered content -- the arrival's rules answering about a body no recovery ever carried,
     # which is the whole of #661.
-    recovered[RECOVERY_OWED] = { 'at' => Time.current.to_i, 'body' => Digest::SHA256.hexdigest(recovered_body.to_s) }
+    #
+    # Two keys off one digest, and the second outlives the first. The debt says an announcement is owed and
+    # comes off the moment one is enqueued; `RECOVERED_BODY` says the body on this row came from a recovery,
+    # which stays true afterwards and is what a later write-back reads to know whether the body it just
+    # restored is that one (#666).
+    recovered[Message::RECOVERED_BODY] = Digest::SHA256.hexdigest(recovered_body.to_s)
+    recovered[RECOVERY_OWED] = { 'at' => Time.current.to_i, 'body' => recovered[Message::RECOVERED_BODY] }
 
     message.content_attributes = message.content_attributes.merge(recovered.compact)
                                         .except('is_unsupported', 'unsupported_reason')
@@ -307,9 +313,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   # A rich card carries its header image, video or document in `media`, which is the
   # same downloadable reference a plain media message has: without this the card is
   # stored with its text and no attachment.
-  def enqueue_media_fetch(message)
-    self.class.fetch_media_for(message, inbound)
-  end
+  def enqueue_media_fetch(message) = self.class.fetch_media_for(message, inbound)
 
   # One message per shared contact, each with a native contact attachment, so the
   # dashboard renders them in the contact bubble instead of as plain text.

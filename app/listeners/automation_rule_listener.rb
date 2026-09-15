@@ -44,9 +44,11 @@ class AutomationRuleListener < BaseListener
   # upgrade, which is the outcome this whole design exists to avoid. Then the content is the only thing
   # missed, which is what every such row had already settled for.
   def message_recovered(event)
-    return unless arrival_tracked?(event.data[:message])
+    message = event.data[:message]
+    return unless arrival_tracked?(message)
 
     process_message_event(event)
+    forget_arrival(message) if announced_body_current?(event, message.reload)
   end
 
   # Somebody changed what a message says, and the rules that answer to it are the ones whose trigger is
@@ -218,6 +220,20 @@ class AutomationRuleListener < BaseListener
 
   def arrival_tracked?(message)
     Redis::Alfred.exists?(arrival_key(message))
+  end
+
+  # The record exists so that a recovery of this placeholder is evaluated once, and it is gone the moment
+  # one has been. What keeps it standing is a recovery that could not be evaluated because the row had
+  # stopped showing the body its announcement named: that announcement is still owed an answer, and the
+  # write-back that puts the body back is what asks again (#666).
+  #
+  # Without this the record would outlive the answer for its whole thirty days, and a refused edit on a
+  # message recovered long ago would re-open the arrival rules against whatever rules the account has by
+  # then -- an auto-reply answering a message from weeks back because an agent's edit failed to send.
+  def forget_arrival(message)
+    Redis::Alfred.delete(arrival_key(message))
+  rescue StandardError => e
+    Rails.logger.warn("[AUTOMATION] could not clear the arrival record #{arrival_key(message)}: #{e.message}")
   end
 
   def arrival_key(message)
