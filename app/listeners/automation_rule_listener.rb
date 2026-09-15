@@ -5,6 +5,11 @@ class AutomationRuleListener < BaseListener
   # worth honouring: past this, a recovery may run that one rule a second time.
   RULE_RUN_CLAIM_EXPIRY = 30.days
 
+  # What a claim holds once the execution that took it has finished. A claim is one key doing two jobs --
+  # "this rule has run for this message" and "somebody is running it right now" -- and telling them apart
+  # is what lets the arrival record end without taking a failed action's retry with it (#666).
+  CLAIM_DONE = 'done'.freeze
+
   # The events that speak of a body rather than of a row appearing. Each of them names the body it is
   # about, and `announced_body_current?` is what makes that name mean something.
   BODY_SCOPED_EVENTS = [Events::Types::MESSAGE_RECOVERED, Events::Types::MESSAGE_EDITED].freeze
@@ -44,9 +49,10 @@ class AutomationRuleListener < BaseListener
   # upgrade, which is the outcome this whole design exists to avoid. Then the content is the only thing
   # missed, which is what every such row had already settled for.
   def message_recovered(event)
-    return unless arrival_tracked?(event.data[:message])
+    message = event.data[:message]
+    return unless arrival_tracked?(message)
 
-    process_message_event(event)
+    forget_arrival(message) if process_message_event(event)
   end
 
   # Somebody changed what a message says, and the rules that answer to it are the ones whose trigger is
@@ -59,23 +65,32 @@ class AutomationRuleListener < BaseListener
 
   private
 
+  # Answers whether this execution finished the question the announcement asked, which only
+  # `message_recovered` reads. It is decided rule by rule inside the lock, where the row is the one the
+  # decision was made against, and never from the row as it reads afterwards: the body is being written
+  # to throughout this window -- that is the whole subject -- so a second look is a different question
+  # with the same words (#666).
+  #
+  # An event nothing subscribes to and an event with no rules are both finished: there was nothing to
+  # ask. An ignored event is not, because it was never asked at all.
   def process_message_event(event, event_name = 'message_created')
     message = event.data[:message]
 
-    return if ignore_message_created_event?(event)
+    return false if ignore_message_created_event?(event)
 
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
 
-    return unless rule_present?(event_name, account)
+    return true unless rule_present?(event_name, account)
 
     rules = current_account_rules(event_name, account)
 
-    rules.each do |rule|
+    rules.map do |rule|
       claimed = claim_matching_rule(rule, message, event, event_name, changed_attributes)
 
       execute_claimed_rule(rule, account, message, claimed[:key], claimed[:token]) if claimed[:token]
-    end
+      claimed[:concluded]
+    end.all?
   end
 
   # An announcement that speaks of a body says which body, and this is where the row is asked whether it
@@ -129,16 +144,41 @@ class AutomationRuleListener < BaseListener
   #
   # `present?` rather than `blank?`, because that is the question the rule's own filter answers and the
   # two differ for anything that defines only one of them.
+  # `concluded` says whether this rule's question is finished, and it is false in exactly two cases.
+  #
+  # The row has stopped showing the body the announcement named: nothing was asked, and something has to
+  # ask again once that body is back. And the claim belongs to an execution that has not finished: that
+  # one owns the rule and may still be acting on it, so concluding here would drop the arrival record out
+  # from under its retry if its action fails and it comes back.
+  #
+  # A claim that is already finished does conclude, and the distinction is the whole reason `CLAIM_DONE`
+  # exists. The ordinary placeholder carries one: a rule that does not filter on content matched at the
+  # arrival and ran there, and its claim then sits for thirty days. Reading that as "somebody is still
+  # working on it" would leave the arrival record standing for every such account, for good, which is the
+  # case this whole mechanism is about.
+  #
+  # A rule whose conditions do not match is finished: it was asked and it answered no.
   def evaluate_and_claim(rule, message, event, event_name, changed_attributes)
-    return {} unless announced_body_current?(event, message)
+    return { concluded: false } unless announced_body_current?(event, message)
 
     conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, message.conversation,
                                                                       { message: message, changed_attributes: changed_attributes }).perform
-    return {} unless conditions_match.present? # rubocop:disable Rails/Blank -- see the note above: not the same question
+    return { concluded: true } unless conditions_match.present? # rubocop:disable Rails/Blank -- see the note above: not the same question
 
     key = claim_key_for(event_name, rule, message)
+    token = claim(key)
 
-    { key: key, token: claim(key) }
+    { key: key, token: token, concluded: token.present? || claim_finished?(key) }
+  end
+
+  # Asked only of a key this attempt did not take, so the answer is about somebody else's execution. A
+  # read that fails answers no, which keeps the arrival record standing: the cost of that is a repeated
+  # announcement the run claims absorb, and the cost of the opposite is a lost automation.
+  def claim_finished?(key)
+    Redis::Alfred.get(key) == CLAIM_DONE
+  rescue StandardError => e
+    Rails.logger.warn("[AUTOMATION] could not read the run claim #{key}: #{e.message}")
+    false
   end
 
   # What the claim is about, and the two events answer it differently.
@@ -191,9 +231,19 @@ class AutomationRuleListener < BaseListener
   # Releasing restores exactly what happens today, where a retry evaluates and acts again.
   def execute_claimed_rule(rule, account, message, key, token)
     execute_rule(rule, account, message.conversation, message: message)
+    finish_claim(key)
   rescue StandardError
     release_claim(key, token)
     raise
+  end
+
+  # The rule has run, so the claim stops meaning "somebody is working on this" and starts meaning "this
+  # happened". Best effort: a write that fails leaves the claim as a token, which still keeps the rule
+  # from running twice and only costs the arrival record its chance to end.
+  def finish_claim(key)
+    Redis::Alfred.set(key, CLAIM_DONE, ex: RULE_RUN_CLAIM_EXPIRY)
+  rescue StandardError => e
+    Rails.logger.warn("[AUTOMATION] could not mark the run claim #{key} finished: #{e.message}")
   end
 
   # Best effort on the way out of a failure that is already being raised: a delete that fails too would
@@ -218,6 +268,20 @@ class AutomationRuleListener < BaseListener
 
   def arrival_tracked?(message)
     Redis::Alfred.exists?(arrival_key(message))
+  end
+
+  # The record exists so that a recovery of this placeholder is evaluated once, and it is gone the moment
+  # one has been. What keeps it standing is a recovery that could not be evaluated because the row had
+  # stopped showing the body its announcement named: that announcement is still owed an answer, and the
+  # write-back that puts the body back is what asks again (#666).
+  #
+  # Without this the record would outlive the answer for its whole thirty days, and a refused edit on a
+  # message recovered long ago would re-open the arrival rules against whatever rules the account has by
+  # then -- an auto-reply answering a message from weeks back because an agent's edit failed to send.
+  def forget_arrival(message)
+    Redis::Alfred.delete(arrival_key(message))
+  rescue StandardError => e
+    Rails.logger.warn("[AUTOMATION] could not clear the arrival record #{arrival_key(message)}: #{e.message}")
   end
 
   def arrival_key(message)

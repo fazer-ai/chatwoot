@@ -55,10 +55,15 @@ RSpec.describe 'every announcement of a body-scoped event names its body' do # r
 
   # The fence is only worth anything while it has something to guard, and a typo in the constant names
   # above would leave it scanning for nothing and passing.
-  it 'is looking at the two sites that exist' do
+  #
+  # Three since #666: the session handler announcing a recovery, `Message#send_edited_event`, and
+  # `Message#send_recovered_event`, which the write-back after a refused edit calls when the body it
+  # restored is the one a recovery brought. Raising this number is not a formality -- do it only with
+  # the new site read, because the assertion above is what says it names a body.
+  it 'is looking at the three sites that exist' do
     found = ruby_files.sum { |path| dispatch_calls(File.read(path)).count { |call| events.any? { |event| call.include?(event) } } }
 
-    expect(found).to eq(2)
+    expect(found).to eq(3)
   end
 
   # The other half of the same question, and the only one that cannot be driven through a dispatcher:

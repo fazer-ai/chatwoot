@@ -168,14 +168,16 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   # The body that came back is the one the contact has, and the rules for it may never have run: the
-  # announcement that named it found this refused body on the row and stood down (#660). `Message#announce_edit`
-  # is what decides whether there is anything to say -- a write-back that undid a first edit takes the marker
-  # with it and announces nothing.
+  # announcement that named it found this refused body on the row and stood down (#660, #661).
+  # `Message#announce_restored_body` is what decides whether there is anything to say, and it has two
+  # questions to answer rather than one -- a write-back that undid a first edit takes the edit marker with
+  # it and announces no edit, and yet the body it put back may be one a recovery brought and nobody ever
+  # asked the arrival rules about (#666).
   #
   # Swallowed on purpose. The channel's own error is the one the agent needs to see, and replacing it with
   # one about the job transport would cost them the reason their edit did not go out.
   def announce_restored_content
-    message.announce_edit
+    message.announce_restored_body
   rescue StandardError => e
     Rails.logger.error "Failed to announce the restored content: #{e.message}"
   end
