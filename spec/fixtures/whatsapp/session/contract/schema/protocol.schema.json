@@ -391,8 +391,6 @@
             { "properties": { "type": { "const": "group.updated" }, "payload": { "$ref": "#/definitions/event_group_updated" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.picture_changed" }, "payload": { "$ref": "#/definitions/event_group_picture_changed" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.activity" }, "payload": { "$ref": "#/definitions/event_group_activity" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "account.reachout_timelock" }, "payload": { "$ref": "#/definitions/event_account_reachout_timelock" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "account.new_chat_cap" }, "payload": { "$ref": "#/definitions/event_account_new_chat_cap" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.offer" }, "payload": { "$ref": "#/definitions/event_call_offer" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/event_call_terminate" } }, "required": ["type"] },
             { "properties": { "type": { "const": "history.sync" }, "payload": { "type": "object" } }, "required": ["type"] },
@@ -682,18 +680,6 @@
         "groups": { "type": "array", "items": { "$ref": "#/definitions/address" }, "minItems": 1 }
       },
       "required": ["groups"],
-      "additionalProperties": true
-    },
-    "event_account_reachout_timelock": {
-      "type": "object",
-      "properties": { "reachout_time_lock": { "type": "object" } },
-      "required": ["reachout_time_lock"],
-      "additionalProperties": true
-    },
-    "event_account_new_chat_cap": {
-      "type": "object",
-      "properties": { "new_chat_cap": { "type": "object" } },
-      "required": ["new_chat_cap"],
       "additionalProperties": true
     },
     "event_call_offer": {

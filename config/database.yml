@@ -15,7 +15,7 @@ default: &default
   # nothing.
   if ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true' &&
      ENV.fetch('WHATSAPP_CONNECTOR_CONSUMER', 'sidekiq') != 'off'
-    pool_size += ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', 8).to_i
+    pool_size += ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', 16).to_i
   end
 %>
   pool: <%= pool_size %>

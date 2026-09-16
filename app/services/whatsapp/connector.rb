@@ -22,8 +22,14 @@ module Whatsapp::Connector
   # How many event streams the connector fans sessions across, as this installation is
   # configured. Only the answer until a connector has run: it publishes the count it is
   # actually using, and that one wins.
+  #
+  # The default tracks the connector's own `WAC_EVENT_SHARDS`, which is what an
+  # installation that sets neither side ends up running. They drifted once, and the cost
+  # was not the consumer, which follows what is published: it was the database pool,
+  # sized from this number in `config/database.yml`, reserving half the connections the
+  # consumer threads would ask for.
   def self.event_shards
-    ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', '8').to_i
+    ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', '16').to_i
   end
 
   # The count the running connector publishes, which is what decides where a session's
