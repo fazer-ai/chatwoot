@@ -35,10 +35,15 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # on this provider today, because a connector session is pushed rather than polled,
       # so what the declaration bought was a promise on the inbox payload that the next
       # caller would have read as an answer.
+      #
+      # `calls` is what puts `{auto_reject: true}` on the connect and what lets the
+      # offer through the dispatcher. It does not promise a call can be answered: the
+      # contract has no command for that, and neither does whatsmeow. What it promises
+      # is that a call reaches the inbox, which is what an agent can act on.
       capabilities: %w[
         qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
         presence_subscribe read_receipts mark_unread check_number profile_picture groups
-        group_management group_admin group_invites group_join_requests media_download
+        group_management group_admin group_invites group_join_requests media_download calls
       ],
       fields: [MARK_AS_READ, PRESENCE_SUBSCRIBE]
     ),
