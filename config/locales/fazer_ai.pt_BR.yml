@@ -35,6 +35,7 @@ pt_BR:
       conversation_resolved: Não é possível fixar uma conversa resolvida.
       conversation_not_visible: Esta conversa não está na sua lista, então não pode ser fixada.
     meta:
+      send_failed: Algo deu errado ao enviar esta mensagem e não foi possível confirmar a entrega. Confira a conversa antes de enviar novamente.
       messaging_window_closed: A janela de resposta da Meta para este contato fechou. Ela reabre quando o contato enviar uma nova mensagem.
       messaging_window_closed_for_automation: A Meta só aceita resposta automática até 24 horas depois da última mensagem do contato. Assuma a conversa para responder como agente.
     whatsapp:

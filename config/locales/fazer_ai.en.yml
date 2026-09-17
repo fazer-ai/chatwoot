@@ -35,6 +35,7 @@ en:
       conversation_resolved: A resolved conversation cannot be pinned.
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
     meta:
+      send_failed: Something went wrong while sending this message and delivery could not be confirmed. Check the conversation before sending it again.
       messaging_window_closed: Meta's reply window for this contact has closed. It reopens when the contact sends a new message.
       messaging_window_closed_for_automation: Meta only accepts automated replies within 24 hours of the contact's last message. Take over the conversation to reply as an agent.
     whatsapp:
