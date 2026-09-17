@@ -92,13 +92,41 @@ frames, but both sides have to agree on them, so they are part of the contract:
 |---|---|---|---|
 | `wa:meta` | HASH | connector | `protocol_min`, `protocol_max`, `event_shards`; a connector whose `event_shards` disagrees refuses to start |
 | `wa:instances`, `wa:instance:<inst>` | SET, HASH (PX 15s) | connector | live instances and what they advertise: `version`, `protocol_min`, `protocol_max`, `advertise_url`, `media_token` |
-| `wa:lease:<sid>`, `wa:lease-epoch:<sid>` | STRING | connector | which instance owns a session, and the epoch it owns it under |
+| `wa:lease:<sid>` | STRING (PX 30s, renewed) | connector | which instance owns a session. It expires on its own, which is what lets an account whose owner died be taken over |
+| `wa:lease-epoch:<sid>` | STRING (**no expiry**) | connector | the epoch that owner holds the session under, incremented on every acquisition. It must outlive every disconnection, logout and re-pairing of the account, and only a `session.delete` removes it |
 | `wa:idem:<sid>:<key>` | STRING | connector | command idempotency (`msg:<message_id>` for sends) |
 | `wa:resume:<sid>` | STRING (EX 60s) | connector | a turn taken to bring an unowned session back, so the fleet asks about one account once per window |
 | `wa:quarantine:<sid>` | HASH (EX wait + 1h) | connector | `strikes` and `until`: how many times a session failed to come back, and how long the fleet leaves it alone |
 | `wa:events:<shard>:lease` | STRING (EX 30s) | client | which consumer reads a shard; exactly one at a time, which is what preserves order |
 | `wa:consumer:<cid>` | STRING (EX 15s) | client | consumer heartbeat and the shards it holds |
 | `wa:cursor:<sid>` | STRING | client | last `epoch:seq` the client processed for a session |
+
+**The epoch counter is the one key here with no lifetime, and that is a decision.** A
+client keeps the highest epoch it has seen for a session and drops every event below it,
+which is what stops a late event from a previous owner overwriting the state of the
+instance running the account now. A counter that expired while nobody held the session
+would start again at one on the next acquisition, and an owner still holding eight -- a
+paused process, a socket that outlived its lease, a delivery that sat in a queue -- would
+then out-rank the live one and be accepted. So a client must never treat a lower epoch as
+fresh, whatever the gap, and nothing but the connector deletes this key. An account logged
+out, whether it asked to be or WhatsApp imposed it, keeps its counter: the inbox is still
+there and the account can be paired again under the same `sid`, so a counter starting over
+would have the client discard the pairing itself.
+
+There is exactly one moment the connector knows an account is gone, and it is the teardown
+itself. Everything else is a guess, and the guesses are left unclosed: an id a
+`session.wake` named and nothing ever paired keeps its counter, so does an account deleted
+before this rule existed, and so does one whose `session.delete` was **delivered twice** --
+the second delivery is answered from the command record without the teardown running, while
+the adoption that answered it has written the counter back. Roughly sixty bytes each.
+
+Reclaiming any of them means telling a deleted account from one waiting to be paired again,
+and from this side those are identical: both have no rows at all. The record of a delete
+does not settle it either, because it is kept for a day and the same `sid` can be paired
+again inside that day -- dropping the counter on the strength of it restarts a live
+session's fencing token under a cursor that is already higher, which is a TTL's damage
+arriving by another road. The client is the only side that knows which sessions it still
+has an inbox for, which is why no sweep is offered here rather than offered with a caveat.
 
 **Four keys left this table rather than being explained in it.** `wa:sessions` and
 `wa:session:<sid>` described a registry of session state that was never built, and
