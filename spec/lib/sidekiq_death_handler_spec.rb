@@ -165,6 +165,39 @@ RSpec.describe SidekiqDeathHandler do
       expect(reply.reload).to have_attributes(status: 'sent', external_error: nil)
     end
 
+    # This job is queued for every message that gets created -- the customer's own, the
+    # agent's private notes, the activity lines -- and it is the channel service that
+    # decides there is nothing to send. A job that dies before reaching that decision never
+    # got to find out, so "failed to send" on one of those rows is a lie about a message
+    # nobody was sending.
+    it 'leaves alone a message the channel was never going to send' do
+      conversation = message.conversation
+      others = {
+        incoming: create(:message, message_type: :incoming, account: account, inbox: inbox, conversation: conversation),
+        note: create(:message, message_type: :outgoing, private: true, account: account, inbox: inbox, conversation: conversation),
+        activity: create(:message, message_type: :activity, account: account, inbox: inbox, conversation: conversation)
+      }
+
+      others.each_value { |row| described_class.call(job_for('SendReplyJob', [row.id]), exception) }
+
+      expect(others.values.map(&:reload)).to all(have_attributes(status: 'sent', external_error: nil))
+    end
+
+    # Two more rows the service would have skipped, both reachable in the same window: a
+    # voice-call bubble is a call status indicator, never a send, and a message deleted
+    # between its creation and the job's run already reads as removed, so failing it would
+    # put an error on something the agent cannot resend and can barely see.
+    it 'leaves alone a voice call bubble and a message deleted before the job ran' do
+      call = create(:message, message_type: :outgoing, content_type: 'voice_call', account: account, inbox: inbox,
+                              conversation: message.conversation)
+      deleted = create(:message, message_type: :outgoing, account: account, inbox: inbox, conversation: message.conversation)
+      deleted.update!(content_attributes: { deleted: true })
+
+      [call, deleted].each { |row| described_class.call(job_for('SendReplyJob', [row.id]), exception) }
+
+      expect([call.reload, deleted.reload]).to all(have_attributes(status: 'sent', external_error: nil))
+    end
+
     # The tracker call sits between the report and the marking, and the outer rescue would
     # swallow the marking with it. SendReplyJob.report_exhausted_email_failure already
     # settles this order for the retry path: a tracker hiccup must not cost the agent the

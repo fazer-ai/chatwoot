@@ -97,14 +97,29 @@ class SendReplyJob < ApplicationJob
     end
   end
 
-  # Two channels route here without this job being what reaches the contact: the widget
-  # broadcasts the reply over the cable and the API channel fires a webhook, both when the
-  # message is created, and all this job does is queue the email-continuity notification.
-  # So its failure is a failure to notify, not to deliver, and marking the message would
-  # tell the agent to resend one the customer already has. Asked of the routing table
-  # rather than a list of our own, which would be a second place to keep in sync.
+  # Whether this job was what would have put this message in front of the contact. Two ways
+  # it was not, and in both a "failed to send" is a lie about a row nobody was sending.
+  #
+  # The channel: the widget broadcasts the reply over the cable and the API channel fires a
+  # webhook, both when the message is created, so all this job does on those two is queue
+  # the email-continuity notification. Its failure there is a failure to notify, not to
+  # deliver, and marking the message would tell the agent to resend one the customer is
+  # reading on screen. Asked of the routing table rather than a list of our own, which
+  # would be a second place to keep in sync.
+  #
+  # The message: `perform` runs for every message that gets created -- the customer's own,
+  # private notes, activity lines, bubbles for a voice call -- and it is
+  # Base::SendOnChannelService that decides there is nothing to send, well after this job
+  # has started. Its rule is mirrored here, deliberately and not delegated to: the service
+  # is upstream's, its predicates are private, and instantiating one needs the concrete
+  # channel class this job resolves. A job that died before reaching that decision never
+  # got to find out, and those are the failures that fill the dead set: a database in
+  # trouble takes out `Message.find` on the first line of `perform`.
   def self.delivers_message?(message)
-    CHANNEL_SERVICES[message.conversation.inbox.channel.class.to_s] != NOTIFICATION_ONLY_SERVICE
+    return false if CHANNEL_SERVICES[message.conversation.inbox.channel.class.to_s] == NOTIFICATION_ONLY_SERVICE
+
+    (message.outgoing? || message.template?) && !message.private? &&
+      message.content_type != 'voice_call' && !message.deleted?
   end
 
   NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze
