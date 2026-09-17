@@ -7,8 +7,10 @@ class SendReplyJob < ApplicationJob
   # specific one above it.
   #
   # Everything else retryable: when the attempts run out the message must not be left
-  # sitting on "sent" with a clock next to it. Nobody is watching the dead set, so an
-  # exhausted job is the last chance to tell the agent it did not go.
+  # sitting on "sent" with a clock next to it. SidekiqDeathHandler marks whatever reaches
+  # the dead set, but this block names the actual error and runs for a job that never gets
+  # there, because returning normally from retry_on tells ActiveJob the failure was
+  # handled.
   retry_on Whatsapp::Session::Errors::Error, wait: :polynomially_longer, attempts: 4 do |job, error|
     Rails.logger.error "SendReplyJob exhausted retries for message #{job.arguments.first}: #{error.message}"
     fail_message(job.arguments.first, error.message)

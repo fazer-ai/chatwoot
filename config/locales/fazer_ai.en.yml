@@ -62,6 +62,7 @@ en:
           media_too_large: The attachment is too large to send.
           invalid_payload: WhatsApp rejected the message content.
           still_processing: The message was still being sent elsewhere and could not be confirmed.
+          send_failed_after_retries: The message could not be sent after several attempts. Send it again.
         provider_connection:
           wrong_phone_number: The phone number you are trying to link is not the same as the one you have configured. Please make sure the phone number is correct before scanning the QR code.
           reconnect_loop_detected: The connection could not be re-established after several attempts. Automatic retries continue at increasing intervals. If this persists, disconnect the inbox and pair it again by scanning a new QR code.

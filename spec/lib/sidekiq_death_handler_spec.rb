@@ -73,6 +73,85 @@ RSpec.describe SidekiqDeathHandler do
     expect { described_class.call(job_for('SendReplyJob', [1]), exception) }.not_to raise_error
   end
 
+  # The report tells whoever watches logs and Sentry. It never told the one person who can
+  # act on it: the agent looking at the conversation, for whom the reply still reads as sent.
+  describe 'the message a dead reply left behind' do
+    let(:reason) { I18n.with_locale(:pt_BR) { I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries') } }
+    let(:account) { create(:account, locale: 'pt_BR') }
+    let(:message) { create(:message, message_type: :outgoing, account: account) }
+
+    before do
+      allow(Rails.logger).to receive(:warn)
+      allow(ChatwootExceptionTracker).to receive(:new).and_return(instance_double(ChatwootExceptionTracker, capture_exception: true))
+    end
+
+    it 'marks it failed with a sentence the agent can read' do
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'failed', external_error: reason, source_id: nil)
+      expect(message.external_error).not_to include('the provider never answered', 'translation missing')
+    end
+
+    it 'writes that sentence in the language of the account' do
+      other = create(:message, message_type: :outgoing, account: create(:account, locale: 'en'))
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+      described_class.call(job_for('SendReplyJob', [other.id]), exception)
+
+      expect([message.reload.external_error, other.reload.external_error]).to all(be_present)
+      expect(message.external_error).not_to eq(other.external_error)
+      expect(other.external_error).to eq(I18n.with_locale(:en) { I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries') })
+    end
+
+    # Most of the dead set is not SendReplyJob, and for those there is no message to mark:
+    # reaching for one anyway would put a resolution warning under every other dead job.
+    it 'leaves a message alone when a dead job of another class names it' do
+      described_class.call(job_for('WebhookJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'sent', external_error: nil)
+      expect(Rails.logger).not_to have_received(:warn)
+    end
+
+    # source_id is written only by the provider confirming the message exists, so failing it
+    # would invite a resend of something the contact already has.
+    it 'leaves a message alone once something proves it left' do
+      message.update!(source_id: 'mid.already-out')
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'sent', external_error: nil, source_id: 'mid.already-out')
+    end
+
+    it 'does not walk a terminal status back to failed' do
+      message.update!(status: :delivered)
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'delivered', external_error: nil)
+    end
+
+    it 'says the same thing when the same job dies twice' do
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+      first = message.reload.external_error
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'failed', external_error: first)
+    end
+
+    # The rule this file already lives by: the report is not best-effort and everything
+    # around it is. SendReplyJob.fail_message re-raises when it cannot write, which is right
+    # inside a retry_on block and would take down the report here.
+    it 'still reports when the message cannot be marked' do
+      allow(SendReplyJob).to receive(:fail_message).and_raise(StandardError, 'row locked')
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(Rails.logger).to have_received(:error).with(/the provider never answered/)
+      expect(Rails.logger).not_to have_received(:error).with(/handler failed/)
+    end
+  end
+
   # Enrichment is best-effort; the report is not. Resolving the message hits the database,
   # and the failures that fill the dead set come with a database in trouble — so an
   # exception there used to take out the line reporting the ORIGINAL error and the tracker

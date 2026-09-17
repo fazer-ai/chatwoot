@@ -4,7 +4,8 @@
 # discovered by the customer complaining rather than by monitoring — the dead set held
 # hundreds of SendReplyJob failures nobody had been told about. The handler runs for
 # every job class; SendReplyJob additionally resolves the message so the report names the
-# account, inbox and conversation instead of an opaque id.
+# account, inbox and conversation instead of an opaque id, and marks it failed, because a
+# reply whose job died is one the agent is still reading as sent.
 class SidekiqDeathHandler
   def self.call(job, exception)
     new(job, exception).report
@@ -27,6 +28,7 @@ class SidekiqDeathHandler
       "error=#{@exception.class}: #{@exception.message}#{suffix}"
     )
     ChatwootExceptionTracker.new(@exception, account: safely('account') { account }).capture_exception
+    safely('message status') { fail_message }
   rescue StandardError => e
     # A death handler that raises takes the reporting down with the job it was reporting.
     Rails.logger.error "[SIDEKIQ][DEAD] handler failed: #{e.message}"
@@ -66,6 +68,31 @@ class SidekiqDeathHandler
 
   def account
     message&.account
+  end
+
+  # The last place that can tell the agent. Every retry_on block in SendReplyJob marks the
+  # message before giving up, but they only cover the exceptions they name: anything else
+  # exhausts Sidekiq's own retries and lands here with the row still on `sent`, which the
+  # dashboard draws as a delivered reply with a clock next to it.
+  #
+  # Through SendReplyJob.fail_message for the terminal-status and source_id rules it
+  # already owns, and inside `safely` because it re-raises when it cannot write. That is
+  # right inside a retry_on block, where the raise is what buries the job and brings it
+  # here; here there is nothing left to escalate to, and a raise would cost the report.
+  def fail_message
+    return if message.blank?
+
+    SendReplyJob.fail_message(message.id, failure_reason)
+  end
+
+  # Persisted for the agent to read, from a worker that never sets a locale, so the
+  # account's has to be named here or every agent reads English. No InvalidLocale guard
+  # like MessageTemplates::Template::CsatSurvey's: `locale` is an enum over
+  # LANGUAGES_CONFIG, and all 42 of its values are in I18n.available_locales, so an
+  # unloaded one is not reachable. A null column yields nil, which with_locale treats as
+  # "leave it alone" and resolves to the default.
+  def failure_reason
+    I18n.with_locale(account&.locale) { I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries') }
   end
 
   def context_suffix
