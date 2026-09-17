@@ -446,7 +446,8 @@ RSpec.describe Whatsapp::Session::Facade do
   # invalid and the session never pairs. `false` is not a value it accepts either, which
   # is why a backend without the capability sends nothing at all.
   it 'describes the call policy the way the contract types it' do
-    channel.setup_channel_provider
+    allow(channel).to receive(:session_capabilities).and_return(%w[groups])
+    channel.provider_service.setup_channel_provider
     expect(backend.last_command.calls).to be_nil
 
     allow(channel).to receive(:session_capabilities).and_return(%w[calls])

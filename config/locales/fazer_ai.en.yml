@@ -101,6 +101,9 @@ en:
         demote:
           single: "%{author_name} demoted %{contact_name} to member"
           multiple: "%{author_name} demoted %{contact_names} and %{last_contact_name} to member"
+      whatsapp_call:
+        voice: "%{contact_name} called on WhatsApp"
+        video: "%{contact_name} made a video call on WhatsApp"
       groups_update:
         subject_changed: '%{author_name} changed the group name to "%{value}"'
         description_changed: "%{author_name} changed the group description"

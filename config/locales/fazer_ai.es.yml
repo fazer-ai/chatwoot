@@ -101,6 +101,9 @@ es:
         demote:
           single: "%{author_name} degradó a %{contact_name} a miembro"
           multiple: "%{author_name} degradó a %{contact_names} y %{last_contact_name} a miembros"
+      whatsapp_call:
+        voice: "%{contact_name} llamó por WhatsApp"
+        video: "%{contact_name} hizo una videollamada por WhatsApp"
       groups_update:
         subject_changed: '%{author_name} cambió el nombre del grupo a "%{value}"'
         description_changed: "%{author_name} cambió la descripción del grupo"
