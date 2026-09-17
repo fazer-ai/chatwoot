@@ -166,6 +166,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     msg = unwrap_message_content(@raw_message[:message])
     content_attributes = { external_created_at: baileys_extract_message_timestamp(@raw_message[:messageTimestamp]) }
     content_attributes[:external_sender_name] = 'WhatsApp' unless incoming?
+    add_internal_channel_attributes(content_attributes)
 
     if type == 'reaction'
       content_attributes[:in_reply_to_external_id] = msg.dig(:reactionMessage, :key, :id)
@@ -182,6 +183,13 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     content_attributes[:referral] = referral if referral.present?
 
     content_attributes
+  end
+
+  def add_internal_channel_attributes(content_attributes)
+    return if @raw_message[:internalChannelMirror].blank?
+
+    content_attributes[:internal_channel_mirror] = true
+    content_attributes[:internal_channel_source_inbox_id] = @raw_message.dig(:internalChannelMirror, :sourceInboxId)
   end
 
   # A row with nothing to render. Both kinds go through the unsupported bubble, which
