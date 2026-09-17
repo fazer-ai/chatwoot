@@ -1062,6 +1062,81 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       expect(message.sender).to be_nil
       expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
     end
+
+    context 'when the recipient is another Baileys channel in the account' do
+      let(:source_phone) { '5512991104483' }
+      let(:source_lid) { '39513900470303' }
+      let(:target_phone) { '5512991662153' }
+      let(:target_lid) { '267585203486864' }
+      let!(:target_channel) do
+        create(:channel_whatsapp, account: inbox.account, phone_number: "+#{target_phone}", provider: 'baileys',
+                                  provider_config: { webhook_verify_token: 'target_token' }, validate_provider_config: false,
+                                  provider_connection: { connection: 'open' }, received_messages: false)
+      end
+
+      def internal_channel_echo_params(id)
+        raw_message = {
+          key: { id: id, remoteJid: "#{target_lid}@lid", remoteJidAlt: "#{target_phone}@s.whatsapp.net", fromMe: true,
+                 addressingMode: 'lid' },
+          messageTimestamp: timestamp,
+          message: { conversation: 'ola' }
+        }
+        { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert', data: { type: 'append', messages: [raw_message] } }
+      end
+
+      before do
+        whatsapp_channel.update_columns(phone_number: "+#{source_phone}") # rubocop:disable Rails/SkipsModelValidations
+        create(:contact, account: inbox.account, phone_number: "+#{source_phone}", identifier: "#{source_lid}@lid")
+        stub_request(:post, %r{baileys\.api/connections/.+/send-receipts}).to_return(status: 200, body: '{}')
+      end
+
+      it 'mirrors the phone echo as an incoming message in the recipient inbox' do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: internal_channel_echo_params('INTERNAL_1')).perform
+
+        mirrored = target_channel.inbox.messages.find_by!(source_id: 'INTERNAL_1')
+        expect(mirrored).to be_incoming
+        expect(mirrored.content).to eq('ola')
+        expect(mirrored.sender.phone_number).to eq("+#{source_phone}")
+        expect(mirrored.conversation).to be_open
+        expect(mirrored.content_attributes).to include('internal_channel_mirror' => true, 'internal_channel_source_inbox_id' => inbox.id)
+      end
+
+      it 'opens a new conversation when the previous recipient conversation was resolved' do
+        source_contact = inbox.account.contacts.find_by!(phone_number: "+#{source_phone}")
+        contact_inbox = create(:contact_inbox, inbox: target_channel.inbox, contact: source_contact, source_id: source_lid)
+        resolved = create(
+          :conversation, inbox: target_channel.inbox, contact: source_contact, contact_inbox: contact_inbox, status: :resolved
+        )
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: internal_channel_echo_params('INTERNAL_2')).perform
+        end.to change { target_channel.inbox.conversations.count }.by(1)
+
+        mirrored = target_channel.inbox.messages.find_by!(source_id: 'INTERNAL_2')
+        expect(mirrored.conversation).not_to eq(resolved)
+        expect(mirrored.conversation).to be_open
+      end
+
+      it 'does not duplicate a message already received by the recipient channel' do
+        source_contact = inbox.account.contacts.find_by!(phone_number: "+#{source_phone}")
+        contact_inbox = create(:contact_inbox, inbox: target_channel.inbox, contact: source_contact, source_id: source_lid)
+        conversation = create(:conversation, inbox: target_channel.inbox, contact: source_contact, contact_inbox: contact_inbox)
+        create(:message, inbox: target_channel.inbox, conversation: conversation, sender: source_contact,
+                         message_type: :incoming, source_id: 'INTERNAL_3', content: 'ola')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: internal_channel_echo_params('INTERNAL_3')).perform
+        end.not_to(change { target_channel.inbox.messages.where(source_id: 'INTERNAL_3').count })
+      end
+
+      it 'does not mirror into a disconnected recipient channel' do
+        target_channel.update_columns(provider_connection: {}) # rubocop:disable Rails/SkipsModelValidations
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: internal_channel_echo_params('INTERNAL_4')).perform
+        end.not_to(change { target_channel.inbox.messages.where(source_id: 'INTERNAL_4').count })
+      end
+    end
   end
 
   describe 'membership request stub handling' do
