@@ -16,18 +16,24 @@ class SidekiqDeathHandler
     @exception = exception
   end
 
-  # The enrichment is best-effort and the report is not. Resolving the message hits the
-  # database, and the failures that fill the dead set are exactly the ones that come with a
-  # database in trouble: an exception raised while building the context used to take out
-  # the line reporting the original error AND the exception tracker call, so monitoring
-  # recorded "handler failed" and lost the terminal failure it exists to surface.
+  # The log line is the one thing here that is not best-effort; everything after it is, and
+  # each step is wrapped on its own so no step can cost the next one. Resolving the message
+  # hits the database, and the failures that fill the dead set are exactly the ones that
+  # come with a database in trouble: an exception raised while building the context used to
+  # take out the line reporting the original error AND the exception tracker call, so
+  # monitoring recorded "handler failed" and lost the terminal failure it exists to
+  # surface. The tracker sits between the report and the marking for the same reason it
+  # does in SendReplyJob.report_exhausted_email_failure: a Sentry hiccup must not cost the
+  # agent the only signal they can act on.
   def report
     suffix = safely('context') { context_suffix } || ''
     Rails.logger.error(
       "[SIDEKIQ][DEAD] #{job_class} jid=#{@job['jid']} queue=#{@job['queue']} " \
       "error=#{@exception.class}: #{@exception.message}#{suffix}"
     )
-    ChatwootExceptionTracker.new(@exception, account: safely('account') { account }).capture_exception
+    safely('tracker') do
+      ChatwootExceptionTracker.new(@exception, account: safely('account') { account }).capture_exception
+    end
     safely('message status') { fail_message }
   rescue StandardError => e
     # A death handler that raises takes the reporting down with the job it was reporting.

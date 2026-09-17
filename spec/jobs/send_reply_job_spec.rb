@@ -125,10 +125,16 @@ RSpec.describe SendReplyJob do
   end
 
   # Until this existed an exhausted job died in the dead set in silence, leaving the
-  # bubble on "sent" with a clock next to it. Nobody watches the dead set, so the
-  # exhaustion handler is the last chance to tell the agent it did not go out.
+  # bubble on "sent" with a clock next to it. SidekiqDeathHandler now marks whatever
+  # reaches that set, but these blocks name the actual error and run for a job that never
+  # gets there, since returning normally from retry_on handles the exception.
   describe 'when retries run out' do
-    let(:message) { create(:message, message_type: :outgoing) }
+    # A channel this job actually delivers on. The default factory inbox is a widget,
+    # where it only queues the email notification and none of these errors can be raised.
+    let(:inbox) { create(:channel_line).inbox }
+    let(:message) do
+      create(:message, message_type: :outgoing, inbox: inbox, conversation: create(:conversation, inbox: inbox))
+    end
 
     it 'marks the message failed with the reason' do
       described_class.fail_message(message.id, 'the provider never answered')

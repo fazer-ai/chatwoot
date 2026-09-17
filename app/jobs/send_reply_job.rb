@@ -70,6 +70,7 @@ class SendReplyJob < ApplicationJob
   def self.fail_message(message_id, reason)
     message = Message.find_by(id: message_id)
     return if message.blank?
+    return unless delivers_message?(message)
 
     return fail_email_message(message, reason) if message.conversation.inbox.channel.is_a?(Channel::Email)
 
@@ -95,6 +96,18 @@ class SendReplyJob < ApplicationJob
       Messages::StatusUpdateService.new(message, 'failed', reason).perform
     end
   end
+
+  # Two channels route here without this job being what reaches the contact: the widget
+  # broadcasts the reply over the cable and the API channel fires a webhook, both when the
+  # message is created, and all this job does is queue the email-continuity notification.
+  # So its failure is a failure to notify, not to deliver, and marking the message would
+  # tell the agent to resend one the customer already has. Asked of the routing table
+  # rather than a list of our own, which would be a second place to keep in sync.
+  def self.delivers_message?(message)
+    CHANNEL_SERVICES[message.conversation.inbox.channel.class.to_s] != NOTIFICATION_ONLY_SERVICE
+  end
+
+  NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze
 
   CHANNEL_SERVICES = {
     'Channel::TwitterProfile' => '::Twitter::SendOnTwitterService',

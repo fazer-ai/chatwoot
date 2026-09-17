@@ -78,7 +78,13 @@ RSpec.describe SidekiqDeathHandler do
   describe 'the message a dead reply left behind' do
     let(:reason) { I18n.with_locale(:pt_BR) { I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries') } }
     let(:account) { create(:account, locale: 'pt_BR') }
-    let(:message) { create(:message, message_type: :outgoing, account: account) }
+    # Not the default factory inbox: that one is a widget, where this job only sends the
+    # email notification and the reply has already reached the customer over the cable.
+    let(:inbox) { create(:channel_line, account: account).inbox }
+    let(:message) do
+      create(:message, message_type: :outgoing, account: account, inbox: inbox,
+                       conversation: create(:conversation, account: account, inbox: inbox))
+    end
 
     before do
       allow(Rails.logger).to receive(:warn)
@@ -93,14 +99,19 @@ RSpec.describe SidekiqDeathHandler do
     end
 
     it 'writes that sentence in the language of the account' do
-      other = create(:message, message_type: :outgoing, account: create(:account, locale: 'en'))
+      english = create(:account, locale: 'en')
+      english_inbox = create(:channel_line, account: english).inbox
+      other = create(:message, message_type: :outgoing, account: english, inbox: english_inbox,
+                               conversation: create(:conversation, account: english, inbox: english_inbox))
 
       described_class.call(job_for('SendReplyJob', [message.id]), exception)
       described_class.call(job_for('SendReplyJob', [other.id]), exception)
 
       expect([message.reload.external_error, other.reload.external_error]).to all(be_present)
       expect(message.external_error).not_to eq(other.external_error)
-      expect(other.external_error).to eq(I18n.with_locale(:en) { I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries') })
+      expect(other.external_error).to eq(I18n.with_locale(:en) do
+        I18n.t('errors.inboxes.channel.outgoing.send_failed_after_retries')
+      end)
     end
 
     # Most of the dead set is not SendReplyJob, and for those there is no message to mark:
@@ -137,6 +148,33 @@ RSpec.describe SidekiqDeathHandler do
       described_class.call(job_for('SendReplyJob', [message.id]), exception)
 
       expect(message.reload).to have_attributes(status: 'failed', external_error: first)
+    end
+
+    # The reply reached the customer by another path entirely: the widget broadcasts over
+    # the cable and the API channel fires a webhook, both when the message is created. All
+    # this job does there is queue the email-continuity notification, so a Redis blip that
+    # kills it says nothing about the reply -- and marking it failed would tell the agent
+    # to resend something the customer is reading on screen.
+    it 'leaves a widget reply alone, where the job only sends the notification' do
+      widget = create(:channel_widget, account: account)
+      conversation = create(:conversation, account: account, inbox: widget.inbox)
+      reply = create(:message, message_type: :outgoing, account: account, conversation: conversation, inbox: widget.inbox)
+
+      described_class.call(job_for('SendReplyJob', [reply.id]), exception)
+
+      expect(reply.reload).to have_attributes(status: 'sent', external_error: nil)
+    end
+
+    # The tracker call sits between the report and the marking, and the outer rescue would
+    # swallow the marking with it. SendReplyJob.report_exhausted_email_failure already
+    # settles this order for the retry path: a tracker hiccup must not cost the agent the
+    # one signal they can act on.
+    it 'still marks the message when the tracker blows up' do
+      allow(ChatwootExceptionTracker).to receive(:new).and_raise(StandardError, 'sentry down')
+
+      described_class.call(job_for('SendReplyJob', [message.id]), exception)
+
+      expect(message.reload).to have_attributes(status: 'failed', external_error: reason)
     end
 
     # The rule this file already lives by: the report is not best-effort and everything
