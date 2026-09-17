@@ -126,8 +126,6 @@ class SendReplyJob < ApplicationJob
       message.content_type != 'voice_call' && !(message.deleted? && !message.removed_reaction?)
   end
 
-  NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze
-
   CHANNEL_SERVICES = {
     'Channel::TwitterProfile' => '::Twitter::SendOnTwitterService',
     'Channel::TwilioSms' => '::Twilio::SendOnTwilioService',
@@ -141,6 +139,10 @@ class SendReplyJob < ApplicationJob
     'Channel::WebWidget' => '::Messages::SendEmailNotificationService',
     'Channel::Api' => '::Messages::SendEmailNotificationService'
   }.freeze
+
+  # The value the two notification-only channels above share, named so delivers_message?
+  # can ask the table about them instead of keeping a second list of channels.
+  NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze
 
   def perform(message_id)
     message = Message.find(message_id)
