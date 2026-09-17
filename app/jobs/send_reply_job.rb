@@ -7,8 +7,10 @@ class SendReplyJob < ApplicationJob
   # specific one above it.
   #
   # Everything else retryable: when the attempts run out the message must not be left
-  # sitting on "sent" with a clock next to it. Nobody is watching the dead set, so an
-  # exhausted job is the last chance to tell the agent it did not go.
+  # sitting on "sent" with a clock next to it. SidekiqDeathHandler marks whatever reaches
+  # the dead set, but this block names the actual error and runs for a job that never gets
+  # there, because returning normally from retry_on tells ActiveJob the failure was
+  # handled.
   retry_on Whatsapp::Session::Errors::Error, wait: :polynomially_longer, attempts: 4 do |job, error|
     Rails.logger.error "SendReplyJob exhausted retries for message #{job.arguments.first}: #{error.message}"
     fail_message(job.arguments.first, error.message)
@@ -68,6 +70,7 @@ class SendReplyJob < ApplicationJob
   def self.fail_message(message_id, reason)
     message = Message.find_by(id: message_id)
     return if message.blank?
+    return unless delivers_message?(message)
 
     return fail_email_message(message, reason) if message.conversation.inbox.channel.is_a?(Channel::Email)
 
@@ -94,6 +97,35 @@ class SendReplyJob < ApplicationJob
     end
   end
 
+  # Whether this job was what would have put this message in front of the contact. Two ways
+  # it was not, and in both a "failed to send" is a lie about a row nobody was sending.
+  #
+  # The channel: the widget broadcasts the reply over the cable and the API channel fires a
+  # webhook, both when the message is created, so all this job does on those two is queue
+  # the email-continuity notification. Its failure there is a failure to notify, not to
+  # deliver, and marking the message would tell the agent to resend one the customer is
+  # reading on screen. Asked of the routing table rather than a list of our own, which
+  # would be a second place to keep in sync.
+  #
+  # The message: `perform` runs for every message that gets created -- the customer's own,
+  # private notes, activity lines, bubbles for a voice call -- and it is
+  # Base::SendOnChannelService that decides there is nothing to send, well after this job
+  # has started. Its rule is mirrored here, deliberately and not delegated to: the service
+  # is upstream's, its predicates are private, and instantiating one needs the concrete
+  # channel class this job resolves. A job that died before reaching that decision never
+  # got to find out, and those are the failures that fill the dead set: a database in
+  # trouble takes out `Message.find` on the first line of `perform`.
+  #
+  # Mirrored whole, including the removed-reaction exception: that row is deleted on
+  # purpose and its empty content is the payload that clears the emoji on the contact's
+  # phone, so it is a send like any other and a send that failed has to say so.
+  def self.delivers_message?(message)
+    return false if CHANNEL_SERVICES[message.conversation.inbox.channel.class.to_s] == NOTIFICATION_ONLY_SERVICE
+
+    (message.outgoing? || message.template?) && !message.private? &&
+      message.content_type != 'voice_call' && !(message.deleted? && !message.removed_reaction?)
+  end
+
   CHANNEL_SERVICES = {
     'Channel::TwitterProfile' => '::Twitter::SendOnTwitterService',
     'Channel::TwilioSms' => '::Twilio::SendOnTwilioService',
@@ -107,6 +139,10 @@ class SendReplyJob < ApplicationJob
     'Channel::WebWidget' => '::Messages::SendEmailNotificationService',
     'Channel::Api' => '::Messages::SendEmailNotificationService'
   }.freeze
+
+  # The value the two notification-only channels above share, named so delivers_message?
+  # can ask the table about them instead of keeping a second list of channels.
+  NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze
 
   def perform(message_id)
     message = Message.find(message_id)
