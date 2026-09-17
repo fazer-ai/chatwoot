@@ -128,7 +128,7 @@ frames, but both sides have to agree on them, so they are part of the contract:
 | `wa:lease-epoch:<sid>` | STRING (**no expiry**) | connector | the epoch that owner holds the session under, incremented on every acquisition. It must outlive every disconnection, logout and re-pairing of the account, and only a `session.delete` removes it |
 | `wa:idem:<sid>:<key>` | STRING | connector | command idempotency (`msg:<message_id>` for sends) |
 | `wa:resume:<sid>` | STRING (EX 60s) | connector | a turn taken to bring an unowned session back, so the fleet asks about one account once per window |
-| `wa:quarantine:<sid>` | HASH (EX wait + 1h) | connector | `strikes` and `until`: how many times a session failed to come back, and how long the fleet leaves it alone |
+| `wa:quarantine:<sid>` | HASH (EX wait + 1h) | connector | `strikes` and `until`: how many times a session failed to come back, and how long the fleet leaves it alone. `attempt` is the connector's own bookkeeping, telling one failure from a retry of the same one |
 | `wa:events:<shard>:lease` | STRING (EX 30s) | client | which consumer reads a shard; exactly one at a time, which is what preserves order |
 | `wa:consumer:<cid>` | STRING (EX 15s) | client | consumer heartbeat and the shards it holds |
 | `wa:cursor:<sid>` | STRING | client | last `epoch:seq` the client processed for a session |
