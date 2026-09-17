@@ -34,6 +34,9 @@ en:
       limit_reached: You can pin up to %{limit} conversations.
       conversation_resolved: A resolved conversation cannot be pinned.
       conversation_not_visible: This conversation is not in your list, so it cannot be pinned.
+    meta:
+      messaging_window_closed: Meta's reply window for this contact has closed. It reopens when the contact sends a new message.
+      messaging_window_closed_for_automation: Meta only accepts automated replies within 24 hours of the contact's last message. Take over the conversation to reply as an agent.
     whatsapp:
       group_announcement_only: Only administrators are allowed to send messages in this group
       group_description_cannot_be_removed: WhatsApp does not allow a group description to be removed once it is set. Replace the text instead.

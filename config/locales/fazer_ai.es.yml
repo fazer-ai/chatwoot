@@ -34,6 +34,9 @@ es:
       limit_reached: Puede fijar hasta %{limit} conversaciones.
       conversation_resolved: No se puede fijar una conversación resuelta.
       conversation_not_visible: Esta conversación no está en su lista, así que no se puede fijar.
+    meta:
+      messaging_window_closed: La ventana de respuesta de Meta para este contacto se cerró. Se reabre cuando el contacto envíe un mensaje nuevo.
+      messaging_window_closed_for_automation: Meta solo acepta respuestas automáticas hasta 24 horas después del último mensaje del contacto. Toma la conversación para responder como agente.
     whatsapp:
       group_announcement_only: Solo los administradores pueden enviar mensajes en este grupo
       group_description_cannot_be_removed: WhatsApp no permite eliminar la descripción de un grupo una vez definida. Reemplace el texto en lugar de borrarlo.
