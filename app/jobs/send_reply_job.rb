@@ -115,11 +115,15 @@ class SendReplyJob < ApplicationJob
   # channel class this job resolves. A job that died before reaching that decision never
   # got to find out, and those are the failures that fill the dead set: a database in
   # trouble takes out `Message.find` on the first line of `perform`.
+  #
+  # Mirrored whole, including the removed-reaction exception: that row is deleted on
+  # purpose and its empty content is the payload that clears the emoji on the contact's
+  # phone, so it is a send like any other and a send that failed has to say so.
   def self.delivers_message?(message)
     return false if CHANNEL_SERVICES[message.conversation.inbox.channel.class.to_s] == NOTIFICATION_ONLY_SERVICE
 
     (message.outgoing? || message.template?) && !message.private? &&
-      message.content_type != 'voice_call' && !message.deleted?
+      message.content_type != 'voice_call' && !(message.deleted? && !message.removed_reaction?)
   end
 
   NOTIFICATION_ONLY_SERVICE = '::Messages::SendEmailNotificationService'.freeze

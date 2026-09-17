@@ -198,6 +198,19 @@ RSpec.describe SidekiqDeathHandler do
       expect([call.reload, deleted.reload]).to all(have_attributes(status: 'sent', external_error: nil))
     end
 
+    # The one deleted row the channel is still supposed to send. Chatwoot reuses the
+    # reaction row and marks it deleted on a toggle, and the empty content it then carries
+    # is what clears the emoji on the contact's phone, so a send that never went through
+    # has to say so: without it the emoji is gone here and still there for the contact.
+    it 'marks a removed reaction whose send died' do
+      reaction = create(:message, message_type: :outgoing, account: account, inbox: inbox, conversation: message.conversation)
+      reaction.update!(content_attributes: { deleted: true, is_reaction: true })
+
+      described_class.call(job_for('SendReplyJob', [reaction.id]), exception)
+
+      expect(reaction.reload).to have_attributes(status: 'failed', external_error: reason)
+    end
+
     # The tracker call sits between the report and the marking, and the outer rescue would
     # swallow the marking with it. SendReplyJob.report_exhausted_email_failure already
     # settles this order for the retry path: a tracker hiccup must not cost the agent the
