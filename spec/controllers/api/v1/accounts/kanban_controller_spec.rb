@@ -34,7 +34,8 @@ RSpec.describe 'Kanban API', type: :request do
       body = response.parsed_body
       expect(body.dig('kanban_data', 'novo_lead').pluck('id')).to eq([conversation.display_id])
       expect(body.dig('kanban_data', 'novo_lead', 0, 'messages_count')).to eq(conversation.messages.count)
-      expect(body.values.to_s).not_to include(hidden_conversation.display_id.to_s)
+      visible_ids = body['kanban_data'].values.flatten.pluck('id')
+      expect(visible_ids).not_to include(hidden_conversation.display_id)
     end
 
     it 'filters by contact name without treating wildcard characters as SQL wildcards' do
