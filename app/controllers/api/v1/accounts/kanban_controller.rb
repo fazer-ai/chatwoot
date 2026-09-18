@@ -20,7 +20,7 @@ class Api::V1::Accounts::KanbanController < Api::V1::Accounts::BaseController
 
   def move
     status = params.require(:status)
-    return render json: { error: 'invalid_status' }, status: :unprocessable_entity unless STATUSES.include?(status)
+    return render json: { error: 'invalid_status' }, status: :unprocessable_content unless STATUSES.include?(status)
 
     @conversation.with_lock do
       @conversation.update!(custom_attributes: @conversation.custom_attributes.to_h.merge('kanban_status' => status))

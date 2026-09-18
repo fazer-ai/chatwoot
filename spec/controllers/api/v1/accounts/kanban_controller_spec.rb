@@ -33,7 +33,7 @@ RSpec.describe 'Kanban API', type: :request do
       expect(response).to have_http_status(:ok)
       body = response.parsed_body
       expect(body.dig('kanban_data', 'novo_lead').pluck('id')).to eq([conversation.display_id])
-      expect(body.dig('kanban_data', 'novo_lead', 0, 'messages_count')).to eq(1)
+      expect(body.dig('kanban_data', 'novo_lead', 0, 'messages_count')).to eq(conversation.messages.count)
       expect(body.values.to_s).not_to include(hidden_conversation.display_id.to_s)
     end
 
@@ -67,7 +67,7 @@ RSpec.describe 'Kanban API', type: :request do
           headers: agent.create_new_auth_token,
           as: :json
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_content)
       expect(conversation.reload.custom_attributes).not_to have_key('kanban_status')
     end
 
