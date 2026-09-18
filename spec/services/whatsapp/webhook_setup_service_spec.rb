@@ -397,6 +397,26 @@ describe Whatsapp::WebhookSetupService do
       end
     end
 
+    # Upstream's rule, kept through the rewrite: a number Meta reports CONNECTED is registered
+    # even after its one-time code verification expired, so an EXPIRED code alone must not
+    # send a second /register.
+    context 'when the number is CONNECTED with an expired code verification' do
+      before do
+        allow(api_client).to receive(:phone_number_verification_status).with('123456789')
+                                                                       .and_return({ 'status' => 'CONNECTED',
+                                                                                     'code_verification_status' => 'EXPIRED' })
+        allow(health_service).to receive(:fetch_health_status).and_return({ platform_type: 'APPLICABLE', throughput_level: 'APPLICABLE' })
+        allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+      end
+
+      it 'does not register the number' do
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).not_to receive(:register_phone_number)
+          service.perform
+        end
+      end
+    end
+
     context 'when the code verification read answers something that is not VERIFIED' do
       # EXPIRED is a documented Meta value and is a definite "no", not a silence.
       %w[NOT_VERIFIED PENDING EXPIRED].each do |status|
