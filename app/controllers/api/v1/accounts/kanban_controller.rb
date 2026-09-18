@@ -49,7 +49,13 @@ class Api::V1::Accounts::KanbanController < Api::V1::Accounts::BaseController
 
   def filtered_conversations
     scope = Conversations::PermissionFilterService.new(Current.account.conversations, Current.user, Current.account).perform
-    scope = scope.includes(:assignee, :contact, :inbox).order(last_activity_at: :desc, id: :desc)
+    scope = scope
+            .select(<<~SQL.squish)
+              conversations.*,
+              (SELECT COUNT(*) FROM messages WHERE messages.conversation_id = conversations.id) AS messages_count
+            SQL
+            .includes(:assignee, :contact, :inbox)
+            .order(last_activity_at: :desc, id: :desc)
     scope = filter_by_status(scope)
     scope = filter_by_temperature(scope)
     scope = filter_by_score(scope)
@@ -138,7 +144,7 @@ class Api::V1::Accounts::KanbanController < Api::V1::Accounts::BaseController
       },
       inbox: { id: conversation.inbox_id, name: conversation.inbox&.name },
       assignee: conversation.assignee && { id: conversation.assignee_id, name: conversation.assignee.name },
-      messages_count: conversation.messages_count,
+      messages_count: messages_count(conversation),
       last_activity_at: conversation.last_activity_at
     }
   end
@@ -157,9 +163,15 @@ class Api::V1::Accounts::KanbanController < Api::V1::Accounts::BaseController
       temperatura: attributes.to_h['temperatura'],
       servico_interesse: attributes.to_h['servico_interesse'],
       ultimo_contato: conversation.last_activity_at,
-      total_mensagens: conversation.messages_count,
+      total_mensagens: messages_count(conversation),
       inbox: conversation.inbox&.name,
       atribuido_a: conversation.assignee&.name
     }
+  end
+
+  def messages_count(conversation)
+    return conversation[:messages_count] if conversation.has_attribute?(:messages_count)
+
+    conversation.messages.count
   end
 end

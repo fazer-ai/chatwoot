@@ -14,6 +14,7 @@ RSpec.describe 'Kanban API', type: :request do
     )
   end
   let!(:hidden_conversation) { create(:conversation, account: account, inbox: other_inbox) }
+  let!(:message) { create(:message, account: account, inbox: inbox, conversation: conversation) }
 
   before do
     create(:inbox_member, user: agent, inbox: inbox)
@@ -32,6 +33,7 @@ RSpec.describe 'Kanban API', type: :request do
       expect(response).to have_http_status(:ok)
       body = response.parsed_body
       expect(body.dig('kanban_data', 'novo_lead').pluck('id')).to eq([conversation.display_id])
+      expect(body.dig('kanban_data', 'novo_lead', 0, 'messages_count')).to eq(1)
       expect(body.values.to_s).not_to include(hidden_conversation.display_id.to_s)
     end
 
