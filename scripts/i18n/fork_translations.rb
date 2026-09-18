@@ -33,13 +33,14 @@ REFERENCE_LOCALE = 'en'
 # The sync-fork flow bumps it together with the upstream merge.
 UPSTREAM_BASE = 'v4.18.0'
 
-class ForkTranslations
+class ForkTranslations # rubocop:disable Metrics/ClassLength
   def initialize
     @errors = []
   end
 
   def check
     check_reference_locale_exists
+    check_fork_files_have_no_duplicated_keys
     check_fork_keys_are_not_duplicated_upstream
     check_every_key_exists_in_reference
     check_reference_keys_are_translated_everywhere
@@ -180,6 +181,31 @@ class ForkTranslations
   end
 
   # A fork key living in both trees means someone edited an upstream file.
+  # JSON.parse keeps the last of two identical keys in one object and drops the first without a
+  # word. A second `EVENTS` block appended to automation.json parsed, passed every check below and
+  # hid the kanban automation events for two releases (chatwoot-pro#88). Scoped to the fork's own
+  # files: upstream's are byte-identical to the release and not ours to fix.
+  def check_fork_files_have_no_duplicated_keys
+    ensure_parser_rejects_duplicated_keys
+    FE_TREES.product(fork_locales).each do |tree, locale|
+      tree_paths(tree[:fork], tree[:layout], locale).sort.each do |path|
+        JSON.parse(File.read(path), allow_duplicate_key: false)
+      rescue JSON::ParserError => e
+        @errors << "#{path}: #{e.message}; o JSON fica so com a ultima ocorrencia"
+      end
+    end
+  end
+
+  # `allow_duplicate_key` arrived in json 2.13. An older parser ignores the option and keeps the
+  # last value, which is the exact silence this check exists to break, so it fails on its own
+  # instead of passing every file. Ruby 3.4 ships 2.9; the CI workflow installs a newer gem.
+  def ensure_parser_rejects_duplicated_keys
+    JSON.parse('{"a":1,"a":2}', allow_duplicate_key: false)
+    abort "json #{JSON::VERSION} nao rejeita chaves duplicadas; instale json >= 2.13 (gem install json)"
+  rescue JSON::ParserError
+    nil
+  end
+
   def check_fork_keys_are_not_duplicated_upstream
     FE_TREES.product(fork_locales).each { |tree, locale| check_tree_not_duplicated(tree, locale) }
   end
