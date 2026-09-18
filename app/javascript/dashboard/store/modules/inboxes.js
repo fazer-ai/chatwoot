@@ -410,6 +410,15 @@ export const actions = {
       throwErrorMessage(error);
     }
   },
+  rotateHmacToken: async ({ commit }, inboxId) => {
+    try {
+      const response = await InboxesAPI.rotateHmacToken(inboxId);
+      commit(types.default.EDIT_INBOXES, response.data);
+      return response.data;
+    } catch (error) {
+      return throwErrorMessage(error);
+    }
+  },
 };
 
 export const mutations = {

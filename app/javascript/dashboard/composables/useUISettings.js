@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import { useStore, useStoreGetters } from 'dashboard/composables/store';
+import wootConstants from 'dashboard/constants/globals';
 
 export const DEFAULT_CONVERSATION_SIDEBAR_ITEMS_ORDER = Object.freeze([
   { name: 'scheduled_messages' },
@@ -155,9 +156,19 @@ export function useUISettings() {
     });
   };
 
+  const isOnExpandedLayout = computed(() => {
+    const {
+      LAYOUT_TYPES: { CONDENSED },
+    } = wootConstants;
+    const { conversation_display_type: conversationDisplayType = CONDENSED } =
+      uiSettings.value;
+    return conversationDisplayType !== CONDENSED;
+  });
+
   return {
     uiSettings,
     updateUISettings,
+    isOnExpandedLayout,
     conversationSidebarItemsOrder: useConversationSidebarItemsOrder(uiSettings),
     contactSidebarItemsOrder: useContactSidebarItemsOrder(uiSettings),
     isContactSidebarItemOpen: key => !!uiSettings.value[key],

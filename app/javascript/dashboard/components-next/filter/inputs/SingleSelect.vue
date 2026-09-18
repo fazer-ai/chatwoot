@@ -139,7 +139,7 @@ const toggleSelected = option => {
 </script>
 
 <template>
-  <DropdownContainer>
+  <DropdownContainer class="min-w-0">
     <template #trigger="{ toggle }">
       <Button
         v-if="selectedItem"
@@ -173,7 +173,7 @@ const toggleSelected = option => {
         <template #icon>
           <Icon :icon="placeholderIcon" class="text-n-slate-11" />
         </template>
-        <span class="text-n-slate-11">{{
+        <span class="text-n-slate-11 min-w-0 truncate">{{
           placeholder || t('COMBOBOX.PLACEHOLDER')
         }}</span>
       </Button>

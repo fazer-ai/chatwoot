@@ -11,9 +11,13 @@ class Whatsapp::PhoneNormalizers::BasePhoneNormalizer
     raise NotImplementedError, 'Subclasses must implement #normalize'
   end
 
-  # All forms the number may appear as on WhatsApp (including itself).
-  # Country normalizers override this when numbers have known variants.
+  # Formats an existing contact_inbox may already be stored under, most canonical first.
   def variants(waid)
+    [normalize(waid)]
+  end
+
+  # Opt-in per country: only safe where the alternate form can't belong to a different subscriber.
+  def contact_candidates(waid)
     [waid]
   end
 

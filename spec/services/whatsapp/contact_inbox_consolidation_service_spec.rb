@@ -5,7 +5,7 @@ describe Whatsapp::ContactInboxConsolidationService do
     create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false)
   end
   let(:inbox) { whatsapp_channel.inbox }
-  let(:phone) { '5511912345678' }
+  let(:phone) { '5511998765432' }
   let(:lid) { '12345678' }
   let(:identifier) { "#{lid}@lid" }
 
@@ -274,8 +274,8 @@ describe Whatsapp::ContactInboxConsolidationService do
     end
 
     context 'when the stored phone carries the Brazilian ninth digit and the webhook delivers the canonical number without it' do
-      let(:phone) { '551112345678' }
-      let(:stored_phone) { '5511912345678' }
+      let(:phone) { '551198765432' }
+      let(:stored_phone) { '5511998765432' }
 
       context 'when a phone-based contact_inbox exists under the other variant' do
         let!(:contact) { create(:contact, account: inbox.account, phone_number: "+#{stored_phone}") }
@@ -332,8 +332,8 @@ describe Whatsapp::ContactInboxConsolidationService do
     end
 
     context 'when the stored phone misses the Brazilian ninth digit and the webhook delivers it' do
-      let(:phone) { '5511912345678' }
-      let(:stored_phone) { '551112345678' }
+      let(:phone) { '5511998765432' }
+      let(:stored_phone) { '551198765432' }
 
       let!(:contact) { create(:contact, account: inbox.account, phone_number: "+#{stored_phone}") }
       let!(:phone_contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: stored_phone) }
@@ -346,18 +346,20 @@ describe Whatsapp::ContactInboxConsolidationService do
       end
     end
 
-    context 'when the stored phone uses a different Argentinian "9" variant' do
+    context 'when the stored phone is the Argentinian mobile form and the webhook delivers the number without the 9' do
       let(:phone) { '541112345678' }
       let(:stored_phone) { '5491112345678' }
 
       let!(:contact) { create(:contact, account: inbox.account, phone_number: "+#{stored_phone}") }
       let!(:phone_contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: stored_phone) }
 
-      it 'migrates the contact_inbox to lid and aligns the phone to the canonical number' do
+      # A 54 number without the 9 is a valid landline of its own, so the two forms are not one line:
+      # synthesizing the 549 alias here could answer a landline through a different subscriber's thread.
+      it 'leaves the contact stored under the mobile form alone' do
         described_class.new(inbox: inbox, phone: phone, lid: lid, identifier: identifier).perform
 
-        expect(phone_contact_inbox.reload.source_id).to eq(lid)
-        expect(contact.reload.phone_number).to eq("+#{phone}")
+        expect(phone_contact_inbox.reload.source_id).to eq(stored_phone)
+        expect(contact.reload.phone_number).to eq("+#{stored_phone}")
       end
     end
   end

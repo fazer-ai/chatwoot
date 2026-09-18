@@ -24,7 +24,7 @@ RSpec.describe 'Conversation assignee contract', type: :request do
   let!(:unassigned_conversation) { create(:conversation, account: account, inbox: inbox, status: :open) }
   let!(:human_conversation) { create(:conversation, account: account, inbox: inbox, status: :open, assignee: agent) }
   let!(:bot_conversation) do
-    create(:conversation, account: account, inbox: inbox, status: :open, assignee_agent_bot: agent_bot)
+    create(:conversation, account: account, inbox: inbox, status: :open, ai_assignee: agent_bot)
   end
 
   # Ids the fixture can be diffed on: the conversations by the role they play here, and both

@@ -181,7 +181,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   end
 
   def toggle_priority
-    @conversation.toggle_priority(params[:priority])
+    @conversation.toggle_priority(permitted_update_params[:priority])
     head :ok
   end
 
@@ -282,6 +282,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def permitted_update_params
     # TODO: Move the other conversation attributes to this method and remove specific endpoints for each attribute
+    raise ActionController::ParameterMissing, :priority unless params[:priority].nil? || Conversation.priorities.key?(params[:priority])
+
     params.permit(:priority)
   end
 
@@ -329,9 +331,11 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     @conversation.snoozed_until = parse_date_time(params[:snoozed_until].to_s) if params[:snoozed_until]
   end
 
-  # Only stages the change; `toggle_status` owns the save.
+  # Only stages the change; `toggle_status` owns the save. Upstream locks and saves here, but the
+  # status is already staged on the row by then, and a lock refuses a record with unsaved changes;
+  # the single save is also what lets the 409 on a takeover answer before anything is reopened.
   def handle_human_open
-    @conversation.assignee_agent_bot = nil
+    @conversation.ai_assignee = nil
     @conversation.assignee = Current.user if Current.user.agent?
   end
 

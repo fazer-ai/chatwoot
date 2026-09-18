@@ -33,7 +33,7 @@ describe Whatsapp::EmbeddedSignupService do
 
       phone_service = instance_double(Whatsapp::PhoneInfoService)
       allow(Whatsapp::PhoneInfoService).to receive(:new)
-        .with(params[:waba_id], params[:phone_number_id], access_token).and_return(phone_service)
+        .with(params[:waba_id], params[:phone_number_id], access_token, expected_phone_number: anything).and_return(phone_service)
       allow(phone_service).to receive(:perform).and_return(phone_info)
 
       channel_creation = instance_double(Whatsapp::ChannelCreationService)
@@ -106,8 +106,13 @@ describe Whatsapp::EmbeddedSignupService do
 
     context 'when parameters are invalid' do
       it 'raises ArgumentError for missing parameters' do
-        invalid_service = described_class.new(account: account, params: { code: '', business_id: '', waba_id: '' })
-        expect { invalid_service.perform }.to raise_error(ArgumentError, /Required parameters are missing/)
+        invalid_service = described_class.new(account: account, params: { code: '', waba_id: '' })
+        expect { invalid_service.perform }.to raise_error(ArgumentError, 'Required parameters are missing: code, waba_id')
+      end
+
+      it 'does not require business_id' do
+        coexistence_service = described_class.new(account: account, params: params.except(:business_id))
+        expect { coexistence_service.perform }.not_to raise_error
       end
     end
 
@@ -224,7 +229,7 @@ describe Whatsapp::EmbeddedSignupService do
     context 'with reauthorization flow' do
       let(:inbox_id) { 123 }
       let(:cloud_inbox) { instance_double(Inbox) }
-      let(:cloud_channel) { instance_double(Channel::Whatsapp, provider: 'whatsapp_cloud') }
+      let(:cloud_channel) { instance_double(Channel::Whatsapp, provider: 'whatsapp_cloud', phone_number: '+1234567890') }
       let(:reauth_service) { instance_double(Whatsapp::ReauthorizationService) }
       let(:service_with_inbox) do
         described_class.new(account: account, params: params, inbox_id: inbox_id)

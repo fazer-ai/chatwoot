@@ -17,9 +17,9 @@ const props = defineProps({
   // Inside a folder or an applied filter, status and group type are already decided by
   // the query itself, so offering them here would let the agent contradict the folder
   // they are standing in. Order is the one choice that stays theirs.
-  sortOnly: {
+  showStatusFilter: {
     type: Boolean,
-    default: false,
+    default: true,
   },
 });
 
@@ -39,7 +39,9 @@ const [showActionsDropdown, toggleDropdown] = useToggle();
 // Wider, not narrower. Narrowing it for the single-row case was the wrong instinct: with
 // only the sort row left, the label sits next to the longest value in the whole menu
 // ("Atividade mais recente primeiro"), and at w-72 the label truncated to "Orden...".
-const dropdownWidth = computed(() => (props.sortOnly ? 'w-[22rem]' : 'w-72'));
+const dropdownWidth = computed(() =>
+  props.showStatusFilter ? 'w-72' : 'w-[22rem]'
+);
 
 const currentStatusFilter = computed(() => {
   return chatStatusFilter.value || wootConstants.STATUS_TYPE.OPEN;
@@ -192,7 +194,10 @@ const handleGroupTypeChange = value => {
         'ltr:right-0 rtl:left-0': isOnExpandedLayout,
       }"
     >
-      <div v-if="!sortOnly" class="flex items-center justify-between gap-2">
+      <div
+        v-if="showStatusFilter"
+        class="flex items-center justify-between gap-2"
+      >
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('CHAT_LIST.CHAT_SORT.STATUS') }}
         </span>
@@ -207,7 +212,7 @@ const handleGroupTypeChange = value => {
       <div class="flex items-center justify-between gap-2">
         <span
           class="text-sm truncate text-n-slate-12"
-          :class="{ 'shrink-0': sortOnly }"
+          :class="{ 'shrink-0': !showStatusFilter }"
         >
           {{ $t('CHAT_LIST.CHAT_SORT.ORDER_BY') }}
         </span>
@@ -219,7 +224,10 @@ const handleGroupTypeChange = value => {
           @update:model-value="handleSortChange"
         />
       </div>
-      <div v-if="!sortOnly" class="flex items-center justify-between gap-2">
+      <div
+        v-if="showStatusFilter"
+        class="flex items-center justify-between gap-2"
+      >
         <span class="text-sm truncate text-n-slate-12">
           {{ $t('GROUP.FILTER.TYPE_LABEL') }}
         </span>

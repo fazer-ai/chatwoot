@@ -129,44 +129,15 @@ describe('ReconnectService', () => {
   });
 
   describe('fetchConversations', () => {
-    it('should update the filters with disconnected time and the threshold', async () => {
-      reconnectService.getSecondsSinceDisconnect = vi.fn().mockReturnValue(100);
-      await reconnectService.fetchConversations();
-      expect(storeMock.dispatch).toHaveBeenCalledWith('updateChatListFilters', {
-        page: null,
-        updatedWithin: 115,
-      });
-    });
-
     it('should dispatch updateChatListFilters and fetchAllConversations', async () => {
-      reconnectService.getSecondsSinceDisconnect = vi.fn().mockReturnValue(100);
       await reconnectService.fetchConversations();
       expect(storeMock.dispatch).toHaveBeenCalledWith('updateChatListFilters', {
-        page: null,
-        updatedWithin: 115,
-      });
-      expect(storeMock.dispatch).toHaveBeenCalledWith('fetchAllConversations');
-    });
-
-    it('should dispatch updateChatListFilters and reset updatedWithin', async () => {
-      reconnectService.getSecondsSinceDisconnect = vi.fn().mockReturnValue(100);
-      await reconnectService.fetchConversations();
-      expect(storeMock.dispatch).toHaveBeenCalledWith('updateChatListFilters', {
+        page: 1,
         updatedWithin: null,
       });
-    });
-
-    // The fetch asks for one tab, so a conversation that left it while the socket was down is not
-    // in the answer and its stale copy survives the merge. A reconnect is the one moment we know
-    // events were missed, so the tab is reconciled outright rather than waiting for the list to
-    // outgrow its badge, which never happens on a tab of several pages.
-    it('should reconcile the current tab after refetching', async () => {
-      reconnectService.getSecondsSinceDisconnect = vi.fn().mockReturnValue(100);
-      await reconnectService.fetchConversations();
-      expect(storeMock.dispatch).toHaveBeenCalledWith(
-        'reconcileConversationTab',
-        storeMock.getters.getChatListFilters
-      );
+      expect(storeMock.dispatch).toHaveBeenCalledWith('fetchAllConversations', {
+        replaceExisting: true,
+      });
     });
   });
 
@@ -176,20 +147,11 @@ describe('ReconnectService', () => {
       await reconnectService.fetchFilteredOrSavedConversations(payload);
       expect(storeMock.dispatch).toHaveBeenCalledWith(
         'fetchFilteredConversations',
-        { queryData: payload, page: 1, sortBy: undefined }
-      );
-    });
-
-    // Page 1 of oldest-first and page 1 of newest-first are different conversations, so a
-    // refetch without the sort merges a page the agent is not looking at and leaves the
-    // visible ones stale, which is what the reconnect exists to prevent.
-    it('should carry the selected sort order', async () => {
-      storeMock.getters.getChatSortFilter = 'last_activity_at_asc';
-      const payload = { test: 'data' };
-      await reconnectService.fetchFilteredOrSavedConversations(payload);
-      expect(storeMock.dispatch).toHaveBeenCalledWith(
-        'fetchFilteredConversations',
-        { queryData: payload, page: 1, sortBy: 'last_activity_at_asc' }
+        {
+          queryData: payload,
+          page: 1,
+          replaceExisting: true,
+        }
       );
     });
   });
@@ -247,10 +209,11 @@ describe('ReconnectService', () => {
     });
   });
 
-  describe('fetchConversationMessagesOnReconnect', () => {
-    it('should dispatch syncActiveConversationMessages if conversationId exists', async () => {
+  describe('refreshActiveConversationOnReconnect', () => {
+    it('should refresh the conversation and its messages if conversationId exists', async () => {
       routerMock.currentRoute.value.params.conversation_id = 1;
-      await reconnectService.fetchConversationMessagesOnReconnect();
+      await reconnectService.refreshActiveConversationOnReconnect();
+      expect(storeMock.dispatch).toHaveBeenCalledWith('getConversation', 1);
       expect(storeMock.dispatch).toHaveBeenCalledWith(
         'syncActiveConversationMessages',
         { conversationId: 1 }
@@ -259,7 +222,11 @@ describe('ReconnectService', () => {
 
     it('should not dispatch syncActiveConversationMessages if conversationId does not exist', async () => {
       routerMock.currentRoute.value.params.conversation_id = null;
-      await reconnectService.fetchConversationMessagesOnReconnect();
+      await reconnectService.refreshActiveConversationOnReconnect();
+      expect(storeMock.dispatch).not.toHaveBeenCalledWith(
+        'getConversation',
+        expect.anything()
+      );
       expect(storeMock.dispatch).not.toHaveBeenCalledWith(
         'syncActiveConversationMessages',
         expect.anything()
@@ -306,13 +273,13 @@ describe('ReconnectService', () => {
         reconnectService,
         'fetchConversationsOnReconnect'
       );
-      const spyMessages = vi.spyOn(
+      const spyActiveConversation = vi.spyOn(
         reconnectService,
-        'fetchConversationMessagesOnReconnect'
+        'refreshActiveConversationOnReconnect'
       );
       await reconnectService.handleRouteSpecificFetch();
       expect(spyConversations).toHaveBeenCalled();
-      expect(spyMessages).toHaveBeenCalled();
+      expect(spyActiveConversation).toHaveBeenCalled();
     });
 
     it('should fetch notifications if current route is an inbox view route', async () => {

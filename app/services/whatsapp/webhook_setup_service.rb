@@ -1,15 +1,18 @@
 class Whatsapp::WebhookSetupService
-  def initialize(channel, waba_id = nil, access_token = nil, deadline: Whatsapp::GraphDeadline::NONE)
+  attr_reader :registration_error
+
+  def initialize(channel, waba_id = nil, access_token = nil, is_coexistence: nil, deadline: Whatsapp::GraphDeadline::NONE)
     @channel = channel
     @waba_id = waba_id || channel.provider_config['business_account_id']
     @access_token = access_token || channel.provider_config['api_key']
     @api_client = Whatsapp::FacebookApiClient.new(@access_token, deadline: deadline)
+    @is_coexistence = is_coexistence
   end
 
   def perform
     validate_parameters!
 
-    register_phone_number if registration_needed?
+    register_phone_number if should_register_phone_number?
 
     setup_webhook
   end
@@ -20,6 +23,18 @@ class Whatsapp::WebhookSetupService
   end
 
   private
+
+  # Coexistence numbers come pre-registered, so /register is redundant. @is_coexistence (from the
+  # FE's FINISH event) skips the health API call entirely; the is_on_biz_app fallback only runs for
+  # callers that pass no signal at all (nil): manual setup, voice toggle, direct webhook
+  # re-registration, since an explicit `false` already means the FE positively ruled out coexistence.
+  # Everything else asks the two reads in `registration_needed?`.
+  def should_register_phone_number?
+    return false if @is_coexistence
+    return false if @is_coexistence.nil? && health_data.to_h[:is_on_biz_app]
+
+    registration_needed?
+  end
 
   def validate_parameters!
     raise ArgumentError, 'Channel is required' if @channel.blank?
@@ -45,6 +60,10 @@ class Whatsapp::WebhookSetupService
     # save the confirmation AFTER a registration Meta accepted. Dropping it on any of those loses a
     # PIN that may well be live and makes the next attempt send a different one, which is the exact
     # disagreement this change exists to prevent.
+    #
+    # The error is kept for the callers that treat registration as part of their own outcome
+    # (manual setup), which raise it once the webhook is in place.
+    @registration_error = e
     Rails.logger.warn("[WHATSAPP] Phone registration #{registration_outcome(e)} but continuing " \
                       "(phone_number_id #{phone_number_id}): #{e.message}")
   end
@@ -125,7 +144,7 @@ class Whatsapp::WebhookSetupService
   end
 
   # `subscribed_fields` is a WABA-wide app subscription, so keep `calls` whenever this inbox or
-  # any sibling on the same WABA has voice on — otherwise a non-calling sibling's setup would
+  # any sibling on the same WABA has voice on: otherwise a non-calling sibling's setup would
   # rewrite the shared subscription and drop calls for a calling-enabled sibling.
   def calls_enabled_on_waba?
     return true if @channel.provider_config['calling_enabled']
@@ -149,10 +168,9 @@ class Whatsapp::WebhookSetupService
   # never on a silence. Both reads below answer three things, not two, and the third one used to be
   # spelled with the same word as "no" (#590).
   #
-  # The order is load-bearing and is the one the old `||` produced, so the calls stay where they
-  # were: a definite "not verified" registers without asking health at all, and anything else asks,
-  # because health names the pending state on its own. What is new is only that "could not tell"
-  # takes the second branch instead of the first.
+  # A definite "not verified" registers without consulting the pending state, and anything else asks
+  # it, because health names the pending state on its own. "Could not tell" takes the second branch
+  # instead of the first.
   def registration_needed?
     return true if verification_state == :not_verified
 
@@ -160,20 +178,24 @@ class Whatsapp::WebhookSetupService
   end
 
   # `:verified`, `:not_verified`, `:unknown`. `:unknown` covers the read that never came back AND
-  # the 200 that came back without the field, which never reached a rescue at all: it used to turn
+  # the 200 that came back with neither field, which never reached a rescue at all: it used to turn
   # into `false` inside the client, one layer further down than anyone was looking.
   def verification_state
     phone_number_id = @channel.provider_config['phone_number_id']
-    status = @api_client.phone_number_code_verification_status(phone_number_id)
+    status = @api_client.phone_number_verification_status(phone_number_id)
 
     if status.blank?
-      Rails.logger.error("[WHATSAPP] Phone number #{phone_number_id} answered no code verification status; " \
+      Rails.logger.error("[WHATSAPP] Phone number #{phone_number_id} answered neither status nor code verification status; " \
                          'not deciding registration from it')
       return :unknown
     end
 
-    Rails.logger.info("[WHATSAPP] Phone number #{phone_number_id} code verification status: #{status}")
-    status == 'VERIFIED' ? :verified : :not_verified
+    Rails.logger.info("[WHATSAPP] Phone number #{phone_number_id} status: #{status['status']}, " \
+                      "code verification status: #{status['code_verification_status']}")
+    # A connected number is already registered even if its one-time code verification has expired.
+    # Otherwise, ownership verification is what says it is.
+    registered = status['status'] == 'CONNECTED' || status['code_verification_status'] == 'VERIFIED'
+    registered ? :verified : :not_verified
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP] Could not read the code verification status for #{phone_number_id}; " \
                        "not deciding registration from it: #{e.message}")
@@ -187,7 +209,7 @@ class Whatsapp::WebhookSetupService
   # `platform_type: NOT_APPLICABLE` means not fully set up, and `throughput.level: NOT_APPLICABLE`
   # means no messaging capacity assigned. Either one is the pending provisioning state.
   def pending_state
-    health_data = Whatsapp::HealthService.new(@channel).fetch_health_status
+    return :unknown if health_data.nil?
 
     # `:throughput_level`, not `dig(:throughput, :level)`. `throughput` is Meta's object kept
     # verbatim, so its keys are strings and the symbol dig has always answered nil: the throughput
@@ -198,8 +220,16 @@ class Whatsapp::WebhookSetupService
     pending = health_data[:platform_type] == 'NOT_APPLICABLE' ||
               health_data[:throughput_level] == 'NOT_APPLICABLE'
     pending ? :pending : :not_pending
+  end
+
+  # Read once: `should_register_phone_number?` asks it for the coexistence signal and `pending_state`
+  # for the provisioning state. `nil` when the read failed, so each asker can say it could not tell.
+  def health_data
+    return @health_data if defined?(@health_data)
+
+    @health_data = Whatsapp::HealthService.new(@channel).fetch_health_status
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP] Could not read the health status; not deciding registration from it: #{e.message}")
-    :unknown
+    @health_data = nil
   end
 end

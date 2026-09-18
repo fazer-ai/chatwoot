@@ -108,6 +108,10 @@ const props = defineProps({
   inboxPhoneNumber: { type: String, default: null },
   enableMentionDropdown: { type: Boolean, default: false },
   enableConversationMention: { type: Boolean, default: false },
+  // Global INSERT_INTO_RICH_EDITOR bus events (Copilot "Use this", article
+  // links) are meant for the conversation reply editor only — other mounted
+  // editors (canned responses, signature, etc.) must not consume them.
+  enableInsertEvents: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -937,7 +941,10 @@ onMounted(() => {
 // current cursor position.
 // Components using this
 // 1. SearchPopover.vue
-useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
+useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, content => {
+  if (!props.enableInsertEvents) return;
+  insertContentIntoEditor(content);
+});
 
 function insertMentionTrigger(char) {
   if (!editorView) return;

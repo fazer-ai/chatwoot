@@ -8,11 +8,6 @@ import {
 
 const MAX_DISCONNECT_SECONDS = 10800;
 
-// The disconnect delay threshold is added to account for delays in identifying
-// disconnections (for example, the websocket disconnection takes up to 3 seconds)
-// while fetching the latest updated conversations or messages.
-const DISCONNECT_DELAY_THRESHOLD = 15;
-
 class ReconnectService {
   constructor(store, router) {
     this.store = store;
@@ -50,43 +45,25 @@ class ReconnectService {
 
   fetchConversations = async () => {
     await this.store.dispatch('updateChatListFilters', {
-      page: null,
-      updatedWithin:
-        this.getSecondsSinceDisconnect() + DISCONNECT_DELAY_THRESHOLD,
-    });
-    await this.store.dispatch('fetchAllConversations');
-    // Reset the updatedWithin in the store chat list filter after fetching conversations when the user is reconnected
-    await this.store.dispatch('updateChatListFilters', {
+      page: 1,
       updatedWithin: null,
     });
-    await this.reconcileConversationTab();
+    // Page 1 REPLACES the list rather than merging into it. The merge only ever adds or replaces,
+    // so a conversation that left this tab while the socket was down would otherwise keep its
+    // stale copy on screen; replacing is what takes it off.
+    await this.store.dispatch('fetchAllConversations', {
+      replaceExisting: true,
+    });
   };
 
-  // The fetch above asks for one tab, so a conversation that LEFT that tab while the socket was
-  // down is not in the answer, and the merge that applies it only ever adds or replaces. The stale
-  // copy stays on the list.
-  //
-  // The list watcher normally catches that, but only when the list ends up longer than the tab's
-  // count, which needs the whole tab to fit in what the agent has loaded. On a tab of several
-  // pages the residue hides inside the count and nothing on screen contradicts anything, so the
-  // one moment we know events were missed is the moment to ask outright.
-  reconcileConversationTab = async () => {
-    await this.store.dispatch(
-      'reconcileConversationTab',
-      this.store.getters.getChatListFilters
-    );
-  };
-
-  // The sort travels with the refetch, and it has to: page 1 of oldest-first and page 1 of
-  // newest-first are different conversations entirely, so refetching without it merges a
-  // page the agent is not looking at and leaves the visible ones stale -- the exact staleness
-  // this reconnect exists to clear.
+  // The store action applies the agent's sort itself, so page 1 here is page 1 of what they are
+  // looking at, and `replaceExisting` swaps the list for it instead of merging a stale one.
   fetchFilteredOrSavedConversations = async queryData => {
     try {
       await this.store.dispatch('fetchFilteredConversations', {
         queryData,
         page: 1,
-        sortBy: this.store.getters.getChatSortFilter,
+        replaceExisting: true,
       });
     } catch (error) {
       // Ignore error, reconnect flow should continue
@@ -108,10 +85,11 @@ class ReconnectService {
     }
   };
 
-  fetchConversationMessagesOnReconnect = async () => {
+  refreshActiveConversationOnReconnect = async () => {
     const { conversation_id: conversationId } =
       this.router.currentRoute.value.params;
     if (conversationId) {
+      await this.store.dispatch('getConversation', Number(conversationId));
       await this.store.dispatch('syncActiveConversationMessages', {
         conversationId: Number(conversationId),
       });
@@ -137,7 +115,7 @@ class ReconnectService {
     const currentRoute = this.router.currentRoute.value.name;
     if (isAConversationRoute(currentRoute, true)) {
       await this.fetchConversationsOnReconnect();
-      await this.fetchConversationMessagesOnReconnect();
+      await this.refreshActiveConversationOnReconnect();
     } else if (isAInboxViewRoute(currentRoute, true)) {
       await this.fetchNotificationsOnReconnect(
         this.store.getters['notifications/getNotificationFilters']

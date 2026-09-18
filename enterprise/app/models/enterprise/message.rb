@@ -38,7 +38,7 @@ module Enterprise::Message
     super
   end
 
-  def mark_pending_conversation_as_open_for_human_response
+  def mark_pending_conversation_as_open_for_human_response # rubocop:disable Metrics/CyclomaticComplexity
     return unless captain_pending_conversation?
     return unless human_response?
     return if private?
@@ -51,6 +51,7 @@ module Enterprise::Message
     Current.executed_by = nil
 
     begin
+      conversation.ai_assignee = nil if conversation.ai_assignee_type == 'Captain::Assistant'
       conversation.open!
       return unless conversation.saved_change_to_status?
 

@@ -8,6 +8,7 @@ import inboxMixin from 'shared/mixins/inboxMixin';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { getAllowedFileTypesByChannel } from '@chatwoot/utils';
 import VideoCallButton from '../VideoCallButton.vue';
+import RequestContactInfoButton from '../RequestContactInfoButton.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { mapGetters } from 'vuex';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -26,6 +27,7 @@ export default {
     DropdownBody,
     DropdownSection,
     DropdownItem,
+    RequestContactInfoButton,
   },
   mixins: [inboxMixin],
   props: {
@@ -148,6 +150,7 @@ export default {
     'selectContentTemplate',
     'toggleQuotedReply',
     'scheduleMessage',
+    'requestContactInfoTemplate',
   ],
   setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
@@ -382,6 +385,10 @@ export default {
         faded
         sm
         @click="$emit('selectWhatsappTemplate')"
+      />
+      <RequestContactInfoButton
+        v-if="!isOnPrivateNote"
+        @request-template="$emit('requestContactInfoTemplate')"
       />
       <NextButton
         v-if="enableContentTemplates"

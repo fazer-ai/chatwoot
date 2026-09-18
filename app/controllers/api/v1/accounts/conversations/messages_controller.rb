@@ -104,6 +104,14 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message_finder ||= MessageFinder.new(@conversation, params)
   end
 
+  # A pending contact-info request keeps its marker across the retry: the eligibility check reads it,
+  # and a bare retry would send the interactive message with no record of what it is.
+  def retry_content_attributes
+    return message.content_attributes if message.content_attributes.dig('whatsapp_contact_info', 'type') == 'request'
+
+    {}
+  end
+
   def permitted_params
     params.permit(:id, :target_language, :status, :external_error, :content)
   end
@@ -139,7 +147,7 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   # Called from inside the claim's lock, so the reset cannot land between a delete and its check.
   def reset_message_state_for_retry
     previous_source_id = message.source_id
-    retry_attributes = { content_attributes: {} }
+    retry_attributes = { content_attributes: retry_content_attributes }
     # An API or web widget inbox owns its source_id: it is the caller's own reference, and the
     # reply job there is an email notification rather than a channel send. On a provider channel
     # a stale id instead makes Base::SendOnChannelService treat the message as already sent.
@@ -195,3 +203,5 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     Rails.configuration.dispatcher.dispatch(event, Time.zone.now, conversation: @conversation, user: user, is_private: params[:private])
   end
 end
+
+Api::V1::Accounts::Conversations::MessagesController.prepend_mod_with('Api::V1::Accounts::Conversations::MessagesController')

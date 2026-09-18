@@ -12,6 +12,8 @@ describe Whatsapp::GraphRequestOptions do
       app/services/whatsapp/business_management_token_validation_service.rb
       app/services/whatsapp/csat_template_service.rb
       app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb
+      app/services/whatsapp/business_profile_service.rb
+      app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb
       enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb
     ]
   end
@@ -109,7 +111,10 @@ describe Whatsapp::GraphRequestOptions do
     # The check above answers "nothing without a ceiling", and it answers that for zero calls too.
     # This one measures that the scan actually reached the calls it was supposed to inspect.
     expected = {
-      'app/services/whatsapp/facebook_api_client.rb' => 10,
+      # Sixteen since 4.18.0: the guided manual setup reads the WABA's numbers, templates, business
+      # profile, permissions and subscriptions through this client, and each read got the ceiling
+      # on the way in.
+      'app/services/whatsapp/facebook_api_client.rb' => 16,
       'app/services/whatsapp/health_service.rb' => 1,
       # Six rather than ten: the five sends now go through `post_outgoing`, which is the single
       # HTTParty call on the outgoing path and carries the ceiling for all of them. That
@@ -119,6 +124,8 @@ describe Whatsapp::GraphRequestOptions do
       'app/services/whatsapp/business_management_token_validation_service.rb' => 2,
       'app/services/whatsapp/csat_template_service.rb' => 3,
       'app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb' => 1,
+      'app/services/whatsapp/business_profile_service.rb' => 1,
+      'app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb' => 1,
       'enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb' => 4
     }
     present = present_sources(guarded_sources)

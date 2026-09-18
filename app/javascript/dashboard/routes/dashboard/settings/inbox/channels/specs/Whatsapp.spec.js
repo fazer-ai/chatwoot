@@ -87,14 +87,19 @@ const WhatsappEmbeddedSignupStub = defineComponent({
   template: '<div class="WhatsappEmbeddedSignup-stub" />',
 });
 
-const mountWhatsapp = (overrides = {}) => {
+const EMBEDDED_SIGNUP_CONFIG = {
+  whatsappAppId: 'appid',
+  whatsappConfigurationId: 'configid',
+};
+
+const mountWhatsapp = (
+  overrides = {},
+  chatwootConfig = EMBEDDED_SIGNUP_CONFIG
+) => {
   // window.chatwootConfig is read in setup() to decide whether to render the
   // embedded signup component. Force "configured" by default so a provider
   // selection of "whatsapp" routes to the embedded signup branch.
-  window.chatwootConfig = {
-    whatsappAppId: 'appid',
-    whatsappConfigurationId: 'configid',
-  };
+  window.chatwootConfig = chatwootConfig;
 
   return mount(Whatsapp, {
     props: {
@@ -107,7 +112,13 @@ const mountWhatsapp = (overrides = {}) => {
         WhatsappEmbeddedSignup: WhatsappEmbeddedSignupStub,
         Twilio: stubComponent('Twilio'),
         ThreeSixtyDialogWhatsapp: stubComponent('ThreeSixtyDialogWhatsapp'),
+        // Upstream's guided manual setup and its access-request dialog read the Vuex store;
+        // these tests mount without one and never reach either branch.
+        WhatsappManualSetup: stubComponent('WhatsappManualSetup'),
         CloudWhatsapp: stubComponent('CloudWhatsapp'),
+        WhatsappAccessRequestDialog: stubComponent(
+          'WhatsappAccessRequestDialog'
+        ),
         ChannelSelector: ChannelSelectorStub,
         BaileysWhatsapp: stubComponent('BaileysWhatsapp'),
         ZapiWhatsapp: stubComponent('ZapiWhatsapp'),
@@ -155,6 +166,27 @@ describe('Whatsapp.vue (convert mode)', () => {
     await nextTick();
     expect(wrapper.find('.WhatsappEmbeddedSignup-stub').exists()).toBe(true);
     expect(wrapper.find('.ChannelSelector-stub').exists()).toBe(false);
+  });
+
+  // Upstream's guided manual setup creates a new inbox. Converting an existing one has to reach
+  // the fork's form, which dispatches `inboxes/convertProvider` for the inbox at hand; the
+  // 4.18.0 merge had routed both modes to the guided setup.
+  describe('manual setup without embedded signup configured', () => {
+    it('renders the convert-aware form in convert mode', async () => {
+      setRouteProvider('whatsapp');
+      const wrapper = mountWhatsapp({}, {});
+      await nextTick();
+      expect(wrapper.find('.CloudWhatsapp-stub').exists()).toBe(true);
+      expect(wrapper.find('.WhatsappManualSetup-stub').exists()).toBe(false);
+    });
+
+    it('renders the guided setup in create mode', async () => {
+      setRouteProvider('whatsapp_manual');
+      const wrapper = mountWhatsapp({ mode: 'create', inbox: null }, {});
+      await nextTick();
+      expect(wrapper.find('.WhatsappManualSetup-stub').exists()).toBe(true);
+      expect(wrapper.find('.CloudWhatsapp-stub').exists()).toBe(false);
+    });
   });
 
   // The badge is what tells the admin a provider is not settled yet, and it follows the

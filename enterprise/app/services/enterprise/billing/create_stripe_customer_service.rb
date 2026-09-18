@@ -93,6 +93,7 @@ class Enterprise::Billing::CreateStripeCustomerService
       # holds: a Time never equals the string that came back, and every run would write again and
       # fire the account's callbacks for nothing.
       'subscription_ends_on' => subscription_ends_on(subscription).as_json,
+      'subscription_cancels_on' => subscription_cancels_on(subscription).as_json,
       'billing_currency' => billing_currency_for(subscription)
     }
   end

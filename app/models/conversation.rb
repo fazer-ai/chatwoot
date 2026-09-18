@@ -5,6 +5,7 @@
 #  id                         :integer          not null, primary key
 #  additional_attributes      :jsonb
 #  agent_last_seen_at         :datetime
+#  ai_assignee_type           :string
 #  assignee_last_seen_at      :datetime
 #  cached_label_list          :text
 #  contact_last_seen_at       :datetime
@@ -29,7 +30,6 @@
 #  contact_inbox_id           :bigint
 #  display_id                 :integer          not null
 #  inbox_id                   :integer          not null
-#  kanban_task_id             :bigint
 #  redirect_origin_display_id :integer
 #  sla_policy_id              :bigint
 #  team_id                    :bigint
@@ -51,7 +51,6 @@
 #  index_conversations_on_identifier_and_account_id     (identifier,account_id)
 #  index_conversations_on_inbox_id                      (inbox_id)
 #  index_conversations_on_inbox_id_and_group_type       (inbox_id,group_type)
-#  index_conversations_on_kanban_task_id                (kanban_task_id)
 #  index_conversations_on_priority                      (priority)
 #  index_conversations_on_status_and_account_id         (status,account_id)
 #  index_conversations_on_status_and_priority           (status,priority)
@@ -61,7 +60,6 @@
 #
 # Foreign Keys
 #
-#  fk_rails_...  (kanban_task_id => kanban_tasks.id)
 #
 
 class Conversation < ApplicationRecord
@@ -138,7 +136,11 @@ class Conversation < ApplicationRecord
   belongs_to :account
   belongs_to :inbox
   belongs_to :assignee, class_name: 'User', optional: true, inverse_of: :assigned_conversations
-  belongs_to :assignee_agent_bot, class_name: 'AgentBot', optional: true
+  belongs_to :ai_assignee,
+             polymorphic: true,
+             foreign_key: :assignee_agent_bot_id,
+             foreign_type: :ai_assignee_type,
+             optional: true
   belongs_to :contact
   belongs_to :contact_inbox
   belongs_to :team, optional: true
@@ -247,7 +249,7 @@ class Conversation < ApplicationRecord
 
   def bot_handoff!(dispatch_event: true)
     update!(waiting_since: Time.current) if waiting_since.blank?
-    self.assignee_agent_bot = nil
+    self.ai_assignee = nil
     open!
     dispatch_bot_handoff_event if dispatch_event
   end
@@ -282,14 +284,14 @@ class Conversation < ApplicationRecord
 
   # Virtual attribute till we switch completely to polymorphic assignee
   def assignee_type
-    return 'AgentBot' if assignee_agent_bot_id.present?
+    return ai_assignee_type if ai_assignee_type.present?
     return 'User' if assignee_id.present?
 
     nil
   end
 
   def assigned_entity
-    assignee_agent_bot || assignee
+    ai_assignee || assignee
   end
 
   def tweet?
@@ -374,7 +376,7 @@ class Conversation < ApplicationRecord
   def reset_agent_bot_when_assignee_present
     return if assignee_id.blank?
 
-    self.assignee_agent_bot_id = nil
+    self.ai_assignee = nil
   end
 
   def determine_conversation_status
@@ -394,7 +396,7 @@ class Conversation < ApplicationRecord
     self.status = :pending
     return unless inbox.agent_bot_inbox&.active? && assignee_id.blank?
 
-    self.assignee_agent_bot = inbox.agent_bot
+    self.ai_assignee = inbox.agent_bot
   end
 
   def notify_conversation_creation
@@ -419,7 +421,7 @@ class Conversation < ApplicationRecord
   # write carries no message and creates nothing, so without an event of its own the change is
   # invisible and the consumer keeps acting on the previous episode's origin (fazer-ai/agents#222).
   def list_of_keys
-    %w[team_id assignee_id assignee_agent_bot_id status snoozed_until custom_attributes label_list waiting_since
+    %w[team_id assignee_id assignee_agent_bot_id ai_assignee_type status snoozed_until custom_attributes label_list waiting_since
        first_reply_created_at priority redirect_origin_display_id]
   end
 
