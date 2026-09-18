@@ -18,12 +18,21 @@ JSON-encoded).
 reaches its owner late is dropped unrun, answered `expired`. `max_runtime_ms` is a
 duration, measured from the moment the work begins, and says *do not let this run longer
 than that*; it says nothing about arriving late. A command carrying both gets whichever
-runs out first, and one carrying neither has no ceiling at all.
+runs out first, and one carrying neither is bounded by something the caller did not
+choose, which the next paragraph names.
 
 The distinction exists because a teardown needs one without the other: a `session.logout`
 dropped for arriving late is a device left linked on somebody's phone with nothing saying
 so, while the same command parked on a socket write holds every other command for that
 account behind it. With one field a client had to choose, and chose neither.
+
+**A command with neither field is still bounded, and mostly not by this connector.** Most of what this connector sends carries a ceiling that is the WhatsApp library's and not this connector's, seventy five seconds, which covers a message send and an information query alike, and several paths are held to something tighter that this connector chooses. What comes back when one of those runs out is `timeout`, the same word a caller's own `max_runtime_ms` produces and with the same meaning: nobody here knows the outcome and nothing afterwards will. But some paths escape every ceiling, two of them named below, and this contract does not claim the list is complete. So a client that has a deadline of its own enforces it on the reply rather than inferring one from this paragraph.
+
+**A client may resend such a command, and for anything that changes something the identifier is not what makes that safe.** The connector records only what succeeded, so a command answered `timeout` has left no record at all, and a resend under the same `idempotency_key` finds nothing to answer from and runs the work again. What the identifier buys is narrower and still worth having: a frame redelivered after the first attempt *succeeded* is answered from the record instead of being run twice. For a send that is enough on its own, because the resend carries the `message_id` the first attempt used and every client downstream discards a repeat of an id it already has. For everything else it is not: a `group.invite.get` that rotates the link, a participant added or removed, a name set, may already have happened, and resending does it again. A client that cannot afford that reads the state back before resending rather than resending blind.
+
+**`group.create` is the exception, and keeping the key is what makes the recovery work.** It writes down what it is about to do before it asks WhatsApp, so a record exists whether or not the attempt succeeded, and a retry under the same `idempotency_key` consults that record: it returns the group the first attempt made, or answers `not_settled` while WhatsApp's notification is still deciding which request made which group. Retrying with a fresh key instead makes a second group. This is the one command for which "left no record at all" above does not hold, and it is why `not_settled` exists.
+
+**Two paths are not bounded, and a client that names no ceiling of its own inherits both.** The first is a node already being written to the socket: that write is not interruptible by any ceiling, this connector's or the caller's, so a command waiting behind one can outlast every number above. The second is a message send that was interrupted by the connection dropping and is retried once the connection is back: that retry waits for its answer with no timer of its own, so it ends when the answer arrives or when the session does. Neither is this connector's to fix from here, and the two do not have the same remedy. `max_runtime_ms` reaches the second: the retry watches the context it was given, so a ceiling ends it and a `timeout` comes back. It does **not** reach the first, and a client should not set it expecting one to. The lock is taken before the context is looked at and the connector carries a command out on the goroutine that is waiting there, so neither ceiling runs and no reply is produced until the write ahead finishes. **A client that cannot wait indefinitely needs its own timeout on the reply**, not a field on the command: this connector will answer, and what no field here can promise is when.
 
 **Neither ceiling reaches `session.wake`, and a client should not expect `expired` for one.**
 It is carried out before any session is involved, and nothing on that path reads `deadline`.
