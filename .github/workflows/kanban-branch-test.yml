@@ -41,3 +41,5 @@ jobs:
       - run: bundle exec rspec spec/controllers/api/v1/accounts/kanban_controller_spec.rb
       - run: bundle exec rubocop app/controllers/api/v1/accounts/kanban_controller.rb spec/controllers/api/v1/accounts/kanban_controller_spec.rb
       - run: ruby scripts/i18n/fork_translations.rb check
+      - if: failure()
+        run: tail -300 log/test.log
