@@ -58,6 +58,22 @@ command for that account in between is talking to the instance that still owns i
 that arrives while the lease is going back is left pending for whoever takes the account
 next, which is what every hand-back does.
 
+**A teardown that ran out of time answers `not_attempted` when nothing was sent, and a
+client should retry that one.** The two ways a teardown fails on time are not the same
+fact and the connector tells them apart. `timeout` is the ordinary one: the request was
+on its way and how far it got is not known here, so a retry may be repeating something
+that already happened. `not_attempted` is the connector saying it is certain nothing was
+written to WhatsApp -- the socket was being dialled and its lock was never free, so the
+unlink was never called. The account is exactly as it was, the device is still linked on
+somebody's phone, and a retry does the whole thing rather than the half that is left.
+Retrying with the same `idempotency_key` is correct: a command that failed is not
+recorded, so the key answers nothing and the retry runs. The same word answers a
+`session.logout` in the same state, because it is the same fact about the socket; a
+logout whose request did reach WhatsApp and whose answer was lost is the other case and
+keeps `timeout`. A client that treats `not_attempted` as final leaves a device linked
+that no later command can remove, because the credentials that would sign the unlink are
+the ones the teardown would have thrown away.
+
 **Both ceilings bound the wait on WhatsApp, not the bookkeeping that follows it.** Once a
 teardown's unlink has been answered, the connector finishes deleting the credentials, the
 device mapping and the session's epoch counter on a bound of its own, and a ceiling that
