@@ -1,6 +1,6 @@
 # Implantar no Coolify como applications
 
-Medido em 10/09/2026, no dia em que `chat.fazer.ai` migrou de um service do Coolify para applications.
+Medido em 10/09/2026, no dia em que a instância de produção migrou de um service do Coolify para applications.
 
 O `docker-compose.coolify.yaml` descreve a instalação como um **service** do Coolify, ou seja, um compose que o painel gerencia. Este documento descreve a outra forma, em que cada processo é uma **application** e cada banco é um **database**, todos na mesma rede Docker. As duas funcionam; a segunda evita as armadilhas listadas no fim.
 
