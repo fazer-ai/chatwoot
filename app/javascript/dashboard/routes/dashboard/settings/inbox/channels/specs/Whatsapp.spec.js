@@ -107,7 +107,12 @@ const mountWhatsapp = (overrides = {}) => {
         WhatsappEmbeddedSignup: WhatsappEmbeddedSignupStub,
         Twilio: stubComponent('Twilio'),
         ThreeSixtyDialogWhatsapp: stubComponent('ThreeSixtyDialogWhatsapp'),
-        CloudWhatsapp: stubComponent('CloudWhatsapp'),
+        // Upstream's guided manual setup and its access-request dialog read the Vuex store;
+        // these tests mount without one and never reach either branch.
+        WhatsappManualSetup: stubComponent('WhatsappManualSetup'),
+        WhatsappAccessRequestDialog: stubComponent(
+          'WhatsappAccessRequestDialog'
+        ),
         ChannelSelector: ChannelSelectorStub,
         BaileysWhatsapp: stubComponent('BaileysWhatsapp'),
         ZapiWhatsapp: stubComponent('ZapiWhatsapp'),

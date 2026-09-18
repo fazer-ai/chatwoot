@@ -356,32 +356,37 @@ describe Whatsapp::FacebookApiClient do
     end
   end
 
-  describe '#phone_number_code_verification_status' do
+  describe '#phone_number_verification_status' do
     let(:phone_number_id) { '123456789' }
+    let(:status_query) { { fields: 'status,code_verification_status' } }
 
-    it "answers Meta's status verbatim" do
+    it "answers Meta's status and code verification status verbatim" do
       stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
-        .to_return(status: 200, body: { code_verification_status: 'NOT_VERIFIED' }.to_json,
+        .with(query: status_query)
+        .to_return(status: 200, body: { status: 'CONNECTED', code_verification_status: 'NOT_VERIFIED', id: phone_number_id }.to_json,
                    headers: { 'Content-Type' => 'application/json' })
 
-      expect(api_client.phone_number_code_verification_status(phone_number_id)).to eq('NOT_VERIFIED')
+      expect(api_client.phone_number_verification_status(phone_number_id))
+        .to eq({ 'status' => 'CONNECTED', 'code_verification_status' => 'NOT_VERIFIED' })
     end
 
-    it 'answers nil when the field is absent, instead of deciding it means not verified' do
-      # A 200 that does not carry the field is not the same fact as Meta saying NOT_VERIFIED, and
+    it 'answers an empty hash when neither field is present, instead of deciding it means not verified' do
+      # A 200 that does not carry the fields is not the same fact as Meta saying NOT_VERIFIED, and
       # the caller writes to Meta on the difference (#590).
       stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+        .with(query: status_query)
         .to_return(status: 200, body: { id: phone_number_id }.to_json,
                    headers: { 'Content-Type' => 'application/json' })
 
-      expect(api_client.phone_number_code_verification_status(phone_number_id)).to be_nil
+      expect(api_client.phone_number_verification_status(phone_number_id)).to eq({})
     end
 
     it 'raises when the read failed, so the caller can tell that apart from an answer' do
       stub_request(:get, "https://graph.facebook.com/#{api_version}/#{phone_number_id}")
+        .with(query: status_query)
         .to_return(status: 500, body: { error: 'boom' }.to_json)
 
-      expect { api_client.phone_number_code_verification_status(phone_number_id) }
+      expect { api_client.phone_number_verification_status(phone_number_id) }
         .to raise_error(/Phone status check failed/)
     end
   end

@@ -10,6 +10,8 @@ class Webhooks::WhatsappController < ActionController::API
       return
     end
 
+    return head :ok if tracking_events_only?
+
     perform_whatsapp_events_job
   end
 
@@ -29,6 +31,13 @@ class Webhooks::WhatsappController < ActionController::API
     head :unauthorized
   rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
     head :not_found
+  end
+
+  def tracking_events_only?
+    return false unless params[:object] == 'whatsapp_business_account'
+
+    changes = params.fetch(:entry, []).flat_map { |entry| entry.fetch(:changes, []) }
+    changes.present? && changes.all? { |change| change[:field] == 'tracking_events' }
   end
 
   def valid_token?(token)

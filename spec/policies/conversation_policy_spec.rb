@@ -86,7 +86,7 @@ RSpec.describe ConversationPolicy, type: :policy do
     end
 
     context 'when the bot is the conversation assignee' do
-      before { conversation.update!(assignee_agent_bot: agent_bot) }
+      before { conversation.update!(ai_assignee: agent_bot) }
 
       it 'allows the receipt' do
         expect(subject).to permit(agent_bot_context, conversation)

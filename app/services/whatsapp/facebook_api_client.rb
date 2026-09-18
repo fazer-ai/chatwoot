@@ -1,4 +1,4 @@
-class Whatsapp::FacebookApiClient
+class Whatsapp::FacebookApiClient # rubocop:disable Metrics/ClassLength
   include Whatsapp::GraphRequestOptions
 
   BASE_URI = 'https://graph.facebook.com'.freeze
@@ -33,6 +33,79 @@ class Whatsapp::FacebookApiClient
     )
 
     handle_response(response, 'WABA phone numbers fetch failed')
+  end
+
+  def fetch_all_phone_numbers(waba_id)
+    phone_numbers = []
+    after_cursor = nil
+
+    loop do
+      response = HTTParty.get(
+        "#{BASE_URI}/#{@api_version}/#{waba_id}/phone_numbers",
+        **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+        headers: request_headers,
+        query: after_cursor.present? ? { after: after_cursor } : {}
+      )
+      data = handle_response(response, 'WABA phone numbers fetch failed')
+      phone_numbers.concat(data['data'] || [])
+      after_cursor = data.dig('paging', 'next').present? ? data.dig('paging', 'cursors', 'after') : nil
+      break if after_cursor.blank?
+    end
+
+    phone_numbers
+  end
+
+  def fetch_message_templates(waba_id)
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/#{waba_id}/message_templates",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers,
+      query: { limit: 1 }
+    )
+
+    handle_response(response, 'WABA message templates fetch failed')
+  end
+
+  def fetch_business_profile(phone_number_id)
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/#{phone_number_id}/whatsapp_business_profile",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers,
+      query: { fields: 'about' }
+    )
+
+    handle_response(response, 'WhatsApp business profile fetch failed')
+  end
+
+  def fetch_permissions
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/me/permissions",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers
+    )
+
+    handle_response(response, 'Token permissions fetch failed')
+  end
+
+  def fetch_subscribed_apps(waba_id)
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers
+    )
+
+    handle_response(response, 'WABA webhook subscription fetch failed')
+  end
+
+  def fetch_phone_number(phone_number_id, fields: nil)
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers,
+      query: fields.present? ? { fields: fields } : {}
+    )
+
+    handle_response(response, 'Phone number fetch failed')
   end
 
   def debug_token(input_token)
@@ -71,19 +144,21 @@ class Whatsapp::FacebookApiClient
     handle_response(response, 'Phone deregistration failed')
   end
 
-  # Answers Meta's status, not a verdict on it, and `nil` when the answer did not carry one.
-  # `code_verification_status` can be absent from a perfectly good 200, and a missing field is not
-  # the same fact as `NOT_VERIFIED`. Collapsing both into `false` here is what let a read that
-  # answered nothing reach the caller looking like a read that said no (#590), and the caller
-  # writes to Meta on that.
-  def phone_number_code_verification_status(phone_number_id)
+  # Answers Meta's status, not a verdict on it, and an empty hash when the answer carried neither
+  # field. `code_verification_status` can be absent from a perfectly good 200, and a missing field is
+  # not the same fact as `NOT_VERIFIED`. Collapsing both into `false` here is what let a read that
+  # answered nothing reach the caller looking like a read that said no (#590), and the caller writes
+  # to Meta on that. `status` rides along because a CONNECTED number is registered even after its
+  # one-time code verification has expired.
+  def phone_number_verification_status(phone_number_id)
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/#{phone_number_id}",
       **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
-      headers: request_headers
+      headers: request_headers,
+      query: { fields: 'status,code_verification_status' }
     )
 
-    handle_response(response, 'Phone status check failed')['code_verification_status']
+    handle_response(response, 'Phone status check failed').slice('status', 'code_verification_status')
   end
 
   # Two calls, and only the first decides whether anything arrives at all.

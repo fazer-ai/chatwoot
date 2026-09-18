@@ -7,7 +7,8 @@ module SortHandler
     end
 
     def sort_on_created_at(sort_direction = :asc)
-      order(created_at: sort_direction)
+      # The id tie-breaker keeps pagination stable when created_at values collide.
+      order(created_at: sort_direction, id: sort_direction)
     end
 
     # Columns are table-qualified because these sorts also run on relations that join contacts,

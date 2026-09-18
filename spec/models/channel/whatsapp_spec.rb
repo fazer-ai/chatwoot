@@ -1195,7 +1195,7 @@ RSpec.describe Channel::Whatsapp do
 
       channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
 
-      expect(Whatsapp::WebhookSetupService).to have_received(:new).with(channel, 'new_waba_id', 'new_cloud_key')
+      expect(Whatsapp::WebhookSetupService).to have_received(:new).with(channel, 'new_waba_id', 'new_cloud_key', is_coexistence: nil)
       expect(webhook_setup_service).to have_received(:perform)
     end
 

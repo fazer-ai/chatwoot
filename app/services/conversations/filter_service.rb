@@ -27,7 +27,11 @@ class Conversations::FilterService < FilterService
     # :messages is deliberately not preloaded: the list payload fetches messages through
     # scoped queries (last message, last_non_activity_message), which bypass the preload.
     conversations = @account.conversations.includes(
-      :taggings, :inbox, { assignee: { avatar_attachment: [:blob] } }, { contact: { avatar_attachment: [:blob] } }, :team, :contact_inbox
+      :taggings, { assignee: { avatar_attachment: [:blob] } }, { contact: { avatar_attachment: [:blob] } }, :team,
+      :contact_inbox
+    ).preload(
+      inbox: :channel,
+      ai_assignee: { avatar_attachment: [:blob] }
     )
 
     Conversations::PermissionFilterService.new(
@@ -59,13 +63,10 @@ class Conversations::FilterService < FilterService
   # allowlist, one set of names, and an unknown value falls back to the previous default
   # instead of reaching `send` (the params here are `permit!`ed straight from the request).
   def conversations
-    sort_by, sort_direction = ConversationFinder::SORT_OPTIONS[@params[:sort_by]] ||
-                              ConversationFinder::SORT_OPTIONS['last_activity_at_desc']
-
     # `pinned_first_for` orders too, and every sort_on_* uses `order` rather than
     # `reorder`, so pinned conversations keep leading the list in every order. That is the
     # existing behaviour of the ordinary list and it stays true here.
-    @conversations.pinned_first_for(@user).send(sort_by, sort_direction).page(current_page).per(per_page)
+    Conversations::SortService.apply(@conversations.pinned_first_for(@user), @params[:sort_by]).page(current_page).per(per_page)
   end
 
   def per_page

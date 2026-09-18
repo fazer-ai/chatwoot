@@ -295,6 +295,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_205353) do
     t.string "remote_address"
     t.string "request_uuid"
     t.datetime "created_at", precision: nil
+    t.string "city"
+    t.string "country"
+    t.string "country_code"
     t.index ["associated_type", "associated_id", "created_at"], name: "index_audits_on_associated_and_created_at"
     t.index ["associated_type", "associated_id"], name: "associated_index"
     t.index ["auditable_type", "auditable_id", "version"], name: "auditable_index"
@@ -642,6 +645,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_205353) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.string "instagram_id"
+    t.string "provider_name"
     t.index ["page_id", "account_id"], name: "index_channel_facebook_pages_on_page_id_and_account_id", unique: true
     t.index ["page_id"], name: "index_channel_facebook_pages_on_page_id"
   end
@@ -653,6 +657,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_205353) do
     t.string "instagram_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "provider_name"
     t.index ["instagram_id"], name: "index_channel_instagram_on_instagram_id", unique: true
   end
 
@@ -694,6 +699,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_205353) do
     t.datetime "refresh_token_expires_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "provider_name"
     t.index ["business_id"], name: "index_channel_tiktok_on_business_id", unique: true
   end
 
@@ -918,6 +924,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_205353) do
     t.datetime "waiting_since"
     t.text "cached_label_list"
     t.bigint "assignee_agent_bot_id"
+    t.string "ai_assignee_type"
     t.datetime "status_changed_at"
     t.integer "group_type", default: 0, null: false
     t.integer "redirect_origin_display_id"

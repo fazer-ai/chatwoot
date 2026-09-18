@@ -14,6 +14,43 @@ class Twilio::VoiceWebhookSetupService
     app_sid
   end
 
+  # Outbound calls dial through the TwiML app, so its voice_url must track the current host too.
+  def sync_twiml_app!
+    return create_twiml_app! if channel.twiml_app_sid.blank?
+
+    channel.client.applications(channel.twiml_app_sid).update( # rubocop:disable Rails/SaveBang
+      voice_url: channel.voice_call_webhook_url,
+      voice_method: HTTP_METHOD
+    )
+    channel.twiml_app_sid
+  rescue StandardError => e
+    # The stored app was deleted in Twilio, so there is nothing to update; make a fresh one.
+    return create_twiml_app! if e.is_a?(Twilio::REST::RestError) && e.status_code == 404
+
+    log_twilio_error('TWIML_APP_UPDATE', e)
+    raise
+  end
+
+  def configure_number_webhooks!
+    numbers = channel.client.incoming_phone_numbers.list(phone_number: channel.phone_number)
+    if numbers.empty?
+      Rails.logger.warn "TWILIO_PHONE_NUMBER_NOT_FOUND: #{channel.phone_number}"
+      return
+    end
+
+    channel.client
+           .incoming_phone_numbers(numbers.first.sid)
+           .update( # rubocop:disable Rails/SaveBang
+             voice_url: channel.voice_call_webhook_url,
+             voice_method: HTTP_METHOD,
+             status_callback: channel.voice_status_webhook_url,
+             status_callback_method: HTTP_METHOD
+           )
+  rescue StandardError => e
+    log_twilio_error('NUMBER_WEBHOOKS_UPDATE', e)
+    raise
+  end
+
   private
 
   def validate_token_credentials!
@@ -35,26 +72,6 @@ class Twilio::VoiceWebhookSetupService
     app.sid
   rescue StandardError => e
     log_twilio_error('TWIML_APP_CREATE', e)
-    raise
-  end
-
-  def configure_number_webhooks!
-    numbers = channel.client.incoming_phone_numbers.list(phone_number: channel.phone_number)
-    if numbers.empty?
-      Rails.logger.warn "TWILIO_PHONE_NUMBER_NOT_FOUND: #{channel.phone_number}"
-      return
-    end
-
-    channel.client
-           .incoming_phone_numbers(numbers.first.sid)
-           .update( # rubocop:disable Rails/SaveBang
-             voice_url: channel.voice_call_webhook_url,
-             voice_method: HTTP_METHOD,
-             status_callback: channel.voice_status_webhook_url,
-             status_callback_method: HTTP_METHOD
-           )
-  rescue StandardError => e
-    log_twilio_error('NUMBER_WEBHOOKS_UPDATE', e)
     raise
   end
 

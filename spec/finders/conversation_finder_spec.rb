@@ -81,7 +81,7 @@ describe ConversationFinder do
     context 'with assignee_type unassigned' do
       let(:params) { { assignee_type: 'unassigned' } }
       let!(:agent_bot_conversation) do
-        create(:conversation, account: account, inbox: inbox, assignee_agent_bot: create(:agent_bot, account: account))
+        create(:conversation, account: account, inbox: inbox, ai_assignee: create(:agent_bot, account: account))
       end
 
       it 'filter conversations by assignee type unassigned' do
@@ -164,7 +164,7 @@ describe ConversationFinder do
     context 'with assignee_type assigned' do
       let(:params) { { assignee_type: 'assigned' } }
       let!(:agent_bot_conversation) do
-        create(:conversation, account: account, inbox: inbox, assignee_agent_bot: create(:agent_bot, account: account))
+        create(:conversation, account: account, inbox: inbox, ai_assignee: create(:agent_bot, account: account))
       end
 
       it 'filter conversations by assignee type assigned' do
@@ -275,7 +275,7 @@ describe ConversationFinder do
       end
 
       it 'combines with the search and source_id filters, which select distinct rows' do
-        described_class::SORT_OPTIONS.each_key do |sort_by|
+        Conversations::SortService::SORT_OPTIONS.each_key do |sort_by|
           expect { described_class.new(user_1, params.merge(q: 'hello', sort_by: sort_by)).perform[:conversations].to_a }
             .not_to raise_error, "failed for q with sort_by=#{sort_by}"
           expect do
@@ -285,7 +285,7 @@ describe ConversationFinder do
       end
 
       it 'puts the pinned conversation first on every sort option' do
-        described_class::SORT_OPTIONS.each_key do |sort_by|
+        Conversations::SortService::SORT_OPTIONS.each_key do |sort_by|
           result = described_class.new(user_1, params.merge(sort_by: sort_by)).perform
 
           expect(result[:conversations].first.id).to eq(pinned_conversation.id), "failed for sort_by=#{sort_by}"

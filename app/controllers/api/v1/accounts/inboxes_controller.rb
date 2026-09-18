@@ -3,12 +3,13 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :fetch_inbox, except: [:index, :create]
   before_action :fetch_agent_bot, only: [:set_agent_bot]
   # we are already handling the authorization in fetch inbox
-  # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in WhatsappHealthManagement concern
+  # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in InboxHealthManagement concern
   before_action :check_authorization,
                 except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
-  before_action :validate_whatsapp_cloud_channel, only: [:health]
   # rubocop:enable Rails/LexicallyScopedActionFilter
-  include Api::V1::Accounts::Concerns::WhatsappHealthManagement
+
+  include Api::V1::Accounts::Concerns::InboxHealthManagement
+  include Api::V1::Accounts::Concerns::InboxSecretManagement
 
   def index
     @inboxes = policy_scope(Current.account.inboxes)
@@ -77,12 +78,6 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
       @inbox.agent_bot_inbox.destroy!
     end
     head :ok
-  end
-
-  def reset_secret
-    return head :not_found unless @inbox.api?
-
-    @inbox.channel.reset_secret!
   end
 
   def setup_channel_provider

@@ -78,6 +78,21 @@ class Attachment < ApplicationRecord
     file.blob.url
   end
 
+  # Blobs written before the identification was corrected still carry audio/opus, which is the
+  # type WhatsApp Cloud rejects with 131053. Catch them the next time the file is handed to an
+  # external service. New blobs never reach here: config/initializers/active_storage_opus_fix.rb
+  # settles the type before the object is written.
+  def normalize_opus_blob_content_type!
+    blob = file.blob
+    return unless blob.content_type == 'audio/opus'
+
+    # update!, not update_column, because the point is the callback: ActiveStorage rewrites the
+    # object's own Content-Type in the bucket on commit. Correcting only the column leaves the
+    # stored object as audio/opus, and on GCS that metadata is what a reader gets, so the fix
+    # would be invisible to the one service where it matters.
+    blob.update!(content_type: 'audio/ogg')
+  end
+
   def thumb_url
     return '' unless file.attached? && image?
 
@@ -138,7 +153,10 @@ class Attachment < ApplicationRecord
   def inline_storage_url
     return '' unless file.attached?
 
-    Rails.application.routes.url_helpers.rails_storage_redirect_url(file, disposition: 'inline')
+    # Through whichever route the installation configured (redirect, or proxy for S3/CORS setups),
+    # the same way `url_for(file)` resolves it, but asking for inline: the audio and video players
+    # cannot use a URL that is served as an attachment.
+    Rails.application.routes.url_helpers.route_for(ActiveStorage.resolve_model_to_route, file, disposition: 'inline')
   end
 
   def file_metadata
@@ -253,21 +271,6 @@ class Attachment < ApplicationRecord
 
   def file_extension
     File.extname(file.filename.to_s).delete_prefix('.').downcase
-  end
-
-  # Blobs written before the identification was corrected still carry audio/opus, which is the
-  # type WhatsApp Cloud rejects with 131053. Catch them the next time the file is handed to an
-  # external service. New blobs never reach here: config/initializers/active_storage_opus_fix.rb
-  # settles the type before the object is written.
-  def normalize_opus_blob_content_type!
-    blob = file.blob
-    return unless blob.content_type == 'audio/opus'
-
-    # update!, not update_column, because the point is the callback: ActiveStorage rewrites the
-    # object's own Content-Type in the bucket on commit. Correcting only the column leaves the
-    # stored object as audio/opus, and on GCS that metadata is what a reader gets, so the fix
-    # would be invisible to the one service where it matters.
-    blob.update!(content_type: 'audio/ogg')
   end
 end
 

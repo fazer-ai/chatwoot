@@ -70,4 +70,16 @@ describe('ConversationCard', () => {
 
     expect(wrapper.findComponent({ name: 'CardPinIcon' }).exists()).toBe(true);
   });
+
+  it('uses the bot icon for a Captain assignee', () => {
+    const wrapper = mountComponent(
+      { meta: { assignee_type: 'Captain::Assistant' } },
+      {},
+      { showAssignee: true, assignee: { name: 'Captain' } }
+    );
+
+    expect(wrapper.findComponent({ name: 'Icon' }).props('icon')).toBe(
+      'i-lucide-bot'
+    );
+  });
 });
