@@ -265,7 +265,7 @@ describe('Response', () => {
 
     it('hands the account brand and the branding entitlement to the footer', async () => {
       window.globalConfig = {
-        BRAND_NAME: 'Guichê Live',
+        BRAND_NAME: 'Bistrô Exemplo',
         BRAND_FROM_ACCOUNT: true,
         DISABLE_BRANDING: true,
       };
@@ -275,7 +275,7 @@ describe('Response', () => {
       await flushPromises();
 
       const branding = wrapper.findComponent({ name: 'Branding' });
-      expect(branding.props('brandName')).toBe('Guichê Live');
+      expect(branding.props('brandName')).toBe('Bistrô Exemplo');
       expect(branding.props('disableBranding')).toBe(true);
     });
 

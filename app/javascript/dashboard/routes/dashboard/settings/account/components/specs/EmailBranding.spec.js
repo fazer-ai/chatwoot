@@ -38,26 +38,26 @@ describe('EmailBranding.vue', () => {
   it('seeds the fields from the account settings', () => {
     const wrapper = montar({
       id: 1,
-      settings: { brand_name: 'Guichê Web', brand_color: '#11D135' },
+      settings: { brand_name: 'Café Exemplo', brand_color: '#11D135' },
       brand_logo_email_url: 'http://localhost/logo.png',
     });
 
-    expect(wrapper.vm.brandName).toBe('Guichê Web');
+    expect(wrapper.vm.brandName).toBe('Café Exemplo');
     expect(wrapper.vm.brandColor).toBe('#11D135');
     expect(wrapper.vm.logoUrl).toBe('http://localhost/logo.png');
   });
 
   it('saves the three text fields together', async () => {
     const wrapper = montar({ id: 1, settings: {} });
-    wrapper.vm.brandName = 'Guichê Web';
-    wrapper.vm.brandUrl = 'https://www.guicheweb.com.br';
+    wrapper.vm.brandName = 'Café Exemplo';
+    wrapper.vm.brandUrl = 'https://www.cafe-exemplo.com.br';
     wrapper.vm.brandColor = '#11D135';
 
     await wrapper.vm.save();
 
     expect(updateAccount).toHaveBeenCalledWith({
-      brand_name: 'Guichê Web',
-      brand_url: 'https://www.guicheweb.com.br',
+      brand_name: 'Café Exemplo',
+      brand_url: 'https://www.cafe-exemplo.com.br',
       brand_color: '#11D135',
     });
   });

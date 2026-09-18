@@ -49,8 +49,8 @@ describe '/survey/response', type: :request do
       before do
         account.enable_features!('branded_email_templates')
         account.update!(
-          brand_name: 'Guichê Live',
-          brand_url: 'https://www.guichelive.com.br',
+          brand_name: 'Bistrô Exemplo',
+          brand_url: 'https://www.bistro-exemplo.com.br',
           brand_color: '#F82323'
         )
       end
@@ -58,15 +58,15 @@ describe '/survey/response', type: :request do
       it 'dresses the page in the brand of that account' do
         get survey_response_url(id: conversation.uuid)
 
-        expect(response.body).to include 'Guichê Live'
-        expect(response.body).to include 'https://www.guichelive.com.br'
+        expect(response.body).to include 'Bistrô Exemplo'
+        expect(response.body).to include 'https://www.bistro-exemplo.com.br'
         expect(response.body).to include BrandColor.surface('#F82323')
       end
 
       it 'names the account in the tab, not the installation' do
         get survey_response_url(id: conversation.uuid)
 
-        expect(response.body).to include '<title>Guichê Live</title>'
+        expect(response.body).to include '<title>Bistrô Exemplo</title>'
       end
 
       # INSTALLATION_NAME and BRAND_NAME are separate settings and are allowed to differ: one
@@ -87,7 +87,7 @@ describe '/survey/response', type: :request do
         get survey_response_url(id: create(:conversation).uuid)
 
         expect(response.body).to include 'Chatwoot'
-        expect(response.body).not_to include 'Guichê Live'
+        expect(response.body).not_to include 'Bistrô Exemplo'
       end
 
       it 'tells the page to keep the branding footer by default' do

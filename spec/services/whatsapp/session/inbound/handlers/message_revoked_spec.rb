@@ -388,7 +388,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
         'v' => 1, 'id' => '01920000-0000-7000-8000-0000000000f1', 'type' => 'message.revoked',
         'sid' => '9f1c0f4e-6a2b-4c8e-9d1a-2b3c4d5e6f70', 'epoch' => 7, 'seq' => 241, 'ts' => 1_788_907_604_000,
         'payload' => {
-          'chat' => { 'kind' => 'group', 'id' => '120363427721750499' },
+          'chat' => { 'kind' => 'group', 'id' => '120363400000000002' },
           'sender' => { 'phone' => '5511936199421', 'lid' => '89572297961476', 'verified_name' => 'Lucas Moreira' },
           'message_id' => '3EB0647797816A5B93E5B1',
           'message_author' => { 'phone' => '5511936187994', 'lid' => '10089566068807' },

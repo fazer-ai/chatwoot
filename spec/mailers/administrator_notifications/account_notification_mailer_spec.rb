@@ -36,12 +36,12 @@ RSpec.describe AdministratorNotifications::AccountNotificationMailer do
     # branded account was told about its own deletion under a name it does not use.
     it 'uses the account brand, matching the body' do
       account.enable_features!('branded_email_templates')
-      account.update!(brand_name: 'Guichê Web')
+      account.update!(brand_name: 'Café Exemplo')
 
       mail = mailer.account_deletion_user_initiated(account, 'manual_deletion')
 
-      expect(mail.subject).to eq('Your Guichê Web account deletion has been scheduled')
-      expect(mail.body.to_s).to include('Guichê Web')
+      expect(mail.subject).to eq('Your Café Exemplo account deletion has been scheduled')
+      expect(mail.body.to_s).to include('Café Exemplo')
     end
 
     it 'falls back to the installation for an account that configured none' do

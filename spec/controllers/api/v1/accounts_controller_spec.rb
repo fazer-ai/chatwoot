@@ -361,13 +361,13 @@ RSpec.describe 'Accounts API', type: :request do
 
       it 'stores the email brand fields' do
         patch "/api/v1/accounts/#{account.id}",
-              params: { brand_name: 'Guichê Web', brand_url: 'https://www.guicheweb.com.br', brand_color: '#11D135' },
+              params: { brand_name: 'Café Exemplo', brand_url: 'https://www.cafe-exemplo.com.br', brand_color: '#11D135' },
               headers: admin.create_new_auth_token,
               as: :json
 
         expect(response).to have_http_status(:success)
-        expect(account.reload.brand_name).to eq('Guichê Web')
-        expect(account.reload.brand_url).to eq('https://www.guicheweb.com.br')
+        expect(account.reload.brand_name).to eq('Café Exemplo')
+        expect(account.reload.brand_url).to eq('https://www.cafe-exemplo.com.br')
         expect(account.reload.brand_color).to eq('#11D135')
       end
 
