@@ -391,22 +391,22 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
           'chat' => { 'kind' => 'group', 'id' => '120363400000000002' },
           'sender' => { 'phone' => '5511999990001', 'lid' => '20000000000002', 'verified_name' => 'Contato Exemplo' },
           'message_id' => '3EB0647797816A5B93E5B1',
-          'message_author' => { 'phone' => '5511936187994', 'lid' => '10089566068807' },
+          'message_author' => { 'phone' => '5511999990002', 'lid' => '30000000000003' },
           'by' => 'contact', 'timestamp' => 1_788_907_604_000
         }
       }
     end
     let(:event) { model::Event.from_frame(frame) }
     let!(:message) do
-      author = create(:contact, account: channel.account, phone_number: '+5511936187994',
-                                identifier: '10089566068807@lid')
+      author = create(:contact, account: channel.account, phone_number: '+5511999990002',
+                                identifier: '30000000000003@lid')
       create(:message, conversation: conversation, inbox: inbox, account: channel.account,
                        content: 'mensagem original', source_id: '3EB0647797816A5B93E5B1',
                        message_type: :incoming, sender: author)
     end
 
     it 'reads the author off the wire and applies the admin deletion' do
-      expect(event.payload.message_author.lid).to eq('10089566068807')
+      expect(event.payload.message_author.lid).to eq('30000000000003')
 
       expect(dispatch).to eq(:handled)
 
