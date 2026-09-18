@@ -13,7 +13,7 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
   # with a Thread#raise the endpoint's own rescue cannot see. The gem is in the production group, so the
   # number is written here rather than read from it.
   it 'sits between a full ceiling for the required write and the cut rack-timeout makes' do
-    deadline = Api::V1::Accounts::Concerns::WhatsappHealthManagement::REGISTER_WEBHOOK_DEADLINE
+    deadline = Api::V1::Accounts::Concerns::InboxHealthManagement::REGISTER_WEBHOOK_DEADLINE
 
     expect(deadline).to be >= Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS[:timeout] + Whatsapp::GraphDeadline::MINIMUM_CALL_SECONDS
     expect(deadline).to be < 15
@@ -100,7 +100,7 @@ RSpec.describe 'register_webhook under one deadline', type: :request do
       stub_const('Whatsapp::FacebookApiClient::BASE_URI', graph[:url])
       stub_const('Whatsapp::HealthService::BASE_URI', graph[:url])
       stub_const('Whatsapp::GraphRequestOptions::GRAPH_REQUEST_OPTIONS', { timeout: 3, max_retries: 0 }.freeze)
-      stub_const('Api::V1::Accounts::Concerns::WhatsappHealthManagement::REGISTER_WEBHOOK_DEADLINE', 2.5)
+      stub_const('Api::V1::Accounts::Concerns::InboxHealthManagement::REGISTER_WEBHOOK_DEADLINE', 2.5)
     end
 
     after do

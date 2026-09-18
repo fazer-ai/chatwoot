@@ -27,7 +27,7 @@ class ConversationPolicy < ApplicationPolicy
   # `AgentBotListener#active_inbox_agent_bot` and `Conversation#set_active_bot_conversation`
   # both mean by a bot serving an inbox.
   def agent_bot_serves_conversation?
-    return true if record.assignee_agent_bot_id == user.id
+    return true if record.ai_assignee == user
 
     user.agent_bot_inboxes.active.exists?(inbox_id: record.inbox_id)
   end
