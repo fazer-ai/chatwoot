@@ -49,9 +49,56 @@ teardown under both ceilings like any other command. **A client should not put a
 on a teardown** -- `session.delete` or `session.logout` -- and should bound it with
 `max_runtime_ms` alone. One that arrives after its deadline is answered `expired` and the
 account is not torn down, which is the device left linked on somebody's phone that the two
-fields exist to keep apart. It costs more than that: the connector has adopted the account
-by the time the refusal happens, so a teardown refused for arriving late leaves the account
-connected on an instance, running, on the strength of a command that was turned down.
+fields exist to keep apart, and it is the whole of what the refusal costs. The adoption
+behind it costs nothing further: an account opened so that a teardown can reach its
+executor is never connected, and one whose teardown was then refused for arriving late is
+given back, by a heartbeat rather than by the answer, so a refused teardown does not
+leave the account owned by the instance that refused it. A client that sends another
+command for that account in between is talking to the instance that still owns it, and one
+that arrives while the lease is going back is left pending for whoever takes the account
+next, which is what every hand-back does.
+
+**A teardown that ran out of time answers `not_attempted` when nothing was sent, and a
+client should retry that one.** The two ways a teardown fails on time are not the same
+fact and the connector tells them apart. `timeout` is the ordinary one: the request was
+on its way and how far it got is not known here, so a retry may be repeating something
+that already happened. `not_attempted` is the connector saying it is certain nothing was
+written to WhatsApp -- the socket was being dialled and its lock was never free, so the
+unlink was never called. The account is exactly as it was, the device is still linked on
+somebody's phone, and a retry does the whole thing rather than the half that is left.
+Retrying with the same `idempotency_key` is correct: a command that failed is not
+recorded, so the key answers nothing and the retry runs. The same word answers a
+`session.logout` in the same state, because it is the same fact about the socket; a
+logout whose request did reach WhatsApp and whose answer was lost is the other case and
+keeps `timeout`. A client that treats `not_attempted` as final leaves a device linked
+that no later command can remove, because the credentials that would sign the unlink are
+the ones the teardown would have thrown away.
+
+**A `group.create` whose outcome is not decided yet answers `not_settled`, and a client
+should ask again in a moment.** Two requests for a group of the same name, both still
+open, make a group on WhatsApp that is evidence for either and proof for neither.
+Answering one of them with it would hand that request the other's conversation and skip
+the creation it asked for, so the connector refuses until WhatsApp's own notification
+names which request made which group, which ordinarily arrives within seconds. This is
+the third answer about time and it is not either of the other two: `timeout` says nobody
+here can tell and nothing afterwards will, `not_attempted` says the request never went
+out, and `not_settled` says it did and the connector expects to know which shortly.
+Retrying with the same `idempotency_key` is correct and is the point: a command that
+failed is not recorded, so the key answers nothing and the retry runs, and the retry is
+what collects the group the first attempt made rather than making a second one. A client
+that treats it as final leaves the operator with a group nobody's conversation points at;
+a client that treats it as `internal` pages somebody for a case that settles itself.
+
+**`not_settled` is not a promise that asking again will settle it, and a client bounds its
+retries.** The word says the outcome is undecided here, not that a decision is coming. One
+state does not resolve: an attempt whose intent was recorded and whose request never
+reached WhatsApp, because the process died between the two. No group was made, so no
+notification will ever name one, and every redelivery gets `not_settled` again. Retrying is
+also what keeps that record alive -- each delivery pushes the intent's clock forward, and
+the connector's own sweep, which would drop an untouched intent after its retention window,
+never reaches one that is still being asked about. So a client retries a few times over
+seconds, and a `not_settled` that survives that is a stranded intent: stop, tell somebody,
+and do not send the same key again expecting a different answer.
 
 **Both ceilings bound the wait on WhatsApp, not the bookkeeping that follows it.** Once a
 teardown's unlink has been answered, the connector finishes deleting the credentials, the
@@ -128,7 +175,7 @@ frames, but both sides have to agree on them, so they are part of the contract:
 | `wa:lease-epoch:<sid>` | STRING (**no expiry**) | connector | the epoch that owner holds the session under, incremented on every acquisition. It must outlive every disconnection, logout and re-pairing of the account, and only a `session.delete` removes it |
 | `wa:idem:<sid>:<key>` | STRING | connector | command idempotency (`msg:<message_id>` for sends) |
 | `wa:resume:<sid>` | STRING (EX 60s) | connector | a turn taken to bring an unowned session back, so the fleet asks about one account once per window |
-| `wa:quarantine:<sid>` | HASH (EX wait + 1h) | connector | `strikes` and `until`: how many times a session failed to come back, and how long the fleet leaves it alone |
+| `wa:quarantine:<sid>` | HASH (EX wait + 1h) | connector | `strikes` and `until`: how many times a session failed to come back, and how long the fleet leaves it alone. `attempt` is the connector's own bookkeeping, telling one failure from a retry of the same one |
 | `wa:events:<shard>:lease` | STRING (EX 30s) | client | which consumer reads a shard; exactly one at a time, which is what preserves order |
 | `wa:consumer:<cid>` | STRING (EX 15s) | client | consumer heartbeat and the shards it holds |
 | `wa:cursor:<sid>` | STRING | client | last `epoch:seq` the client processed for a session |
