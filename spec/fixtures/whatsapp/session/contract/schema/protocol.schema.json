@@ -290,7 +290,7 @@
       "enum": [
         "invalid_payload", "unsupported", "session_not_found", "not_connected", "not_paired",
         "owned_elsewhere", "quarantined", "client_outdated", "rate_limited", "expired", "timeout",
-        "not_attempted",
+        "not_attempted", "not_settled",
         "media_too_large", "media_unavailable", "recipient_not_on_whatsapp", "group_participant_not_allowed",
         "wa_error", "provider_unavailable", "internal"
       ]
