@@ -1,11 +1,56 @@
 {
   "KANBAN": {
-    "PAYWALL": {
-      "TITLE": "Upgrade to use Kanban",
-      "DESCRIPTION": "The Kanban feature requires a fazer.ai Chatwoot Pro subscription.",
-      "UPGRADE_PROMPT": "Subscribe to fazer.ai Chatwoot Pro to access Kanban funnels, task management, and workflow automation.",
-      "NON_ADMIN_MESSAGE": "The Kanban feature is not available on your current plan. Please reach out to your administrator to upgrade.",
-      "UPGRADE_NOW": "Upgrade now"
+    "TITLE": "Conversation Kanban",
+    "CONVERSATION_COUNT": "{count} conversations",
+    "REFRESH": "Refresh",
+    "EMPTY_COLUMN": "No conversations in this stage",
+    "LIMIT_NOTICE": "Showing the {count} most recent conversations. Use filters to narrow the board.",
+    "STATUS": {
+      "NOVO_LEAD": "New lead",
+      "AQUECIMENTO": "Warming up",
+      "QUALIFICADO": "Qualified",
+      "CONVERTIDO": "Converted",
+      "PERDIDO": "Lost"
+    },
+    "TEMPERATURE": {
+      "QUENTE": "🔥 Hot",
+      "MORNO": "☀️ Warm",
+      "FRIO": "❄️ Cold"
+    },
+    "FILTERS": {
+      "SEARCH": "Search by name or phone",
+      "TEMPERATURE": "Temperature",
+      "SCORE": "Score",
+      "INBOX": "Inbox",
+      "ALL_TEMPERATURES": "All temperatures",
+      "ALL_SCORES": "All scores",
+      "ALL_INBOXES": "All inboxes",
+      "SCORE_HIGH": "High score (70-100)",
+      "SCORE_MEDIUM": "Medium score (40-69)",
+      "SCORE_LOW": "Low score (0-39)",
+      "APPLY": "Apply",
+      "CLEAR": "Clear"
+    },
+    "CARD": {
+      "UNNAMED": "Unnamed contact",
+      "NO_PHONE": "No phone number",
+      "NO_ACTIVITY": "No activity",
+      "MESSAGE_COUNT": "{count} messages"
+    },
+    "EXPORT": {
+      "BUTTON": "Export column",
+      "SUCCESS": "Column exported successfully",
+      "ERROR": "Could not export this column",
+      "NO_DATA": "There are no conversations to export"
+    },
+    "API": {
+      "SUCCESS": {
+        "MOVE": "Conversation moved successfully"
+      },
+      "ERROR": {
+        "FETCH": "Could not load the Kanban board",
+        "MOVE": "Could not move the conversation"
+      }
     }
   }
 }

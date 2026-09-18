@@ -1,11 +1,56 @@
 {
   "KANBAN": {
-    "PAYWALL": {
-      "TITLE": "Faça upgrade para usar o Kanban",
-      "DESCRIPTION": "O recurso Kanban requer uma assinatura Chatwoot Pro fazer.ai.",
-      "UPGRADE_PROMPT": "Assine o Chatwoot Pro fazer.ai para acessar funis Kanban, gerenciamento de tarefas e automação de fluxo de trabalho.",
-      "NON_ADMIN_MESSAGE": "O recurso Kanban não está disponível no seu plano atual. Entre em contato com o administrador para fazer o upgrade.",
-      "UPGRADE_NOW": "Fazer upgrade"
+    "TITLE": "Kanban de conversas",
+    "CONVERSATION_COUNT": "{count} conversas",
+    "REFRESH": "Atualizar",
+    "EMPTY_COLUMN": "Nenhuma conversa nesta etapa",
+    "LIMIT_NOTICE": "Exibindo as {count} conversas mais recentes. Use os filtros para refinar o quadro.",
+    "STATUS": {
+      "NOVO_LEAD": "Novo lead",
+      "AQUECIMENTO": "Aquecimento",
+      "QUALIFICADO": "Qualificado",
+      "CONVERTIDO": "Convertido",
+      "PERDIDO": "Perdido"
+    },
+    "TEMPERATURE": {
+      "QUENTE": "🔥 Quente",
+      "MORNO": "☀️ Morno",
+      "FRIO": "❄️ Frio"
+    },
+    "FILTERS": {
+      "SEARCH": "Buscar por nome ou telefone",
+      "TEMPERATURE": "Temperatura",
+      "SCORE": "Pontuação",
+      "INBOX": "Caixa de entrada",
+      "ALL_TEMPERATURES": "Todas as temperaturas",
+      "ALL_SCORES": "Todas as pontuações",
+      "ALL_INBOXES": "Todas as caixas",
+      "SCORE_HIGH": "Pontuação alta (70-100)",
+      "SCORE_MEDIUM": "Pontuação média (40-69)",
+      "SCORE_LOW": "Pontuação baixa (0-39)",
+      "APPLY": "Aplicar",
+      "CLEAR": "Limpar"
+    },
+    "CARD": {
+      "UNNAMED": "Contato sem nome",
+      "NO_PHONE": "Sem telefone",
+      "NO_ACTIVITY": "Sem atividade",
+      "MESSAGE_COUNT": "{count} mensagens"
+    },
+    "EXPORT": {
+      "BUTTON": "Exportar coluna",
+      "SUCCESS": "Coluna exportada com sucesso",
+      "ERROR": "Não foi possível exportar esta coluna",
+      "NO_DATA": "Não há conversas para exportar"
+    },
+    "API": {
+      "SUCCESS": {
+        "MOVE": "Conversa movida com sucesso"
+      },
+      "ERROR": {
+        "FETCH": "Não foi possível carregar o Kanban",
+        "MOVE": "Não foi possível mover a conversa"
+      }
     }
   }
 }
