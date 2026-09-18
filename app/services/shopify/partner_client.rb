@@ -88,7 +88,8 @@ class Shopify::PartnerClient
           occurredAtMin: 364.days.ago.iso8601
         }
       }.to_json,
-      timeout: REQUEST_TIMEOUT
+      timeout: REQUEST_TIMEOUT,
+      max_retries: 0
     )
   end
 

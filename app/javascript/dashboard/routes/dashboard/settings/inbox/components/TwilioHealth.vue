@@ -344,7 +344,7 @@ const handleRegisterWebhook = () => emit('registerWebhook');
               sm
               solid
               blue
-              :loading="isRegisteringWebhook"
+              :is-loading="isRegisteringWebhook"
               :disabled="isRegisteringWebhook"
               class="flex-shrink-0"
               @click="handleRegisterWebhook"

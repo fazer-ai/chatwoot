@@ -15,7 +15,7 @@ RSpec.describe 'Search indexing', type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(robots_directives).to include('noindex')
-      expect(response.body).not_to include('rel="manifest"')
+      expect(response.body).not_to include('msapplication-TileImage')
     end
 
     it 'allows indexing on Cloud' do

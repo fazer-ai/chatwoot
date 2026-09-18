@@ -17,7 +17,8 @@ class Instagram::UserDetailsService
         fields: 'id,username,user_id,name,profile_picture_url,account_type',
         access_token: access_token
       },
-      headers: { 'Accept' => 'application/json' }
+      headers: { 'Accept' => 'application/json' },
+      **Instagram::RequestOptions::INSTAGRAM_SHORT_REQUEST_OPTIONS
     )
 
     unless response.success?
