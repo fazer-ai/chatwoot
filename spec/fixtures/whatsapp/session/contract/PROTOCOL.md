@@ -49,9 +49,14 @@ teardown under both ceilings like any other command. **A client should not put a
 on a teardown** -- `session.delete` or `session.logout` -- and should bound it with
 `max_runtime_ms` alone. One that arrives after its deadline is answered `expired` and the
 account is not torn down, which is the device left linked on somebody's phone that the two
-fields exist to keep apart. It costs more than that: the connector has adopted the account
-by the time the refusal happens, so a teardown refused for arriving late leaves the account
-connected on an instance, running, on the strength of a command that was turned down.
+fields exist to keep apart, and it is the whole of what the refusal costs. The adoption
+behind it costs nothing further: an account opened so that a teardown can reach its
+executor is never connected, and one whose teardown was then refused for arriving late is
+given back, by a heartbeat rather than by the answer, so a refused teardown does not
+leave the account owned by the instance that refused it. A client that sends another
+command for that account in between is talking to the instance that still owns it, and one
+that arrives while the lease is going back is left pending for whoever takes the account
+next, which is what every hand-back does.
 
 **Both ceilings bound the wait on WhatsApp, not the bookkeeping that follows it.** Once a
 teardown's unlink has been answered, the connector finishes deleting the credentials, the
