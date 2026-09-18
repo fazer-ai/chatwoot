@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n, I18nT } from 'vue-i18n';
 import Twilio from './Twilio.vue';
 import ThreeSixtyDialogWhatsapp from './360DialogWhatsapp.vue';
+import CloudWhatsapp from './CloudWhatsapp.vue';
 import WhatsappManualSetup from './WhatsappManualSetup.vue';
 import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import WhatsappAccessRequestDialog from '../components/WhatsappAccessRequestDialog.vue';
@@ -356,7 +357,9 @@ const requestEmbeddedSignupAccess = () => {
           </span>
         </div>
       </Banner>
-      <WhatsappManualSetup />
+      <!-- The guided setup creates an inbox. Converting keeps the fork's form, which knows the inbox it is converting. -->
+      <CloudWhatsapp v-if="isConvertMode" :mode="mode" :inbox="inbox" />
+      <WhatsappManualSetup v-else />
     </div>
 
     <div v-else-if="showProviderSelection">

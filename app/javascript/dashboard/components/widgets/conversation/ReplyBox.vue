@@ -118,7 +118,6 @@ export default {
 
     const { formatMessage } = useMessageFormatter();
 
-    const replyEditor = useTemplateRef('replyEditor');
     const messageEditor = useTemplateRef('messageEditor');
     const copilot = useCopilotReply();
     const macroExecution = useMacroExecution();
@@ -168,7 +167,6 @@ export default {
       fetchQuotedReplyFlagFromUISettings,
       getSignatureForInbox,
       getSignatureSettingsForInbox,
-      replyEditor,
       messageEditor,
       copilot,
       shortcutKey,

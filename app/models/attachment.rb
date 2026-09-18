@@ -127,7 +127,8 @@ class Attachment < ApplicationRecord
     audio_file_data = base_data.merge(file_metadata)
     audio_file_data.merge(
       {
-        # Keep audio playback inline while avoiding the ActiveStorage proxy path.
+        # Inline disposition so the player streams it instead of the browser downloading it; the
+        # route follows whichever Active Storage delivery method the install configured.
         data_url: inline_storage_url,
         transcribed_text: meta&.[]('transcribed_text') || ''
       }
