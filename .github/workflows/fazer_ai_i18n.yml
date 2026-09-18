@@ -18,6 +18,11 @@ jobs:
         with:
           ruby-version: '3.4'
 
+      # Ruby 3.4 ships json 2.9, which keeps the last of two identical keys without a word;
+      # `check` refuses to run on a parser that cannot reject them.
+      - name: Install a JSON parser that rejects duplicated keys
+        run: gem install json --no-document
+
       # Structural rules that hold regardless of which upstream release we track.
       - name: Check fork translation boundaries
         run: ruby scripts/i18n/fork_translations.rb check
