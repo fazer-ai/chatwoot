@@ -14,7 +14,6 @@ RSpec.describe 'Kanban API', type: :request do
     )
   end
   let!(:hidden_conversation) { create(:conversation, account: account, inbox: other_inbox) }
-  let!(:message) { create(:message, account: account, inbox: inbox, conversation: conversation) }
 
   before do
     create(:inbox_member, user: agent, inbox: inbox)
