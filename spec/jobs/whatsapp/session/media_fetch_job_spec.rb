@@ -27,12 +27,12 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
   # does not live in, and the provider answers that it cannot find it.
   it 'asks with the chat the event carried, not one rebuilt from the contact' do
     conversation.contact.update!(identifier: '167392323834034@lid')
-    chat = model::Address.phone('553499503261')
+    chat = model::Address.phone('553499990001')
 
     described_class.perform_now(message, media.to_h, chat.to_h)
 
     command = backend.commands.last
-    expect(command.chat.to_jid).to eq('553499503261@s.whatsapp.net')
+    expect(command.chat.to_jid).to eq('553499990001@s.whatsapp.net')
     expect(command.message_id).to eq('3EB0AAAA0001')
   end
 

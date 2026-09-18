@@ -31,7 +31,7 @@ RSpec.describe Brand do
   end
 
   context 'when the account has not enabled branded email templates' do
-    before { account.update!(brand_name: 'Guichê Web', brand_color: '#11D135') }
+    before { account.update!(brand_name: 'Café Exemplo', brand_color: '#11D135') }
 
     it 'ignores what the account configured' do
       brand = described_class.for(account: account)
@@ -63,11 +63,11 @@ RSpec.describe Brand do
     end
 
     it 'keys the config like the installation, so a stored layout keeps resolving' do
-      account.update!(brand_name: 'Guichê Web')
+      account.update!(brand_name: 'Café Exemplo')
 
       config = described_class.for(account: account).config
 
-      expect(config['BRAND_NAME']).to eq 'Guichê Web'
+      expect(config['BRAND_NAME']).to eq 'Café Exemplo'
       expect(config['LOGO']).to eq '/brand-assets/logo.svg'
     end
   end
@@ -141,8 +141,8 @@ RSpec.describe Brand do
       before do
         account.enable_features!('branded_email_templates')
         account.update!(
-          brand_name: 'Guichê Live',
-          brand_url: 'https://www.guichelive.com.br',
+          brand_name: 'Bistrô Exemplo',
+          brand_url: 'https://www.bistro-exemplo.com.br',
           brand_color: '#F82323'
         )
       end
@@ -150,8 +150,8 @@ RSpec.describe Brand do
       it 'wears the brand of the account' do
         config = described_class.for(account: account).web_config
 
-        expect(config['BRAND_NAME']).to eq 'Guichê Live'
-        expect(config['WIDGET_BRAND_URL']).to eq 'https://www.guichelive.com.br'
+        expect(config['BRAND_NAME']).to eq 'Bistrô Exemplo'
+        expect(config['WIDGET_BRAND_URL']).to eq 'https://www.bistro-exemplo.com.br'
       end
 
       it 'falls back field by field to the installation' do
@@ -159,7 +159,7 @@ RSpec.describe Brand do
 
         config = described_class.for(account: account).web_config
 
-        expect(config['BRAND_NAME']).to eq 'Guichê Live'
+        expect(config['BRAND_NAME']).to eq 'Bistrô Exemplo'
         expect(config['WIDGET_BRAND_URL']).to eq 'https://www.chatwoot.com'
       end
 

@@ -875,9 +875,9 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
           entry: [{
             changes: [{
               value: {
-                contacts: [{ profile: { name: 'Gabriel Jablonski' }, wa_id: '553499503261' }],
+                contacts: [{ profile: { name: 'Contato Exemplo' }, wa_id: '553499990001' }],
                 messages: [{
-                  from: '553499503261',
+                  from: '553499990001',
                   id: 'wamid.REACTION_MESSAGE_ID',
                   timestamp: '1776974260',
                   type: 'reaction',
@@ -894,8 +894,8 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
 
       context 'when the reacted message exists in Chatwoot' do
         it 'creates a reaction message linked to the original message' do
-          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
-          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          contact = create(:contact, phone_number: '+553499990001', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499990001')
           conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
           original_message = create(:message,
                                     conversation: conversation,
@@ -942,8 +942,8 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         end
 
         it 'marks a matching existing reaction as removed in place' do
-          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
-          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          contact = create(:contact, phone_number: '+553499990001', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499990001')
           conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
           create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
           existing_reaction = create(:message,
@@ -964,8 +964,8 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         end
 
         it 'dispatches conversation.updated after marking a reaction as removed' do
-          contact = create(:contact, phone_number: '+553499503261', account: whatsapp_channel.account)
-          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499503261')
+          contact = create(:contact, phone_number: '+553499990001', account: whatsapp_channel.account)
+          contact_inbox = create(:contact_inbox, contact: contact, inbox: whatsapp_channel.inbox, source_id: '553499990001')
           conversation = create(:conversation, contact: contact, inbox: whatsapp_channel.inbox, contact_inbox: contact_inbox)
           create(:message, conversation: conversation, source_id: 'wamid.ORIGINAL_MESSAGE_ID', content: 'Original message')
           create(:message,

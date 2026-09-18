@@ -512,7 +512,7 @@ RSpec.describe Account do
     end
 
     it 'accepts an absolute http(s) URL' do
-      account.brand_url = 'https://www.guicheweb.com.br'
+      account.brand_url = 'https://www.cafe-exemplo.com.br'
 
       expect(account).to be_valid
     end

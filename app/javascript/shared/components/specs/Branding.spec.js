@@ -42,10 +42,10 @@ describe('Branding', () => {
   });
 
   it('names the account when a brand name is given', () => {
-    const wrapper = mountBranding({ brandName: 'Guichê Live' });
+    const wrapper = mountBranding({ brandName: 'Bistrô Exemplo' });
 
-    expect(wrapper.text()).toContain('Powered by Guichê Live');
-    expect(wrapper.find('img').attributes('alt')).toBe('Guichê Live');
+    expect(wrapper.text()).toContain('Powered by Bistrô Exemplo');
+    expect(wrapper.find('img').attributes('alt')).toBe('Bistrô Exemplo');
   });
 
   // The only case the fork key is for: Persian and Tamil spell the vendor transliterated, so
@@ -55,11 +55,11 @@ describe('Branding', () => {
   // where it used to read "Propulsé par Chatwoot".
   it('keeps the sentence in the locale of the survey when substituting the brand', () => {
     const wrapper = mountBranding(
-      { brandName: 'Guichê Live' },
+      { brandName: 'Bistrô Exemplo' },
       'Propulsé par Chatwoot'
     );
 
-    expect(wrapper.text()).toContain('Propulsé par Guichê Live');
+    expect(wrapper.text()).toContain('Propulsé par Bistrô Exemplo');
   });
 
   // brand_name only rejects `<>`, so `$` reaches here. As a replacement string those are
@@ -75,17 +75,17 @@ describe('Branding', () => {
 
   it('falls back to the interpolated key where there is no Latin name to substitute', () => {
     const wrapper = mountBranding(
-      { brandName: 'Guichê Live' },
+      { brandName: 'Bistrô Exemplo' },
       'قدرت گرفته از چت ووت'
     );
 
-    expect(wrapper.text()).toContain('Powered by Guichê Live');
+    expect(wrapper.text()).toContain('Powered by Bistrô Exemplo');
     expect(wrapper.text()).not.toContain('چت ووت');
   });
 
   it('renders nothing when branding is disabled', () => {
     const wrapper = mountBranding({
-      brandName: 'Guichê Live',
+      brandName: 'Bistrô Exemplo',
       disableBranding: true,
     });
 

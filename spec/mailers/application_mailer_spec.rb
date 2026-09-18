@@ -52,12 +52,12 @@ RSpec.describe ApplicationMailer do
     end
 
     it 'paints the email with the account brand instead of the installation one' do
-      account.update!(brand_color: '#11D135', brand_name: 'Guichê Web')
+      account.update!(brand_color: '#11D135', brand_name: 'Café Exemplo')
 
       body = deliver.body.decoded
 
       expect(body).to include 'background-color: #11D135'
-      expect(body).to include 'Guichê Web'
+      expect(body).to include 'Café Exemplo'
       expect(body).not_to include 'background-color: #1F93FF'
     end
 
@@ -80,7 +80,7 @@ RSpec.describe ApplicationMailer do
       InstallationConfig.where(name: 'BRAND_NAME').first_or_create!(value: 'Chatwoot')
       GlobalConfig.clear_cache
       account.enable_features!('branded_email_templates')
-      account.update!(brand_name: 'Guichê Web')
+      account.update!(brand_name: 'Café Exemplo')
     end
 
     # Parameterized the way User#send_devise_notification does it, which is the only way the
@@ -97,7 +97,7 @@ RSpec.describe ApplicationMailer do
       body = devise_body(:reset_password_instructions)
 
       expect(body).to include 'Chatwoot'
-      expect(body).not_to include 'Guichê Web'
+      expect(body).not_to include 'Café Exemplo'
     end
 
     # The same mailer sends the workspace invitation, whose template names the account, the
@@ -105,7 +105,7 @@ RSpec.describe ApplicationMailer do
     it 'leaves the workspace invitation on the account brand' do
       body = devise_body(:confirmation_instructions)
 
-      expect(body).to include 'Guichê Web'
+      expect(body).to include 'Café Exemplo'
       expect(body).not_to include 'Chatwoot'
     end
 
