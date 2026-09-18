@@ -5,7 +5,7 @@ namespace :whatsapp do
   #
   # Usage:
   #   bundle exec rails "whatsapp:replay_webhook[tmp/payload.json]"
-  #   bundle exec rails "whatsapp:replay_webhook[tmp/payload.json,+5511936199421]"
+  #   bundle exec rails "whatsapp:replay_webhook[tmp/payload.json,+5511999990001]"
   #
   # The phone_number arg is required for Baileys payloads (used to find the
   # channel and inject its webhook_verify_token). Cloud payloads resolve the

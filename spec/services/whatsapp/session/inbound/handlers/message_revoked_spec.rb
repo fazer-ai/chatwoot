@@ -349,12 +349,12 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
       # in there, and swapping the hash wholesale skips the event before it reaches here.
       before do
         channel.update!(provider_connection: channel.provider_connection.merge(
-          'phone_number' => '5541999990000', 'lid' => '89572297961476'
+          'phone_number' => '5541999990000', 'lid' => '20000000000002'
         ))
       end
 
       context 'when the claim names this account' do
-        let(:claimed) { model::Party.new(phone: '5541999990000', lid: '89572297961476') }
+        let(:claimed) { model::Party.new(phone: '5541999990000', lid: '20000000000002') }
 
         it 'applies the deletion' do
           expect(dispatch).to eq(:handled)
@@ -389,7 +389,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
         'sid' => '9f1c0f4e-6a2b-4c8e-9d1a-2b3c4d5e6f70', 'epoch' => 7, 'seq' => 241, 'ts' => 1_788_907_604_000,
         'payload' => {
           'chat' => { 'kind' => 'group', 'id' => '120363400000000002' },
-          'sender' => { 'phone' => '5511936199421', 'lid' => '89572297961476', 'verified_name' => 'Lucas Moreira' },
+          'sender' => { 'phone' => '5511999990001', 'lid' => '20000000000002', 'verified_name' => 'Contato Exemplo' },
           'message_id' => '3EB0647797816A5B93E5B1',
           'message_author' => { 'phone' => '5511936187994', 'lid' => '10089566068807' },
           'by' => 'contact', 'timestamp' => 1_788_907_604_000
@@ -416,7 +416,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageRevoked do
     # The same frame with the key naming the admin who pressed delete instead of the member
     # who wrote it, which is the shape #486 measured WhatsApp refusing.
     it 'refuses the same deletion once the key names somebody who did not write it' do
-      frame['payload']['message_author'] = { 'phone' => '5511936199421', 'lid' => '89572297961476' }
+      frame['payload']['message_author'] = { 'phone' => '5511999990001', 'lid' => '20000000000002' }
 
       expect(dispatch).to eq(:ignored)
 

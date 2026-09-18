@@ -26,7 +26,7 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
   # one, so a chat rebuilt from the contact addresses a refresh to a chat the message
   # does not live in, and the provider answers that it cannot find it.
   it 'asks with the chat the event carried, not one rebuilt from the contact' do
-    conversation.contact.update!(identifier: '167392323834034@lid')
+    conversation.contact.update!(identifier: '100000000000001@lid')
     chat = model::Address.phone('553499990001')
 
     described_class.perform_now(message, media.to_h, chat.to_h)
