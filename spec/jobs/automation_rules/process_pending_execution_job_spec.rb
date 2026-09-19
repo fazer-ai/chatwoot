@@ -133,6 +133,31 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # The actions write to the conversation: a private note, a reopen and an unassign are all
+    # messages, and a message moves last_activity_at. Counting that as activity would arm the rule
+    # against its own run, and a rule scoped to an inbox would act again every delay, for ever.
+    it 'does not read its own actions as the activity that restarts the count' do
+      quiet = travel_to(61.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      noting_rule = create(:automation_rule, account: account, event_name: 'conversation_updated',
+                                             execution_delay: 60, execution_delay_trigger: 'inactivity',
+                                             conditions: [{ 'values' => [quiet.inbox_id], 'attribute_key' => 'inbox_id',
+                                                            'query_operator' => nil, 'filter_operator' => 'equal_to' }],
+                                             actions: [{ 'action_name' => 'add_private_note',
+                                                         'action_params' => ['Released for rework'] }])
+      travel_to(61.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: noting_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+
+      job.perform(row.reload)
+
+      expect(quiet.messages.where(private: true).count).to eq(1)
+      expect(row.reload).to be_executed
+    end
+
     # An activity message and a reply another automation sent both bump last_activity_at without
     # reaching a listener, so the clock is read here instead of trusted from the arm.
     it 'pushes the clock instead of firing when something touched the conversation after the arm' do

@@ -65,21 +65,26 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
   def execute(pending_execution)
     pending_execution.update!(status: :executing)
     armed_for = pending_execution.due_at
+    # Read before the actions, never after: a note, a reopen and an unassign are all messages, and a
+    # message writes last_activity_at. Read afterwards, the run would see itself as the activity that
+    # restarts the count, and an inbox-only rule would act again every delay for ever. Activity that
+    # lands while the actions run is not lost by reading early -- it reaches the row as activity_seen_at.
+    conversation_anchor = AutomationRulePendingExecution.activity_anchor_for(pending_execution.conversation, nil)
     AutomationRules::ActionService.new(
       pending_execution.automation_rule,
       pending_execution.account,
       pending_execution.conversation
     ).perform
-    settle(pending_execution, armed_for)
+    settle(pending_execution, armed_for, conversation_anchor)
   end
 
   # Activity that landed while this worker held the row moved the clock and not the status. Reading
   # it here is what starts the next count from that activity instead of dropping it: an executed
-  # row is never swept again. The rule's own actions cannot trip it, since the events they dispatch
-  # are automation-originated and reach no arm.
-  def settle(pending_execution, armed_for)
+  # row is never swept again. Somebody else's activity, that is: the conversation's own clock is
+  # the snapshot taken before the actions ran, so what this run wrote is not read back as movement.
+  def settle(pending_execution, armed_for, conversation_anchor)
     pending_execution.with_lock do
-      due_at = pending_execution.inactivity_due_at(armed_for: armed_for)
+      due_at = pending_execution.inactivity_due_at(armed_for: armed_for, conversation_anchor: conversation_anchor)
       next pending_execution.update!(status: :pending, due_at: due_at) if due_at
 
       pending_execution.update!(status: :executed)

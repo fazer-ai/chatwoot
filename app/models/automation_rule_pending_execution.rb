@@ -260,13 +260,18 @@ class AutomationRulePendingExecution < ApplicationRecord
   # reply another automation sent, a custom attribute another rule wrote -- so the clock is read
   # here rather than trusted from the arm, and it is read the same way the arm reads it: a write
   # that lands on updated_at alone is still activity.
-  def inactivity_due_at(armed_for: due_at)
+  #
+  # `conversation_anchor` is that reading taken at another moment, which is what a caller that has
+  # since written to the conversation itself passes: its own writes are not activity, and reading
+  # the column after them would restart the count on the rule's own run.
+  def inactivity_due_at(armed_for: due_at, conversation_anchor: nil)
     return nil unless automation_rule&.inactivity_trigger?
 
     delay = automation_rule.execution_delay.minutes
     # Both sources: what a listener recorded on the row, and what the conversation itself says, for
     # the activity that reaches no listener at all.
-    anchor = [self.class.activity_anchor_for(conversation, nil), activity_seen_at].compact.max
+    conversation_anchor ||= self.class.activity_anchor_for(conversation, nil)
+    anchor = [conversation_anchor, activity_seen_at].compact.max
     return nil unless anchor > armed_for - delay
 
     anchor + delay
