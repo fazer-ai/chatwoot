@@ -98,16 +98,7 @@ what collects the group the first attempt made rather than making a second one. 
 that treats it as final leaves the operator with a group nobody's conversation points at;
 a client that treats it as `internal` pages somebody for a case that settles itself.
 
-**`not_settled` is not a promise that asking again will settle it, and a client bounds its
-retries.** The word says the outcome is undecided here, not that a decision is coming. One
-state does not resolve: an attempt whose intent was recorded and whose request never
-reached WhatsApp, because the process died between the two. No group was made, so no
-notification will ever name one, and every redelivery gets `not_settled` again. Retrying is
-also what keeps that record alive -- each delivery pushes the intent's clock forward, and
-the connector's own sweep, which would drop an untouched intent after its retention window,
-never reaches one that is still being asked about. So a client retries a few times over
-seconds, and a `not_settled` that survives that is a stranded intent: stop, tell somebody,
-and do not send the same key again expecting a different answer.
+**`not_settled` is not a promise that asking again will settle it, and a client bounds its retries.** The word says the outcome is undecided here, not that a decision is coming. One state does not resolve: an attempt whose intent was recorded and whose request never reached WhatsApp. Two things leave it that way, and neither is rare enough to leave unsaid. The process can die between the two. Or the connector's own ceiling on that write can run out after the database has committed the row and before this side learned that it had, a race nobody here can see the winner of: the row is on record, nothing was ever asked of WhatsApp, and the connector has already answered that it could not record the intent. No group was made, so no notification will ever name one, and every redelivery gets `not_settled` again. Retrying is also what keeps that record alive: each delivery pushes the intent's clock forward, and the connector's own sweep, which would drop an untouched intent after its retention window, never reaches one that is still being asked about. So a client retries a few times over seconds, and a `not_settled` that survives that is a stranded intent: stop, tell somebody, and do not send the same key again expecting a different answer.
 
 **Both ceilings bound the wait on WhatsApp, not the bookkeeping that follows it.** Once a
 teardown's unlink has been answered, the connector finishes deleting the credentials, the
