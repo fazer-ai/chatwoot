@@ -133,6 +133,31 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # Everything between the claim and the actions is a decision, not an action, and the arm cannot
+    # take a claimed row back. Without a last look the customer replies and is unassigned in the
+    # same breath, which is the one thing the wait promises not to do.
+    it 'does not run the actions when activity landed while this worker was deciding' do
+      quiet = travel_to(61.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(61.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+      allow(AutomationRules::ConditionsFilterService).to receive(:new) do
+        # The conditions still match, and the customer writes while that is being asked.
+        AutomationRulePendingExecution.find(row.id).record_activity(Time.current)
+        instance_double(AutomationRules::ConditionsFilterService, perform: [quiet])
+      end
+      expect(AutomationRules::ActionService).not_to receive(:new)
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+    end
+
     # A skip is as terminal as a run, and nothing sweeps a terminal row again, so activity recorded
     # while this worker was deciding to skip would be buried with the skip.
     it 'returns the row to pending when activity landed while a skip was being decided' do

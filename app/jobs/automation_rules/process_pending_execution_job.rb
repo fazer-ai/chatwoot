@@ -60,11 +60,10 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
     ).perform.present?
   end
 
-  # Marked before the actions run: a row that dies here stays `executing`, which no sweep reclaims,
-  # so a message/email/webhook is never sent twice. Everything up to this point is still retryable.
   def execute(pending_execution)
-    pending_execution.update!(status: :executing)
     armed_for = pending_execution.due_at
+    return unless start_run(pending_execution)
+
     # Read before the actions, never after: a note, a reopen and an unassign are all messages, and a
     # message writes last_activity_at. Read afterwards, the run would see itself as the activity that
     # restarts the count, and an inbox-only rule would act again every delay for ever. Activity that
@@ -76,6 +75,28 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
       pending_execution.conversation
     ).perform
     settle(pending_execution, armed_for, conversation_anchor)
+  end
+
+  # Marked `executing` before the actions run: a row that dies from here on stays there, which no
+  # sweep reclaims, so a message/email/webhook is never sent twice. Everything up to this point is
+  # still retryable.
+  #
+  # It is also the last look at the clock before anything customer-facing happens, taken under the
+  # same lock the arm takes. Activity that landed while this worker was deciding moved the clock and left the
+  # claimed row alone, deliberately, because a live worker keeps its row -- and everything since the
+  # claim has been a decision, not an action, so it is still free to be abandoned. After the actions
+  # there is nothing to undo, which is why this is the last place that reading can happen.
+  def start_run(pending_execution)
+    pending_execution.with_lock do
+      due_at = pending_execution.inactivity_due_at
+      if due_at
+        pending_execution.update!(status: :pending, due_at: due_at)
+        next false
+      end
+
+      pending_execution.update!(status: :executing)
+      true
+    end
   end
 
   # A skip is as terminal as a run, and terminal rows are never swept again, so activity that landed

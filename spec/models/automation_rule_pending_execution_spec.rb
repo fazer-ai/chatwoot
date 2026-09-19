@@ -495,6 +495,26 @@ RSpec.describe AutomationRulePendingExecution do
       expect(row.due_at).to be_within(5.seconds).of(moved_at + 60.minutes)
     end
 
+    # The dead worker wrote to the conversation before it died and there is no snapshot left to
+    # subtract, so a recovery that read the conversation's own clock would take the run's message
+    # for new activity and run the actions a second time.
+    it 'does not recover a run from the writing the dead worker itself did' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      # Consumed: the arm this row is running on.
+      row.record_activity(row.armed_anchor)
+      row.update!(status: :executing)
+
+      travel_to(20.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+
+        expect(described_class.recover_abandoned_with_activity!).to eq(0)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
     # The run may have half happened, and its actions are customer-facing, so a row with nothing new
     # on its clock is left alone rather than replayed.
     it 'leaves an abandoned run with nothing new on its clock alone' do

@@ -310,16 +310,19 @@ class AutomationRulePendingExecution < ApplicationRecord
     executing? && abandoned_run?
   end
 
-  # Starts the next count on a row whose worker died, and only that: the deadline comes from the
-  # activity, never from the run, so nothing of the old run is replayed by getting here.
+  # Starts the next count on a row whose worker died, and only that. It reads what a listener
+  # recorded and never the conversation's own columns, which the other clock readings do: the dead
+  # worker wrote to that conversation before it died and there is no snapshot left to subtract, so
+  # reading it here would take the run's own message for new activity and run the actions a second
+  # time. What a listener recorded cannot be the run's own writing, which is the arm's whole job.
   def recover_abandoned_run!
     with_lock do
-      next false unless abandoned_run?
+      next false unless abandoned_run? && automation_rule&.inactivity_trigger?
+      # Strictly newer than the arm this row is running on, or it is activity already consumed.
+      next false unless activity_seen_at && activity_seen_at > armed_anchor
 
-      due_at = inactivity_due_at
-      next false unless due_at
-
-      update!(status: :pending, skip_reason: nil, due_at: due_at)
+      update!(status: :pending, skip_reason: nil,
+              due_at: activity_seen_at + automation_rule.execution_delay.minutes)
       true
     end
   end
