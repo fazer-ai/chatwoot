@@ -73,12 +73,14 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
     settle(pending_execution, armed_for)
   end
 
-  # Activity that landed while the actions ran moved the clock without touching this row's status.
-  # Reading it here is what starts the next count from that activity instead of dropping it: the
-  # rule's own actions never move it, since the events they dispatch are automation-originated.
+  # Activity that landed while this worker held the row moved the clock and not the status. Reading
+  # it here is what starts the next count from that activity instead of dropping it: an executed
+  # row is never swept again. The rule's own actions cannot trip it, since the events they dispatch
+  # are automation-originated and reach no arm.
   def settle(pending_execution, armed_for)
     pending_execution.with_lock do
-      next pending_execution.update!(status: :pending) if pending_execution.due_at > armed_for
+      due_at = pending_execution.inactivity_due_at(armed_for: armed_for)
+      next pending_execution.update!(status: :pending, due_at: due_at) if due_at
 
       pending_execution.update!(status: :executed)
     end

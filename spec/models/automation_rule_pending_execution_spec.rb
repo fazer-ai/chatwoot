@@ -420,6 +420,39 @@ RSpec.describe AutomationRulePendingExecution do
       expect(row.reload).to be_executing
     end
 
+    # The row is `processing` between the claim and the first action, and `executing` while they
+    # run. Neither may be taken from a live worker, and neither may lose the activity either.
+    it 'records activity on a row a live worker holds, without taking the row from it' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :processing)
+
+      # Inside the stale window: past it the worker counts as dead and the row is taken back.
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(row.reload).to be_processing
+        expect(row.activity_seen_at).to be_within(5.seconds).of(Time.current)
+      end
+    end
+
+    # updated_at is the worker's lock. Renewing it on every message would keep a dead worker looking
+    # alive on a busy conversation, and the row would sit in `executing` for good.
+    it 'does not renew the worker lock when it records activity' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+      locked_at = row.reload.updated_at
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload.updated_at).to be_within(1.second).of(locked_at)
+    end
+
     it 'takes back a row whose worker died mid-run, so the rule is not frozen for good' do
       described_class.schedule(rule: inactivity_rule, conversation: conversation)
       row = described_class.last

@@ -340,6 +340,30 @@ describe AutomationRuleListener do
       end
     end
 
+    # The message run claims key an edit on its body, so an edit that restores a body the rule
+    # already saw would reuse that finished claim. An arm is not a run: it writes a clock, and
+    # writing the same clock twice writes the same clock.
+    it 'restarts the count on an edit that restores a body the rule already saw' do
+      message = create(:message, account: account, conversation: conversation, message_type: :outgoing, content: 'A')
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: message }))
+
+      travel_to(10.minutes.from_now) do
+        message.update!(content: 'B')
+        listener.message_edited(Events::Base.new('message_edited', Time.zone.now, { message: message, content: 'B' }))
+        message.update!(content: 'A')
+        listener.message_edited(Events::Base.new('message_edited', Time.zone.now, { message: message, content: 'A' }))
+      end
+
+      restored_at = nil
+      travel_to(20.minutes.from_now) do
+        message.update!(content: 'B')
+        listener.message_edited(Events::Base.new('message_edited', Time.zone.now, { message: message, content: 'B' }))
+        restored_at = Time.current
+      end
+
+      expect(AutomationRulePendingExecution.last.due_at).to be_within(5.seconds).of(restored_at + 60.minutes)
+    end
+
     it 'ignores a message the automation itself sent, so its own note does not restart the count' do
       message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
       event = Events::Base.new('message_created', Time.zone.now, { message: message, performed_by: automation_rule })

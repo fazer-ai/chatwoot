@@ -35,6 +35,7 @@ class AutomationRuleListener < BaseListener
     # the claims are what keep it from repeating whatever this evaluation is about to do.
     track_arrival(event.data[:message])
     process_message_event(event)
+    arm_inactivity(event)
   end
 
   # The body of a message that was stored before it could be read has arrived into that same row. Rules
@@ -61,6 +62,7 @@ class AutomationRuleListener < BaseListener
   # answering a typo correction is the outcome that keeps this off `message_created` (#648).
   def message_edited(event)
     process_message_event(event, 'message_edited')
+    arm_inactivity(event)
   end
 
   private
@@ -81,7 +83,9 @@ class AutomationRuleListener < BaseListener
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
 
-    rules = message_rules(event_name, account)
+    return true if account.blank?
+
+    rules = current_account_rules(event_name, account)
     return true if rules.blank?
 
     rules.map do |rule|
@@ -323,21 +327,6 @@ class AutomationRuleListener < BaseListener
     rules + current_account_rules('conversation_updated', account).where.not(execution_delay: nil)
   end
 
-  # A message is the commonest activity there is, and it dispatches no conversation event:
-  # last_activity_at is written with update_columns. A wait on inactivity is conversation-level, so
-  # it arms from here too, or a conversation that only exchanges messages would never restart its
-  # count. An edit is activity as well, and it moves no conversation timestamp at all, so it arms
-  # from here or the wait would fire on a conversation somebody was writing in. Their conditions
-  # are about the conversation, and the run claims keep the arm single.
-  def message_rules(event_name, account)
-    return [] if account.blank?
-
-    rules = current_account_rules(event_name, account)
-    return rules unless %w[message_created message_edited].include?(event_name)
-
-    rules + current_account_rules('conversation_updated', account).where(execution_delay_trigger: 'inactivity')
-  end
-
   # Delayed rules record a pending execution instead of acting; the sweep re-checks and
   # runs them at due time. Flag off means no arming and no immediate fallback — a delayed
   # message silently becoming instant is worse than skipping.
@@ -357,6 +346,16 @@ class AutomationRuleListener < BaseListener
       account_id: account.id,
       active: true
     )
+  end
+
+  # A message is the commonest activity there is, and neither its arrival nor its edit dispatches a
+  # conversation event: last_activity_at is written with update_columns on a create, and an edit
+  # moves no conversation timestamp at all. A wait on inactivity is conversation-level, so it arms
+  # from here or it would fire on a conversation somebody is writing in.
+  def arm_inactivity(event)
+    return if ignore_message_created_event?(event)
+
+    ::AutomationRules::InactivityArmingService.new(event.data[:message]).perform
   end
 
   def performed_by_automation?(event)

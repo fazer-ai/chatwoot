@@ -3,6 +3,7 @@
 # Table name: automation_rule_pending_executions
 #
 #  id                 :bigint           not null, primary key
+#  activity_seen_at   :datetime
 #  due_at             :datetime         not null
 #  episode_key        :string           not null
 #  skip_reason        :string
@@ -110,23 +111,23 @@ class AutomationRulePendingExecution < ApplicationRecord
   end
 
   # Any activity restarts an inactivity count, including the activity that carries no message: a
-  # status change, an assignment, a tabulation. The clock only moves forward, so a listener running
-  # out of order cannot pull it back and fire before the delay elapsed. A row that already ran
-  # re-arms too: the conversation was touched again, so it can go quiet again.
+  # status change, an assignment, a tabulation, an edit.
+  #
+  # The clock and the row's state are two different things, and this is where they part. The clock
+  # always moves, whatever the row is doing, because activity happened and nothing else is going to
+  # remember it. The state moves only when no worker holds the row: pulling a live one back to
+  # pending would let the sweep claim it and run the same actions alongside the worker. That worker
+  # reads the clock when it finishes, so nothing is lost by waiting.
   def self.advance_inactivity_episode(rule, conversation, key, anchor)
-    due_at = rule.execution_delay.minutes.since(anchor)
     row = find_by!(automation_rule_id: rule.id, conversation_id: conversation.id, episode_key: key)
     row.with_lock do
-      next if row.due_at >= due_at
+      # Forward only: a listener running out of order cannot pull the clock back and fire early.
+      next if row.activity_at >= anchor
 
-      # A live worker keeps its status: pulling its row to pending would let the sweep claim it and
-      # run the same actions alongside it. The clock still moves, and the worker reads it when it
-      # finishes, so activity that lands mid-run starts the next count instead of being lost.
-      next row.update!(due_at: due_at) if row.executing? && !row.abandoned_run?
-
+      row.record_activity(anchor)
       next unless row.rearmable_for_inactivity?
 
-      row.update!(status: :pending, skip_reason: nil, due_at: due_at)
+      row.update!(status: :pending, skip_reason: nil, due_at: rule.execution_delay.minutes.since(anchor))
     end
   end
 
@@ -236,18 +237,37 @@ class AutomationRulePendingExecution < ApplicationRecord
     self.class.episode_key_for(conversation, message) == episode_key
   end
 
+  # The latest activity this row knows about: what a listener recorded, or the arm's own anchor for
+  # a row that predates any. Never nil, so callers compare times rather than handling absence.
+  def activity_at
+    activity_seen_at || armed_anchor
+  end
+
+  # The anchor the current deadline was built from.
+  def armed_anchor
+    due_at - automation_rule.execution_delay.minutes
+  end
+
+  # Writes the clock without touching updated_at, which is the worker's lock: renewing it on every
+  # message would keep a dead worker looking alive and freeze the row in `executing` for good.
+  def record_activity(anchor)
+    update_column(:activity_seen_at, anchor) # rubocop:disable Rails/SkipsModelValidations -- see above
+  end
+
   # When the conversation moved after this row was armed, the time it should fire at instead.
   # Nil when nothing moved (or when this row is not an inactivity wait), which is the case that
   # actually runs the actions. Some activity never reaches a listener -- an activity message, a
   # reply another automation sent, a custom attribute another rule wrote -- so the clock is read
   # here rather than trusted from the arm, and it is read the same way the arm reads it: a write
   # that lands on updated_at alone is still activity.
-  def inactivity_due_at
+  def inactivity_due_at(armed_for: due_at)
     return nil unless automation_rule&.inactivity_trigger?
 
     delay = automation_rule.execution_delay.minutes
-    anchor = self.class.activity_anchor_for(conversation, nil)
-    return nil unless anchor > due_at - delay
+    # Both sources: what a listener recorded on the row, and what the conversation itself says, for
+    # the activity that reaches no listener at all.
+    anchor = [self.class.activity_anchor_for(conversation, nil), activity_seen_at].compact.max
+    return nil unless anchor > armed_for - delay
 
     anchor + delay
   end

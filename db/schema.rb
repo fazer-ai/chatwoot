@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_19_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_19_220000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -317,6 +317,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_19_120000) do
     t.string "skip_reason"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "activity_seen_at"
     t.index ["account_id"], name: "index_automation_rule_pending_executions_on_account_id"
     t.index ["automation_rule_id", "conversation_id", "episode_key"], name: "uniq_automation_pending_execution_episode", unique: true
     t.index ["automation_rule_id"], name: "index_automation_rule_pending_executions_on_automation_rule_id"
