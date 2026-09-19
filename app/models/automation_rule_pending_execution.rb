@@ -73,14 +73,14 @@ class AutomationRulePendingExecution < ApplicationRecord
   # can't fill the sweep limit and starve enabled accounts (paused rows resume on re-enable).
   scope :for_enabled_accounts, -> { joins(:account).merge(Account.feature_delayed_automations) }
 
-  def self.schedule(rule:, conversation:, message: nil)
+  def self.schedule(rule:, conversation:, message: nil, at: nil)
     # status_changed_at is only written from this feature onwards, so a conversation that predates it
     # has no status clock. Anchoring on created_at would make every old conversation instantly
     # overdue and fire on the next sweep; leave them for their next status change to arm.
     return if message.nil? && !rule.inactivity_trigger? && conversation.status_changed_at.blank?
 
     key = arm_episode_key_for(conversation, message, rule: rule)
-    anchor = arm_anchor_for(conversation, message, rule: rule)
+    anchor = arm_anchor_for(conversation, message, rule: rule, at: at)
     create!(
       automation_rule: rule, conversation: conversation, account_id: conversation.account_id,
       # An inactivity row is about the conversation, not about the message that happened to arm it.
@@ -145,8 +145,8 @@ class AutomationRulePendingExecution < ApplicationRecord
   # The wait is measured from when the qualifying event happened, not when this (possibly
   # backlogged or retried) listener runs, so a late dispatch still fires on schedule. Mirrors
   # the timestamps the episode keys track.
-  def self.arm_anchor_for(conversation, message, rule: nil)
-    return activity_anchor_for(conversation, message) if rule&.inactivity_trigger?
+  def self.arm_anchor_for(conversation, message, rule: nil, at: nil)
+    return inactivity_anchor_for(conversation, message, at) if rule&.inactivity_trigger?
 
     if message.nil?
       conversation.status_changed_at
@@ -155,6 +155,17 @@ class AutomationRulePendingExecution < ApplicationRecord
     else
       message.created_at
     end
+  end
+
+  # A message is its own timestamp. Without one, `at` is when the event that armed this said it
+  # happened, and that is what the count starts from -- not the conversation as it reads now. A
+  # conversation carries no timestamp per change, and this job can run long after its event: a retry
+  # or a backlog would read a conversation the rule's own actions have since written to and arm from
+  # the rule's own note. The event's own clock cannot move under it.
+  def self.inactivity_anchor_for(conversation, message, at)
+    return activity_anchor_for(conversation, message) if message
+
+    at || activity_anchor_for(conversation, nil)
   end
 
   # The last thing that happened on the conversation. A message is its own timestamp; everything

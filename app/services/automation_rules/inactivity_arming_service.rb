@@ -4,10 +4,11 @@
 # restores a body the rule already saw reuses that body's finished claim, and the deadline that
 # should have moved never does. Nothing here is customer-facing, so there is nothing to deduplicate.
 class AutomationRules::InactivityArmingService
-  def initialize(conversation, message: nil, performed_by: nil)
+  def initialize(conversation, message: nil, performed_by: nil, at: nil)
     @conversation = conversation
     @message = message
     @performed_by = performed_by
+    @at = at
     @account = conversation.account
   end
 
@@ -18,7 +19,7 @@ class AutomationRules::InactivityArmingService
     rules.each do |rule|
       next if AutomationRules::ConditionsFilterService.new(rule, @conversation, {}).perform.blank?
 
-      AutomationRulePendingExecution.schedule(rule: rule, conversation: @conversation, message: @message)
+      AutomationRulePendingExecution.schedule(rule: rule, conversation: @conversation, message: @message, at: @at)
     end
   end
 

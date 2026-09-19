@@ -312,7 +312,7 @@ class AutomationRuleListener < BaseListener
 
     rules.each do |rule|
       conditions_match = ::AutomationRules::ConditionsFilterService.new(rule, conversation, { changed_attributes: changed_attributes }).perform
-      execute_rule(rule, account, conversation) if conditions_match.present?
+      execute_rule(rule, account, conversation, at: event.timestamp) if conditions_match.present?
     end
   end
 
@@ -330,11 +330,11 @@ class AutomationRuleListener < BaseListener
   # Delayed rules record a pending execution instead of acting; the sweep re-checks and
   # runs them at due time. Flag off means no arming and no immediate fallback — a delayed
   # message silently becoming instant is worse than skipping.
-  def execute_rule(rule, account, conversation, message: nil)
+  def execute_rule(rule, account, conversation, message: nil, at: nil)
     if rule.execution_delay.present?
       return unless account.feature_enabled?('delayed_automations')
 
-      AutomationRulePendingExecution.schedule(rule: rule, conversation: conversation, message: message)
+      AutomationRulePendingExecution.schedule(rule: rule, conversation: conversation, message: message, at: at)
     else
       ::AutomationRules::ActionService.new(rule, account, conversation).perform
     end
@@ -363,7 +363,7 @@ class AutomationRuleListener < BaseListener
 
     conversation = message&.conversation || event.data[:conversation]
     ::AutomationRules::InactivityArmingService.new(
-      conversation, message: message, performed_by: event.data[:performed_by]
+      conversation, message: message, performed_by: event.data[:performed_by], at: event.timestamp
     ).perform
   end
 

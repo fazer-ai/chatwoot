@@ -405,6 +405,26 @@ describe AutomationRuleListener do
       end
     end
 
+    # This job can run long after its event, and the conversation it deserializes is the one the
+    # rule's own actions have since written to. Arming from that state is the rule re-arming itself
+    # from its own note, and the performed_by guard cannot see it: the retry keeps the original actor.
+    it 'arms from when the event happened, not from the conversation as a retry finds it' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+      happened_at = first.updated_at
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        retried = Events::Base.new('conversation_updated', happened_at, { conversation: conversation.reload })
+
+        listener.conversation_updated(retried)
+
+        expect(row.reload).to be_executed
+      end
+    end
+
     # A rule's own writing is no reason to run the rules again, but it is activity, and a wait that
     # already ran is terminal: no sweep will read it, so the arm is the only thing that can.
     it 'restarts a finished count on a conversation change another rule made' do
