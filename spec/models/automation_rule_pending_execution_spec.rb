@@ -495,6 +495,29 @@ RSpec.describe AutomationRulePendingExecution do
       expect(row.due_at).to be_within(5.seconds).of(moved_at + 60.minutes)
     end
 
+    # A rejected row is never removed from the table -- an abandoned run stays abandoned -- so asking
+    # the question row by row lets a batch fill up with rows whose activity was already consumed and
+    # starve the ones that really have something new, sweep after sweep, for ever.
+    it 'does not let consumed rows crowd a recoverable one out of the batch' do
+      account.enable_features!('delayed_automations')
+      recoverable = nil
+
+      travel_to(20.minutes.ago) do
+        consumed = create(:automation_rule_pending_execution, account: account, conversation: conversation,
+                                                              automation_rule: inactivity_rule, episode_key: 'inactivity',
+                                                              status: :executing, due_at: 30.minutes.from_now)
+        consumed.record_activity(consumed.armed_anchor)
+        recoverable = create(:automation_rule_pending_execution, account: account, episode_key: 'inactivity',
+                                                                 conversation: create(:conversation, account: account),
+                                                                 automation_rule: inactivity_rule,
+                                                                 status: :executing, due_at: 40.minutes.from_now)
+        recoverable.record_activity(recoverable.armed_anchor + 1.minute)
+      end
+
+      expect(described_class.recover_abandoned_with_activity!(limit: 1)).to eq(1)
+      expect(recoverable.reload).to be_pending
+    end
+
     # The dead worker wrote to the conversation before it died and there is no snapshot left to
     # subtract, so a recovery that read the conversation's own clock would take the run's message
     # for new activity and run the actions a second time.

@@ -58,6 +58,17 @@ class AutomationRulePendingExecution < ApplicationRecord
   # Non-terminal rows still bound to fire (a stale processing row is reclaimed by the sweep).
   scope :armed, -> { where(status: [statuses[:pending], statuses[:processing]]) }
 
+  # Abandoned runs carrying activity their worker never read. Unconsumed is the SQL form of what the
+  # row rechecks under its own lock: recorded later than the arm the row is running on. It is asked
+  # here, and not row by row, because a rejected row is never removed from the table -- an abandoned
+  # run stays abandoned -- so a batch filling up with rejects would starve the real ones for ever.
+  scope :recoverable_abandoned, lambda {
+    abandoned.joins(:automation_rule)
+             .where(automation_rules: { execution_delay_trigger: 'inactivity' })
+             .where('automation_rule_pending_executions.activity_seen_at > automation_rule_pending_executions.due_at ' \
+                    "- (automation_rules.execution_delay * interval '1 minute')")
+  }
+
   # Excludes rows whose account paused delayed automations, so one disabled account's backlog
   # can't fill the sweep limit and starve enabled accounts (paused rows resume on re-enable).
   scope :for_enabled_accounts, -> { joins(:account).merge(Account.feature_delayed_automations) }
@@ -209,8 +220,7 @@ class AutomationRulePendingExecution < ApplicationRecord
   # frozen on that conversation until something else happens to arrive. A later arm already takes
   # such a row back; this is the same recovery for the activity that arrived too early to do it.
   def self.recover_abandoned_with_activity!(limit: 1000)
-    rows = abandoned.where.not(activity_seen_at: nil).for_enabled_accounts.limit(limit)
-    rows.count(&:recover_abandoned_run!)
+    recoverable_abandoned.for_enabled_accounts.order(:due_at).limit(limit).count(&:recover_abandoned_run!)
   end
 
   def self.purge_terminal!
