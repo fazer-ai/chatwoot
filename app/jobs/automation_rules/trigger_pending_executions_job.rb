@@ -6,12 +6,13 @@ class AutomationRules::TriggerPendingExecutionsJob < ApplicationJob
   def perform
     started_at = Time.current
     purged = AutomationRulePendingExecution.purge_terminal!
+    recovered = AutomationRulePendingExecution.recover_abandoned_with_activity!(limit: sweep_limit)
 
     rows = AutomationRulePendingExecution.sweepable.for_enabled_accounts.order(:due_at).limit(sweep_limit).to_a
     rows.each { |row| AutomationRules::ProcessPendingExecutionJob.perform_later(row) }
 
-    log_summary(enqueued: rows.size, capped: rows.size >= sweep_limit, purged: purged,
-                abandoned: AutomationRulePendingExecution.abandoned.count, started_at: started_at)
+    log_summary(started_at, enqueued: rows.size, capped: rows.size >= sweep_limit, purged: purged,
+                            recovered: recovered, abandoned: AutomationRulePendingExecution.abandoned.count)
   end
 
   private
@@ -20,9 +21,8 @@ class AutomationRules::TriggerPendingExecutionsJob < ApplicationJob
     (InstallationConfig.find_by(name: 'AUTOMATION_PENDING_EXECUTIONS_SWEEP_LIMIT')&.value || DEFAULT_SWEEP_LIMIT).to_i
   end
 
-  def log_summary(enqueued:, capped:, purged:, abandoned:, started_at:)
-    summary = { event: 'completed', enqueued: enqueued, capped: capped, purged: purged, abandoned: abandoned,
-                duration_ms: ((Time.current - started_at) * 1000).round }
+  def log_summary(started_at, **counts)
+    summary = { event: 'completed', **counts, duration_ms: ((Time.current - started_at) * 1000).round }
     Rails.logger.info("[AutomationRules::TriggerPendingExecutionsJob] #{summary.to_json}")
   end
 end

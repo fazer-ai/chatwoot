@@ -470,6 +470,46 @@ RSpec.describe AutomationRulePendingExecution do
       expect(row.reload.updated_at).to be_within(1.second).of(locked_at)
     end
 
+    # Activity that lands while the dead worker is still inside its timeout is recorded and does not
+    # take the row: the worker is presumed alive and would read it when it finished. It never does,
+    # and nothing sweeps an `executing` row, so without a recovery that activity sits there for good
+    # and the rule stays frozen on the conversation until something else happens to arrive.
+    it 'recovers a run whose worker died holding activity it never read' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+      moved_at = nil
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+        moved_at = Time.current
+      end
+
+      travel_to(20.minutes.from_now) do
+        expect(described_class.recover_abandoned_with_activity!).to eq(1)
+      end
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(moved_at + 60.minutes)
+    end
+
+    # The run may have half happened, and its actions are customer-facing, so a row with nothing new
+    # on its clock is left alone rather than replayed.
+    it 'leaves an abandoned run with nothing new on its clock alone' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(20.minutes.from_now) do
+        expect(described_class.recover_abandoned_with_activity!).to eq(0)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
     it 'takes back a row whose worker died mid-run, so the rule is not frozen for good' do
       described_class.schedule(rule: inactivity_rule, conversation: conversation)
       row = described_class.last

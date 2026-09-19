@@ -202,6 +202,17 @@ class AutomationRulePendingExecution < ApplicationRecord
     end
   end
 
+  # A run whose worker died holds its row for good: nothing reclaims an `executing` row, because
+  # replaying customer-facing actions is worse than dropping them. Activity that landed on it while
+  # the worker was still within its timeout is a different matter. It is not the old run, it is the
+  # next count, and the worker that would have read it is gone, so without this the rule stays
+  # frozen on that conversation until something else happens to arrive. A later arm already takes
+  # such a row back; this is the same recovery for the activity that arrived too early to do it.
+  def self.recover_abandoned_with_activity!(limit: 1000)
+    rows = abandoned.where.not(activity_seen_at: nil).for_enabled_accounts.limit(limit)
+    rows.count(&:recover_abandoned_run!)
+  end
+
   def self.purge_terminal!
     where(status: [statuses[:executed], statuses[:skipped]], updated_at: ...RETENTION_WINDOW.ago)
       .in_batches(of: 1000).delete_all
@@ -297,6 +308,20 @@ class AutomationRulePendingExecution < ApplicationRecord
     return true if pending? || skipped? || executed? || stale_processing?
 
     executing? && abandoned_run?
+  end
+
+  # Starts the next count on a row whose worker died, and only that: the deadline comes from the
+  # activity, never from the run, so nothing of the old run is replayed by getting here.
+  def recover_abandoned_run!
+    with_lock do
+      next false unless abandoned_run?
+
+      due_at = inactivity_due_at
+      next false unless due_at
+
+      update!(status: :pending, skip_reason: nil, due_at: due_at)
+      true
+    end
   end
 
   # Marked `executing` long enough ago that the worker holding it is gone.
