@@ -133,6 +133,30 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # A skip is as terminal as a run, and nothing sweeps a terminal row again, so activity recorded
+    # while this worker was deciding to skip would be buried with the skip.
+    it 'returns the row to pending when activity landed while a skip was being decided' do
+      quiet = travel_to(61.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(61.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+      allow(AutomationRules::ConditionsFilterService).to receive(:new) do
+        # The conditions stopped matching, so this run is about to skip -- and a message lands while
+        # that is being decided, which moves the clock and leaves the claimed row alone.
+        AutomationRulePendingExecution.find(row.id).record_activity(Time.current)
+        instance_double(AutomationRules::ConditionsFilterService, perform: [])
+      end
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+    end
+
     # The actions write to the conversation: a private note, a reopen and an unassign are all
     # messages, and a message moves last_activity_at. Counting that as activity would arm the rule
     # against its own run, and a rule scoped to an inbox would act again every delay, for ever.

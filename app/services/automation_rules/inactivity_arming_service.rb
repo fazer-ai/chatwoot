@@ -4,14 +4,16 @@
 # restores a body the rule already saw reuses that body's finished claim, and the deadline that
 # should have moved never does. Nothing here is customer-facing, so there is nothing to deduplicate.
 class AutomationRules::InactivityArmingService
-  def initialize(message)
+  def initialize(message, performed_by: nil)
     @message = message
+    @performed_by = performed_by
     @conversation = message.conversation
     @account = message.account
   end
 
   def perform
     return if @account.blank? || !@account.feature_enabled?('delayed_automations')
+    return if quiet_wait_speaking?
 
     rules.each do |rule|
       next if AutomationRules::ConditionsFilterService.new(rule, @conversation, {}).perform.blank?
@@ -21,6 +23,17 @@ class AutomationRules::InactivityArmingService
   end
 
   private
+
+  # What another rule wrote is activity on the conversation, and the fire-time clock has always read
+  # it that way; the arm has to agree, or a row that already ran or was skipped is terminal, nothing
+  # sweeps it again, and that activity never starts a new count.
+  #
+  # Except when the rule that wrote it is itself a wait on silence. Such a rule speaks BECAUSE the
+  # conversation went quiet, so reading it as the conversation coming alive is how two of them end up
+  # answering each other for ever, each one's message restarting the other's count.
+  def quiet_wait_speaking?
+    @performed_by.is_a?(AutomationRule) && @performed_by.inactivity_trigger?
+  end
 
   # Conversation-level rules, so the conditions are asked of the conversation and not of the
   # message that happened to arm them.

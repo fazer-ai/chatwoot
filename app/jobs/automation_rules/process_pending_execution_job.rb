@@ -13,7 +13,7 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
     return if reschedule_inactivity(pending_execution)
 
     skip_reason = skip_reason_for(pending_execution)
-    return pending_execution.update!(status: :skipped, skip_reason: skip_reason) if skip_reason
+    return settle_skip(pending_execution, skip_reason) if skip_reason
 
     execute(pending_execution)
   rescue StandardError => e
@@ -76,6 +76,18 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
       pending_execution.conversation
     ).perform
     settle(pending_execution, armed_for, conversation_anchor)
+  end
+
+  # A skip is as terminal as a run, and terminal rows are never swept again, so activity that landed
+  # while this worker was deciding would be buried with the skip. An inactivity row goes terminal
+  # only with nothing left on its clock, whichever way the decision went.
+  def settle_skip(pending_execution, skip_reason)
+    pending_execution.with_lock do
+      due_at = pending_execution.inactivity_due_at
+      next pending_execution.update!(status: :pending, skip_reason: nil, due_at: due_at) if due_at
+
+      pending_execution.update!(status: :skipped, skip_reason: skip_reason)
+    end
   end
 
   # Activity that landed while this worker held the row moved the clock and not the status. Reading

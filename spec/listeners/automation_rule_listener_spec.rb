@@ -364,6 +364,47 @@ describe AutomationRuleListener do
       expect(AutomationRulePendingExecution.last.due_at).to be_within(5.seconds).of(restored_at + 60.minutes)
     end
 
+    # What another rule wrote is activity on the conversation, and the fire-time clock has always
+    # read it that way. A row that already ran is terminal and nothing sweeps it again, so an arm
+    # that disagreed would leave that activity unable to ever start a new count.
+    it 'restarts a finished count on a message another rule sent' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        other_rule = create(:automation_rule, account: account, event_name: 'message_created')
+        reply = create(:message, account: account, conversation: conversation, message_type: :outgoing)
+        event = Events::Base.new('message_created', Time.zone.now, { message: reply, performed_by: other_rule })
+
+        listener.message_created(event)
+
+        expect(row.reload).to be_pending
+        expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    # A rule that speaks because a conversation went quiet is not that conversation coming alive.
+    # Reading it that way is how two waits on silence end up answering each other for ever.
+    it 'does not restart a finished count on a message another wait on silence sent' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        other_wait = create(:automation_rule, account: account, event_name: 'conversation_updated',
+                                              execution_delay: 60, execution_delay_trigger: 'inactivity')
+        reply = create(:message, account: account, conversation: conversation, message_type: :outgoing)
+        event = Events::Base.new('message_created', Time.zone.now, { message: reply, performed_by: other_wait })
+
+        listener.message_created(event)
+
+        expect(row.reload).to be_executed
+      end
+    end
+
     it 'ignores a message the automation itself sent, so its own note does not restart the count' do
       message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
       event = Events::Base.new('message_created', Time.zone.now, { message: message, performed_by: automation_rule })

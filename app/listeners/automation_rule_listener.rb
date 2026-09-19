@@ -352,10 +352,13 @@ class AutomationRuleListener < BaseListener
   # conversation event: last_activity_at is written with update_columns on a create, and an edit
   # moves no conversation timestamp at all. A wait on inactivity is conversation-level, so it arms
   # from here or it would fire on a conversation somebody is writing in.
+  # Who wrote the message is handed over rather than filtered here: which automation's writing counts
+  # as the conversation being alive is the wait's own question, and it is answered where it is asked.
   def arm_inactivity(event)
-    return if ignore_message_created_event?(event)
+    message = event.data[:message]
+    return if message.activity? || message.auto_reply_email?
 
-    ::AutomationRules::InactivityArmingService.new(event.data[:message]).perform
+    ::AutomationRules::InactivityArmingService.new(message, performed_by: event.data[:performed_by]).perform
   end
 
   def performed_by_automation?(event)
