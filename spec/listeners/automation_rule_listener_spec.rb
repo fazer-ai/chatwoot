@@ -324,6 +324,22 @@ describe AutomationRuleListener do
       end
     end
 
+    # An edit moves no conversation timestamp at all, so without this the wait would fire on a
+    # conversation somebody was writing in.
+    it 'restarts the count when a message is edited' do
+      message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: message }))
+      armed_due_at = AutomationRulePendingExecution.last.due_at
+
+      travel_to(30.minutes.from_now) do
+        message.update!(content: 'corrigindo o que eu disse')
+        event = Events::Base.new('message_edited', Time.zone.now, { message: message, content: message.content })
+
+        expect { listener.message_edited(event) }.not_to change(AutomationRulePendingExecution, :count)
+        expect(AutomationRulePendingExecution.last.due_at).to be > armed_due_at
+      end
+    end
+
     it 'ignores a message the automation itself sent, so its own note does not restart the count' do
       message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
       event = Events::Base.new('message_created', Time.zone.now, { message: message, performed_by: automation_rule })

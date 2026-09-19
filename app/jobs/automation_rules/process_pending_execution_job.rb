@@ -64,11 +64,23 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
   # so a message/email/webhook is never sent twice. Everything up to this point is still retryable.
   def execute(pending_execution)
     pending_execution.update!(status: :executing)
+    armed_for = pending_execution.due_at
     AutomationRules::ActionService.new(
       pending_execution.automation_rule,
       pending_execution.account,
       pending_execution.conversation
     ).perform
-    pending_execution.update!(status: :executed)
+    settle(pending_execution, armed_for)
+  end
+
+  # Activity that landed while the actions ran moved the clock without touching this row's status.
+  # Reading it here is what starts the next count from that activity instead of dropping it: the
+  # rule's own actions never move it, since the events they dispatch are automation-originated.
+  def settle(pending_execution, armed_for)
+    pending_execution.with_lock do
+      next pending_execution.update!(status: :pending) if pending_execution.due_at > armed_for
+
+      pending_execution.update!(status: :executed)
+    end
   end
 end

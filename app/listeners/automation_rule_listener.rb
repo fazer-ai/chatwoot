@@ -326,12 +326,14 @@ class AutomationRuleListener < BaseListener
   # A message is the commonest activity there is, and it dispatches no conversation event:
   # last_activity_at is written with update_columns. A wait on inactivity is conversation-level, so
   # it arms from here too, or a conversation that only exchanges messages would never restart its
-  # count. Its conditions are about the conversation, and the run claims keep the arm single.
+  # count. An edit is activity as well, and it moves no conversation timestamp at all, so it arms
+  # from here or the wait would fire on a conversation somebody was writing in. Their conditions
+  # are about the conversation, and the run claims keep the arm single.
   def message_rules(event_name, account)
     return [] if account.blank?
 
     rules = current_account_rules(event_name, account)
-    return rules unless event_name == 'message_created'
+    return rules unless %w[message_created message_edited].include?(event_name)
 
     rules + current_account_rules('conversation_updated', account).where(execution_delay_trigger: 'inactivity')
   end

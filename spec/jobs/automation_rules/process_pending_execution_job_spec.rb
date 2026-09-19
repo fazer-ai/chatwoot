@@ -108,6 +108,31 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # The row is `executing` while the actions run, which no re-arm may take away from the worker.
+    # The clock still moves, and reading it at the end is what keeps that activity from being lost:
+    # the sweep never looks at an executed row again.
+    it 'starts the next count from activity that landed while the actions ran' do
+      quiet = travel_to(61.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(61.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+      allow(AutomationRules::ActionService).to receive(:new) do
+        # A message lands while the actions are running: it moves the clock and leaves the row alone.
+        reply = create(:message, conversation: quiet, account: account, message_type: :incoming)
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload, message: reply)
+        instance_double(AutomationRules::ActionService, perform: true)
+      end
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+    end
+
     # An activity message and a reply another automation sent both bump last_activity_at without
     # reaching a listener, so the clock is read here instead of trusted from the arm.
     it 'pushes the clock instead of firing when something touched the conversation after the arm' do

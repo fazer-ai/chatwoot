@@ -117,8 +117,14 @@ class AutomationRulePendingExecution < ApplicationRecord
     due_at = rule.execution_delay.minutes.since(anchor)
     row = find_by!(automation_rule_id: rule.id, conversation_id: conversation.id, episode_key: key)
     row.with_lock do
-      next unless row.rearmable_for_inactivity?
       next if row.due_at >= due_at
+
+      # A live worker keeps its status: pulling its row to pending would let the sweep claim it and
+      # run the same actions alongside it. The clock still moves, and the worker reads it when it
+      # finishes, so activity that lands mid-run starts the next count instead of being lost.
+      next row.update!(due_at: due_at) if row.executing? && !row.abandoned_run?
+
+      next unless row.rearmable_for_inactivity?
 
       row.update!(status: :pending, skip_reason: nil, due_at: due_at)
     end
@@ -143,7 +149,9 @@ class AutomationRulePendingExecution < ApplicationRecord
   # else (a status change, an assignment, a label, a custom attribute) lands on updated_at, and
   # only some of those also bump last_activity_at, so the clock reads whichever is later.
   def self.activity_anchor_for(conversation, message)
-    return message.created_at if message
+    # updated_at, not created_at: an edit is activity, and what it changes is when the message was
+    # last written. The two are the same value on a message that just arrived.
+    return message.updated_at if message
 
     [conversation.last_activity_at, conversation.updated_at].compact.max
   end
@@ -245,12 +253,17 @@ class AutomationRulePendingExecution < ApplicationRecord
   end
 
   # A new stretch of activity starts a new count, including after a run: the lead was released,
-  # somebody touched the conversation again, and it can go quiet again. Only a live worker keeps
-  # its row -- pulling that one back to pending would have the job's own completion overwrite the
-  # new clock, and an abandoned `executing` row would otherwise freeze the rule for good.
+  # somebody touched the conversation again, and it can go quiet again. A live worker is the one
+  # case that keeps its status, and an abandoned `executing` row would otherwise freeze the rule
+  # for good.
   def rearmable_for_inactivity?
     return true if pending? || skipped? || executed? || stale_processing?
 
+    executing? && abandoned_run?
+  end
+
+  # Marked `executing` long enough ago that the worker holding it is gone.
+  def abandoned_run?
     executing? && updated_at < STALE_PROCESSING_TIMEOUT.ago
   end
 
