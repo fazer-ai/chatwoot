@@ -4,11 +4,11 @@
 # restores a body the rule already saw reuses that body's finished claim, and the deadline that
 # should have moved never does. Nothing here is customer-facing, so there is nothing to deduplicate.
 class AutomationRules::InactivityArmingService
-  def initialize(message, performed_by: nil)
+  def initialize(conversation, message: nil, performed_by: nil)
+    @conversation = conversation
     @message = message
     @performed_by = performed_by
-    @conversation = message.conversation
-    @account = message.account
+    @account = conversation.account
   end
 
   def perform

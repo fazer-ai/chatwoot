@@ -405,6 +405,47 @@ describe AutomationRuleListener do
       end
     end
 
+    # A rule's own writing is no reason to run the rules again, but it is activity, and a wait that
+    # already ran is terminal: no sweep will read it, so the arm is the only thing that can.
+    it 'restarts a finished count on a conversation change another rule made' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        other_rule = create(:automation_rule, account: account, event_name: 'conversation_updated')
+        conversation.update!(custom_attributes: { 'fechamento' => 'Em negociação' })
+        event = Events::Base.new('conversation_updated', Time.zone.now,
+                                 { conversation: conversation.reload, performed_by: other_rule })
+
+        listener.conversation_updated(event)
+
+        expect(row.reload).to be_pending
+        expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    # The rule's own actions change the conversation -- it reopens it, it strips an attribute -- and
+    # each of those dispatches an update. Arming from them would be the rule resurrecting itself the
+    # moment it finished, for ever.
+    it 'does not restart its own count from the conversation changes its actions made' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(custom_attributes: {})
+        event = Events::Base.new('conversation_updated', Time.zone.now,
+                                 { conversation: conversation.reload, performed_by: automation_rule })
+
+        listener.conversation_updated(event)
+
+        expect(row.reload).to be_executed
+      end
+    end
+
     it 'ignores a message the automation itself sent, so its own note does not restart the count' do
       message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
       event = Events::Base.new('message_created', Time.zone.now, { message: message, performed_by: automation_rule })

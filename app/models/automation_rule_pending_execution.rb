@@ -237,10 +237,13 @@ class AutomationRulePendingExecution < ApplicationRecord
     self.class.episode_key_for(conversation, message) == episode_key
   end
 
-  # The latest activity this row knows about: what a listener recorded, or the arm's own anchor for
-  # a row that predates any. Never nil, so callers compare times rather than handling absence.
+  # The latest activity this row knows about. Both sources, because they are written on different
+  # paths: a listener records one, and a worker that pushed the deadline forward moved the other
+  # without recording anything. Reading the older of the two would let an event the current deadline
+  # already covers pass the forward-only guard and pull the clock back. Never nil, so callers
+  # compare times rather than handling absence.
   def activity_at
-    activity_seen_at || armed_anchor
+    [activity_seen_at, armed_anchor].compact.max
   end
 
   # The anchor the current deadline was built from.

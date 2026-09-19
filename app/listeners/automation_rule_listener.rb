@@ -298,7 +298,7 @@ class AutomationRuleListener < BaseListener
   end
 
   def process_conversation_event(event, event_name)
-    return if performed_by_automation?(event)
+    return arm_inactivity(event) if performed_by_automation?(event)
 
     auto_reply_skip_events = %w[conversation_created conversation_opened]
     return if auto_reply_skip_events.include?(event_name) && ignore_auto_reply_event?(event)
@@ -352,13 +352,19 @@ class AutomationRuleListener < BaseListener
   # conversation event: last_activity_at is written with update_columns on a create, and an edit
   # moves no conversation timestamp at all. A wait on inactivity is conversation-level, so it arms
   # from here or it would fire on a conversation somebody is writing in.
-  # Who wrote the message is handed over rather than filtered here: which automation's writing counts
-  # as the conversation being alive is the wait's own question, and it is answered where it is asked.
+  # Who wrote it is handed over rather than filtered here: which automation's writing counts as the
+  # conversation being alive is the wait's own question, and it is answered where it is asked. That
+  # is also why a rule's own conversation event reaches this after the early return above: its
+  # writing is no reason to run the rules again, but it is still activity, and a wait on silence
+  # that already ran is terminal, so no sweep will read it. The arm is the only thing left that can.
   def arm_inactivity(event)
     message = event.data[:message]
-    return if message.activity? || message.auto_reply_email?
+    return if message && (message.activity? || message.auto_reply_email?)
 
-    ::AutomationRules::InactivityArmingService.new(message, performed_by: event.data[:performed_by]).perform
+    conversation = message&.conversation || event.data[:conversation]
+    ::AutomationRules::InactivityArmingService.new(
+      conversation, message: message, performed_by: event.data[:performed_by]
+    ).perform
   end
 
   def performed_by_automation?(event)

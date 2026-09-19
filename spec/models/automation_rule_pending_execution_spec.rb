@@ -393,6 +393,23 @@ RSpec.describe AutomationRulePendingExecution do
       expect(row.reload.due_at).to be_within(1.second).of(90.minutes.from_now)
     end
 
+    # A worker that pushes the deadline forward moves the arm's anchor and records nothing, so a row
+    # that also carries an older recorded activity has two clocks. Reading the older one lets an
+    # event the current deadline already covers pass the forward-only guard and pull it back.
+    it 'never pulls the clock backwards after a worker pushed the deadline forward' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.record_activity(Time.current)
+      row.update!(due_at: 90.minutes.from_now)
+
+      travel_to(10.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload.due_at).to be_within(1.second).of(90.minutes.from_now)
+    end
+
     it 'counts again after a run, because the conversation was touched again' do
       described_class.schedule(rule: inactivity_rule, conversation: conversation)
       row = described_class.last
