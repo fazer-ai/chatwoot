@@ -405,6 +405,20 @@ describe AutomationRuleListener do
       end
     end
 
+    # The columns hold microseconds and an event's timestamp keeps its nanoseconds through the
+    # queue, so the same event replayed reads as newer than the row it armed itself.
+    it 'does not read a replay of the same event as new activity' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      happened_at = Time.zone.now.change(nsec: 123_456_789)
+      listener.message_created(Events::Base.new('message_created', happened_at, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      listener.message_created(Events::Base.new('message_created', happened_at, { message: first }))
+
+      expect(row.reload).to be_executed
+    end
+
     # A message's updated_at moves for things that are not activity at all -- a delivery receipt,
     # a status update -- so a retry of the same event would arm from a timestamp the event never
     # had. The performed_by guard cannot see it either: a retry keeps the original actor.

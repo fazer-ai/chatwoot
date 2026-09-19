@@ -80,7 +80,7 @@ class AutomationRulePendingExecution < ApplicationRecord
     return if message.nil? && !rule.inactivity_trigger? && conversation.status_changed_at.blank?
 
     key = arm_episode_key_for(conversation, message, rule: rule)
-    anchor = arm_anchor_for(conversation, message, rule: rule, at: at)
+    anchor = stored_precision(arm_anchor_for(conversation, message, rule: rule, at: at))
     create!(
       automation_rule: rule, conversation: conversation, account_id: conversation.account_id,
       # An inactivity row is about the conversation, not about the message that happened to arm it.
@@ -197,6 +197,14 @@ class AutomationRulePendingExecution < ApplicationRecord
       # landed while this job queued must end the episode at fire time, not be baked into its key.
       "reply_chase:#{conversation.messages.incoming.where(id: ...message.id).maximum(:id) || 0}"
     end
+  end
+
+  # These columns hold microseconds, and a timestamp carried by an event keeps its nanoseconds
+  # through the queue. Compared against what the column gives back, the SAME event then reads as
+  # newer than the row it armed, and a retry resurrects a wait that already ran. An anchor is cut
+  # to the column's precision before it is compared or written, so what goes in comes back equal.
+  def self.stored_precision(time)
+    time&.round(6)
   end
 
   # Microsecond integer, not a float: epoch seconds carry ~16 significant digits, past float64's
