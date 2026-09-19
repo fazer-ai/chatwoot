@@ -654,6 +654,46 @@ describe('AutomationWaitCondition', () => {
       expect(wrapper.vm.validate()).toBe(true);
     });
 
+    // A status wait offers no additional filter at all, so a kept assignee row would render with
+    // no operator to choose from, and the backend refuses those conditions anyway.
+    it('drops conditions the status trigger does not offer when switching back to it', async () => {
+      const wrapper = mountComponent({
+        eventName: 'conversation_updated',
+        delayTrigger: 'inactivity',
+        isSavedWait: true,
+        inboxOptions,
+        conditions: [
+          {
+            attribute_key: 'inbox_id',
+            filter_operator: 'equal_to',
+            values: [{ id: 7, name: 'Paid traffic' }],
+            query_operator: 'and',
+            custom_attribute_type: '',
+          },
+          {
+            attribute_key: 'assignee_id',
+            filter_operator: 'equal_to',
+            values: '',
+            query_operator: null,
+            custom_attribute_type: '',
+          },
+        ],
+      });
+      await nextTick();
+
+      wrapper
+        .findAllComponents(FilterSelect)[0]
+        .vm.$emit('update:modelValue', 'conversation_status');
+      await nextTick();
+
+      const conditions = wrapper.emitted('update:conditions').at(-1)[0];
+      expect(conditions.map(condition => condition.attribute_key)).toEqual([
+        'status',
+        'inbox_id',
+      ]);
+      expect(wrapper.emitted('update:delayTrigger').at(-1)[0]).toBeNull();
+    });
+
     it('opens a saved inactivity wait on its own trigger and offers the remaining filters', async () => {
       const wrapper = mountComponent({
         eventName: 'conversation_updated',

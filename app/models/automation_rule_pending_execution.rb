@@ -231,14 +231,17 @@ class AutomationRulePendingExecution < ApplicationRecord
   # When the conversation moved after this row was armed, the time it should fire at instead.
   # Nil when nothing moved (or when this row is not an inactivity wait), which is the case that
   # actually runs the actions. Some activity never reaches a listener -- an activity message, a
-  # reply another automation sent -- so the clock is read here rather than trusted from the arm.
+  # reply another automation sent, a custom attribute another rule wrote -- so the clock is read
+  # here rather than trusted from the arm, and it is read the same way the arm reads it: a write
+  # that lands on updated_at alone is still activity.
   def inactivity_due_at
     return nil unless automation_rule&.inactivity_trigger?
 
     delay = automation_rule.execution_delay.minutes
-    return nil unless conversation.last_activity_at > due_at - delay
+    anchor = self.class.activity_anchor_for(conversation, nil)
+    return nil unless anchor > due_at - delay
 
-    conversation.last_activity_at + delay
+    anchor + delay
   end
 
   # A new stretch of activity starts a new count, including after a run: the lead was released,

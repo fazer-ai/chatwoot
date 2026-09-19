@@ -311,11 +311,18 @@ const applyTrigger = ({
   const droppedKeys = previousTrigger
     ? managedKeysFor(previousTrigger)
     : new Set();
+  // And a condition the new trigger does not offer cannot be carried over either: a status wait
+  // exposes no additional filter at all, so a kept assignee row would render with no operator to
+  // choose from, and the backend refuses those conditions anyway.
+  const offered = new Set(
+    additionalFilterTypes.value.map(filter => filter.attributeKey)
+  );
   const additionalConditions = preserveAdditional
     ? conditions.value.filter(
         condition =>
           isAdditionalCondition(condition) &&
-          !droppedKeys.has(condition.attribute_key)
+          !droppedKeys.has(condition.attribute_key) &&
+          offered.has(condition.attribute_key)
       )
     : [];
   // An inactivity wait manages no state of its own: the inboxes are its only managed condition,

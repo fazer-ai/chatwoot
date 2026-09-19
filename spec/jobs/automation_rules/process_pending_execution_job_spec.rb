@@ -81,6 +81,33 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.reload).to be_executed
     end
 
+    # A custom attribute written by another automation moves updated_at and not last_activity_at,
+    # and the event it dispatches is ignored for being automation-originated, so nothing re-arms
+    # the row. The clock has to read that write the same way the arm would.
+    it 'pushes the clock when the activity landed on updated_at alone' do
+      # A conversation that really has been quiet for an hour: the column defaults to the database
+      # clock, which travel_to does not move, so the arm would otherwise read the present.
+      quiet = travel_to(61.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(61.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+      # Written by another automation: it moves updated_at and not last_activity_at, and the event
+      # it dispatches is ignored for being automation-originated, so no listener re-arms the row.
+      other_rule = create(:automation_rule, account: account, event_name: 'conversation_updated')
+      Current.executed_by = other_rule
+      quiet.update!(custom_attributes: { 'fechamento' => 'Venda efetivada' })
+      Current.reset
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+    end
+
     # An activity message and a reply another automation sent both bump last_activity_at without
     # reaching a listener, so the clock is read here instead of trusted from the arm.
     it 'pushes the clock instead of firing when something touched the conversation after the arm' do
