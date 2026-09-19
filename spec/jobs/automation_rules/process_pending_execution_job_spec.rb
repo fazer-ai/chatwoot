@@ -65,6 +65,22 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       end
     end
 
+    # The arm anchors on the activity itself, so the two timestamps are equal when the row comes due.
+    # Reading that as "something happened after the arm" would push the row forward for ever and the
+    # actions would never run.
+    it 'fires on the activity it was armed from instead of rescheduling itself' do
+      conversation
+      message = travel_to(61.minutes.ago) do
+        create(:message, conversation: conversation, account: account, message_type: :incoming)
+      end
+      AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: conversation.reload, message: message)
+      row = AutomationRulePendingExecution.last
+
+      job.perform(row)
+
+      expect(row.reload).to be_executed
+    end
+
     # An activity message and a reply another automation sent both bump last_activity_at without
     # reaching a listener, so the clock is read here instead of trusted from the arm.
     it 'pushes the clock instead of firing when something touched the conversation after the arm' do
