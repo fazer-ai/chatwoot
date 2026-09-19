@@ -264,6 +264,15 @@ class AutomationRulePendingExecution < ApplicationRecord
   # here rather than trusted from the arm, and it is read the same way the arm reads it: a write
   # that lands on updated_at alone is still activity.
   #
+  # This reads every write, including one from another wait on silence, which the ARM excludes. The
+  # asymmetry is the point, because the two can do different things: this one can only push a
+  # deadline forward, so its worst outcome is waiting longer than asked, while the arm can take a
+  # terminal row back to pending and cause an action that would otherwise never happen -- two such
+  # waits arming each other answer each other for ever. Forward on any write; a new count only from
+  # writing that is not itself a wait on silence. Symmetry is also not available: last_activity_at
+  # and updated_at are columns with no provenance, and at fire time, in another job, nothing on the
+  # conversation says which rule wrote them.
+  #
   # `conversation_anchor` is that reading taken at another moment, which is what a caller that has
   # since written to the conversation itself passes: its own writes are not activity, and reading
   # the column after them would restart the count on the rule's own run.
