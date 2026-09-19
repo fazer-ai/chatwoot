@@ -27,8 +27,17 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
     due_at = pending_execution.inactivity_due_at
     return false if due_at.nil?
 
-    pending_execution.update!(status: :pending, due_at: due_at)
-    true
+    if due_at.future?
+      pending_execution.update!(status: :pending, due_at: due_at)
+      return true
+    end
+
+    # The clock moved by less than it took to get here -- an arm anchored on a message, and the
+    # write that message makes to the conversation landing a moment later, is enough -- so the wait
+    # is already over and this worker is the one holding the row. Record where the count really
+    # ended and carry on; handing the row back would cost a whole sweep to reach the same answer.
+    pending_execution.update!(due_at: due_at)
+    false
   end
 
   def skip_reason_for(pending_execution)
@@ -89,11 +98,14 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
   def start_run(pending_execution)
     pending_execution.with_lock do
       due_at = pending_execution.inactivity_due_at
-      if due_at
+      if due_at&.future?
         pending_execution.update!(status: :pending, due_at: due_at)
         next false
       end
 
+      # Nothing moved, or it moved by less than the wait had left: either way the count is over and
+      # the row is this worker's. The deadline still records where it really ended.
+      pending_execution.due_at = due_at if due_at
       pending_execution.update!(status: :executing)
       true
     end

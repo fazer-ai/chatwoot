@@ -133,6 +133,27 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # The clock moves by less than the wait had left on ordinary paths: an arm anchored on a message
+    # and the write that message makes to the conversation land a moment apart. Handing the row back
+    # for that costs a whole sweep to reach the same answer, so the wait runs late for no reason.
+    it 'runs the actions when the recomputed deadline has already elapsed' do
+      quiet = travel_to(70.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(70.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      # Five minutes later something touched the conversation, which still leaves the wait over.
+      travel_to(65.minutes.ago) { quiet.update!(last_activity_at: Time.current) }
+      row = AutomationRulePendingExecution.last
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_executed
+      expect(row.due_at).to be_within(5.seconds).of(5.minutes.ago)
+    end
+
     # Everything between the claim and the actions is a decision, not an action, and the arm cannot
     # take a claimed row back. Without a last look the customer replies and is unassigned in the
     # same breath, which is the one thing the wait promises not to do.
