@@ -349,4 +349,111 @@ RSpec.describe AutomationRulePendingExecution do
       expect(claimed.due_at).to be_within(5.seconds).of(5.days.ago)
     end
   end
+
+  describe 'inactivity episodes' do
+    let(:inactivity_rule) do
+      create(:automation_rule, account: account, event_name: 'conversation_updated', execution_delay: 60,
+                               execution_delay_trigger: 'inactivity',
+                               actions: [{ 'action_name' => 'remove_assigned_agent', 'action_params' => [] }])
+    end
+
+    it 'arms one row per conversation, anchored on the last activity rather than on the arm' do
+      conversation
+
+      travel_to(10.minutes.from_now) do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        row = described_class.last
+        expect(row.episode_key).to eq('inactivity')
+        expect(row.message_id).to be_nil
+        # Ten minutes of the hour are already gone: the clock started at the activity, not here.
+        expect(row.due_at).to be_within(1.second).of(50.minutes.from_now)
+      end
+    end
+
+    it 'restarts the count on activity that carries no message' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(custom_attributes: { 'fechamento' => 'Em negociação' })
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(described_class.count).to eq(1)
+        expect(described_class.last.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    it 'never pulls the clock backwards when a listener runs out of order' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(due_at: 90.minutes.from_now)
+
+      described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+      expect(row.reload.due_at).to be_within(1.second).of(90.minutes.from_now)
+    end
+
+    it 'counts again after a run, because the conversation was touched again' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(row.reload).to be_pending
+        expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    it 'leaves a live worker holding its row' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
+    it 'takes back a row whose worker died mid-run, so the rule is not frozen for good' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload).to be_pending
+    end
+
+    describe '#inactivity_due_at' do
+      it 'is nil while nothing happened after the arm' do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation)
+
+        expect(described_class.last.inactivity_due_at).to be_nil
+      end
+
+      it 'is the last activity plus the delay when something did' do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation)
+        row = described_class.last
+        activity = 5.minutes.from_now
+        conversation.update!(last_activity_at: activity)
+
+        expect(row.reload.inactivity_due_at).to be_within(1.second).of(activity + 60.minutes)
+      end
+
+      it 'is nil for a wait that is not about inactivity' do
+        described_class.schedule(rule: rule, conversation: conversation)
+
+        expect(described_class.last.inactivity_due_at).to be_nil
+      end
+    end
+  end
 end

@@ -131,6 +131,28 @@ RSpec.describe AutomationRules::ActionService do
       end
     end
 
+    describe '#perform with remove_custom_attribute action' do
+      before do
+        conversation.update!(custom_attributes: { 'fechamento' => 'Em negociação', 'origem' => 'tráfego pago' })
+        rule.actions = [{ action_name: 'remove_custom_attribute', action_params: ['fechamento'] }]
+        rule.save!
+      end
+
+      # Writing an empty value instead would leave the key behind, and on a list attribute that reads
+      # as unset on screen while hiding the control an agent would use to clear it.
+      it 'drops the key instead of emptying it, and leaves the other attributes alone' do
+        described_class.new(rule, account, conversation).perform
+
+        expect(conversation.reload.custom_attributes).to eq({ 'origem' => 'tráfego pago' })
+      end
+
+      it 'does not touch the conversation when the attribute was never set' do
+        rule.update!(actions: [{ action_name: 'remove_custom_attribute', action_params: ['inexistente'] }])
+
+        expect { described_class.new(rule, account, conversation).perform }.not_to(change { conversation.reload.updated_at })
+      end
+    end
+
     describe '#perform with send_email_transcript action' do
       before do
         allow(account).to receive(:email_transcript_enabled?).and_return(true)

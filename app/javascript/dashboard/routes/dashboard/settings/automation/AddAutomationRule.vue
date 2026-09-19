@@ -11,6 +11,7 @@ const START_VALUE = {
   description: null,
   event_name: 'conversation_created',
   execution_delay: null,
+  execution_delay_trigger: null,
   conditions: [
     {
       attribute_key: 'status',

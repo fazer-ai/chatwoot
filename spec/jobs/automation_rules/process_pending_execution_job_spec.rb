@@ -39,6 +39,46 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
 
   before { account.enable_features!('delayed_automations') }
 
+  context 'when the wait is about inactivity' do
+    let(:inactivity_rule) do
+      create(:automation_rule, account: account, event_name: 'conversation_updated', execution_delay: 60,
+                               execution_delay_trigger: 'inactivity',
+                               conditions: [{ 'values' => [conversation.inbox_id], 'attribute_key' => 'inbox_id',
+                                              'query_operator' => nil, 'filter_operator' => 'equal_to' }],
+                               actions: [{ 'action_name' => 'remove_assigned_agent', 'action_params' => [] }])
+    end
+    let(:inactivity_execution) do
+      AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: conversation)
+      AutomationRulePendingExecution.last.tap { |row| row.update!(due_at: 1.minute.ago) }
+    end
+
+    it 'runs the actions when the conversation really did go quiet' do
+      conversation
+
+      travel_to(61.minutes.from_now) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: conversation.reload)
+        row = AutomationRulePendingExecution.last
+
+        job.perform(row)
+
+        expect(row.reload).to be_executed
+      end
+    end
+
+    # An activity message and a reply another automation sent both bump last_activity_at without
+    # reaching a listener, so the clock is read here instead of trusted from the arm.
+    it 'pushes the clock instead of firing when something touched the conversation after the arm' do
+      inactivity_execution
+      conversation.update!(last_activity_at: Time.current)
+
+      job.perform(inactivity_execution.reload)
+
+      expect(inactivity_execution.reload).to be_pending
+      expect(inactivity_execution.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      expect(conversation.reload.assignee_id).to be_nil
+    end
+  end
+
   it 'runs the actions and marks the row executed when every guard passes' do
     job.perform(pending_execution.reload)
 

@@ -107,6 +107,7 @@ const ACTION_ICONS = {
   resolve_conversation: 'i-lucide-circle-check',
   change_priority: 'i-lucide-signal-high',
   add_sla: 'i-lucide-gauge',
+  remove_custom_attribute: 'i-lucide-eraser',
 };
 
 const DEFAULT_ACTION_ICON = 'i-lucide-zap';
@@ -145,11 +146,19 @@ export const generateLabelOptions = labels =>
     color: label.color,
   }));
 
+// The action names the attribute by its key, which is what the conversation stores it under.
+const generateCustomAttributeOptions = (attributes = []) =>
+  attributes.map(attribute => ({
+    id: attribute.attribute_key,
+    name: attribute.attribute_display_name,
+  }));
+
 export const getActionOptions = ({
   agents,
   teams,
   labels,
   slaPolicies,
+  conversationCustomAttributes,
   type,
   addNoneToListFn,
   priorityOptions,
@@ -164,6 +173,9 @@ export const getActionOptions = ({
     remove_label: generateLabelOptions(labels),
     change_priority: priorityOptions,
     add_sla: slaPolicies,
+    remove_custom_attribute: generateCustomAttributeOptions(
+      conversationCustomAttributes
+    ),
   };
   return actionsMap[type];
 };

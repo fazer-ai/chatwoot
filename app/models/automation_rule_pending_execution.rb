@@ -30,6 +30,9 @@ class AutomationRulePendingExecution < ApplicationRecord
   STALE_PROCESSING_TIMEOUT = 15.minutes
   # Terminal rows are purged after this to keep the table bounded.
   RETENTION_WINDOW = 30.days
+  # An inactivity wait has one episode per conversation: the count restarts on every activity
+  # instead of ending, so the row is re-anchored in place rather than replaced by a new key.
+  INACTIVITY_EPISODE_KEY = 'inactivity'.freeze
 
   belongs_to :automation_rule
   belongs_to :conversation
@@ -62,13 +65,17 @@ class AutomationRulePendingExecution < ApplicationRecord
     # status_changed_at is only written from this feature onwards, so a conversation that predates it
     # has no status clock. Anchoring on created_at would make every old conversation instantly
     # overdue and fire on the next sweep; leave them for their next status change to arm.
-    return if message.nil? && conversation.status_changed_at.blank?
+    return if message.nil? && !rule.inactivity_trigger? && conversation.status_changed_at.blank?
 
-    key = arm_episode_key_for(conversation, message)
-    anchor = arm_anchor_for(conversation, message)
+    key = arm_episode_key_for(conversation, message, rule: rule)
+    anchor = arm_anchor_for(conversation, message, rule: rule)
     create!(
       automation_rule: rule, conversation: conversation, account_id: conversation.account_id,
-      message_id: message&.id, episode_key: key, due_at: rule.execution_delay.minutes.since(anchor)
+      # An inactivity row is about the conversation, not about the message that happened to arm it.
+      # Leaving the message out is also what keeps the fire-time condition re-check scoped to the
+      # conversation instead of to one message that may be gone by then.
+      message_id: rule.inactivity_trigger? ? nil : message&.id,
+      episode_key: key, due_at: rule.execution_delay.minutes.since(anchor)
     )
   rescue ActiveRecord::RecordNotUnique
     rearm_or_advance_episode(rule, conversation, key, message, anchor)
@@ -77,6 +84,7 @@ class AutomationRulePendingExecution < ApplicationRecord
   # The episode is already armed. Status episodes keep their first clock (a status change would
   # give a new key), so only message episodes advance or re-arm here.
   def self.rearm_or_advance_episode(rule, conversation, key, message, anchor)
+    return advance_inactivity_episode(rule, conversation, key, anchor) if rule.inactivity_trigger?
     return unless message
 
     due_at = rule.execution_delay.minutes.since(anchor)
@@ -101,10 +109,27 @@ class AutomationRulePendingExecution < ApplicationRecord
     end
   end
 
+  # Any activity restarts an inactivity count, including the activity that carries no message: a
+  # status change, an assignment, a tabulation. The clock only moves forward, so a listener running
+  # out of order cannot pull it back and fire before the delay elapsed. A row that already ran
+  # re-arms too: the conversation was touched again, so it can go quiet again.
+  def self.advance_inactivity_episode(rule, conversation, key, anchor)
+    due_at = rule.execution_delay.minutes.since(anchor)
+    row = find_by!(automation_rule_id: rule.id, conversation_id: conversation.id, episode_key: key)
+    row.with_lock do
+      next unless row.rearmable_for_inactivity?
+      next if row.due_at >= due_at
+
+      row.update!(status: :pending, skip_reason: nil, due_at: due_at)
+    end
+  end
+
   # The wait is measured from when the qualifying event happened, not when this (possibly
   # backlogged or retried) listener runs, so a late dispatch still fires on schedule. Mirrors
   # the timestamps the episode keys track.
-  def self.arm_anchor_for(conversation, message)
+  def self.arm_anchor_for(conversation, message, rule: nil)
+    return activity_anchor_for(conversation, message) if rule&.inactivity_trigger?
+
     if message.nil?
       conversation.status_changed_at
     elsif message.incoming?
@@ -114,10 +139,20 @@ class AutomationRulePendingExecution < ApplicationRecord
     end
   end
 
+  # The last thing that happened on the conversation. A message is its own timestamp; everything
+  # else (a status change, an assignment, a label, a custom attribute) lands on updated_at, and
+  # only some of those also bump last_activity_at, so the clock reads whichever is later.
+  def self.activity_anchor_for(conversation, message)
+    return message.created_at if message
+
+    [conversation.last_activity_at, conversation.updated_at].compact.max
+  end
+
   # Arming keys differ from the strict fire-time keys wherever current state can already reflect the
   # event the row waits for: MESSAGE_CREATED dispatches asynchronously, so this can run long after
   # the message it arms.
-  def self.arm_episode_key_for(conversation, message)
+  def self.arm_episode_key_for(conversation, message, rule: nil)
+    return INACTIVITY_EPISODE_KEY if rule&.inactivity_trigger?
     return episode_key_for(conversation, message) if message.nil?
 
     if message.incoming?
@@ -186,7 +221,34 @@ class AutomationRulePendingExecution < ApplicationRecord
   end
 
   def episode_current?
+    # An inactivity episode never ends, it only restarts: what would cancel it is activity, and
+    # that is read from the clock (`inactivity_due_at`) rather than from a key that changes.
+    return true if automation_rule&.inactivity_trigger?
+
     self.class.episode_key_for(conversation, message) == episode_key
+  end
+
+  # When the conversation moved after this row was armed, the time it should fire at instead.
+  # Nil when nothing moved (or when this row is not an inactivity wait), which is the case that
+  # actually runs the actions. Some activity never reaches a listener -- an activity message, a
+  # reply another automation sent -- so the clock is read here rather than trusted from the arm.
+  def inactivity_due_at
+    return nil unless automation_rule&.inactivity_trigger?
+
+    delay = automation_rule.execution_delay.minutes
+    return nil unless conversation.last_activity_at > due_at - delay
+
+    conversation.last_activity_at + delay
+  end
+
+  # A new stretch of activity starts a new count, including after a run: the lead was released,
+  # somebody touched the conversation again, and it can go quiet again. Only a live worker keeps
+  # its row -- pulling that one back to pending would have the job's own completion overwrite the
+  # new clock, and an abandoned `executing` row would otherwise freeze the rule for good.
+  def rearmable_for_inactivity?
+    return true if pending? || skipped? || executed? || stale_processing?
+
+    executing? && updated_at < STALE_PROCESSING_TIMEOUT.ago
   end
 
   # The claim renews updated_at, so a processing row past the timeout means its worker died. Only

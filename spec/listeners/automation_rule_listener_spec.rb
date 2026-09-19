@@ -281,6 +281,57 @@ describe AutomationRuleListener do
     end
   end
 
+  # An inactivity wait is a conversation rule, and a message dispatches no conversation event, so
+  # the message path has to arm it as well or a conversation that only exchanges messages would
+  # never restart its count.
+  describe 'the inactivity trigger' do
+    let(:automation_rule) do
+      create(:automation_rule, account: account, event_name: 'conversation_updated', execution_delay: 60,
+                               execution_delay_trigger: 'inactivity',
+                               conditions: [{ 'attribute_key' => 'inbox_id', 'filter_operator' => 'equal_to',
+                                              'values' => [conversation.inbox_id], 'query_operator' => nil }],
+                               actions: [{ 'action_name' => 'remove_assigned_agent', 'action_params' => [] }])
+    end
+
+    before do
+      allow(AutomationRules::ConditionsFilterService).to receive(:new).and_call_original
+      account.enable_features!('delayed_automations')
+      automation_rule
+    end
+
+    it 'arms the wait on a message, with one row for the conversation and no message on it' do
+      message = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      event = Events::Base.new('message_created', Time.zone.now, { message: message })
+
+      expect { listener.message_created(event) }.to change(AutomationRulePendingExecution, :count).by(1)
+      row = AutomationRulePendingExecution.last
+      expect(row.automation_rule).to eq(automation_rule)
+      expect(row.episode_key).to eq('inactivity')
+      expect(row.message_id).to be_nil
+    end
+
+    it 'restarts the count on the next message instead of arming a second row' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      listener.message_created(Events::Base.new('message_created', Time.zone.now, { message: first }))
+      armed_due_at = AutomationRulePendingExecution.last.due_at
+
+      travel_to(30.minutes.from_now) do
+        later = create(:message, account: account, conversation: conversation, message_type: :outgoing)
+        event = Events::Base.new('message_created', Time.zone.now, { message: later })
+
+        expect { listener.message_created(event) }.not_to change(AutomationRulePendingExecution, :count)
+        expect(AutomationRulePendingExecution.last.due_at).to be > armed_due_at
+      end
+    end
+
+    it 'ignores a message the automation itself sent, so its own note does not restart the count' do
+      message = create(:message, account: account, conversation: conversation, message_type: :outgoing)
+      event = Events::Base.new('message_created', Time.zone.now, { message: message, performed_by: automation_rule })
+
+      expect { listener.message_created(event) }.not_to change(AutomationRulePendingExecution, :count)
+    end
+  end
+
   # The builder's "customer unresponsive" trigger writes message_type = outgoing plus
   # private_note = false. A pending status condition can be joined to those structural conditions
   # so the follow-up only arms while the conversation is pending.

@@ -81,9 +81,8 @@ class AutomationRuleListener < BaseListener
     account = message.try(:account)
     changed_attributes = event.data[:changed_attributes]
 
-    return true unless rule_present?(event_name, account)
-
-    rules = current_account_rules(event_name, account)
+    rules = message_rules(event_name, account)
+    return true if rules.blank?
 
     rules.map do |rule|
       claimed = claim_matching_rule(rule, message, event, event_name, changed_attributes)
@@ -324,6 +323,19 @@ class AutomationRuleListener < BaseListener
     rules + current_account_rules('conversation_updated', account).where.not(execution_delay: nil)
   end
 
+  # A message is the commonest activity there is, and it dispatches no conversation event:
+  # last_activity_at is written with update_columns. A wait on inactivity is conversation-level, so
+  # it arms from here too, or a conversation that only exchanges messages would never restart its
+  # count. Its conditions are about the conversation, and the run claims keep the arm single.
+  def message_rules(event_name, account)
+    return [] if account.blank?
+
+    rules = current_account_rules(event_name, account)
+    return rules unless event_name == 'message_created'
+
+    rules + current_account_rules('conversation_updated', account).where(execution_delay_trigger: 'inactivity')
+  end
+
   # Delayed rules record a pending execution instead of acting; the sweep re-checks and
   # runs them at due time. Flag off means no arming and no immediate fallback — a delayed
   # message silently becoming instant is worse than skipping.
@@ -335,12 +347,6 @@ class AutomationRuleListener < BaseListener
     else
       ::AutomationRules::ActionService.new(rule, account, conversation).perform
     end
-  end
-
-  def rule_present?(event_name, account)
-    return false if account.blank?
-
-    current_account_rules(event_name, account).any?
   end
 
   def current_account_rules(event_name, account)

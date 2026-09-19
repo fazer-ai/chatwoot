@@ -60,7 +60,7 @@ class Api::V1::Accounts::AutomationRulesController < Api::V1::Accounts::BaseCont
 
   def automation_rules_permit
     permitted_attributes = [:name, :description, :event_name, :active]
-    permitted_attributes << :execution_delay if delayed_automations_enabled?
+    permitted_attributes += [:execution_delay, :execution_delay_trigger] if delayed_automations_enabled?
 
     params.permit(
       *permitted_attributes,

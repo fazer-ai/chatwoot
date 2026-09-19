@@ -45,6 +45,10 @@ const props = defineProps({
 
 const eventName = defineModel('eventName', { type: String, required: true });
 const conditions = defineModel('conditions', { type: Array, required: true });
+const delayTrigger = defineModel('delayTrigger', {
+  type: String,
+  default: null,
+});
 const delay = defineModel('delay', { type: Number, default: null });
 const unit = defineModel('unit', { type: String, required: true });
 
@@ -55,20 +59,33 @@ const triggerStatus = ref(DEFAULT_TRIGGER_STATUS);
 // No inbox selected means the rule applies to every inbox.
 const triggerInboxes = ref([]);
 const conditionsRef = useTemplateRef('conditionsRef');
+const inboxRequiredError = ref(false);
 
 const isStatusTrigger = computed(
   () => selectedTrigger.value === 'conversation_status'
 );
 
-const managedAttributeKeys = computed(() => {
+const isInactivityTrigger = computed(
+  () => selectedTrigger.value === 'conversation_inactive'
+);
+
+// What the wait controls own for a given trigger, and therefore what is not an ordinary condition.
+const managedKeysFor = triggerKey => {
   const keys = ['inbox_id'];
-  if (isStatusTrigger.value) return new Set([...keys, 'status']);
+  if (triggerKey === 'conversation_status') return new Set([...keys, 'status']);
+  if (triggerKey === 'conversation_inactive') return new Set(keys);
   return new Set([...keys, 'message_type', 'private_note']);
-});
+};
+
+const managedAttributeKeys = computed(() =>
+  managedKeysFor(selectedTrigger.value)
+);
 
 const additionalFilterTypes = computed(() => {
-  // Conversation-level waits only support status and inbox, and both are already managed by the
-  // wait controls. Message waits can safely combine their event fields with the remaining filters.
+  // A status wait only supports status and inbox, and both are already managed by the wait
+  // controls. Every other wait can safely combine its own fields with the remaining filters:
+  // an inactivity episode is re-anchored by activity, so a mutable attribute cannot collapse two
+  // periods into one the way it would under a status key.
   if (isStatusTrigger.value) return [];
 
   return props.filterTypes.filter(
@@ -153,7 +170,10 @@ const hydrateFromRule = () => {
   }
 
   if (eventName.value === 'conversation_updated') {
-    selectedTrigger.value = 'conversation_status';
+    selectedTrigger.value =
+      delayTrigger.value === 'inactivity'
+        ? 'conversation_inactive'
+        : 'conversation_status';
     triggerStatus.value =
       rawConditionValue(conditionFor('status')) || DEFAULT_TRIGGER_STATUS;
   }
@@ -265,7 +285,10 @@ const patchMessageWaitConditions = trigger => {
   conditions.value = nextConditions;
 };
 
-const applyTrigger = ({ preserveAdditional = true } = {}) => {
+const applyTrigger = ({
+  preserveAdditional = true,
+  previousTrigger = null,
+} = {}) => {
   const trigger = DELAYED_TRIGGERS.find(
     item => item.key === selectedTrigger.value
   );
@@ -276,19 +299,35 @@ const applyTrigger = ({ preserveAdditional = true } = {}) => {
     conditionFor('message_type');
 
   eventName.value = trigger.eventName;
+  delayTrigger.value = trigger.delayTrigger || null;
   if (canPatchMessageWait) {
     patchMessageWaitConditions(trigger);
     return;
   }
 
+  // Two triggers can share an event and still own different conditions: the status a status wait
+  // manages is an ordinary condition to an inactivity wait, and carrying it over would silently
+  // narrow a rule the admin just changed.
+  const droppedKeys = previousTrigger
+    ? managedKeysFor(previousTrigger)
+    : new Set();
   const additionalConditions = preserveAdditional
-    ? conditions.value.filter(isAdditionalCondition)
+    ? conditions.value.filter(
+        condition =>
+          isAdditionalCondition(condition) &&
+          !droppedKeys.has(condition.attribute_key)
+      )
     : [];
-  const waitConditions = [
-    trigger.messageType
-      ? buildCondition('message_type', trigger.messageType)
-      : buildCondition('status', triggerStatus.value),
-  ];
+  // An inactivity wait manages no state of its own: the inboxes are its only managed condition,
+  // and everything else the rule filters on is an ordinary condition below.
+  const waitConditions =
+    trigger.delayTrigger === 'inactivity'
+      ? []
+      : [
+          trigger.messageType
+            ? buildCondition('message_type', trigger.messageType)
+            : buildCondition('status', triggerStatus.value),
+        ];
   // A private note is an outgoing message, so without this an internal note would read as a reply
   // and arm the customer-unresponsive wait. Incoming messages are never private.
   if (trigger.messageType === 'outgoing') {
@@ -302,7 +341,7 @@ const applyTrigger = ({ preserveAdditional = true } = {}) => {
       )
     );
   }
-  if (additionalConditions.length) {
+  if (additionalConditions.length && waitConditions.length) {
     waitConditions.at(-1).query_operator = connectorBeforeCondition(
       conditions.value.indexOf(additionalConditions[0])
     );
@@ -342,10 +381,16 @@ const addCondition = () => {
 const validate = () => {
   const validationResults =
     conditionsRef.value?.map(condition => condition.validate()) ?? [];
-  return validationResults.every(Boolean);
+  // Every other wait is scoped by the state it waits on. An inactivity wait is scoped by nothing,
+  // so without an inbox it would expire every conversation in the account, which is never what
+  // somebody setting up one team's rule means.
+  inboxRequiredError.value =
+    isInactivityTrigger.value && !triggerInboxes.value.length;
+  return validationResults.every(Boolean) && !inboxRequiredError.value;
 };
 
 const resetValidation = () => {
+  inboxRequiredError.value = false;
   conditionsRef.value?.forEach(condition => condition.resetValidation());
 };
 
@@ -367,6 +412,7 @@ watch(
     ).eventName;
     applyTrigger({
       preserveAdditional: !triggerChanged || nextEvent === eventName.value,
+      previousTrigger: triggerChanged ? previousTrigger : null,
     });
   }
 );
@@ -471,6 +517,9 @@ defineExpose({ validate, resetValidation });
     </div>
     <span v-if="hasError" class="text-xs text-n-ruby-9">
       {{ $t('AUTOMATION.ADD.FORM.WAIT.ERROR') }}
+    </span>
+    <span v-if="inboxRequiredError" class="text-xs text-n-ruby-9">
+      {{ $t('AUTOMATION.ADD.FORM.WAIT.INBOX_ERROR') }}
     </span>
   </div>
 </template>
