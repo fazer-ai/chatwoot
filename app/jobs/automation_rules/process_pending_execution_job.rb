@@ -70,9 +70,12 @@ class AutomationRules::ProcessPendingExecutionJob < ApplicationJob
   end
 
   def execute(pending_execution)
-    armed_for = pending_execution.due_at
     return unless start_run(pending_execution)
 
+    # Read after the run started, never before: start_run may have recorded a deadline that had
+    # already elapsed, and that activity is the one this run consumes. Kept from before, it would
+    # read as new when the run settles and the actions would happen a second time.
+    armed_for = pending_execution.due_at
     # Read before the actions, never after: a note, a reopen and an unassign are all messages, and a
     # message writes last_activity_at. Read afterwards, the run would see itself as the activity that
     # restarts the count, and an inbox-only rule would act again every delay for ever. Activity that

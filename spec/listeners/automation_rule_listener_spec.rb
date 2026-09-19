@@ -405,6 +405,24 @@ describe AutomationRuleListener do
       end
     end
 
+    # A message's updated_at moves for things that are not activity at all -- a delivery receipt,
+    # a status update -- so a retry of the same event would arm from a timestamp the event never
+    # had. The performed_by guard cannot see it either: a retry keeps the original actor.
+    it 'arms a message event from when it happened, not from a timestamp the message got later' do
+      first = create(:message, account: account, conversation: conversation, message_type: :incoming)
+      happened_at = Time.zone.now
+      listener.message_created(Events::Base.new('message_created', happened_at, { message: first }))
+      row = AutomationRulePendingExecution.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        first.update!(status: :delivered)
+        listener.message_created(Events::Base.new('message_created', happened_at, { message: first.reload }))
+
+        expect(row.reload).to be_executed
+      end
+    end
+
     # This job can run long after its event, and the conversation it deserializes is the one the
     # rule's own actions have since written to. Arming from that state is the rule re-arming itself
     # from its own note, and the performed_by guard cannot see it: the retry keeps the original actor.

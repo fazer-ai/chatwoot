@@ -157,15 +157,14 @@ class AutomationRulePendingExecution < ApplicationRecord
     end
   end
 
-  # A message is its own timestamp. Without one, `at` is when the event that armed this said it
-  # happened, and that is what the count starts from -- not the conversation as it reads now. A
-  # conversation carries no timestamp per change, and this job can run long after its event: a retry
-  # or a backlog would read a conversation the rule's own actions have since written to and arm from
-  # the rule's own note. The event's own clock cannot move under it.
+  # `at` is when the event that armed this said it happened, and that is what the count starts from
+  # -- not the row as it reads now, whichever row it is. This job can run long after its event: a
+  # retry or a backlog reads a conversation the rule's own actions have since written to, or a
+  # message whose updated_at a delivery receipt has since moved, and arms from that. Neither is new
+  # activity, and no guard about WHO wrote can see it, because a retry keeps the original actor.
+  # The event's own clock is the one thing that cannot move under the job.
   def self.inactivity_anchor_for(conversation, message, at)
-    return activity_anchor_for(conversation, message) if message
-
-    at || activity_anchor_for(conversation, nil)
+    at || activity_anchor_for(conversation, message)
   end
 
   # The last thing that happened on the conversation. A message is its own timestamp; everything

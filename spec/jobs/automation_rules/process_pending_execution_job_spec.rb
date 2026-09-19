@@ -133,6 +133,30 @@ RSpec.describe AutomationRules::ProcessPendingExecutionJob do
       expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
     end
 
+    # The deadline the run consumes is the one it started on, not the one it was enqueued with. Kept
+    # from before the start, activity this run already accounted for reads as new when it settles,
+    # and the actions happen a second time on the next sweep.
+    it 'does not settle against a deadline the run itself replaced' do
+      quiet = travel_to(70.minutes.ago) do
+        create(:conversation, account: account, inbox: conversation.inbox, status: :pending,
+                              last_activity_at: Time.current)
+      end
+      travel_to(70.minutes.ago) do
+        AutomationRulePendingExecution.schedule(rule: inactivity_rule, conversation: quiet.reload)
+      end
+      row = AutomationRulePendingExecution.last
+      allow(AutomationRules::ConditionsFilterService).to receive(:new) do
+        # A backlogged event lands while the conditions are being asked, and the wait it moves the
+        # deadline to is already over.
+        AutomationRulePendingExecution.find(row.id).record_activity(65.minutes.ago)
+        instance_double(AutomationRules::ConditionsFilterService, perform: [quiet])
+      end
+
+      job.perform(row.reload)
+
+      expect(row.reload).to be_executed
+    end
+
     # The clock moves by less than the wait had left on ordinary paths: an arm anchored on a message
     # and the write that message makes to the conversation land a moment apart. Handing the row back
     # for that costs a whole sweep to reach the same answer, so the wait runs late for no reason.
