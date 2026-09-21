@@ -49,6 +49,30 @@ done
 
 echo "Database ready to accept connections."
 
+echo "Waiting for the schema to exist...."
+
+# Asking Rails whether the schema is current is itself a write on an empty database, and
+# that is what broke every fresh install. `rake db:abort_if_pending_migrations` boots a db:
+# task, and booting one against a database with no tables CREATES ar_internal_metadata and
+# schema_migrations. `db:chatwoot_prepare` (lib/tasks/db_enhancements.rake), which the web
+# container runs, decides whether the database is fresh by `table_exists?
+# 'ar_internal_metadata'` -- so a worker that got there first made the web container skip
+# the schema load and run every migration from InitSchema instead. That path dies on
+# 20231211010807_add_cached_labels_list, which calls ActsAsTaggableOn::Taggable::Cache,
+# removed in acts-as-taggable-on 12 (the Gemfile pins no version). The web container then
+# crash-loops with `uninitialized constant`, and it reads as a broken image rather than as
+# a race. Measured on a fresh install: an empty database, then those two tables and nothing
+# else after the rake.
+#
+# `rails runner` only connects, so it can ask the question without answering it: measured
+# on the same empty database, it creates no table. Wait on a schema_migrations that exists
+# AND has rows, which is the web container having finished loading the schema, and only
+# then ask the real gate below.
+until bundle exec rails runner "exit(ActiveRecord::Base.connection.table_exists?('schema_migrations') && ActiveRecord::Base.connection.select_value('SELECT 1 FROM schema_migrations LIMIT 1') ? 0 : 1)"
+do
+  sleep 5;
+done
+
 echo "Waiting for the schema to be current...."
 
 until bundle exec rake db:abort_if_pending_migrations
