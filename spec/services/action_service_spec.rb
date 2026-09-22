@@ -23,6 +23,69 @@ describe ActionService do
       action_service.open_conversation(nil)
       expect(conversation.reload.status).to eq('open')
     end
+
+    # Opening is handing the conversation to people. An agent bot left as the assignee keeps it out
+    # of Unassigned and out of auto-assignment, which is how a routing rule ends up hiding the very
+    # conversations it routes (issue #708). The dashboard reopen already releases it.
+    context 'when an agent bot owns the conversation' do
+      let(:team) { create(:team, account: account) }
+      let(:agent_bot) { create(:agent_bot, account: account) }
+      let(:conversation) { create(:conversation, account: account, status: :pending, team: team) }
+
+      before { conversation.update!(ai_assignee: agent_bot) }
+
+      it 'releases the bot and keeps the team' do
+        action_service.open_conversation(nil)
+
+        conversation.reload
+        expect(conversation.status).to eq('open')
+        expect(conversation.assignee_agent_bot_id).to be_nil
+        expect(conversation.ai_assignee_type).to be_nil
+        expect(conversation.team).to eq(team)
+        expect(Conversation.unassigned).to include(conversation)
+      end
+
+      # Released in the same save as the open: auto-assignment runs inside that save and skips a
+      # conversation that still names a bot, so a release afterwards would never assign it.
+      it 'hands the conversation to auto-assignment' do
+        agent = create(:user, account: account, auto_offline: false)
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+        create(:team_member, team: team, user: agent)
+        allow(Redis::Alfred).to receive(:rpoplpush).and_return(agent.id)
+
+        action_service.open_conversation(nil)
+
+        expect(conversation.reload.assignee).to eq(agent)
+      end
+    end
+
+    context 'when a person owns the conversation' do
+      let(:conversation) { create(:conversation, :with_assignee, account: account, status: :pending) }
+
+      it 'keeps the person' do
+        assignee = conversation.assignee
+        action_service.open_conversation(nil)
+        expect(conversation.reload.assignee).to eq(assignee)
+      end
+    end
+  end
+
+  describe '#change_status' do
+    let(:agent_bot) { create(:agent_bot, account: account) }
+    let(:conversation) { create(:conversation, account: account, status: :pending) }
+    let(:action_service) { described_class.new(conversation) }
+
+    before { conversation.update!(ai_assignee: agent_bot) }
+
+    it 'releases the bot when the new status is open' do
+      action_service.change_status(['open'])
+      expect(conversation.reload.assignee_agent_bot_id).to be_nil
+    end
+
+    it 'keeps the bot for any other status' do
+      action_service.change_status(['snoozed'])
+      expect(conversation.reload.assignee_agent_bot_id).to eq(agent_bot.id)
+    end
   end
 
   describe '#change_priority' do
