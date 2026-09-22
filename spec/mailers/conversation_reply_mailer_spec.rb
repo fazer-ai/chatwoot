@@ -60,6 +60,30 @@ RSpec.describe ConversationReplyMailer do
         expect(mail.subject).to eq('Re: Mail Subject')
       end
 
+      it 'sends a long subject whole, so the thread is not split' do
+        # A subject the conversation is allowed to hold goes out verbatim. Cutting it here would
+        # change the normalized subject that Gmail and Outlook thread on, and would also send a
+        # different base subject on the first message than on the replies, because the `Re: `
+        # prefix eats into any budget applied to the finished header.
+        long_subject = (['palavra'] * 400).join(' ')
+        conversation.additional_attributes = { 'mail_subject': long_subject }
+        conversation.save!
+        new_message.save!
+
+        expect(mail.subject).to eq("Re: #{long_subject}")
+      end
+
+      it 'folds a long subject inside the RFC 5322 line limit' do
+        # Length is a line problem, not a subject problem: Mail folds an unstructured header at
+        # whitespace, so prose of any length stays inside 998 octets per physical line.
+        conversation.additional_attributes = { 'mail_subject': (['palavra'] * 400).join(' ') }
+        conversation.save!
+        new_message.save!
+
+        longest_line = mail.to_s.lines.map { |line| line.chomp.bytesize }.max
+        expect(longest_line).to be <= 998
+      end
+
       it 'not have private notes' do
         # make the message private
         private_message.private = true

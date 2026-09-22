@@ -103,6 +103,22 @@ RSpec.describe Conversation do
       expect(error_messages[:custom_attributes][0]).to eq('company_name length should be < 1500')
       expect(error_messages[:custom_attributes][1]).to eq('contact_number value should be < 9999999999')
     end
+
+    it 'allows a mail_subject past the generic limit in additional_attributes' do
+      conversation.additional_attributes = { mail_subject: 'a' * 1972 }
+
+      expect(conversation).to be_valid
+    end
+
+    it 'keeps the generic limit for a custom attribute that happens to be named mail_subject' do
+      # The allowance belongs to the mailbox, not to the name: custom_attributes keys are
+      # whatever an operator typed into the UI, and one of them matching by accident must not
+      # widen the payload.
+      conversation.custom_attributes = { mail_subject: 'a' * 1972 }
+      conversation.valid?
+
+      expect(conversation.errors.messages[:custom_attributes][0]).to eq('mail_subject length should be < 1500')
+    end
   end
 
   describe '.after_update' do
