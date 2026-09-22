@@ -7,6 +7,10 @@ class AutomationRules::ActionService < ActionService
   end
 
   def perform
+    # Taken once, before the first action: the text of every action of this run reads the same
+    # picture, and reads it even after the actions that erase what it shows already ran.
+    Current.conversation_snapshot = ConversationSnapshot.new(@conversation)
+
     @rule.actions.each do |action|
       @conversation.reload
       action = action.with_indifferent_access
