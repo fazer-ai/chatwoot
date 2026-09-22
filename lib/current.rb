@@ -1,5 +1,5 @@
 module Current
-  ATTRIBUTES = %i[user account account_user executed_by contact inbox].freeze
+  ATTRIBUTES = %i[user account account_user executed_by contact inbox conversation_snapshot].freeze
 
   ATTRIBUTES.each { |attribute| thread_mattr_accessor attribute }
 

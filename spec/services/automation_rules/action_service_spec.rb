@@ -280,4 +280,80 @@ RSpec.describe AutomationRules::ActionService do
       end
     end
   end
+
+  describe 'conversation variables in the text of an action' do
+    let(:agent) { create(:user, account: account, name: 'john doe') }
+    let(:conversation) do
+      create(:conversation, account: account, assignee: agent, custom_attributes: { 'fechamento' => 'Em negociação' })
+    end
+
+    def notes_of(record)
+      record.reload.messages.where(private: true).order(:id).pluck(:content)
+    end
+
+    it 'reads the state the run is about to destroy, and the live state after it did' do
+      rule = create(:automation_rule, account: account, actions: [
+                      { action_name: 'assign_agent', action_params: ['nil'] },
+                      { action_name: 'remove_custom_attribute', action_params: ['fechamento'] },
+                      { action_name: 'add_private_note',
+                        action_params: ['Antes=[{{conversation.before.assignee.name}}|{{conversation.before.custom_attribute.fechamento}}] ' \
+                                        'Agora=[{{conversation.assignee.name}}|{{conversation.custom_attribute.fechamento}}]'] }
+                    ])
+
+      described_class.new(rule, account, conversation).perform
+
+      expect(notes_of(conversation)).to eq ['Antes=[John Doe|Em negociação] Agora=[|]']
+    end
+
+    it 'gives every note of the same run the state of the start of the run' do
+      snapshot_text = '[{{conversation.before.assignee.name}}|{{conversation.before.custom_attribute.fechamento}}]'
+      rule = create(:automation_rule, account: account, actions: [
+                      { action_name: 'add_private_note', action_params: ["A=#{snapshot_text}"] },
+                      { action_name: 'assign_agent', action_params: ['nil'] },
+                      { action_name: 'remove_custom_attribute', action_params: ['fechamento'] },
+                      { action_name: 'add_private_note', action_params: ["B=#{snapshot_text}"] }
+                    ])
+
+      described_class.new(rule, account, conversation).perform
+
+      expect(notes_of(conversation)).to eq ['A=[John Doe|Em negociação]', 'B=[John Doe|Em negociação]']
+    end
+
+    it 'keeps a snapshot value literal when it carries liquid syntax of its own' do
+      conversation.update!(custom_attributes: { 'fechamento' => 'Em negociação {{contact.name}}' })
+      rule = create(:automation_rule, account: account, actions: [
+                      { action_name: 'remove_custom_attribute', action_params: ['fechamento'] },
+                      { action_name: 'add_private_note', action_params: ['Tab: {{conversation.before.custom_attribute.fechamento}}'] }
+                    ])
+
+      described_class.new(rule, account, conversation).perform
+
+      expect(notes_of(conversation)).to eq ['Tab: Em negociação {{contact.name}}']
+    end
+
+    it 'leaves no snapshot behind for whatever runs next in the same thread' do
+      rule = create(:automation_rule, account: account, actions: [{ action_name: 'assign_agent', action_params: ['nil'] }])
+
+      described_class.new(rule, account, conversation).perform
+
+      expect(Current.conversation_snapshot).to be_nil
+    end
+
+    it 'does not carry the snapshot of one conversation into the run of the next' do
+      other = create(:conversation, account: account, inbox: conversation.inbox,
+                                    custom_attributes: { 'fechamento' => 'Parou de responder' })
+      note_text = 'Estava com: [{{conversation.before.assignee.name}}] ' \
+                  'Tab: [{{conversation.before.custom_attribute.fechamento}}]'
+      rule = create(:automation_rule, account: account, actions: [
+                      { action_name: 'assign_agent', action_params: ['nil'] },
+                      { action_name: 'add_private_note', action_params: [note_text] }
+                    ])
+
+      described_class.new(rule, account, conversation).perform
+      described_class.new(rule, account, other).perform
+
+      expect(notes_of(conversation)).to eq ['Estava com: [John Doe] Tab: [Em negociação]']
+      expect(notes_of(other)).to eq ['Estava com: [] Tab: [Parou de responder]']
+    end
+  end
 end

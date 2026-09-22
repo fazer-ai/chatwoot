@@ -210,4 +210,19 @@ RSpec.describe Macros::ExecutionService, type: :service do
       service.send(:send_webhook_event, ['https://example.com/webhook'])
     end
   end
+
+  describe 'conversation variables in the text of an action' do
+    it 'reads the live conversation and leaves the automation snapshot out of it' do
+      user.update!(name: 'john doe')
+      note_text = 'Antes=[{{conversation.before.assignee.name}}] Agora=[{{conversation.assignee.name}}]'
+      allow(macro).to receive(:actions).and_return([
+                                                     { action_name: 'assign_agent', action_params: ['self'] },
+                                                     { action_name: 'add_private_note', action_params: [note_text] }
+                                                   ])
+
+      service.perform
+
+      expect(conversation.reload.messages.where(private: true).last.content).to eq 'Antes=[] Agora=[John Doe]'
+    end
+  end
 end

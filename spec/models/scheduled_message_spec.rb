@@ -297,6 +297,15 @@ RSpec.describe ScheduledMessage, type: :model do
       expect(scheduled_message.content).to eq("Conversation ##{conversation.display_id}")
     end
 
+    it 'leaves the automation snapshot empty and still renders the rest' do
+      conversation.update!(assignee: create(:user, account: account, name: 'john doe'))
+      scheduled_message = build_scheduled_message(content: 'Antes=[{{conversation.before.assignee.name}}] Agora=[{{conversation.assignee.name}}]')
+
+      scheduled_message.save!
+
+      expect(scheduled_message.content).to eq('Antes=[] Agora=[John Doe]')
+    end
+
     it 'preserves original content when Liquid syntax is invalid' do
       original_content = 'Hello {{contact.name | }'
       scheduled_message = build_scheduled_message(content: original_content)
