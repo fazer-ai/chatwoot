@@ -61,6 +61,17 @@ class ActionService
     @conversation.update!(label_list: labels)
   end
 
+  # Clears conversation custom attributes by key. Writing an empty value instead would leave the key
+  # in the JSON, and on a list attribute that reads as unset on screen while hiding the delete
+  # control, so an agent could no longer clear it by hand.
+  def remove_custom_attribute(attribute_keys = [])
+    keys = Array(attribute_keys).map(&:to_s)
+    remaining = @conversation.custom_attributes.except(*keys)
+    return if remaining.size == @conversation.custom_attributes.size
+
+    @conversation.update!(custom_attributes: remaining)
+  end
+
   def assign_team(team_ids = [])
     # Keep nil/0 handling for existing automation and macro payloads.
     should_unassign = team_ids.blank? || %w[nil 0].include?(team_ids[0].to_s)

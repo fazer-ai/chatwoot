@@ -349,4 +349,244 @@ RSpec.describe AutomationRulePendingExecution do
       expect(claimed.due_at).to be_within(5.seconds).of(5.days.ago)
     end
   end
+
+  describe 'inactivity episodes' do
+    let(:inactivity_rule) do
+      create(:automation_rule, account: account, event_name: 'conversation_updated', execution_delay: 60,
+                               execution_delay_trigger: 'inactivity',
+                               actions: [{ 'action_name' => 'remove_assigned_agent', 'action_params' => [] }])
+    end
+
+    it 'arms one row per conversation, anchored on the last activity rather than on the arm' do
+      conversation
+
+      travel_to(10.minutes.from_now) do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        row = described_class.last
+        expect(row.episode_key).to eq('inactivity')
+        expect(row.message_id).to be_nil
+        # Ten minutes of the hour are already gone: the clock started at the activity, not here.
+        expect(row.due_at).to be_within(1.second).of(50.minutes.from_now)
+      end
+    end
+
+    it 'restarts the count on activity that carries no message' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(custom_attributes: { 'fechamento' => 'Em negociação' })
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(described_class.count).to eq(1)
+        expect(described_class.last.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    it 'never pulls the clock backwards when a listener runs out of order' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(due_at: 90.minutes.from_now)
+
+      described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+      expect(row.reload.due_at).to be_within(1.second).of(90.minutes.from_now)
+    end
+
+    # A worker that pushes the deadline forward moves the arm's anchor and records nothing, so a row
+    # that also carries an older recorded activity has two clocks. Reading the older one lets an
+    # event the current deadline already covers pass the forward-only guard and pull it back.
+    it 'never pulls the clock backwards after a worker pushed the deadline forward' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.record_activity(Time.current)
+      row.update!(due_at: 90.minutes.from_now)
+
+      travel_to(10.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload.due_at).to be_within(1.second).of(90.minutes.from_now)
+    end
+
+    it 'counts again after a run, because the conversation was touched again' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executed)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(row.reload).to be_pending
+        expect(row.due_at).to be_within(5.seconds).of(60.minutes.from_now)
+      end
+    end
+
+    it 'leaves a live worker holding its row' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
+    # The row is `processing` between the claim and the first action, and `executing` while they
+    # run. Neither may be taken from a live worker, and neither may lose the activity either.
+    it 'records activity on a row a live worker holds, without taking the row from it' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :processing)
+
+      # Inside the stale window: past it the worker counts as dead and the row is taken back.
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+
+        expect(row.reload).to be_processing
+        expect(row.activity_seen_at).to be_within(5.seconds).of(Time.current)
+      end
+    end
+
+    # updated_at is the worker's lock. Renewing it on every message would keep a dead worker looking
+    # alive on a busy conversation, and the row would sit in `executing` for good.
+    it 'does not renew the worker lock when it records activity' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+      locked_at = row.reload.updated_at
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload.updated_at).to be_within(1.second).of(locked_at)
+    end
+
+    # Activity that lands while the dead worker is still inside its timeout is recorded and does not
+    # take the row: the worker is presumed alive and would read it when it finished. It never does,
+    # and nothing sweeps an `executing` row, so without a recovery that activity sits there for good
+    # and the rule stays frozen on the conversation until something else happens to arrive.
+    it 'recovers a run whose worker died holding activity it never read' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+      moved_at = nil
+
+      travel_to(5.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+        moved_at = Time.current
+      end
+
+      travel_to(20.minutes.from_now) do
+        expect(described_class.recover_abandoned_with_activity!).to eq(1)
+      end
+
+      expect(row.reload).to be_pending
+      expect(row.due_at).to be_within(5.seconds).of(moved_at + 60.minutes)
+    end
+
+    # A rejected row is never removed from the table -- an abandoned run stays abandoned -- so asking
+    # the question row by row lets a batch fill up with rows whose activity was already consumed and
+    # starve the ones that really have something new, sweep after sweep, for ever.
+    it 'does not let consumed rows crowd a recoverable one out of the batch' do
+      account.enable_features!('delayed_automations')
+      recoverable = nil
+
+      travel_to(20.minutes.ago) do
+        consumed = create(:automation_rule_pending_execution, account: account, conversation: conversation,
+                                                              automation_rule: inactivity_rule, episode_key: 'inactivity',
+                                                              status: :executing, due_at: 30.minutes.from_now)
+        consumed.record_activity(consumed.armed_anchor)
+        recoverable = create(:automation_rule_pending_execution, account: account, episode_key: 'inactivity',
+                                                                 conversation: create(:conversation, account: account),
+                                                                 automation_rule: inactivity_rule,
+                                                                 status: :executing, due_at: 40.minutes.from_now)
+        recoverable.record_activity(recoverable.armed_anchor + 1.minute)
+      end
+
+      expect(described_class.recover_abandoned_with_activity!(limit: 1)).to eq(1)
+      expect(recoverable.reload).to be_pending
+    end
+
+    # The dead worker wrote to the conversation before it died and there is no snapshot left to
+    # subtract, so a recovery that read the conversation's own clock would take the run's message
+    # for new activity and run the actions a second time.
+    it 'does not recover a run from the writing the dead worker itself did' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      # Consumed: the arm this row is running on.
+      row.record_activity(row.armed_anchor)
+      row.update!(status: :executing)
+
+      travel_to(20.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+
+        expect(described_class.recover_abandoned_with_activity!).to eq(0)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
+    # The run may have half happened, and its actions are customer-facing, so a row with nothing new
+    # on its clock is left alone rather than replayed.
+    it 'leaves an abandoned run with nothing new on its clock alone' do
+      account.enable_features!('delayed_automations')
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(20.minutes.from_now) do
+        expect(described_class.recover_abandoned_with_activity!).to eq(0)
+      end
+
+      expect(row.reload).to be_executing
+    end
+
+    it 'takes back a row whose worker died mid-run, so the rule is not frozen for good' do
+      described_class.schedule(rule: inactivity_rule, conversation: conversation)
+      row = described_class.last
+      row.update!(status: :executing)
+
+      travel_to(30.minutes.from_now) do
+        conversation.update!(last_activity_at: Time.current)
+        described_class.schedule(rule: inactivity_rule, conversation: conversation.reload)
+      end
+
+      expect(row.reload).to be_pending
+    end
+
+    describe '#inactivity_due_at' do
+      it 'is nil while nothing happened after the arm' do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation)
+
+        expect(described_class.last.inactivity_due_at).to be_nil
+      end
+
+      it 'is the last activity plus the delay when something did' do
+        described_class.schedule(rule: inactivity_rule, conversation: conversation)
+        row = described_class.last
+        activity = 5.minutes.from_now
+        conversation.update!(last_activity_at: activity)
+
+        expect(row.reload.inactivity_due_at).to be_within(1.second).of(activity + 60.minutes)
+      end
+
+      it 'is nil for a wait that is not about inactivity' do
+        described_class.schedule(rule: rule, conversation: conversation)
+
+        expect(described_class.last.inactivity_due_at).to be_nil
+      end
+    end
+  end
 end

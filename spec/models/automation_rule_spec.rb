@@ -282,6 +282,51 @@ RSpec.describe AutomationRule do
       expect(rule.errors[:execution_delay]).to include('is not supported for rules triggered by an edit.')
     end
 
+    it 'lets an inactivity wait filter on a mutable attribute, which a status episode cannot' do
+      rule.event_name = 'conversation_updated'
+      rule.execution_delay = 60
+      rule.execution_delay_trigger = 'inactivity'
+      rule.conditions = [{ 'attribute_key' => 'assignee_id', 'filter_operator' => 'is_present', 'values' => [], 'query_operator' => nil }]
+
+      expect(rule).to be_valid
+    end
+
+    it 'still refuses attribute_changed on an inactivity wait, which the fire-time re-check cannot answer' do
+      rule.event_name = 'conversation_updated'
+      rule.execution_delay = 60
+      rule.execution_delay_trigger = 'inactivity'
+      rule.conditions = [{ 'attribute_key' => 'status', 'filter_operator' => 'attribute_changed', 'values' => ['resolved'], 'query_operator' => nil }]
+
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay]).to include('cannot be used with attribute_changed conditions.')
+    end
+
+    it 'rejects a trigger the scheduler has no episode for' do
+      rule.execution_delay = 60
+      rule.execution_delay_trigger = 'whenever'
+
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay_trigger]).to be_present
+    end
+
+    it 'rejects a trigger without a wait to anchor' do
+      rule.event_name = 'conversation_updated'
+      rule.execution_delay = nil
+      rule.execution_delay_trigger = 'inactivity'
+
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay_trigger]).to include('requires an execution delay.')
+    end
+
+    it 'rejects an inactivity trigger on a message event' do
+      rule.event_name = 'message_created'
+      rule.execution_delay = 60
+      rule.execution_delay_trigger = 'inactivity'
+
+      expect(rule).not_to be_valid
+      expect(rule.errors[:execution_delay_trigger]).to include('is only supported for conversation_updated rules.')
+    end
+
     it 'allows a delayed conversation-level rule with only status conditions' do
       rule.event_name = 'conversation_updated'
       rule.execution_delay = 60

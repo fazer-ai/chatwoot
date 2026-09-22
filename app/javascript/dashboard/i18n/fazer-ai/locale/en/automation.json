@@ -8,7 +8,8 @@
       "TEMPLATE_USE": "Use this template"
     },
     "ACTIONS": {
-      "CREATE_SCHEDULED_MESSAGE": "Create Scheduled Message"
+      "CREATE_SCHEDULED_MESSAGE": "Create Scheduled Message",
+      "REMOVE_CUSTOM_ATTRIBUTE": "Remove custom attribute"
     },
     "ATTRIBUTES": {
       "SENDER": "Sender",
@@ -22,6 +23,19 @@
     },
     "EVENTS": {
       "MESSAGE_EDITED": "Message Edited"
+    },
+    "ADD": {
+      "FORM": {
+        "WAIT": {
+          "OPTIONS": {
+            "CONVERSATION_INACTIVE": "The conversation goes quiet"
+          },
+          "EXPLANATION": {
+            "CONVERSATION_INACTIVE": "The count starts at the conversation’s last activity. If nothing happens on it for {duration}, the actions below run. Any new activity restarts the count."
+          },
+          "INBOX_ERROR": "Choose at least one inbox for this wait."
+        }
+      }
     }
   }
 }

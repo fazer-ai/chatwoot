@@ -590,4 +590,134 @@ describe('AutomationWaitCondition', () => {
     expect(validations[0]).toHaveBeenCalledOnce();
     expect(validations[1]).toHaveBeenCalledOnce();
   });
+  describe('the inactivity trigger', () => {
+    const inboxOptions = [{ id: 7, name: 'Paid traffic' }];
+
+    const selectInactivity = async wrapper => {
+      wrapper
+        .findAllComponents(FilterSelect)[0]
+        .vm.$emit('update:modelValue', 'conversation_inactive');
+      await nextTick();
+    };
+
+    it('marks the rule as an inactivity wait and manages no state of its own', async () => {
+      const wrapper = mountComponent({ inboxOptions });
+      await nextTick();
+      await selectInactivity(wrapper);
+
+      expect(wrapper.emitted('update:delayTrigger').at(-1)[0]).toBe(
+        'inactivity'
+      );
+      expect(wrapper.emitted('update:eventName').at(-1)[0]).toBe(
+        'conversation_updated'
+      );
+      expect(wrapper.emitted('update:conditions').at(-1)[0]).toEqual([]);
+      // No status row: the wait is about the conversation going quiet in any state.
+      expect(wrapper.findAllComponents(FilterSelect)).toHaveLength(1);
+    });
+
+    it('writes the chosen inboxes as its only managed condition', async () => {
+      const wrapper = mountComponent({ inboxOptions });
+      await nextTick();
+      await selectInactivity(wrapper);
+
+      wrapper
+        .findComponent(MultiSelect)
+        .vm.$emit('update:modelValue', inboxOptions);
+      await nextTick();
+
+      expect(wrapper.emitted('update:conditions').at(-1)[0]).toEqual([
+        {
+          attribute_key: 'inbox_id',
+          filter_operator: 'equal_to',
+          values: [7],
+          query_operator: 'and',
+          custom_attribute_type: '',
+        },
+      ]);
+    });
+
+    // Every other wait is scoped by the state it waits on; this one would otherwise expire every
+    // conversation in the account.
+    it('refuses to validate until an inbox is chosen', async () => {
+      const wrapper = mountComponent({ inboxOptions });
+      await nextTick();
+      await selectInactivity(wrapper);
+
+      expect(wrapper.vm.validate()).toBe(false);
+
+      wrapper
+        .findComponent(MultiSelect)
+        .vm.$emit('update:modelValue', inboxOptions);
+      await nextTick();
+
+      expect(wrapper.vm.validate()).toBe(true);
+    });
+
+    // A status wait offers no additional filter at all, so a kept assignee row would render with
+    // no operator to choose from, and the backend refuses those conditions anyway.
+    it('drops conditions the status trigger does not offer when switching back to it', async () => {
+      const wrapper = mountComponent({
+        eventName: 'conversation_updated',
+        delayTrigger: 'inactivity',
+        isSavedWait: true,
+        inboxOptions,
+        conditions: [
+          {
+            attribute_key: 'inbox_id',
+            filter_operator: 'equal_to',
+            values: [{ id: 7, name: 'Paid traffic' }],
+            query_operator: 'and',
+            custom_attribute_type: '',
+          },
+          {
+            attribute_key: 'assignee_id',
+            filter_operator: 'equal_to',
+            values: '',
+            query_operator: null,
+            custom_attribute_type: '',
+          },
+        ],
+      });
+      await nextTick();
+
+      wrapper
+        .findAllComponents(FilterSelect)[0]
+        .vm.$emit('update:modelValue', 'conversation_status');
+      await nextTick();
+
+      const conditions = wrapper.emitted('update:conditions').at(-1)[0];
+      expect(conditions.map(condition => condition.attribute_key)).toEqual([
+        'status',
+        'inbox_id',
+      ]);
+      expect(wrapper.emitted('update:delayTrigger').at(-1)[0]).toBeNull();
+    });
+
+    it('opens a saved inactivity wait on its own trigger and offers the remaining filters', async () => {
+      const wrapper = mountComponent({
+        eventName: 'conversation_updated',
+        delayTrigger: 'inactivity',
+        isSavedWait: true,
+        inboxOptions,
+        conditions: [
+          {
+            attribute_key: 'inbox_id',
+            filter_operator: 'equal_to',
+            values: [{ id: 7, name: 'Paid traffic' }],
+            query_operator: null,
+            custom_attribute_type: '',
+          },
+        ],
+      });
+      await nextTick();
+
+      expect(
+        wrapper.findAllComponents(FilterSelect)[0].props('modelValue')
+      ).toBe('conversation_inactive');
+      // A status wait offers none; this one can be filtered on anything, the conditions being
+      // re-checked when it fires.
+      expect(wrapper.findComponent(NextButton).exists()).toBe(true);
+    });
+  });
 });
