@@ -10,9 +10,13 @@ class JsonbAttributesLengthValidator < ActiveModel::EachValidator
   #
   # Still bounded, and deliberately so. `additional_attributes` rides in every conversation
   # payload over ActionCable and webhooks, so an unbounded subject would be paid for on every
-  # event of that conversation, forever, by every subscriber. The outgoing reply header is cut
-  # separately, at `ConversationReplyMailerHelper::MAX_SUBJECT_LENGTH`, where the value stops
-  # being data and becomes an RFC 5322 field.
+  # event of that conversation, forever, by every subscriber.
+  #
+  # Nothing is cut on the way out. RFC 5322 bounds a physical line, not a subject, and Mail folds
+  # an unstructured header at whitespace, so prose of any length leaves as legal lines. Cutting
+  # the value at send time instead would change the normalized subject that Gmail and Outlook
+  # thread on, and would split the thread of every conversation already holding a subject past
+  # the cut, which the generic limit has always allowed up to 1500.
   #
   # Keyed by attribute as well as by key, because the same validator also guards
   # `custom_attributes`, whose keys are whatever an operator typed into the UI. Without the

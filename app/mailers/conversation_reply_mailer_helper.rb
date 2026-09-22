@@ -1,18 +1,12 @@
 module ConversationReplyMailerHelper
   include ConversationReplyMailerAttachmentHelper
 
-  # Cut here, not where the subject is stored: the conversation keeps what the customer wrote
-  # (JsonbAttributesLengthValidator::KEY_MAX_STRING_LENGTH), and this is where the value becomes
-  # an RFC 5322 header, folded at 998 per line and ~3x longer once RFC 2047 encodes non-ASCII.
-  # Threading is unaffected, being matched by References and In-Reply-To.
-  MAX_SUBJECT_LENGTH = 255
-
   def prepare_mail(cc_bcc_enabled)
     @options = {
       to: to_emails,
       from: email_from,
       reply_to: email_reply_to,
-      subject: mail_subject&.truncate(MAX_SUBJECT_LENGTH),
+      subject: mail_subject,
       message_id: custom_message_id,
       in_reply_to: in_reply_to_email,
       references: references_header
