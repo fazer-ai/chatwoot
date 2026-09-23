@@ -882,6 +882,40 @@ RSpec.describe Channel::Whatsapp do
     end
   end
 
+  describe 'the lease epoch across a phone number change' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'baileys', phone_number: '+5511911110000',
+                                validate_provider_config: false, sync_templates: false)
+    end
+
+    before { channel.update_provider_connection!(connection: 'close', epoch: 3537) }
+
+    it 'drops the previous number epoch and keeps the rest of the connection record' do
+      channel.update!(phone_number: '+5511922220000')
+
+      expect(channel.reload.provider_connection).to eq('connection' => 'close')
+    end
+
+    it 'keeps the epoch on a save that leaves the number alone' do
+      channel.update!(provider_config: channel.provider_config.merge('mark_as_read' => true))
+
+      expect(channel.reload.provider_connection['epoch']).to eq(3537)
+    end
+
+    context 'when the session layer serves the inbox' do
+      let(:channel) do
+        create(:channel_whatsapp, provider: 'native', phone_number: '+5511911110000',
+                                  validate_provider_config: false, sync_templates: false)
+      end
+
+      it 'keeps the epoch, which belongs to the session and not to the number' do
+        channel.update!(phone_number: '+5511922220000')
+
+        expect(channel.reload.provider_connection['epoch']).to eq(3537)
+      end
+    end
+  end
+
   describe '#update_reachout_time_lock!' do
     let(:channel) do
       create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,

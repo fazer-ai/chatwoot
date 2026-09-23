@@ -47,7 +47,6 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # snapshot, so keeping it would make the 5-min poll re-broadcast every cycle for no reason).
   NEW_CHAT_CAP_KEYS = %w[capping_status ote_status mv_status total_quota used_quota cycle_start_timestamp cycle_end_timestamp].freeze
   before_validation :ensure_webhook_verify_token
-  before_save :drop_lease_epoch, if: :phone_number_changed?
 
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
@@ -56,6 +55,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   has_one :inbox, as: :channel, dependent: :destroy
 
   after_create :sync_templates
+  before_update :drop_lease_epoch, if: :phone_number_changed?, unless: :session_provider?
   after_update_commit :log_credentials_transfer, if: :saved_change_to_provider_config?
   before_destroy :teardown_webhooks
   before_destroy :disconnect_channel_provider, if: -> { provider_service.respond_to?(:disconnect_channel_provider) }
@@ -568,6 +568,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # the change. Dropping the epoch here lets the guard fall through on blank until the new number
   # sets its own. Mirrors the clears convert_provider! and let_go_of already do for the other two
   # attributes that invalidate a connection record.
+  #
+  # Only on update, since a channel created with a connection record already holds the right
+  # epoch for its number. And only for the providers that address the session by number: the
+  # session layer keys it by session_id, so its epoch outlives a number change and dropping it
+  # would let one stale event through.
   def drop_lease_epoch
     self.provider_connection = provider_connection.except('epoch')
   end

@@ -403,6 +403,16 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(inbox.channel.provider_connection['connection']).to eq('open')
         end
 
+        it 'accepts the new number epoch after the channel moves to another number' do
+          inbox.channel.update_provider_connection!(connection: 'close', epoch: 3537)
+          inbox.channel.update!(phone_number: '+5511922220000')
+          params = base_params.merge({ data: { connection: 'open', epoch: 626 } })
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.channel.reload.provider_connection).to include('connection' => 'open', 'epoch' => 626)
+        end
+
         it 'accepts any epoch when none has been seen yet' do
           inbox.channel.update_provider_connection!(connection: 'reconnecting')
           params = base_params.merge(
