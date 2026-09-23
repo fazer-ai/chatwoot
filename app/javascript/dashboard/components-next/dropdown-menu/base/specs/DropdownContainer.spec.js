@@ -23,6 +23,26 @@ const pressEscape = () => {
   return event;
 };
 
+const mountNested = () => {
+  const inner = h(
+    DropdownContainer,
+    { 'data-testid': 'inner', onClose: () => {} },
+    {
+      trigger: ({ toggle }) =>
+        h('button', { 'data-testid': 'inner-trigger', onClick: toggle }, 'Sub'),
+      default: () => h('ul', { 'data-testid': 'inner-menu' }, 'Status'),
+    }
+  );
+  return mount(DropdownContainer, {
+    slots: {
+      trigger: ({ toggle }) =>
+        h('button', { 'data-testid': 'trigger', onClick: toggle }, 'Open'),
+      default: () => inner,
+    },
+    attachTo: document.body,
+  });
+};
+
 describe('DropdownContainer', () => {
   it('closes an open menu on Escape and marks the Escape as handled', async () => {
     const wrapper = mountDropdown();
@@ -44,6 +64,28 @@ describe('DropdownContainer', () => {
 
     expect(event.defaultPrevented).toBe(false);
     expect(wrapper.emitted('close')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('closes only the innermost open menu on each Escape', async () => {
+    const wrapper = mountNested();
+    await wrapper.get('[data-testid="trigger"]').trigger('click');
+    await wrapper.get('[data-testid="inner-trigger"]').trigger('click');
+    const inner = wrapper
+      .findAllComponents(DropdownContainer)
+      .find(dropdown => dropdown.vm !== wrapper.vm);
+
+    const first = pressEscape();
+    await wrapper.vm.$nextTick();
+
+    expect(first.defaultPrevented).toBe(true);
+    expect(inner.emitted('close')).toHaveLength(1);
+    expect(wrapper.emitted('close')).toBeUndefined();
+
+    pressEscape();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
   });
 });

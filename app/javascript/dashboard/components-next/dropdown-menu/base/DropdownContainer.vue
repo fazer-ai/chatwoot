@@ -1,12 +1,22 @@
 <script setup>
-import { ref } from 'vue';
-import { onKeyStroke, useToggle } from '@vueuse/core';
+import { onBeforeUnmount, ref, watch } from 'vue';
+import { onKeyStroke } from '@vueuse/core';
 import { vOnClickOutside } from '@vueuse/components';
 import DropdownFloating from './DropdownFloating.vue';
-import { provideDropdownContext, useDropdownTeleport } from './provider.js';
+import {
+  isInnermostOpenMenu,
+  markMenuOpen,
+  provideDropdownContext,
+  useDropdownTeleport,
+} from './provider.js';
 
 const emit = defineEmits(['close']);
-const [isOpen, toggle] = useToggle(false);
+const isOpen = ref(false);
+// useToggle's contract, on a ref this component's watcher tracks: a value sets it, none flips it.
+const toggle = (...value) => {
+  isOpen.value = value.length ? value[0] : !isOpen.value;
+  return isOpen.value;
+};
 
 const teleport = useDropdownTeleport();
 const containerRef = ref(null);
@@ -22,12 +32,17 @@ const closeMenu = () => {
   }
 };
 
-// Escape closes an open menu, and only the menu: the event is marked handled so a panel or dialog
-// around it stays open. Listening on the document runs this before a panel's window listener.
+const menu = {};
+watch(isOpen, open => markMenuOpen(menu, open), { flush: 'sync' });
+onBeforeUnmount(() => markMenuOpen(menu, false));
+
+// Escape closes the innermost open menu, and only it: a submenu goes first and the menu it sits in
+// stays open, and the event is marked handled so a panel or dialog around them stays open too.
+// Listening on the document runs this before a panel's window listener.
 onKeyStroke(
   'Escape',
   event => {
-    if (!isOpen.value) return;
+    if (!isInnermostOpenMenu(menu)) return;
     event.preventDefault();
     closeMenu();
   },
