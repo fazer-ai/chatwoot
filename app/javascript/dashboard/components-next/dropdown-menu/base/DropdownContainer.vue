@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { useToggle } from '@vueuse/core';
+import { onKeyStroke, useToggle } from '@vueuse/core';
 import { vOnClickOutside } from '@vueuse/components';
 import DropdownFloating from './DropdownFloating.vue';
 import { provideDropdownContext, useDropdownTeleport } from './provider.js';
@@ -21,6 +21,18 @@ const closeMenu = () => {
     toggle(false);
   }
 };
+
+// Escape closes an open menu, and only the menu: the event is marked handled so a panel or dialog
+// around it stays open. Listening on the document runs this before a panel's window listener.
+onKeyStroke(
+  'Escape',
+  event => {
+    if (!isOpen.value) return;
+    event.preventDefault();
+    closeMenu();
+  },
+  { target: document }
+);
 
 // A teleported menu sits outside the container, so clicks inside it read as clicks outside.
 const clickOutsideHandler = [closeMenu, { ignore: ['[data-dropdown-menu]'] }];
