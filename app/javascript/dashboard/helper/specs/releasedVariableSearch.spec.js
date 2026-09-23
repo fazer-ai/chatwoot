@@ -10,12 +10,21 @@ const schema = new Schema({
   },
 });
 
-// A paragraph holding `text`, with the caret at its end, where typing leaves it.
-const stateWith = text => {
+// A paragraph holding `text`, with the caret at `caret`, or at its end, where typing leaves it.
+const stateWith = (text, caret) => {
   const doc = schema.node('doc', null, [
     schema.node('paragraph', null, text ? [schema.text(text)] : []),
   ]);
-  return EditorState.create({ schema, doc, selection: Selection.atEnd(doc) });
+  const selection =
+    caret === undefined
+      ? Selection.atEnd(doc)
+      : Selection.near(doc.resolve(caret));
+  return EditorState.create({ schema, doc, selection });
+};
+
+const typing = (state, transaction, typed) => {
+  const released = state.apply(transaction);
+  return released.apply(released.tr.insertText(typed)).doc.textContent;
 };
 
 const textAfter = (state, transaction) =>
@@ -112,6 +121,67 @@ describe('releasedVariableSearchTransaction', () => {
     expect(
       released.apply(released.tr.insertText('.apelido}}')).doc.textContent
     ).toBe('Oi {{contato.apelido}}');
+  });
+
+  it('adds what was typed to the end of the variable when the caret sat inside it', () => {
+    // Caret before `name`: the search showed `contact.name` and the letter went after it.
+    const state = stateWith('Oi {{contact.name}}', 14);
+    const range = { from: 4, to: 20 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'x',
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.namex}}');
+    expect(typing(state, transaction, 'y')).toBe('Oi {{contact.namexy}}');
+  });
+
+  it('goes on after the variable when the caret sat past its braces, before punctuation', () => {
+    const state = stateWith('Oi {{contact.name}}, ok', 20);
+    const range = { from: 4, to: 21 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: '!',
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.name}}!, ok');
+  });
+
+  it('lets a brace typed in the search close the variable in place of its own', () => {
+    const state = stateWith('Oi {{contact.name}}, ok');
+    const range = { from: 4, to: 21 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'contact.email}',
+      replace: true,
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.email}, ok');
+    // The picker has let go, so the second brace is typed in the editor.
+    expect(typing(state, transaction, '}')).toBe('Oi {{contact.email}}, ok');
+  });
+
+  it('does not double the braces when the search came with both', () => {
+    const state = stateWith('Oi {{contact.name}}');
+    const range = { from: 4, to: 20 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'contact.email}}',
+      replace: true,
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.email}}');
+  });
+
+  it('closes the variable once when the brace was typed after its content', () => {
+    const state = stateWith('Oi {{contact.name}}', 14);
+    const range = { from: 4, to: 20 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: '}',
+    });
+
+    expect(typing(state, transaction, '}')).toBe('Oi {{contact.name}}');
   });
 
   it('does nothing when nothing was typed', () => {

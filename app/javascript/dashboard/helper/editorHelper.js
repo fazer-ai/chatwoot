@@ -503,30 +503,42 @@ export const createVariableInputRule = ({ isPrivate, getVariables }) => {
   return inputRules({ rules: [rule] });
 };
 
-// What the variable picker hands back when it cannot complete its search. `text` goes where the
-// caret is. With `replace`, the search was edited into the part that came from the document, so it
-// takes the place of the variable's content only: the suggestion range runs to the next space and
-// can hold the closing braces and punctuation after them (`{{contact.name}},`), which the search
-// never showed, so everything from the first brace or comma on is kept. The caret is left at the
-// end of the content, so what is typed next stays inside the variable.
+// What the variable picker hands back when it cannot complete its search. The suggestion range
+// runs from the `{{` to the next space, so it can hold the variable's closing braces and the
+// punctuation after them (`{{contact.name}},`), which the search never showed.
+// - The caret sat past the closing braces: what was typed there goes on after the variable.
+// - Otherwise the variable's content becomes what the search held: the content plus what was typed
+//   after it, or, with `replace`, the edited search. Braces typed in the search close the variable
+//   in place of the document's own, since the picker lets go on the first one and the next goes to
+//   the editor. The caret is left at the end of the content, so typing goes on inside the variable.
 export const releasedVariableSearchTransaction = (
   state,
   range,
   { text, replace = false } = {}
 ) => {
   if (!text) return null;
-  if (!replace || !range) return state.tr.insertText(text);
+  if (!range) return state.tr.insertText(text);
 
-  const typedAfterTrigger = state.doc
-    .textBetween(range.from, range.to)
-    .slice(2);
+  const from = range.from + 2;
+  const typedAfterTrigger = state.doc.textBetween(from, range.to);
   const contentEnd = typedAfterTrigger.search(/[},]/);
   const contentLength =
     contentEnd === -1 ? typedAfterTrigger.length : contentEnd;
-  const from = range.from + 2;
-  const transaction = state.tr.insertText(text, from, from + contentLength);
+  const closingBraces = typedAfterTrigger
+    .slice(contentLength)
+    .match(/^}*/)[0].length;
+  const variableEnd = from + contentLength + closingBraces;
+  if (!replace && state.selection.from >= variableEnd) {
+    return state.tr.insertText(text);
+  }
+
+  const content = replace
+    ? text
+    : typedAfterTrigger.slice(0, contentLength) + text;
+  const replacedTo = text.includes('}') ? variableEnd : from + contentLength;
+  const transaction = state.tr.insertText(content, from, replacedTo);
   return transaction.setSelection(
-    Selection.near(transaction.doc.resolve(from + text.length))
+    Selection.near(transaction.doc.resolve(from + content.length))
   );
 };
 
