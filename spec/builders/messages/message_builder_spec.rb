@@ -52,6 +52,38 @@ describe Messages::MessageBuilder do
     end
   end
 
+  # A template is sent from the agent side, like an outgoing message: the builder already renders its
+  # e-mail body for that reason, and the sender has to agree, or the conversation shows it as written by
+  # the contact and the mailer, which reads the sender's name, fails to send it.
+  describe 'when message_type is template' do
+    let(:user) { create(:user, account: account, name: 'Agent Smith') }
+    let(:contact) { create(:contact, account: account, name: 'John', email: 'john@example.com') }
+    let(:conversation) do
+      create(:conversation, inbox: create(:channel_email, account: account).inbox, account: account, contact: contact)
+    end
+
+    it 'saves the user as sender, like an outgoing message' do
+      message = described_class.new(user, conversation, { content: 'test', message_type: 'template' }).perform
+
+      expect(message).to be_template
+      expect(message.sender).to eq(user)
+    end
+
+    it 'renders the agent in the e-mail body as the user, not the contact' do
+      message = described_class.new(user, conversation, { content: 'Hi, {{agent.name}} here', message_type: 'template' }).perform
+
+      expect(message.content_attributes.dig('email', 'text_content', 'full')).to eq 'Hi, Agent Smith here'
+    end
+
+    it 'keeps the contact as sender of an incoming message' do
+      api_conversation = create(:conversation, inbox: create(:channel_api, account: account).inbox, account: account, contact: contact)
+
+      message = described_class.new(user, api_conversation, { content: 'test', message_type: 'incoming' }).perform
+
+      expect(message.sender).to eq(contact)
+    end
+  end
+
   describe '#content_attributes' do
     context 'when content_attributes is a JSON string' do
       let(:params) do

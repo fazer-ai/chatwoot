@@ -271,7 +271,13 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   end
 
   def sender
-    message_type == 'outgoing' ? (message_sender || @user) : @conversation.contact
+    agent_side? ? (message_sender || @user) : @conversation.contact
+  end
+
+  # Outgoing and template messages are both sent from the agent side. The sender and the e-mail body
+  # render go by this one list, so a template is never saved, or rendered, as if the contact wrote it.
+  def agent_side?
+    %w[outgoing template].include?(message_type)
   end
 
   def external_created_at
@@ -403,7 +409,7 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
   end
 
   def should_process_liquid?
-    @message_type == 'outgoing' || @message_type == 'template'
+    agent_side?
   end
 
   def drops_with_sender
