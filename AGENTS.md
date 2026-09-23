@@ -157,6 +157,7 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 - **Translations**: the fork's strings live in their own tree, never inside upstream's locale files. See **Fork translations** below.
 - **Frontend**:
   - Use `components-next/` for message bubbles (the rest is being deprecated)
+- **Conversation ids: the dashboard knows a conversation by its `display_id`.** `Conversations::EventDataPresenter#push_data` sends `id: display_id`, so `allConversations[].id`, `currentChat.id`, the routes and every `/conversations/:id` endpoint use the display id. Other payloads that embed a conversation do not always follow that: the kanban task's `conversations[]` has the internal id in `id` next to `display_id`, and the WhatsApp `voice_call.*` events send the internal id as `conversation_id`. Before you match an embedded id against the store, a route or the API, read what the producer actually sends. And write the spec with an internal id that differs from the display id: with `{ id: 10 }` and nothing else, the wrong key passes. This is not hypothetical. In 2026-09 the kanban cable handlers matched on `conversations[].id` and put one clinic patient's card on another patient's conversation (fazer-ai/chatwoot-pro#90), and the specs that should have caught it used exactly such a payload.
 
 ## Ruby Best Practices
 
@@ -174,6 +175,7 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 ## Enterprise Edition Notes
 
 - Chatwoot has an Enterprise overlay under `enterprise/` that extends/overrides OSS code.
+- **Code under `enterprise/` does not run on CE installs.** The CE image workflow (`publish_github_docker.yml`) runs `rm -rf enterprise` before it builds, and premium features such as `channel_voice` stay off on the community pricing plan. In this fork, what turns them on is Pro's `fazer_ai/` hub layer, which sets the pricing plan. So a defect in `enterprise/` only shows up for Pro customers. The fix still lands here in CE, because the file is shared and Pro receives it through the sync. An issue about `enterprise/` code must say that it only affects Pro and which feature has to be on for it to happen, so nobody triages it as affecting every install.
 - When you add or modify core functionality, always check for corresponding files in `enterprise/` and keep behavior compatible.
 - Follow the Enterprise development practices documented here:
   - https://chatwoot.help/hc/handbook/articles/developing-enterprise-edition-features-38
