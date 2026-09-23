@@ -227,10 +227,22 @@ class Whatsapp::Connector::Consumer::ShardWorker
 
   def dispatch(event)
     channel = channel_for(event.sid)
-    return if channel.nil?
+    return orphaned(event) if channel.nil?
     return unless cursor.behind?(event)
 
     Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+    mark_processed(event)
+  end
+
+  # A session no inbox holds any more. Nearly everything about it is dropped, but a
+  # teardown's failure arrives here by construction: the inbox that asked for it has been
+  # destroyed or moved to another provider by the time the connector answers. The cursor
+  # guards it as it guards an inbox's events, or every replay would schedule another one.
+  def orphaned(event)
+    return if event.sid.blank? || event.type != 'command.failed'
+    return unless cursor.behind?(event)
+
+    Whatsapp::Session::TeardownRetry.consider(event)
     mark_processed(event)
   end
 

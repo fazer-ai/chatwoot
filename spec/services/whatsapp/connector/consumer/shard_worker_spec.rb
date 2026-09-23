@@ -57,6 +57,56 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(inbox.messages).to be_empty
   end
 
+  describe 'a teardown that failed for a session no inbox holds' do
+    # What delete_session leaves behind: the inbox is gone by the time the connector answers,
+    # so the answer names a session nobody here holds any more.
+    let(:orphan) { 'a-session-whose-inbox-was-destroyed' }
+    let(:failure) do
+      frame.merge(
+        'type' => 'command.failed', 'sid' => orphan,
+        'payload' => { command_id: 'cmd-1', command_type: 'session.delete', message_id: nil,
+                       error: { code: code, message: 'socket busy dialling' } }.to_json
+      )
+    end
+
+    after { Redis::Alfred.delete(Whatsapp::Session::TeardownRetry.attempts_key(orphan, 'session.delete')) }
+
+    context 'when the connector never attempted it' do
+      let(:code) { 'not_attempted' }
+
+      it 'sends it again rather than dropping it with the rest of the orphans' do
+        redis.xadd(stream, failure)
+
+        expect(worker.poll).to eq(1)
+
+        expect(Whatsapp::Session::TeardownRetryJob).to have_been_enqueued.with(orphan, 'session.delete')
+        expect(redis.xpending(stream, described_class::Consumer::GROUP)['size']).to eq(0)
+      end
+
+      # The cursor is what makes a redelivery harmless for an inbox, and a session with no
+      # inbox needs the same guard or every replay schedules another teardown.
+      it 'sends it again once for a redelivery of the same event' do
+        2.times { redis.xadd(stream, failure) }
+
+        expect(worker.poll).to eq(2)
+
+        expect(Whatsapp::Session::TeardownRetryJob).to have_been_enqueued.once
+      end
+    end
+
+    context 'when it failed for any other reason' do
+      let(:code) { 'invalid_payload' }
+
+      it 'drops it as before' do
+        redis.xadd(stream, failure)
+
+        expect(worker.poll).to eq(1)
+
+        expect(Whatsapp::Session::TeardownRetryJob).not_to have_been_enqueued
+      end
+    end
+  end
+
   it 'drops a redelivery it has already processed' do
     redis.xadd(stream, frame)
     worker.poll

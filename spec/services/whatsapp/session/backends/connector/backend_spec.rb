@@ -152,8 +152,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
   # The connector answers a teardown it could not carry out with `command.failed`, and
   # that event is routed to an inbox by `session_id`: this inbox is being destroyed, so
-  # the lookup misses and the event is dropped as an orphan. What is written here is the
-  # last thing about the session anybody can see.
+  # the lookup misses. Short of a teardown the connector never attempted, which is sent
+  # again, the event is dropped as an orphan, and what is written here is the last thing
+  # about the session anybody can see.
   it 'writes down what it asked for, because the failure has nowhere to be reported' do
     allow(Rails.logger).to receive(:info)
 

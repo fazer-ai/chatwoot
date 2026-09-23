@@ -148,8 +148,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # Logged here, which is the only place it can be. The connector answers a teardown it
   # could not carry out with `command.failed`, and that event is routed to an inbox by
   # `session_id`: the inbox this one is about has just been destroyed, so the lookup
-  # misses and the event is dropped as an orphan. What we publish is the last thing about
-  # this session that anybody can see.
+  # misses. The consumer acts on one answer before dropping the orphan, a teardown the
+  # connector never attempted, which Whatsapp::Session::TeardownRetry sends again; every
+  # other failure is dropped, and what we publish is the last thing about this session
+  # that anybody can see.
   #
   # The two ids go into the hash the log line carries. Ruby evaluates the values in the
   # order they are written, so the logout is still sent first, and a spec pins that
