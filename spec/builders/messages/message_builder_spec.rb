@@ -22,6 +22,68 @@ describe Messages::MessageBuilder do
     end
   end
 
+  # message_type is an enum on Message, so `message_type: :incoming` is the shape the rest of the
+  # codebase writes. The builder decides who the sender is, whether the inbox may take incoming
+  # messages and whether to render the e-mail body by comparing against Strings, so a Symbol has to
+  # land on the same decisions as its String.
+  describe 'when message_type arrives as a Symbol' do
+    let(:contact) { create(:contact, account: account, name: 'John', email: 'john@example.com') }
+    let(:conversation) { create(:conversation, inbox: inbox, account: account, contact: contact) }
+
+    it 'refuses an incoming message outside an API inbox, like the String does' do
+      expect { described_class.new(user, conversation, { content: 'test', message_type: :incoming }).perform }
+        .to raise_error 'Incoming messages are only allowed in Api inboxes'
+      expect(conversation.messages.where(content: 'test')).to be_empty
+    end
+
+    it 'saves an outgoing message with the user as sender, like the String does' do
+      message = described_class.new(user, conversation, { content: 'test', message_type: :outgoing }).perform
+
+      expect(message).to be_outgoing
+      expect(message.sender).to eq(user)
+    end
+
+    it 'renders the e-mail body of an outgoing message, like the String does' do
+      email_conversation = create(:conversation, inbox: create(:channel_email, account: account).inbox, account: account, contact: contact)
+
+      message = described_class.new(user, email_conversation, { content: 'Hello {{contact.name}}', message_type: :outgoing }).perform
+
+      expect(message.content_attributes.dig('email', 'text_content', 'full')).to eq 'Hello John'
+    end
+  end
+
+  # A template is sent from the agent side, like an outgoing message: the builder already renders its
+  # e-mail body for that reason, and the sender has to agree, or the conversation shows it as written by
+  # the contact and the mailer, which reads the sender's name, fails to send it.
+  describe 'when message_type is template' do
+    let(:user) { create(:user, account: account, name: 'Agent Smith') }
+    let(:contact) { create(:contact, account: account, name: 'John', email: 'john@example.com') }
+    let(:conversation) do
+      create(:conversation, inbox: create(:channel_email, account: account).inbox, account: account, contact: contact)
+    end
+
+    it 'saves the user as sender, like an outgoing message' do
+      message = described_class.new(user, conversation, { content: 'test', message_type: 'template' }).perform
+
+      expect(message).to be_template
+      expect(message.sender).to eq(user)
+    end
+
+    it 'renders the agent in the e-mail body as the user, not the contact' do
+      message = described_class.new(user, conversation, { content: 'Hi, {{agent.name}} here', message_type: 'template' }).perform
+
+      expect(message.content_attributes.dig('email', 'text_content', 'full')).to eq 'Hi, Agent Smith here'
+    end
+
+    it 'keeps the contact as sender of an incoming message' do
+      api_conversation = create(:conversation, inbox: create(:channel_api, account: account).inbox, account: account, contact: contact)
+
+      message = described_class.new(user, api_conversation, { content: 'test', message_type: 'incoming' }).perform
+
+      expect(message.sender).to eq(contact)
+    end
+  end
+
   describe '#content_attributes' do
     context 'when content_attributes is a JSON string' do
       let(:params) do

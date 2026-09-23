@@ -4,7 +4,7 @@
       "SCHEDULED_MESSAGE_DELAY_LABEL": "Atraso",
       "ATTACHMENT_ADD": "Adicionar anexo",
       "TEMPLATE_SELECT": "Usar template",
-      "TEMPLATE_SELECTED": "Template: {name}",
+      "TEMPLATE_SELECTED": "Modelo: {name}",
       "TEMPLATE_USE": "Usar este template"
     },
     "ACTIONS": {
@@ -19,7 +19,7 @@
       "CONTACT": "Contato",
       "USER": "Agente",
       "AGENT_BOT": "Bot",
-      "CAPTAIN": "Captain"
+      "CAPTAIN": "Capitão"
     },
     "EVENTS": {
       "MESSAGE_EDITED": "Mensagem editada"

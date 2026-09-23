@@ -75,6 +75,9 @@ const onOverlayClick = () => {
 
 onKeyStroke('Escape', event => {
   if (!isOpen.value) return;
+  // Something inside the panel already closed itself with this Escape (a picker, a menu): the
+  // panel waits for the next one. Their listeners sit on the document and run before this one.
+  if (event.defaultPrevented) return;
   // A dialog opened on top of the panel (e.g. the editor's link prompt) handles Escape itself.
   if (document.querySelector('dialog[open]')) return;
 

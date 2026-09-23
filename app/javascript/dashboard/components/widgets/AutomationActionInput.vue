@@ -225,6 +225,7 @@ export default {
       <WootMessageEditor
         v-else-if="inputType === 'textarea'"
         v-model="castMessageVmodel"
+        override-line-breaks
         rows="4"
         enable-variables
         :enable-automation-variables="!isMacro"

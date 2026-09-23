@@ -281,6 +281,63 @@ RSpec.describe AutomationRules::ActionService do
     end
   end
 
+  # The actions render their activity messages as they commit, in the thread's locale. A rule runs in
+  # Sidekiq, whose locale is the one of whoever enqueued the event (English for an inbound message)
+  # or the process default, so the run names the account's.
+  describe 'the language of the activity messages a run writes' do
+    let(:conversation) { create(:conversation, account: account, assignee: agent, status: :open) }
+    let(:rule) do
+      create(:automation_rule, account: account, actions: [
+               { action_name: 'add_label', action_params: ['representante'] },
+               { action_name: 'change_priority', action_params: ['high'] },
+               { action_name: 'assign_agent', action_params: ['nil'] },
+               { action_name: 'resolve_conversation', action_params: [] }
+             ])
+    end
+
+    def activity_contents
+      ActiveJob::Base.queue_adapter.enqueued_jobs
+                     .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                     .map { |job| job['arguments'].second['content'] }
+    end
+
+    before { clear_enqueued_jobs }
+
+    it 'writes them in the account locale when the thread arrives in another one' do
+      account.update!(locale: 'pt_BR')
+
+      I18n.with_locale(:en) { described_class.new(rule, account, conversation).perform }
+
+      expect(activity_contents).to contain_exactly(
+        'Sistema de Automação adicionou representante',
+        'Sistema de Automação definiu a prioridade para high',
+        'Conversa desatribuída por Sistema de Automação',
+        'Conversa foi marcada como resolvida por Sistema de Automação'
+      )
+    end
+
+    it 'writes them in English for an English account, even from a pt_BR thread' do
+      account.update!(locale: 'en')
+
+      I18n.with_locale(:pt_BR) { described_class.new(rule, account, conversation).perform }
+
+      expect(activity_contents).to include('Conversation unassigned by Automation System',
+                                           'Conversation was marked resolved by Automation System')
+      expect(activity_contents.join).not_to include('Sistema de Automação')
+    end
+
+    it 'hands the thread back in the locale it came with' do
+      account.update!(locale: 'pt_BR')
+
+      locale_after = I18n.with_locale(:en) do
+        described_class.new(rule, account, conversation).perform
+        I18n.locale
+      end
+
+      expect(locale_after).to eq(:en)
+    end
+  end
+
   describe 'conversation variables in the text of an action' do
     let(:agent) { create(:user, account: account, name: 'john doe') }
     let(:conversation) do

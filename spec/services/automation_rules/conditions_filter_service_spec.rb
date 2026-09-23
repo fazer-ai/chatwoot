@@ -254,6 +254,45 @@ RSpec.describe AutomationRules::ConditionsFilterService do
         end
       end
 
+      # The dashboard offers a single-value picker for a list attribute, but the API stores every value
+      # it is given, and the SQL is an IN (...): a condition with two values must match either of them.
+      context 'when a custom attribute condition carries more than one value' do
+        before do
+          create(:custom_attribute_definition, attribute_key: 'fechamento', account: account,
+                                               attribute_model: 'conversation_attribute', attribute_display_type: 'list',
+                                               attribute_values: ['Atendimento iniciado', 'Parou de responder', 'Venda efetivada'])
+        end
+
+        def rule_with(operator)
+          rule.update!(conditions: [
+                         { 'values': ['Atendimento iniciado', 'Parou de responder'], 'attribute_key': 'fechamento',
+                           'query_operator': nil, 'filter_operator': operator, 'custom_attribute_type': 'conversation_attribute' }
+                       ])
+          rule
+        end
+
+        def matches?(operator, value)
+          conversation.update!(custom_attributes: { fechamento: value })
+          described_class.new(rule_with(operator), conversation, { changed_attributes: {} }).perform
+        end
+
+        it 'matches a conversation holding the second value, not only the first' do
+          expect(matches?('equal_to', 'Parou de responder')).to be(true)
+          expect(matches?('equal_to', 'Atendimento iniciado')).to be(true)
+          expect(matches?('equal_to', 'Venda efetivada')).to be(false)
+        end
+
+        it 'compares every value without regard to case' do
+          expect(matches?('equal_to', 'PAROU DE RESPONDER')).to be(true)
+        end
+
+        it 'excludes every value on not_equal_to' do
+          expect(matches?('not_equal_to', 'Parou de responder')).to be(false)
+          expect(matches?('not_equal_to', 'Atendimento iniciado')).to be(false)
+          expect(matches?('not_equal_to', 'Venda efetivada')).to be(true)
+        end
+      end
+
       context 'when filter_operator is on processed_message_content' do
         before do
           rule.conditions = [
