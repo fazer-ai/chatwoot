@@ -16,7 +16,10 @@
 # The answer usually arrives for a session no inbox holds any more (the inbox was
 # destroyed or moved to another provider), which is why the consumer hands it here before
 # dropping it as an orphan. The one inbox that can still be around is one an operator
-# disconnected, and the job checks at send time that nobody has asked to connect it since.
+# disconnected, and for that one what counts is the request, not the connection record:
+# the backend notes the teardown when it sends it and withdraws the note when it is asked
+# to connect, while `close` is also what any dropped connection writes and `open` is what
+# a redial the teardown was racing writes.
 module Whatsapp::Session::TeardownRetry
   TYPES = %w[session.logout session.delete].freeze
 
@@ -24,9 +27,10 @@ module Whatsapp::Session::TeardownRetry
   # usually back within seconds, and one that is not is down for a while.
   WAITS = [30.seconds, 2.minutes, 5.minutes, 15.minutes, 1.hour].freeze
 
-  # How long the count of attempts outlives the last one. Longer than the widest wait, so
-  # the count is still there when that attempt's answer comes back, and short enough that
-  # a teardown asked for again another day starts over.
+  # How long the count of attempts, and the note that a live inbox asked for the teardown,
+  # outlive the last attempt. Longer than the widest wait, so both are still there when
+  # that attempt's answer comes back, and short enough that a teardown asked for again
+  # another day starts over.
   ATTEMPTS_TTL = 2.hours
 
   class << self
@@ -40,27 +44,39 @@ module Whatsapp::Session::TeardownRetry
       payload = event.payload
       return false unless teardown?(payload) && not_attempted?(payload.error)
 
-      attempt = count_attempt(event.sid, payload.command_type)
+      key = attempts_key(event.sid, payload.command_type)
+      attempt = Redis::Alfred.get(key).to_i + 1
       wait = WAITS[attempt - 1]
       return give_up(event.sid, payload.command_type) if wait.nil?
 
-      Rails.logger.info(
-        "[WHATSAPP SESSION] #{payload.command_type} for session #{event.sid} was not attempted by the connector; " \
-        "sending it again in #{wait.inspect} (attempt #{attempt} of #{WAITS.size})"
-      )
+      announce(event.sid, payload.command_type, wait, attempt)
       Whatsapp::Session::TeardownRetryJob.set(wait: wait).perform_later(event.sid, payload.command_type)
+      # Counted once the retry is queued, never before. The consumer runs the event again
+      # when the enqueue raises, and a count taken first would spend the budget on
+      # attempts that never went out. A count that fails after the enqueue costs one extra
+      # teardown, which asks for nothing new.
+      count_attempt(key)
       true
     end
 
+    # Noted by the backend when it sends a teardown, withdrawn when it is asked to connect.
+    def requested(session_id)
+      Redis::Alfred.setex(requested_key(session_id), '1', ATTEMPTS_TTL)
+    end
+
+    def withdrawn(session_id)
+      Redis::Alfred.delete(requested_key(session_id))
+    end
+
     # Whether the teardown is still what somebody wants. A session no inbox holds is
-    # always owed one. An inbox that is still here is owed one only while it stays as the
-    # disconnect left it: pairing again writes `connecting` before it asks for anything,
-    # and a quarantined inbox is the LogoutJob's. A check, not a fence, like the LogoutJob's.
+    # always owed one. An inbox that is still here is owed one only while nobody has asked
+    # to connect it since the teardown was sent. A check, not a fence, like the LogoutJob's:
+    # a connect that lands while the job is inside `send_again` is still ended by it.
     def wanted?(session_id)
       channel = Channel::Whatsapp.where(provider: 'native').where("provider_config->>'session_id' = ?", session_id).first
       return true if channel.nil?
 
-      channel.provider_connection.to_h['connection'] == 'close' && !Whatsapp::Session::ConnectionStateWriter.disowned?(channel)
+      Redis::Alfred.exists?(requested_key(session_id))
     end
 
     # By the route the first one took: the logout on the session's own stream, where its
@@ -82,6 +98,10 @@ module Whatsapp::Session::TeardownRetry
       "WHATSAPP::SESSION::TEARDOWN_ATTEMPTS::#{session_id}::#{command_type}"
     end
 
+    def requested_key(session_id)
+      "WHATSAPP::SESSION::TEARDOWN_REQUESTED::#{session_id}"
+    end
+
     private
 
     # Asked of the catalogue, so the code only counts once it maps to its class: a code
@@ -91,11 +111,16 @@ module Whatsapp::Session::TeardownRetry
       error.present? && error.to_exception.is_a?(Whatsapp::Session::Errors::NotAttempted)
     end
 
-    def count_attempt(session_id, command_type)
-      key = attempts_key(session_id, command_type)
-      attempt = Redis::Alfred.incr(key)
+    def announce(session_id, command_type, wait, attempt)
+      Rails.logger.info(
+        "[WHATSAPP SESSION] #{command_type} for session #{session_id} was not attempted by the connector; " \
+        "sending it again in #{wait.inspect} (attempt #{attempt} of #{WAITS.size})"
+      )
+    end
+
+    def count_attempt(key)
+      Redis::Alfred.incr(key)
       Redis::Alfred.expire(key, ATTEMPTS_TTL.to_i)
-      attempt
     end
 
     def give_up(session_id, command_type)

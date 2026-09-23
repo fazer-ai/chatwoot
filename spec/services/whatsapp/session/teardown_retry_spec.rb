@@ -59,6 +59,19 @@ RSpec.describe Whatsapp::Session::TeardownRetry do
     end
   end
 
+  # The consumer runs the event again when the enqueue raises. Counting first would spend
+  # the whole budget on retries that never went out, and then give up on the delivery
+  # that could have worked.
+  it 'spends none of the budget on a retry it could not queue' do
+    allow(Whatsapp::Session::TeardownRetryJob).to receive(:set).and_raise(RedisClient::ConnectionError)
+
+    3.times do
+      expect { described_class.consider(failed('session.delete', 'not_attempted')) }.to raise_error(RedisClient::ConnectionError)
+    end
+
+    expect(Redis::Alfred.get(described_class.attempts_key(session_id, 'session.delete')).to_i).to eq(0)
+  end
+
   it 'gives up out loud once every wait has been spent' do
     allow(Rails.logger).to receive(:warn)
     described_class::WAITS.size.times { described_class.consider(failed('session.delete', 'not_attempted')) }

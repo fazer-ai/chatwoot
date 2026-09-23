@@ -42,29 +42,33 @@ RSpec.describe Whatsapp::Session::TeardownRetryJob, :redis_streams do
     let(:channel) { create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false) }
     let(:session_id) { channel.provider_config['session_id'] }
 
-    # The operator disconnected it, the endpoint recorded it closed, and nobody asked to
-    # connect it since: the teardown is still what the inbox wants.
-    it 'sends it again while the inbox stays disconnected' do
-      channel.update_provider_connection!({ 'connection' => 'close' })
+    after { Whatsapp::Session::TeardownRetry.withdrawn(session_id) }
+
+    # The operator disconnected it and nobody asked to connect it since: the teardown is
+    # still what the inbox wants.
+    it 'sends it again while the teardown it asked for stands' do
+      Whatsapp::Session::TeardownRetry.requested(session_id)
 
       described_class.perform_now(session_id, 'session.delete')
 
       expect(frames('control').size).to eq(1)
     end
 
-    # Pairing again writes `connecting` before it asks for anything, so a teardown sent now
-    # would end the session the operator is setting up.
-    it 'stands down once somebody asked to connect it again' do
-      channel.update_provider_connection!({ 'connection' => 'connecting' })
+    # The connection record cannot say this: a dropped connection writes `close` too, and a
+    # retry keyed on it would end a session the operator had just paired again.
+    it 'stands down once somebody asked to connect it again, whatever the connection reads' do
+      Whatsapp::Session::TeardownRetry.requested(session_id)
+      Whatsapp::Session::TeardownRetry.withdrawn(session_id)
+      channel.update_provider_connection!({ 'connection' => 'close' })
 
       described_class.perform_now(session_id, 'session.delete')
 
       expect(frames('control')).to be_empty
     end
 
-    # A session paired with the wrong account is the LogoutJob's, which has its own
-    # schedule and its own check.
-    it 'leaves a quarantined inbox to the logout job' do
+    # A logout the LogoutJob sent to a quarantined account is that job's to repeat, on its
+    # own schedule and behind its own check; nothing here asked for a teardown.
+    it 'sends nothing for an inbox that never asked for a teardown' do
       channel.update_provider_connection!({ 'connection' => 'close', 'error_code' => 'wrong_phone_number' })
 
       described_class.perform_now(session_id, 'session.logout')

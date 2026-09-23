@@ -165,6 +165,25 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(Rails.logger).to have_received(:info).with(/tearing session #{session_id} down.*cmd-0001.*cmd-0002/)
   end
 
+  # What lets a retry of a teardown the connector never attempted tell a disconnect that
+  # still stands from a session the operator has paired again since.
+  describe 'the note a retried teardown checks' do
+    after { Whatsapp::Session::TeardownRetry.withdrawn(session_id) }
+
+    it 'is left by the teardown' do
+      backend.delete_session
+
+      expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(true)
+    end
+
+    it 'is withdrawn by asking to connect' do
+      backend.delete_session
+      backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
+
+      expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(false)
+    end
+  end
+
   # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
   # deliberately leaves a teardown pending with no reply while the session is between
   # owners, so there is no answer to wait for.
