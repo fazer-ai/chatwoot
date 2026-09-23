@@ -67,9 +67,12 @@ class FilterService
     values.map(&:downcase)
   end
 
+  # A text or list custom attribute is compared as LOWER(...) IN (...), so every value is lowercased and
+  # every value is kept: the API stores all the values a condition is given, and keeping only the first
+  # made a rule saved with two of them act on one, with nothing to say so.
   def case_insensitive_values(query_hash)
     if @custom_attribute_type.present? && query_hash['values'][0].is_a?(String)
-      string_filter_values(query_hash)
+      Array(query_hash['values']).map { |value| value.is_a?(String) ? value.downcase : value }
     else
       query_hash['values']
     end

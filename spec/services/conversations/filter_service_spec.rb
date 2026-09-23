@@ -696,6 +696,44 @@ describe Conversations::FilterService do
         expect(result[:conversations].length).to be 1
       end
 
+      # A saved folder or an API call can carry several values for a list or text attribute; the SQL is an
+      # IN (...) over the lowercased column, so every value has to reach it, lowercased.
+      it 'filters a custom attribute by every value it is given, whatever the case' do
+        en_conversation_1.update!(custom_attributes: { conversation_type: 'Gold' })
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'equal_to',
+            values: %w[PLATINUM gold],
+            query_operator: nil,
+            custom_attribute_type: 'conversation_attribute'
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id))
+          .to contain_exactly(en_conversation_1.id, en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
+      it 'excludes every value of a custom attribute on not_equal_to' do
+        en_conversation_1.update!(custom_attributes: { conversation_type: 'gold' })
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'not_equal_to',
+            values: %w[platinum gold],
+            query_operator: nil,
+            custom_attribute_type: 'conversation_attribute'
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id))
+          .not_to include(en_conversation_1.id, en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
       it 'filter by custom_attributes with custom_attribute_type nil' do
         params[:payload] = [
           {
