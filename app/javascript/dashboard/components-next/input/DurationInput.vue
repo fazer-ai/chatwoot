@@ -56,13 +56,27 @@ const normalizeDuration = () => {
   duration.value = Math.min(Math.max(duration.value, props.min), props.max);
 };
 
-// when unit is changed set the nearest value to that unit
-// so if the minute is set to 900, and the user changes the unit to "days"
-// the transformed value will show 0, but the real value will still be 900
-// this might create some confusion, especially when saving
-// this watcher fixes it by rounding the duration basically, to the nearest unit value
+// A unit the user picks keeps the number on screen: "2" hours becomes "2" days. Converting the
+// duration instead reads as 0 days and then snaps to the minimum, so the field shows a number
+// nobody typed. The result is not clamped here either: a bound replacing the number would be the
+// same silent swap, so the range is left to blur/Enter and to the form's own validation.
+let countToKeep = null;
+const onUnitSelected = event => {
+  countToKeep = transformedValue.value;
+  unit.value = event.target.value;
+};
+
+// A unit set by the parent (to show a saved value in its largest whole unit) keeps the duration
+// and rounds it to the new unit, so if the minute is set to 900 and the unit becomes "days" the
+// field does not show 0 while 900 is what gets saved.
 watch(unit, () => {
+  const keptCount = countToKeep;
+  countToKeep = null;
   if (duration.value == null) return;
+  if (keptCount != null) {
+    duration.value = convertToMinutes(keptCount);
+    return;
+  }
   let adjustedValue = convertToMinutes(transformedValue.value);
   duration.value = Math.min(Math.max(adjustedValue, props.min), props.max);
 });
@@ -80,9 +94,10 @@ watch(unit, () => {
     @keydown.enter="normalizeDuration"
   />
   <select
-    v-model="unit"
+    :value="unit"
     :disabled="disabled"
     class="mb-0 text-sm disabled:outline-n-weak disabled:opacity-40"
+    @change="onUnitSelected"
   >
     <option :value="DURATION_UNITS.MINUTES">
       {{ t('DURATION_INPUT.MINUTES') }}
