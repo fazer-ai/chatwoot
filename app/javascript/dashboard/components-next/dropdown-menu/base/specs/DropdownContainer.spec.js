@@ -88,4 +88,27 @@ describe('DropdownContainer', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
   });
+
+  it('hands focus back to the trigger when Escape closes the menu', async () => {
+    const wrapper = mount(DropdownContainer, {
+      slots: {
+        trigger: ({ toggle }) =>
+          h('div', [
+            h('button', { 'data-testid': 'trigger', onClick: toggle }, 'Open'),
+          ]),
+        default: () => h('input', { 'data-testid': 'search' }),
+      },
+      attachTo: document.body,
+    });
+    await wrapper.get('[data-testid="trigger"]').trigger('click');
+    wrapper.get('[data-testid="search"]').element.focus();
+
+    pressEscape();
+    await wrapper.vm.$nextTick();
+
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-testid="trigger"]').element
+    );
+    wrapper.unmount();
+  });
 });

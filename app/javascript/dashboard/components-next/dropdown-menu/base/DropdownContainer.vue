@@ -32,6 +32,18 @@ const closeMenu = () => {
   }
 };
 
+// Closing the menu removes what had focus inside it (a search field), so Escape hands focus back to
+// the trigger, where the keyboard can reopen the menu or move on through the form.
+const FOCUSABLE =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const focusTrigger = () => {
+  const trigger = getTrigger();
+  const focusable = trigger?.matches(FOCUSABLE)
+    ? trigger
+    : trigger?.querySelector(FOCUSABLE);
+  focusable?.focus();
+};
+
 const menu = {};
 watch(isOpen, open => markMenuOpen(menu, open), { flush: 'sync' });
 onBeforeUnmount(() => markMenuOpen(menu, false));
@@ -45,6 +57,7 @@ onKeyStroke(
     if (!isInnermostOpenMenu(menu)) return;
     event.preventDefault();
     closeMenu();
+    focusTrigger();
   },
   { target: document }
 );
