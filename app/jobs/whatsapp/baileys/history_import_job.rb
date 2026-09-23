@@ -20,6 +20,11 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
   # group of 8,545 messages lost eleven batches to its own siblings.
   retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 40
 
+  # How long a batch that found every import slot taken waits before looking again. Spread
+  # out so a dump of thousands of batches does not come back all at once, and fixed rather
+  # than growing: this is a queue, not a failure.
+  SLOT_WAIT = (15..30)
+
   # Everything past `requested` says how to file this dump rather than what is in it, and
   # it is collected rather than listed because the list grows: each entry has to keep a
   # default for the jobs already queued when it shipped, and a job argument list is a
@@ -32,12 +37,19 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
     channel = inbox&.channel
     return unless channel.is_a?(Channel::Whatsapp) && channel.provider == 'baileys'
 
-    Whatsapp::Baileys::HistoryImporter.new(
-      inbox: inbox,
-      params: {
-        messages: messages, watermark: watermark, requested: requested,
-        announce: filing.fetch(:announce, false), group_name: filing[:group_name]
-      }
-    ).perform
+    Whatsapp::Session::Inbound::ImportSlots.with_slot do
+      Whatsapp::Baileys::HistoryImporter.new(
+        inbox: inbox,
+        params: {
+          messages: messages, watermark: watermark, requested: requested,
+          announce: filing.fetch(:announce, false), group_name: filing[:group_name]
+        }
+      ).perform
+    end
+  rescue Whatsapp::Session::Inbound::ImportSlots::Full
+    # `retry_job` and not `retry_on`: it files the same job for later without touching the
+    # per-exception counters, so a batch that waited through a long dump still has the
+    # whole chat lock budget above when its turn comes.
+    retry_job(wait: rand(SLOT_WAIT).seconds)
   end
 end
