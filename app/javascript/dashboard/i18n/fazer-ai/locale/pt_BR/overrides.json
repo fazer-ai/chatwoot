@@ -71,5 +71,10 @@
         "ASK_ADMIN": "Entre em contato com seu administrador para o upgrade."
       }
     }
+  },
+  "AUTOMATION": {
+    "ACTIONS": {
+      "REMOVE_ASSIGNED_AGENT": "Remover Agente Atribuído"
+    }
   }
 }
