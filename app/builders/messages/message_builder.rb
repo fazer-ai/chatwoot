@@ -11,7 +11,9 @@ class Messages::MessageBuilder # rubocop:disable Metrics/ClassLength
     @conversation = conversation
     @user = user
     @account = conversation.account
-    @message_type = params[:message_type] || 'outgoing'
+    # Compared against Strings below; a Symbol (the shape the Message enum takes elsewhere) would
+    # skip the incoming guard, flip the sender to the contact and leave the e-mail body unrendered.
+    @message_type = (params[:message_type] || 'outgoing').to_s
     @attachments = params[:attachments]
     @is_recorded_audio = params[:is_recorded_audio]
     @is_voice_message = ActiveModel::Type::Boolean.new.cast(params[:is_voice_message])
