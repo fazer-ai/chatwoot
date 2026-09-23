@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Input from './Input.vue';
 import { useI18n } from 'vue-i18n';
 import { DURATION_UNITS } from './constants';
@@ -30,6 +30,9 @@ const convertToMinutes = newValue => {
   return Math.floor(newValue) * 24 * 60;
 };
 
+// Which bound a picked unit ran into, so the adjustment is said next to the field.
+const adjustedTo = ref(null);
+
 const transformedValue = computed({
   get() {
     if (duration.value == null) return null;
@@ -42,6 +45,7 @@ const transformedValue = computed({
     return 0;
   },
   set(newValue) {
+    adjustedTo.value = null;
     if (newValue == null || newValue === '') {
       duration.value = null;
       return;
@@ -58,8 +62,9 @@ const normalizeDuration = () => {
 
 // A unit the user picks keeps the number on screen: "2" hours becomes "2" days. Converting the
 // duration instead reads as 0 days and then snaps to the minimum, so the field shows a number
-// nobody typed. The result is not clamped here either: a bound replacing the number would be the
-// same silent swap, so the range is left to blur/Enter and to the form's own validation.
+// nobody typed. When the kept number falls outside the range it is brought to the bound, since not
+// every form validates the range before saving, and the field says so instead of passing the bound
+// off as what the user typed.
 let countToKeep = null;
 const onUnitSelected = event => {
   countToKeep = transformedValue.value;
@@ -72,13 +77,30 @@ const onUnitSelected = event => {
 watch(unit, () => {
   const keptCount = countToKeep;
   countToKeep = null;
+  adjustedTo.value = null;
   if (duration.value == null) return;
   if (keptCount != null) {
-    duration.value = convertToMinutes(keptCount);
+    const kept = convertToMinutes(keptCount);
+    duration.value = Math.min(Math.max(kept, props.min), props.max);
+    if (kept > props.max) adjustedTo.value = 'MAX';
+    else if (kept < props.min) adjustedTo.value = 'MIN';
     return;
   }
   let adjustedValue = convertToMinutes(transformedValue.value);
   duration.value = Math.min(Math.max(adjustedValue, props.min), props.max);
+});
+const unitLabels = computed(() => ({
+  [DURATION_UNITS.MINUTES]: t('DURATION_INPUT.MINUTES'),
+  [DURATION_UNITS.HOURS]: t('DURATION_INPUT.HOURS'),
+  [DURATION_UNITS.DAYS]: t('DURATION_INPUT.DAYS'),
+}));
+
+const adjustedMessage = computed(() => {
+  if (!adjustedTo.value) return '';
+  return t(`DURATION_INPUT.ADJUSTED_TO_${adjustedTo.value}`, {
+    value: transformedValue.value,
+    unit: unitLabels.value[unit.value].toLowerCase(),
+  });
 });
 </script>
 
@@ -89,6 +111,7 @@ watch(unit, () => {
     autocomplete="off"
     :disabled="disabled"
     :placeholder="t('DURATION_INPUT.PLACEHOLDER')"
+    :message="adjustedMessage"
     class="flex-grow w-full disabled:"
     @blur="normalizeDuration"
     @keydown.enter="normalizeDuration"

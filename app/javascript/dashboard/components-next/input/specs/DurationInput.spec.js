@@ -1,6 +1,9 @@
 import { defineComponent, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import DurationInput from '../DurationInput.vue';
+import { withFullI18n } from 'test-i18n';
+
+withFullI18n('pt_BR');
 
 const mountDurationInput = ({ initialValue = null } = {}) => {
   const TestHost = defineComponent({
@@ -144,7 +147,7 @@ describe('DurationInput unit change', () => {
     expect(wrapper.get('[data-testid="duration"]').text()).toBe('5400');
   });
 
-  it('does not replace a number past the maximum with the bound on a unit change', async () => {
+  it('brings a number past the maximum to the bound and says so next to the field', async () => {
     const wrapper = mountWithUnit();
     const input = wrapper.get('input');
 
@@ -152,8 +155,54 @@ describe('DurationInput unit change', () => {
     await input.trigger('blur');
     await wrapper.get('select').setValue('days');
 
-    expect(input.element.value).toBe('48');
-    expect(wrapper.get('[data-testid="duration"]').text()).toBe('69120');
+    expect(input.element.value).toBe('30');
+    expect(wrapper.get('[data-testid="duration"]').text()).toBe('43200');
+    expect(wrapper.text()).toContain('Máximo: 30 dias');
+  });
+
+  it('brings a number under the minimum to the bound and says so', async () => {
+    const wrapper = mountWithUnit({ initialUnit: 'days' });
+    const input = wrapper.get('input');
+
+    await input.setValue('2');
+    await input.trigger('blur');
+    await wrapper.get('select').setValue('minutes');
+
+    expect(input.element.value).toBe('10');
+    expect(wrapper.text()).toContain('Mínimo: 10 minutos');
+  });
+
+  it('says nothing when the kept number is within range, and drops the notice once the user types', async () => {
+    const wrapper = mountWithUnit();
+    const input = wrapper.get('input');
+
+    await input.setValue('2');
+    await input.trigger('blur');
+    await wrapper.get('select').setValue('days');
+    expect(wrapper.text()).not.toContain('Máximo');
+
+    await wrapper.get('select').setValue('hours');
+    await input.setValue('48');
+    await input.trigger('blur');
+    await wrapper.get('select').setValue('days');
+    expect(wrapper.text()).toContain('Máximo: 30 dias');
+
+    await input.setValue('3');
+    expect(wrapper.text()).not.toContain('Máximo');
+  });
+
+  it('drops the notice when the next unit picked needs no adjustment', async () => {
+    const wrapper = mountWithUnit();
+    const input = wrapper.get('input');
+
+    await input.setValue('48');
+    await input.trigger('blur');
+    await wrapper.get('select').setValue('days');
+    expect(wrapper.text()).toContain('Máximo: 30 dias');
+
+    await wrapper.get('select').setValue('hours');
+    expect(input.element.value).toBe('30');
+    expect(wrapper.text()).not.toContain('Máximo');
   });
 
   it('leaves an empty field empty on a unit change', async () => {
