@@ -511,8 +511,15 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     )
   end
 
+  # The stored token wins over whatever came in, because provider_config is permitted wholesale
+  # by the inbox API and an update is a plain replace of the column: one that leaves the token
+  # out would otherwise mint a new one while the provider keeps posting the old one. A provider
+  # change (creation included) is the one write that starts over.
   def ensure_webhook_verify_token
-    provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])
+    return unless provider.in?(%w[whatsapp_cloud baileys])
+
+    stored = provider_config_was.to_h['webhook_verify_token'] unless provider_changed?
+    provider_config['webhook_verify_token'] = stored.presence || provider_config['webhook_verify_token'].presence || SecureRandom.hex(16)
   end
 
   # A check that could not reach a verdict is neither a refusal nor a broken application, so it gets a

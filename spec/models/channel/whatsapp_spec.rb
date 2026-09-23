@@ -362,6 +362,39 @@ RSpec.describe Channel::Whatsapp do
 
       expect(channel.provider_config['webhook_verify_token']).to eq '123'
     end
+
+    context 'when an update writes provider_config without the token' do
+      %w[baileys whatsapp_cloud].each do |provider|
+        it "keeps the stored token on #{provider}" do
+          channel = create(:channel_whatsapp, provider: provider,
+                                              provider_config: { 'webhook_verify_token' => 'stored-token', 'api_key' => 'test_key' },
+                                              validate_provider_config: false, sync_templates: false)
+
+          channel.update!(provider_config: { 'api_key' => 'rotated_key' })
+
+          expect(channel.reload.provider_config).to include('webhook_verify_token' => 'stored-token', 'api_key' => 'rotated_key')
+        end
+      end
+    end
+
+    it 'keeps the stored token when an update hands in another one' do
+      channel = create(:channel_whatsapp, provider: 'baileys', provider_config: { 'webhook_verify_token' => 'stored-token' },
+                                          validate_provider_config: false, sync_templates: false)
+
+      channel.update!(provider_config: { 'webhook_verify_token' => 'chosen-by-caller' })
+
+      expect(channel.reload.provider_config['webhook_verify_token']).to eq 'stored-token'
+    end
+
+    it 'does not carry the token across a provider change' do
+      channel = create(:channel_whatsapp, provider: 'baileys', provider_config: { 'webhook_verify_token' => 'stored-token' },
+                                          validate_provider_config: false, sync_templates: false)
+
+      channel.assign_attributes(provider: 'whatsapp_cloud', provider_config: { 'api_key' => 'test_key' })
+      channel.valid?
+
+      expect(channel.provider_config['webhook_verify_token']).to be_present.and(satisfy { |token| token != 'stored-token' })
+    end
   end
 
   describe 'webhook setup after creation' do
