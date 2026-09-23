@@ -30,6 +30,7 @@ es:
       cannot_delete_processed: No se puede eliminar un mensaje programado que ya se envió o que falló
     conversations:
       already_assigned: "%{agent_name} ya está atendiendo esta conversación."
+      agent_bot_not_serving_inbox: "Este bot no atiende la bandeja de entrada de esta conversación."
     conversation_pins:
       limit_reached: Puede fijar hasta %{limit} conversaciones.
       conversation_resolved: No se puede fijar una conversación resuelta.

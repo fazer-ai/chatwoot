@@ -12,10 +12,17 @@ class Api::V1::Accounts::AssignableAgentsController < Api::V1::Accounts::BaseCon
     agent_ids = agent_ids.inject(:&)
     agents = Current.account.users.where(id: agent_ids)
     @assignable_agents = (agents + Current.account.administrators).uniq
-    @agent_bots = @include_ai_assignees ? AgentBot.accessible_to(Current.account) : []
+    @agent_bots = @include_ai_assignees ? serving_agent_bots : []
   end
 
   private
+
+  # The bot serving every requested inbox, the same intersection the Captain assistant gets
+  # (Enterprise::Api::V1::Accounts::AssignableAgentsController). See Conversations::AssignmentService#agent_bot.
+  def serving_agent_bots
+    bots = @inboxes.map { |inbox| inbox.agent_bot if inbox.agent_bot_inbox&.active? }
+    bots.all? && bots.uniq.one? ? bots.uniq : []
+  end
 
   def fetch_inboxes
     @inboxes = Current.account.inboxes.find(permitted_params[:inbox_ids])
