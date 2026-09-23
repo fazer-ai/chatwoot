@@ -50,12 +50,8 @@ class Conversations::AssignmentService
     @assignee ||= conversation.account.users.find_by(id: assignee_id)
   end
 
-  # Only the bot serving the conversation's inbox, the rule the Captain assistant already follows
-  # (Enterprise::Conversations::AssignmentService#captain_assistant). Any other bot of the account
-  # would take the conversation out of the team's queues without ever answering it (#721).
   def agent_bot
-    bot_inbox = conversation.inbox.agent_bot_inbox
-    bot_inbox.agent_bot if bot_inbox&.active? && bot_inbox.agent_bot_id == assignee_id.to_i
+    @agent_bot ||= AgentBot.accessible_to(conversation.account).find_by(id: assignee_id)
   end
 
   def agent_bot_assignment?

@@ -18,8 +18,6 @@ class Api::V1::Accounts::Conversations::AssignmentsController < Api::V1::Account
       assignee_id: params[:assignee_id],
       assignee_type: params[:assignee_type]
     ).perform
-    # The service hands back no bot when the one asked for does not serve the conversation's inbox.
-    return render_could_not_create_error(I18n.t('errors.conversations.agent_bot_not_serving_inbox')) if agent_bot_assignment? && resource.nil?
 
     render_agent(resource)
   end

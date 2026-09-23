@@ -56,7 +56,6 @@ RSpec.describe 'Conversation Assignment API', type: :request do
       end
 
       it 'assigns an agent bot to the conversation' do
-        create(:agent_bot_inbox, inbox: conversation.inbox, agent_bot: agent_bot)
         params = { assignee_id: agent_bot.id, assignee_type: 'AgentBot' }
 
         expect(Conversations::AssignmentService).to receive(:new)
@@ -73,46 +72,6 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         conversation.reload
         expect(conversation.ai_assignee).to eq(agent_bot)
         expect(conversation.assignee).to be_nil
-      end
-
-      # The bot's own assignment has an author, as a user's does (#721).
-      it 'writes an activity naming who assigned the agent bot' do
-        create(:agent_bot_inbox, inbox: conversation.inbox, agent_bot: agent_bot)
-
-        expect do
-          post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
-               params: { assignee_id: agent_bot.id, assignee_type: 'AgentBot' },
-               headers: agent.create_new_auth_token,
-               as: :json
-        end.to have_enqueued_job(Conversations::ActivityMessageJob)
-          .with(conversation, hash_including(message_type: :activity, content: "Assigned to #{agent_bot.name} by #{agent.name}"))
-      end
-
-      it 'refuses an agent bot that serves another inbox, leaving the conversation as it was' do
-        create(:agent_bot_inbox, inbox: create(:inbox, account: account), agent_bot: agent_bot)
-        conversation.update!(assignee: agent, status: :open)
-
-        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
-             params: { assignee_id: agent_bot.id, assignee_type: 'AgentBot' },
-             headers: agent.create_new_auth_token,
-             as: :json
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(response.parsed_body['error']).to eq("This agent bot does not serve this conversation's inbox.")
-        conversation.reload
-        expect(conversation.ai_assignee).to be_nil
-        expect(conversation.assignee).to eq(agent)
-        expect(conversation.status).to eq('open')
-      end
-
-      it 'refuses an agent bot id that does not exist' do
-        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
-             params: { assignee_id: AgentBot.maximum(:id).to_i + 1, assignee_type: 'AgentBot' },
-             headers: agent.create_new_auth_token,
-             as: :json
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(conversation.reload.ai_assignee).to be_nil
       end
 
       it 'assigns a team to the conversation' do

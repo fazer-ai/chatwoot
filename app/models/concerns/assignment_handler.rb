@@ -95,27 +95,9 @@ module AssignmentHandler
     user_name = Current.user.name if Current.user.present?
     if saved_change_to_team_id?
       create_team_change_activity(user_name)
-    elsif ai_assignee_handed_over?
-      create_ai_assignee_change_activity(user_name)
     elsif saved_change_to_assignee_id?
       create_assignee_change_activity(user_name)
     end
-  end
-
-  # A bot or assistant taking over an existing conversation, which is written down like a user's
-  # assignment is (#721). The one the inbox hands a new conversation is left out, as it has no author.
-  def ai_assignee_handed_over?
-    return false if previously_new_record? || ai_assignee.blank?
-
-    saved_change_to_assignee_agent_bot_id? || saved_change_to_ai_assignee_type?
-  end
-
-  def create_ai_assignee_change_activity(user_name)
-    user_name = activity_message_owner(user_name)
-    return unless user_name
-
-    content = I18n.t('conversations.activity.assignee.assigned', assignee_name: ai_assignee.name, user_name: user_name)
-    ::Conversations::ActivityMessageJob.perform_later(self, activity_message_params(content))
   end
 
   def self_assign?(assignee_id)
