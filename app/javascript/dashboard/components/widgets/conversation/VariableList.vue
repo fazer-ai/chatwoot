@@ -4,7 +4,10 @@ import { useI18n } from 'vue-i18n';
 import { MESSAGE_VARIABLES } from 'shared/constants/messages';
 import { useMapGetter } from 'dashboard/composables/store';
 import { sanitizeVariableSearchKey } from 'dashboard/helper/commons';
-import { resolveVariableText } from 'dashboard/helper/editorHelper';
+import {
+  resolveVariableText,
+  variableContent,
+} from 'dashboard/helper/editorHelper';
 import CaretAnchoredPicker from 'dashboard/components-next/preview-picker/CaretAnchoredPicker.vue';
 
 const props = defineProps({
@@ -20,15 +23,31 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  // Text of an automation rule is rendered when the rule runs, which also knows the conversation's
+  // assignee and the state it was in before the run (`conversation.before`).
+  automation: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['selectVariable', 'close', 'removeTrigger']);
+const emit = defineEmits([
+  'selectVariable',
+  'close',
+  'removeTrigger',
+  'release',
+]);
 
 const { t } = useI18n();
 
 const customAttributes = useMapGetter('attributes/getAttributes');
 
-const searchQuery = ref(sanitizeVariableSearchKey(props.searchKey));
+// The search starts with the variable only: the punctuation after `{{contact.name}}.` is text
+// of the message, and would otherwise be handed back into the variable when the search is edited.
+const initialQuery = sanitizeVariableSearchKey(
+  variableContent(props.searchKey)
+);
+const searchQuery = ref(initialQuery);
 
 const searchTerm = computed(() => searchQuery.value.trim().toLowerCase());
 
@@ -50,8 +69,41 @@ const customVariables = computed(() =>
     }))
 );
 
+const automationVariables = computed(() => {
+  if (!props.automation) return [];
+
+  const conversationAttributes = customAttributes.value.filter(
+    attribute => attribute.attribute_model === 'conversation_attribute'
+  );
+  return [
+    {
+      key: 'conversation.assignee.name',
+      description: t('CONVERSATION.PICKER.VARIABLE.AUTOMATION.ASSIGNEE_NAME'),
+    },
+    {
+      key: 'conversation.before.assignee.name',
+      description: t(
+        'CONVERSATION.PICKER.VARIABLE.AUTOMATION.BEFORE_ASSIGNEE_NAME'
+      ),
+    },
+    ...conversationAttributes.map(attribute => ({
+      key: `conversation.before.custom_attribute.${attribute.attribute_key}`,
+      description: t(
+        'CONVERSATION.PICKER.VARIABLE.AUTOMATION.BEFORE_ATTRIBUTE',
+        {
+          name: attribute.attribute_display_name,
+        }
+      ),
+    })),
+  ];
+});
+
 const items = computed(() =>
-  [...standardVariables.value, ...customVariables.value]
+  [
+    ...standardVariables.value,
+    ...automationVariables.value,
+    ...customVariables.value,
+  ]
     .filter(
       ({ key, description }) =>
         key.toLowerCase().includes(searchTerm.value) ||
@@ -83,6 +135,7 @@ const onSelect = item => emit('selectVariable', item.key);
     @select="onSelect"
     @close="emit('close')"
     @remove-trigger="emit('removeTrigger')"
+    @release="emit('release', $event)"
   >
     <template #preview="{ item }">
       <div v-if="item" class="flex flex-col gap-3 px-4 py-3">

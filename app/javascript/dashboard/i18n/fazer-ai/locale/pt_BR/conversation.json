@@ -95,7 +95,16 @@
       "ERROR": "Não foi possível pedir as mensagens mais antigas. Tente de novo em instantes.",
       "EXHAUSTED": "Não há nada mais antigo aqui. O restante desta conversa está apenas no celular."
     },
-    "FILE_IS_EMPTY": "Este arquivo está vazio e não pode ser enviado"
+    "FILE_IS_EMPTY": "Este arquivo está vazio e não pode ser enviado",
+    "PICKER": {
+      "VARIABLE": {
+        "AUTOMATION": {
+          "ASSIGNEE_NAME": "Nome do agente atribuído à conversa",
+          "BEFORE_ASSIGNEE_NAME": "Agente atribuído à conversa antes da regra rodar",
+          "BEFORE_ATTRIBUTE": "{name} antes da regra rodar"
+        }
+      }
+    }
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

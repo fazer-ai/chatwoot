@@ -35,7 +35,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'close', 'removeTrigger']);
+const emit = defineEmits(['select', 'close', 'removeTrigger', 'release']);
 
 const search = defineModel('search', { type: String, default: '' });
 
@@ -171,6 +171,30 @@ watch(items, () => {
   selectedIndex.value = 0;
   adjustScroll();
 });
+
+// The search field takes every keystroke while the picker is open, so a picker that cannot
+// complete what was typed must not keep it: once the search matches nothing (a closing brace, a
+// Liquid filter, a key it does not list, a plain ` / ` in a sentence), the text goes back to the
+// editor and the picker closes. Only what was typed here is handed back; what came from the
+// document is already there. Only a new search or the end of a load asks: a filter the owner
+// switches (the Teams tab of the mentions) empties the list without anything being typed. The
+// owner hands in the items for the new search together with it.
+const initialSearch = search.value;
+watch(
+  () => [search.value, props.isLoading],
+  ([query, loading]) => {
+    if (loading || props.items.length || !query || query === initialSearch) {
+      return;
+    }
+
+    emit(
+      'release',
+      query.startsWith(initialSearch)
+        ? { text: query.slice(initialSearch.length) }
+        : { text: query, replace: true }
+    );
+  }
+);
 </script>
 
 <template>

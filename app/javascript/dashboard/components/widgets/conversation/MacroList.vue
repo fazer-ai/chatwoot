@@ -17,7 +17,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['selectMacro', 'close', 'removeTrigger']);
+const emit = defineEmits(['selectMacro', 'close', 'removeTrigger', 'release']);
 
 const store = useStore();
 const { t } = useI18n();
@@ -64,6 +64,7 @@ onMounted(() => {
     @select="onSelect"
     @close="emit('close')"
     @remove-trigger="emit('removeTrigger')"
+    @release="emit('release', $event)"
   >
     <template #preview="{ item }">
       <div v-if="item" class="px-4 py-3">
