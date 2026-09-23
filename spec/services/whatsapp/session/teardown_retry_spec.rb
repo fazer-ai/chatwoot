@@ -70,6 +70,13 @@ RSpec.describe Whatsapp::Session::TeardownRetry do
     expect(Rails.logger).to have_received(:warn).with(a_string_including(session_id, 'session.delete', 'linked'))
   end
 
+  it 'forgets the count a while after the last attempt, so a teardown asked for another day starts over' do
+    described_class.consider(failed('session.delete', 'not_attempted'))
+
+    expect(Redis::Alfred.ttl(described_class.attempts_key(session_id, 'session.delete')))
+      .to be_between(described_class::WAITS.last.to_i, described_class::ATTEMPTS_TTL.to_i)
+  end
+
   it 'says in the log which answer it acted on' do
     allow(Rails.logger).to receive(:info)
 
