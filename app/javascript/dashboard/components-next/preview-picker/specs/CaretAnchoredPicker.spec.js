@@ -63,10 +63,10 @@ describe('CaretAnchoredPicker', () => {
     expect(wrapper.emitted('release')).toEqual([[{ text: 'x' }]]);
   });
 
-  it('keeps a search it opened with, even when nothing matches it', async () => {
-    const wrapper = mountPicker({ search: 'zz', items: [] });
+  it('keeps a search it opened with, even when nothing matches it once loaded', async () => {
+    const wrapper = mountPicker({ search: 'zz', items: [], isLoading: true });
 
-    await answer(wrapper, 'zz', []);
+    await wrapper.setProps({ isLoading: false });
 
     expect(wrapper.emitted('release')).toBeUndefined();
   });
@@ -75,6 +75,15 @@ describe('CaretAnchoredPicker', () => {
     const wrapper = mountPicker({ search: 'sm' });
 
     await answer(wrapper, '', []);
+
+    expect(wrapper.emitted('release')).toBeUndefined();
+  });
+
+  it('keeps the search when a filter empties the list without anything typed', async () => {
+    const wrapper = mountPicker();
+
+    await answer(wrapper, 'jo', [ITEM]);
+    await wrapper.setProps({ items: [] });
 
     expect(wrapper.emitted('release')).toBeUndefined();
   });

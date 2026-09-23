@@ -176,13 +176,16 @@ watch(items, () => {
 // complete what was typed must not keep it: once the search matches nothing (a closing brace, a
 // Liquid filter, a key it does not list, a plain ` / ` in a sentence), the text goes back to the
 // editor and the picker closes. Only what was typed here is handed back; what came from the
-// document is already there. The owner's re-render hands in the items for the new search before
-// this runs, since a parent updates ahead of its children.
+// document is already there. Only a new search or the end of a load asks: a filter the owner
+// switches (the Teams tab of the mentions) empties the list without anything being typed. The
+// owner hands in the items for the new search together with it.
 const initialSearch = search.value;
 watch(
-  () => [search.value, props.items.length, props.isLoading],
-  ([query, count, loading]) => {
-    if (loading || count || !query || query === initialSearch) return;
+  () => [search.value, props.isLoading],
+  ([query, loading]) => {
+    if (loading || props.items.length || !query || query === initialSearch) {
+      return;
+    }
 
     emit(
       'release',
