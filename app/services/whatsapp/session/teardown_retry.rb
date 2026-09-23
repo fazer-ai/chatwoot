@@ -27,11 +27,17 @@ module Whatsapp::Session::TeardownRetry
   # usually back within seconds, and one that is not is down for a while.
   WAITS = [30.seconds, 2.minutes, 5.minutes, 15.minutes, 1.hour].freeze
 
-  # How long the count of attempts, and the note that a live inbox asked for the teardown,
-  # outlive the last attempt. Longer than the widest wait, so both are still there when
-  # that attempt's answer comes back, and short enough that a teardown asked for again
-  # another day starts over.
+  # How long the count of attempts outlives the last one. Longer than the widest wait, so
+  # the count is still there when that attempt's answer comes back, and short enough that
+  # a teardown asked for again another day starts over.
   ATTEMPTS_TTL = 2.hours
+
+  # How long the note that a live inbox asked for a teardown lasts when nobody asks to
+  # connect it. Not tied to the attempts: a teardown carries no deadline and can sit
+  # pending for as long as the connector is away, and the answer that finally comes back
+  # must still find the request standing. Only a connect withdraws it; the expiry is there
+  # so the note of an inbox destroyed later does not stay forever.
+  REQUEST_TTL = 7.days
 
   class << self
     def teardown?(payload)
@@ -60,12 +66,15 @@ module Whatsapp::Session::TeardownRetry
     end
 
     # Noted by the backend when it sends a teardown, withdrawn when it is asked to connect.
+    # Both run where the caller rescues the session errors and nothing else (the disconnect
+    # endpoint answers ProviderUnavailable with a 503), so a Redis that is down arrives as
+    # one of those, as it does from the connector client.
     def requested(session_id)
-      Redis::Alfred.setex(requested_key(session_id), '1', ATTEMPTS_TTL)
+      translating_outages { Redis::Alfred.setex(requested_key(session_id), '1', REQUEST_TTL) }
     end
 
     def withdrawn(session_id)
-      Redis::Alfred.delete(requested_key(session_id))
+      translating_outages { Redis::Alfred.delete(requested_key(session_id)) }
     end
 
     # Whether the teardown is still what somebody wants. A session no inbox holds is
@@ -109,6 +118,12 @@ module Whatsapp::Session::TeardownRetry
     # exists to catch.
     def not_attempted?(error)
       error.present? && error.to_exception.is_a?(Whatsapp::Session::Errors::NotAttempted)
+    end
+
+    def translating_outages
+      yield
+    rescue Redis::BaseError, ConnectionPool::TimeoutError => e
+      raise Whatsapp::Session::Errors::ProviderUnavailable, "the teardown record could not be written: #{e.class}: #{e.message}"
     end
 
     def announce(session_id, command_type, wait, attempt)

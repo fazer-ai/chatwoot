@@ -176,6 +176,21 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(true)
     end
 
+    # The disconnect endpoint answers ProviderUnavailable with a 503 and anything else with
+    # a 500, and the client already translates its own Redis failures the same way.
+    it 'reports a Redis that is down as the provider being unavailable' do
+      allow(Redis::Alfred).to receive(:setex).and_raise(Redis::CannotConnectError)
+
+      expect { backend.delete_session }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+    end
+
+    it 'outlasts a teardown left pending while the connector is away' do
+      backend.delete_session
+
+      expect(Redis::Alfred.ttl(Whatsapp::Session::TeardownRetry.requested_key(session_id)))
+        .to be > Whatsapp::Session::TeardownRetry::ATTEMPTS_TTL.to_i
+    end
+
     it 'is withdrawn by asking to connect' do
       backend.delete_session
       backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
