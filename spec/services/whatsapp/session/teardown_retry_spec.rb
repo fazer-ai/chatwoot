@@ -90,6 +90,20 @@ RSpec.describe Whatsapp::Session::TeardownRetry do
       .to be_between(described_class::WAITS.last.to_i, described_class::ATTEMPTS_TTL.to_i)
   end
 
+  # Disconnect, run out of retries, pair again, disconnect again: the second teardown is
+  # its own, and inheriting the first one's spent budget would give up on its first answer.
+  it 'starts the attempts over for a teardown asked for again' do
+    described_class::WAITS.size.times { described_class.consider(failed('session.delete', 'not_attempted')) }
+    clear_enqueued_jobs
+
+    described_class.requested(session_id)
+
+    expect(described_class.consider(failed('session.delete', 'not_attempted'))).to be(true)
+    expect(Whatsapp::Session::TeardownRetryJob).to have_been_enqueued.once
+  ensure
+    described_class.withdrawn(session_id)
+  end
+
   it 'says in the log which answer it acted on' do
     allow(Rails.logger).to receive(:info)
 

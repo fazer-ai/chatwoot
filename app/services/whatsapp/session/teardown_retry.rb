@@ -69,12 +69,21 @@ module Whatsapp::Session::TeardownRetry
     # Both run where the caller rescues the session errors and nothing else (the disconnect
     # endpoint answers ProviderUnavailable with a 503), so a Redis that is down arrives as
     # one of those, as it does from the connector client.
+    #
+    # Each also starts the attempts over. A teardown asked for again is a new one, and a
+    # budget a previous one spent would give up on its first answer.
     def requested(session_id)
-      translating_outages { Redis::Alfred.setex(requested_key(session_id), '1', REQUEST_TTL) }
+      translating_outages do
+        forget_attempts(session_id)
+        Redis::Alfred.setex(requested_key(session_id), '1', REQUEST_TTL)
+      end
     end
 
     def withdrawn(session_id)
-      translating_outages { Redis::Alfred.delete(requested_key(session_id)) }
+      translating_outages do
+        forget_attempts(session_id)
+        Redis::Alfred.delete(requested_key(session_id))
+      end
     end
 
     # Whether the teardown is still what somebody wants. A session no inbox holds is
@@ -118,6 +127,10 @@ module Whatsapp::Session::TeardownRetry
     # exists to catch.
     def not_attempted?(error)
       error.present? && error.to_exception.is_a?(Whatsapp::Session::Errors::NotAttempted)
+    end
+
+    def forget_attempts(session_id)
+      TYPES.each { |command_type| Redis::Alfred.delete(attempts_key(session_id, command_type)) }
     end
 
     def translating_outages
