@@ -3,6 +3,20 @@ import { inject, provide } from 'vue';
 const DropdownControl = Symbol('DropdownControl');
 const DropdownTeleport = Symbol('DropdownTeleport');
 
+// Open menus, in the order they opened. A submenu opens after the menu it sits in, so the last one
+// is the innermost, and it is the one an Escape closes.
+const openMenus = [];
+
+export function markMenuOpen(menu, open) {
+  const index = openMenus.indexOf(menu);
+  if (index !== -1) openMenus.splice(index, 1);
+  if (open) openMenus.push(menu);
+}
+
+export function isInnermostOpenMenu(menu) {
+  return openMenus[openMenus.length - 1] === menu;
+}
+
 export function useDropdownContext() {
   const context = inject(DropdownControl, null);
 
