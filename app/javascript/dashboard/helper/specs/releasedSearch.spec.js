@@ -1,6 +1,6 @@
 import { EditorState, Selection } from '@chatwoot/prosemirror-schema';
 import { Schema } from 'prosemirror-model';
-import { releasedVariableSearchTransaction } from '../editorHelper';
+import { releasedSearchTransaction } from '../editorHelper';
 
 const schema = new Schema({
   nodes: {
@@ -30,12 +30,12 @@ const typing = (state, transaction, typed) => {
 const textAfter = (state, transaction) =>
   state.apply(transaction).doc.textContent;
 
-describe('releasedVariableSearchTransaction', () => {
+describe('releasedSearchTransaction', () => {
   it('puts what was typed in the picker where the caret is', () => {
     const state = stateWith('Estava com: {{');
     const range = { from: 13, to: 15 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contato.apelido',
     });
 
@@ -46,7 +46,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Tab: {{conversation.before.assignee.name}}');
     const range = { from: 6, to: 43 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: ' ok',
     });
 
@@ -59,7 +59,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.na}}');
     const range = { from: 4, to: 18 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.x',
       replace: true,
     });
@@ -71,7 +71,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}, tudo bem');
     const range = { from: 4, to: 21 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.x',
       replace: true,
     });
@@ -83,7 +83,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.na, ok');
     const range = { from: 4, to: 17 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.x',
       replace: true,
     });
@@ -96,7 +96,7 @@ describe('releasedVariableSearchTransaction', () => {
     const range = { from: 4, to: 18 };
 
     const replaced = state.apply(
-      releasedVariableSearchTransaction(state, range, {
+      releasedSearchTransaction(state, range, {
         text: 'contact.x',
         replace: true,
       })
@@ -111,11 +111,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{');
 
     const released = state.apply(
-      releasedVariableSearchTransaction(
-        state,
-        { from: 4, to: 6 },
-        { text: 'contato' }
-      )
+      releasedSearchTransaction(state, { from: 4, to: 6 }, { text: 'contato' })
     );
 
     expect(
@@ -128,7 +124,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}', 14);
     const range = { from: 4, to: 20 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'x',
     });
 
@@ -140,7 +136,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}, ok', 20);
     const range = { from: 4, to: 21 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: '!',
     });
 
@@ -151,7 +147,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}, ok');
     const range = { from: 4, to: 21 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.email}',
       replace: true,
     });
@@ -165,7 +161,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}');
     const range = { from: 4, to: 20 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.email}}',
       replace: true,
     });
@@ -177,7 +173,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}', 14);
     const range = { from: 4, to: 20 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: '}',
     });
 
@@ -188,7 +184,7 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{contact.name}}.');
     const range = { from: 4, to: 21 };
 
-    const transaction = releasedVariableSearchTransaction(state, range, {
+    const transaction = releasedSearchTransaction(state, range, {
       text: 'contact.nme',
       replace: true,
     });
@@ -200,7 +196,55 @@ describe('releasedVariableSearchTransaction', () => {
     const state = stateWith('Oi {{');
 
     expect(
-      releasedVariableSearchTransaction(state, { from: 4, to: 6 }, { text: '' })
+      releasedSearchTransaction(state, { from: 4, to: 6 }, { text: '' })
     ).toBeNull();
+  });
+
+  describe('after a trigger other than `{{`', () => {
+    it('goes on after a slash typed as punctuation in a sentence', () => {
+      const state = stateWith(
+        'Estava com: {{conversation.before.assignee.name}} /'
+      );
+      const range = { from: 51, to: 52 };
+
+      const transaction = releasedSearchTransaction(
+        state,
+        range,
+        { text: ' Agora com: ' },
+        '/'
+      );
+
+      expect(textAfter(state, transaction)).toBe(
+        'Estava com: {{conversation.before.assignee.name}} / Agora com: '
+      );
+    });
+
+    it('adds what was typed to the end of the token when the caret sat inside it', () => {
+      const state = stateWith('Oi /sau fim', 6);
+      const range = { from: 4, to: 8 };
+
+      const transaction = releasedSearchTransaction(
+        state,
+        range,
+        { text: 'x' },
+        '/'
+      );
+
+      expect(textAfter(state, transaction)).toBe('Oi /saux fim');
+    });
+
+    it('replaces the whole token with an edited search, braces and all', () => {
+      const state = stateWith('Oi @joa}} ok');
+      const range = { from: 4, to: 10 };
+
+      const transaction = releasedSearchTransaction(
+        state,
+        range,
+        { text: 'maria', replace: true },
+        '@'
+      );
+
+      expect(textAfter(state, transaction)).toBe('Oi @maria ok');
+    });
   });
 });

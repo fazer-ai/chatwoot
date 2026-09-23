@@ -35,7 +35,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'close', 'removeTrigger']);
+const emit = defineEmits(['select', 'close', 'removeTrigger', 'release']);
 
 const search = defineModel('search', { type: String, default: '' });
 
@@ -171,6 +171,27 @@ watch(items, () => {
   selectedIndex.value = 0;
   adjustScroll();
 });
+
+// The search field takes every keystroke while the picker is open, so a picker that cannot
+// complete what was typed must not keep it: once the search matches nothing (a closing brace, a
+// Liquid filter, a key it does not list, a plain ` / ` in a sentence), the text goes back to the
+// editor and the picker closes. Only what was typed here is handed back; what came from the
+// document is already there. The owner's re-render hands in the items for the new search before
+// this runs, since a parent updates ahead of its children.
+const initialSearch = search.value;
+watch(
+  () => [search.value, props.items.length, props.isLoading],
+  ([query, count, loading]) => {
+    if (loading || count || !query || query === initialSearch) return;
+
+    emit(
+      'release',
+      query.startsWith(initialSearch)
+        ? { text: query.slice(initialSearch.length) }
+        : { text: query, replace: true }
+    );
+  }
+);
 </script>
 
 <template>

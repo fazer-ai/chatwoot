@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { MESSAGE_VARIABLES } from 'shared/constants/messages';
 import { useMapGetter } from 'dashboard/composables/store';
@@ -118,21 +118,6 @@ const items = computed(() =>
     }))
 );
 
-// The search field takes every keystroke while the picker is open, so a picker that cannot
-// complete what was typed must not keep it: once the search matches nothing (a closing brace, a
-// Liquid filter, a key it does not list), the text goes back to the editor and the picker closes.
-// Only what was typed here is handed back; what came from the document is already there.
-watch(searchQuery, query => {
-  if (query === initialQuery || items.value.length) return;
-
-  emit(
-    'release',
-    query.startsWith(initialQuery)
-      ? { text: query.slice(initialQuery.length) }
-      : { text: query, replace: true }
-  );
-});
-
 const resolvedValue = key => resolveVariableText(key, props.variables);
 
 const hasValue = key => resolvedValue(key) !== `{{${key}}}`;
@@ -150,6 +135,7 @@ const onSelect = item => emit('selectVariable', item.key);
     @select="onSelect"
     @close="emit('close')"
     @remove-trigger="emit('removeTrigger')"
+    @release="emit('release', $event)"
   >
     <template #preview="{ item }">
       <div v-if="item" class="flex flex-col gap-3 px-4 py-3">

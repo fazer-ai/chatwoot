@@ -22,7 +22,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['selectAgent', 'close', 'removeTrigger']);
+const emit = defineEmits(['selectAgent', 'close', 'removeTrigger', 'release']);
 
 const { t } = useI18n();
 const getters = useStoreGetters();
@@ -134,6 +134,7 @@ const onSelect = item => emit('selectAgent', item.record);
     @select="onSelect"
     @close="emit('close')"
     @remove-trigger="emit('removeTrigger')"
+    @release="emit('release', $event)"
   >
     <template #filters>
       <div role="tablist" class="flex items-center min-w-0 gap-1">

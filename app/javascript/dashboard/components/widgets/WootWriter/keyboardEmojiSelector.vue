@@ -15,7 +15,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['selectEmoji', 'close', 'removeTrigger']);
+const emit = defineEmits(['selectEmoji', 'close', 'removeTrigger', 'release']);
 
 const { t } = useI18n();
 
@@ -73,6 +73,7 @@ const onSelect = item => emit('selectEmoji', item.emoji);
     @select="onSelect"
     @close="emit('close')"
     @remove-trigger="emit('removeTrigger')"
+    @release="emit('release', $event)"
   >
     <template #leading="{ item }">
       <span class="text-base leading-none">{{ item.emoji }}</span>
