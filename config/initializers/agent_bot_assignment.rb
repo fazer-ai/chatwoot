@@ -10,9 +10,11 @@
 module AgentBotAssignment
   # The assignee dropdown listed every bot of the account, so the bot answering a WhatsApp inbox was
   # one click away from an e-mail conversation it had never been set up for; in production that
-  # conversation sat in pending for five days with no owner. A bot connected to another inbox is no
-  # longer offered. The inbox's own active bot still is, and so are the bots connected to no inbox
-  # of the account, global ones included, which is where a specialist bot lives.
+  # conversation sat in pending for five days with no owner. The dropdown now offers the inbox's own
+  # active bot, and the bots connected to no inbox of the account, global ones included, which is
+  # where a specialist bot lives. Any other connection takes a bot off the list, whatever its status
+  # and whatever the inbox: an inactive one still says which inbox the bot was built for, and an
+  # observer (AgentBotObserver) never answers, so handing it a conversation strands it the same way.
   #
   # With several inboxes asked for, a bot has to pass for each of them, the rule agents already
   # follow in the same action.
@@ -30,14 +32,13 @@ module AgentBotAssignment
       bot_inbox = inbox.agent_bot_inbox
       return true if bot_inbox&.active? && bot_inbox.agent_bot_id == agent_bot.id
 
-      (connected_inbox_ids[agent_bot.id] || []).all?(inbox.id)
+      connected_bot_ids.exclude?(agent_bot.id)
     end
 
-    # Any status, because an inactive connection still says which inbox the bot was built for.
-    def connected_inbox_ids
-      @connected_inbox_ids ||= AgentBotInbox.where(account_id: Current.account.id, agent_bot_id: @agent_bots.map(&:id))
-                                            .pluck(:agent_bot_id, :inbox_id)
-                                            .group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
+    def connected_bot_ids
+      @connected_bot_ids ||= [AgentBotInbox, AgentBotObserver].flat_map do |connection|
+        connection.where(account_id: Current.account.id, agent_bot_id: @agent_bots.map(&:id)).distinct.pluck(:agent_bot_id)
+      end.to_set
     end
   end
 

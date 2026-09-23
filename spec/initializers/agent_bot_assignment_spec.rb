@@ -71,10 +71,10 @@ describe 'AgentBotAssignment', type: :request do
       expect(offered_bots(inbox)).not_to include(other_inbox_bot.name)
     end
 
-    it 'keeps offering a bot whose only connection, to this inbox, is inactive' do
+    it 'does not offer the inbox bot while its connection is inactive' do
       inbox.agent_bot_inbox.update!(status: :inactive)
 
-      expect(offered_bots(inbox)).to include(inbox_bot.name)
+      expect(offered_bots(inbox)).not_to include(inbox_bot.name)
     end
 
     it 'does not offer the inbox bot while its connection here is inactive and it answers another inbox' do
@@ -84,14 +84,29 @@ describe 'AgentBotAssignment', type: :request do
       expect(offered_bots(inbox)).not_to include(inbox_bot.name)
     end
 
-    it 'offers a bot that only observes another inbox, since it answers none' do
+    # An observer gets the inbox's events and never answers, so owning a conversation strands it.
+    it 'does not offer a bot that observes another inbox' do
       create(:agent_bot_observer, inbox: other_inbox, agent_bot: unconnected_bot)
 
-      expect(offered_bots(inbox)).to include(unconnected_bot.name)
+      expect(offered_bots(inbox)).not_to include(unconnected_bot.name)
     end
 
-    it 'ignores connections the bot has in another account' do
-      create(:agent_bot_inbox, inbox: create(:inbox), agent_bot: global_bot)
+    it 'does not offer a bot that observes this inbox' do
+      create(:agent_bot_observer, inbox: inbox, agent_bot: unconnected_bot)
+
+      expect(offered_bots(inbox)).not_to include(unconnected_bot.name)
+    end
+
+    it 'keeps offering the inbox bot when it also observes another inbox' do
+      create(:agent_bot_observer, inbox: other_inbox, agent_bot: inbox_bot)
+
+      expect(offered_bots(inbox)).to include(inbox_bot.name)
+    end
+
+    it 'ignores the connections and observations a bot has in another account' do
+      elsewhere = create(:inbox)
+      create(:agent_bot_inbox, inbox: elsewhere, agent_bot: global_bot)
+      create(:agent_bot_observer, inbox: create(:inbox), agent_bot: global_bot)
 
       expect(offered_bots(inbox)).to include(global_bot.name)
     end
