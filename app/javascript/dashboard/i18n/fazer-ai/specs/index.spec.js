@@ -46,6 +46,34 @@ describe('fazer.ai translation overlay', () => {
     );
   });
 
+  // The automation screens are where our customers' admins work in pt_BR and es, and upstream
+  // leaves some of their strings in English. An upstream sync that adds another one fails here, so
+  // it gets translated in overrides.json instead of reaching the picker in English.
+  it('leaves no automation string in English in pt_BR or es', () => {
+    const sameAsEnglish = {
+      pt_BR: ['ATTRIBUTES.STATUS', 'SENDER_TYPES.AGENT_BOT'],
+      es: ['TOGGLE.CANCEL_LABEL', 'SENDER_TYPES.AGENT_BOT'],
+    };
+    const flatten = (tree, prefix = '') =>
+      Object.entries(tree).flatMap(([key, value]) =>
+        typeof value === 'object'
+          ? flatten(value, `${prefix}${key}.`)
+          : [[`${prefix}${key}`, value]]
+      );
+    const english = Object.fromEntries(flatten(messages.en.AUTOMATION));
+
+    ['pt_BR', 'es'].forEach(locale => {
+      const untranslated = flatten(messages[locale].AUTOMATION)
+        .filter(
+          ([key, value]) => /[a-z]/i.test(value) && value === english[key]
+        )
+        .map(([key]) => key)
+        .filter(key => !sameAsEnglish[locale].includes(key));
+
+      expect({ locale, untranslated }).toEqual({ locale, untranslated: [] });
+    });
+  });
+
   it('leaves languages without a fork folder untouched', () => {
     expect(messages.fr).toEqual(upstreamFr);
   });
