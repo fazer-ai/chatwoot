@@ -58,6 +58,38 @@ describe('releasedVariableSearchTransaction', () => {
     expect(textAfter(state, transaction)).toBe('Oi {{contact.x}}');
   });
 
+  it('leaves the caret before the kept braces, so typing goes on inside the variable', () => {
+    const state = stateWith('Oi {{contact.na}}');
+    const range = { from: 4, to: 18 };
+
+    const replaced = state.apply(
+      releasedVariableSearchTransaction(state, range, {
+        text: 'contact.x',
+        replace: true,
+      })
+    );
+
+    expect(replaced.apply(replaced.tr.insertText('yz')).doc.textContent).toBe(
+      'Oi {{contact.xyz}}'
+    );
+  });
+
+  it('leaves the caret after what was handed back at the caret', () => {
+    const state = stateWith('Oi {{');
+
+    const released = state.apply(
+      releasedVariableSearchTransaction(
+        state,
+        { from: 4, to: 6 },
+        { text: 'contato' }
+      )
+    );
+
+    expect(
+      released.apply(released.tr.insertText('.apelido}}')).doc.textContent
+    ).toBe('Oi {{contato.apelido}}');
+  });
+
   it('does nothing when nothing was typed', () => {
     const state = stateWith('Oi {{');
 
