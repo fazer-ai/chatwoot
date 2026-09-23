@@ -503,6 +503,11 @@ export const createVariableInputRule = ({ isPrivate, getVariables }) => {
   return inputRules({ rules: [rule] });
 };
 
+// The variable in the text typed after `{{`: what comes before its closing braces, or before a
+// comma when it was never closed. What follows (braces, punctuation) is not part of it.
+export const variableContent = (typedAfterTrigger = '') =>
+  typedAfterTrigger.split(/[},]/)[0];
+
 // What the variable picker hands back when it cannot complete its search. The suggestion range
 // runs from the `{{` to the next space, so it can hold the variable's closing braces and the
 // punctuation after them (`{{contact.name}},`), which the search never showed.
@@ -521,9 +526,7 @@ export const releasedVariableSearchTransaction = (
 
   const from = range.from + 2;
   const typedAfterTrigger = state.doc.textBetween(from, range.to);
-  const contentEnd = typedAfterTrigger.search(/[},]/);
-  const contentLength =
-    contentEnd === -1 ? typedAfterTrigger.length : contentEnd;
+  const contentLength = variableContent(typedAfterTrigger).length;
   const closingBraces = typedAfterTrigger
     .slice(contentLength)
     .match(/^}*/)[0].length;

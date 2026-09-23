@@ -4,7 +4,10 @@ import { useI18n } from 'vue-i18n';
 import { MESSAGE_VARIABLES } from 'shared/constants/messages';
 import { useMapGetter } from 'dashboard/composables/store';
 import { sanitizeVariableSearchKey } from 'dashboard/helper/commons';
-import { resolveVariableText } from 'dashboard/helper/editorHelper';
+import {
+  resolveVariableText,
+  variableContent,
+} from 'dashboard/helper/editorHelper';
 import CaretAnchoredPicker from 'dashboard/components-next/preview-picker/CaretAnchoredPicker.vue';
 
 const props = defineProps({
@@ -39,7 +42,11 @@ const { t } = useI18n();
 
 const customAttributes = useMapGetter('attributes/getAttributes');
 
-const initialQuery = sanitizeVariableSearchKey(props.searchKey);
+// The search starts with the variable only: the punctuation after `{{contact.name}}.` is text
+// of the message, and would otherwise be handed back into the variable when the search is edited.
+const initialQuery = sanitizeVariableSearchKey(
+  variableContent(props.searchKey)
+);
 const searchQuery = ref(initialQuery);
 
 const searchTerm = computed(() => searchQuery.value.trim().toLowerCase());

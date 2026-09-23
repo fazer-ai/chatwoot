@@ -184,6 +184,18 @@ describe('releasedVariableSearchTransaction', () => {
     expect(typing(state, transaction, '}')).toBe('Oi {{contact.name}}');
   });
 
+  it('keeps the sentence punctuation outside the variable it replaces', () => {
+    const state = stateWith('Oi {{contact.name}}.');
+    const range = { from: 4, to: 21 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'contact.nme',
+      replace: true,
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.nme}}.');
+  });
+
   it('does nothing when nothing was typed', () => {
     const state = stateWith('Oi {{');
 

@@ -98,6 +98,19 @@ describe('VariableList', () => {
         [{ text: 'contact.x', replace: true }],
       ]);
     });
+
+    it('leaves the punctuation after the variable out of the search', async () => {
+      const wrapper = mountList({ searchKey: 'contact.name}}.' });
+
+      expect(search(wrapper).element.value).toBe('contact.name');
+      expect(offeredKeys(wrapper)).toContain('contact.name');
+
+      await search(wrapper).setValue('contact.nme');
+
+      expect(wrapper.emitted('release')).toEqual([
+        [{ text: 'contact.nme', replace: true }],
+      ]);
+    });
   });
 
   describe('variables offered', () => {
