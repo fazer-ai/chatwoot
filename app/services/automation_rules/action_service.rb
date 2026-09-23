@@ -7,17 +7,23 @@ class AutomationRules::ActionService < ActionService
   end
 
   def perform
-    # Taken once, before the first action: the text of every action of this run reads the same
-    # picture, and reads it even after the actions that erase what it shows already ran.
-    Current.conversation_snapshot = ConversationSnapshot.new(@conversation)
+    # The activity messages the actions trigger are rendered as each change commits, in the thread's
+    # locale. A rule runs in Sidekiq, where that is the locale of whoever enqueued the event (English
+    # for an inbound message) or the process default, so the account's is named here. No
+    # InvalidLocale guard: `locale` is an enum over LANGUAGES_CONFIG, all of it loaded.
+    I18n.with_locale(@account.locale) do
+      # Taken once, before the first action: the text of every action of this run reads the same
+      # picture, and reads it even after the actions that erase what it shows already ran.
+      Current.conversation_snapshot = ConversationSnapshot.new(@conversation)
 
-    @rule.actions.each do |action|
-      @conversation.reload
-      action = action.with_indifferent_access
-      begin
-        send(action[:action_name], action[:action_params])
-      rescue StandardError => e
-        ChatwootExceptionTracker.new(e, account: @account).capture_exception
+      @rule.actions.each do |action|
+        @conversation.reload
+        action = action.with_indifferent_access
+        begin
+          send(action[:action_name], action[:action_params])
+        rescue StandardError => e
+          ChatwootExceptionTracker.new(e, account: @account).capture_exception
+        end
       end
     end
   ensure
