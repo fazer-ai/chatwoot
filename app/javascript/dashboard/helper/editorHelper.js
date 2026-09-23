@@ -505,8 +505,10 @@ export const createVariableInputRule = ({ isPrivate, getVariables }) => {
 
 // What the variable picker hands back when it cannot complete its search. `text` goes where the
 // caret is. With `replace`, the search was edited into the part that came from the document, so it
-// takes that part's place and keeps the braces that closed it, with the caret left before them so
-// what is typed next stays inside the variable.
+// takes the place of the variable's content only: the suggestion range runs to the next space and
+// can hold the closing braces and punctuation after them (`{{contact.name}},`), which the search
+// never showed, so everything from the first brace or comma on is kept. The caret is left at the
+// end of the content, so what is typed next stays inside the variable.
 export const releasedVariableSearchTransaction = (
   state,
   range,
@@ -518,13 +520,11 @@ export const releasedVariableSearchTransaction = (
   const typedAfterTrigger = state.doc
     .textBetween(range.from, range.to)
     .slice(2);
-  const closingBraces = typedAfterTrigger.match(/\}*$/)[0];
+  const contentEnd = typedAfterTrigger.search(/[},]/);
+  const contentLength =
+    contentEnd === -1 ? typedAfterTrigger.length : contentEnd;
   const from = range.from + 2;
-  const transaction = state.tr.insertText(
-    text,
-    from,
-    range.to - closingBraces.length
-  );
+  const transaction = state.tr.insertText(text, from, from + contentLength);
   return transaction.setSelection(
     Selection.near(transaction.doc.resolve(from + text.length))
   );

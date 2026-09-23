@@ -58,6 +58,30 @@ describe('releasedVariableSearchTransaction', () => {
     expect(textAfter(state, transaction)).toBe('Oi {{contact.x}}');
   });
 
+  it('keeps the braces and the punctuation after the variable it replaces', () => {
+    const state = stateWith('Oi {{contact.name}}, tudo bem');
+    const range = { from: 4, to: 21 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'contact.x',
+      replace: true,
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.x}}, tudo bem');
+  });
+
+  it('keeps the punctuation after a variable that was never closed', () => {
+    const state = stateWith('Oi {{contact.na, ok');
+    const range = { from: 4, to: 17 };
+
+    const transaction = releasedVariableSearchTransaction(state, range, {
+      text: 'contact.x',
+      replace: true,
+    });
+
+    expect(textAfter(state, transaction)).toBe('Oi {{contact.x, ok');
+  });
+
   it('leaves the caret before the kept braces, so typing goes on inside the variable', () => {
     const state = stateWith('Oi {{contact.na}}');
     const range = { from: 4, to: 18 };
