@@ -106,6 +106,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     # stream and a connect written straight to it would sit there until its deadline.
     # The wake goes on the control stream, which every instance reads, and asks whichever
     # answers to take the session before the connect lands on it.
+    #
+    # Asking to connect withdraws any teardown still owed to this session, so a retry of
+    # one the connector never attempted does not end the session being set up now.
+    Whatsapp::Session::TeardownRetry.withdrawn(session_id)
     client.control(commands::SessionWake.new(desired: 'connected'))
     model::ConnectionState.from_h(client.call(command))
   end
@@ -148,13 +152,16 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # Logged here, which is the only place it can be. The connector answers a teardown it
   # could not carry out with `command.failed`, and that event is routed to an inbox by
   # `session_id`: the inbox this one is about has just been destroyed, so the lookup
-  # misses and the event is dropped as an orphan. What we publish is the last thing about
-  # this session that anybody can see.
+  # misses. The consumer acts on one answer before dropping the orphan, a teardown the
+  # connector never attempted, which Whatsapp::Session::TeardownRetry sends again; every
+  # other failure is dropped, and what we publish is the last thing about this session
+  # that anybody can see.
   #
   # The two ids go into the hash the log line carries. Ruby evaluates the values in the
   # order they are written, so the logout is still sent first, and a spec pins that
   # ordering rather than leaving it to be read out of this comment.
   def delete_session
+    Whatsapp::Session::TeardownRetry.requested(session_id)
     asked = { logout: client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME),
               delete: client.control(commands::SessionDelete.new, max_runtime: TEARDOWN_RUNTIME) }
     Rails.logger.info("[WHATSAPP] tearing session #{session_id} down for inbox #{channel.inbox&.id}: #{asked.to_json}")

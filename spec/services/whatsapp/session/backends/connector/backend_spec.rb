@@ -152,8 +152,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
   # The connector answers a teardown it could not carry out with `command.failed`, and
   # that event is routed to an inbox by `session_id`: this inbox is being destroyed, so
-  # the lookup misses and the event is dropped as an orphan. What is written here is the
-  # last thing about the session anybody can see.
+  # the lookup misses. Short of a teardown the connector never attempted, which is sent
+  # again, the event is dropped as an orphan, and what is written here is the last thing
+  # about the session anybody can see.
   it 'writes down what it asked for, because the failure has nowhere to be reported' do
     allow(Rails.logger).to receive(:info)
 
@@ -162,6 +163,40 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     # The command ids too: they are what ties this line to the connector's own log, which
     # is the only other place a teardown that failed leaves a trace.
     expect(Rails.logger).to have_received(:info).with(/tearing session #{session_id} down.*cmd-0001.*cmd-0002/)
+  end
+
+  # What lets a retry of a teardown the connector never attempted tell a disconnect that
+  # still stands from a session the operator has paired again since.
+  describe 'the note a retried teardown checks' do
+    after { Whatsapp::Session::TeardownRetry.withdrawn(session_id) }
+
+    it 'is left by the teardown' do
+      backend.delete_session
+
+      expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(true)
+    end
+
+    # The disconnect endpoint answers ProviderUnavailable with a 503 and anything else with
+    # a 500, and the client already translates its own Redis failures the same way.
+    it 'reports a Redis that is down as the provider being unavailable' do
+      allow(Redis::Alfred).to receive(:setex).and_raise(Redis::CannotConnectError)
+
+      expect { backend.delete_session }.to raise_error(Whatsapp::Session::Errors::ProviderUnavailable)
+    end
+
+    it 'outlasts a teardown left pending while the connector is away' do
+      backend.delete_session
+
+      expect(Redis::Alfred.ttl(Whatsapp::Session::TeardownRetry.requested_key(session_id)))
+        .to be > Whatsapp::Session::TeardownRetry::ATTEMPTS_TTL.to_i
+    end
+
+    it 'is withdrawn by asking to connect' do
+      backend.delete_session
+      backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
+
+      expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(false)
+    end
   end
 
   # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
