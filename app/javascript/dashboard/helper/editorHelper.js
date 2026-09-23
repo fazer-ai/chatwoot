@@ -503,6 +503,28 @@ export const createVariableInputRule = ({ isPrivate, getVariables }) => {
   return inputRules({ rules: [rule] });
 };
 
+// What the variable picker hands back when it cannot complete its search. `text` goes where the
+// caret is. With `replace`, the search was edited into the part that came from the document, so it
+// takes that part's place and keeps the braces that closed it.
+export const releasedVariableSearchTransaction = (
+  state,
+  range,
+  { text, replace = false } = {}
+) => {
+  if (!text) return null;
+  if (!replace || !range) return state.tr.insertText(text);
+
+  const typedAfterTrigger = state.doc
+    .textBetween(range.from, range.to)
+    .slice(2);
+  const closingBraces = typedAfterTrigger.match(/\}*$/)[0];
+  return state.tr.insertText(
+    text,
+    range.from + 2,
+    range.to - closingBraces.length
+  );
+};
+
 /**
  * Centralized node creation function that handles the creation of different types of nodes based on the specified type.
  * @param {Object} editorView - The editor view instance.

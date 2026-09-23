@@ -95,7 +95,16 @@
       "ERROR": "Could not ask for older messages. Try again in a moment.",
       "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
     },
-    "FILE_IS_EMPTY": "This file is empty and cannot be sent"
+    "FILE_IS_EMPTY": "This file is empty and cannot be sent",
+    "PICKER": {
+      "VARIABLE": {
+        "AUTOMATION": {
+          "ASSIGNEE_NAME": "Name of the agent the conversation is assigned to",
+          "BEFORE_ASSIGNEE_NAME": "Agent the conversation was assigned to before the rule ran",
+          "BEFORE_ATTRIBUTE": "{name} before the rule ran"
+        }
+      }
+    }
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

@@ -66,6 +66,7 @@ import {
   getEffectiveChannelType,
   stripUnsupportedFormatting,
   createVariableInputRule,
+  releasedVariableSearchTransaction,
 } from 'dashboard/helper/editorHelper';
 import {
   hasPressedEnterAndNotCmdOrShift,
@@ -87,6 +88,8 @@ const props = defineProps({
   overrideLineBreaks: { type: Boolean, default: false },
   updateSelectionWith: { type: String, default: '' },
   enableVariables: { type: Boolean, default: false },
+  // Offers the variables only an automation rule can render (`conversation.before.*`).
+  enableAutomationVariables: { type: Boolean, default: false },
   enableCannedResponses: { type: Boolean, default: true },
   enableCaptainTools: { type: Boolean, default: false },
   enableMacros: { type: Boolean, default: false },
@@ -308,6 +311,16 @@ const dismissPicker = showMenu => {
 const dismissUserMentions = () => dismissPicker(showUserMentions);
 const dismissCannedResponses = () => dismissPicker(showCannedMenu);
 const dismissVariables = () => dismissPicker(showVariables);
+
+// The variable picker gave up on its search: what was typed in it belongs in the editor.
+const releaseVariableSearch = released => {
+  showVariables.value = false;
+  const transaction =
+    editorView &&
+    releasedVariableSearchTransaction(editorView.state, range.value, released);
+  if (transaction) editorView.dispatch(transaction);
+  editorView?.focus();
+};
 const dismissEmojiMenu = () => dismissPicker(showEmojiMenu);
 const dismissMacros = () => dismissPicker(showMacroMenu);
 
@@ -1002,7 +1015,9 @@ defineExpose({ focusEditorInputField, insertMentionTrigger });
       :caret-position="caretPosition"
       :search-key="variableSearchKey"
       :variables="variables"
+      :automation="enableAutomationVariables"
       @close="dismissVariables"
+      @release="releaseVariableSearch"
       @remove-trigger="removeSuggestionTrigger"
       @select-variable="content => insertSpecialContent('variable', content)"
     />

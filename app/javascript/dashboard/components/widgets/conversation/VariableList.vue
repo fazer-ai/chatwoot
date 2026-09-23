@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { MESSAGE_VARIABLES } from 'shared/constants/messages';
 import { useMapGetter } from 'dashboard/composables/store';
@@ -20,15 +20,27 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  // Text of an automation rule is rendered when the rule runs, which also knows the conversation's
+  // assignee and the state it was in before the run (`conversation.before`).
+  automation: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emit = defineEmits(['selectVariable', 'close', 'removeTrigger']);
+const emit = defineEmits([
+  'selectVariable',
+  'close',
+  'removeTrigger',
+  'release',
+]);
 
 const { t } = useI18n();
 
 const customAttributes = useMapGetter('attributes/getAttributes');
 
-const searchQuery = ref(sanitizeVariableSearchKey(props.searchKey));
+const initialQuery = sanitizeVariableSearchKey(props.searchKey);
+const searchQuery = ref(initialQuery);
 
 const searchTerm = computed(() => searchQuery.value.trim().toLowerCase());
 
@@ -50,8 +62,41 @@ const customVariables = computed(() =>
     }))
 );
 
+const automationVariables = computed(() => {
+  if (!props.automation) return [];
+
+  const conversationAttributes = customAttributes.value.filter(
+    attribute => attribute.attribute_model === 'conversation_attribute'
+  );
+  return [
+    {
+      key: 'conversation.assignee.name',
+      description: t('CONVERSATION.PICKER.VARIABLE.AUTOMATION.ASSIGNEE_NAME'),
+    },
+    {
+      key: 'conversation.before.assignee.name',
+      description: t(
+        'CONVERSATION.PICKER.VARIABLE.AUTOMATION.BEFORE_ASSIGNEE_NAME'
+      ),
+    },
+    ...conversationAttributes.map(attribute => ({
+      key: `conversation.before.custom_attribute.${attribute.attribute_key}`,
+      description: t(
+        'CONVERSATION.PICKER.VARIABLE.AUTOMATION.BEFORE_ATTRIBUTE',
+        {
+          name: attribute.attribute_display_name,
+        }
+      ),
+    })),
+  ];
+});
+
 const items = computed(() =>
-  [...standardVariables.value, ...customVariables.value]
+  [
+    ...standardVariables.value,
+    ...automationVariables.value,
+    ...customVariables.value,
+  ]
     .filter(
       ({ key, description }) =>
         key.toLowerCase().includes(searchTerm.value) ||
@@ -65,6 +110,21 @@ const items = computed(() =>
       subtitle: description,
     }))
 );
+
+// The search field takes every keystroke while the picker is open, so a picker that cannot
+// complete what was typed must not keep it: once the search matches nothing (a closing brace, a
+// Liquid filter, a key it does not list), the text goes back to the editor and the picker closes.
+// Only what was typed here is handed back; what came from the document is already there.
+watch(searchQuery, query => {
+  if (query === initialQuery || items.value.length) return;
+
+  emit(
+    'release',
+    query.startsWith(initialQuery)
+      ? { text: query.slice(initialQuery.length) }
+      : { text: query, replace: true }
+  );
+});
 
 const resolvedValue = key => resolveVariableText(key, props.variables);
 
