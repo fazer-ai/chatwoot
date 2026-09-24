@@ -33,6 +33,8 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
     return handle_revoke if protocol_revoke?
 
     return if ignore_message?
+
+    mirror_outgoing_to_owned_channel if %w[lid user].include?(jid_type)
     return if find_message_by_source_id(raw_message_id)
 
     route_contact_message
@@ -41,6 +43,12 @@ module Whatsapp::BaileysHandlers::MessagesUpsert
   def route_contact_message
     return handle_individual_contact_message if %w[lid user].include?(jid_type)
     return handle_group_contact_message if jid_type == 'group' && Whatsapp::Providers::WhatsappBaileysService.groups_enabled?
+  end
+
+  def mirror_outgoing_to_owned_channel
+    Whatsapp::BaileysHandlers::InternalChannelMessageMirror.new(
+      source_inbox: inbox, raw_message: @raw_message, recipient_phone: extract_from_jid(type: 'pn')
+    ).perform
   end
 
   # The contact deleted a message for everyone. Keep the stored content and only
