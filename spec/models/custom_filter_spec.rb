@@ -138,4 +138,27 @@ RSpec.describe CustomFilter do
       expect(filters.pluck(:name)).to eq(['admin contact global'])
     end
   end
+
+  describe 'before the visibility column exists' do
+    # Instances updated from before v4.13.0-fazer-ai.67 run migrations that load this model
+    # while custom_filters has no visibility column yet (it only arrives in 20260510160215).
+    let(:connection) { described_class.connection }
+
+    before do
+      connection.remove_column :custom_filters, :visibility
+      described_class.reset_column_information
+    end
+
+    after { described_class.reset_column_information }
+
+    it 'lets the country_code cleanup migration run' do
+      filter = create(:custom_filter, account: account, user: user, filter_type: :conversation,
+                                      query: { 'payload' => [{ 'attribute_key' => 'country_code' }, { 'attribute_key' => 'status' }] })
+      require Rails.root.join('db/migrate/20260112092041_remove_country_code_from_conversation_filters.rb')
+
+      ActiveRecord::Migration.suppress_messages { RemoveCountryCodeFromConversationFilters.new.migrate(:up) }
+
+      expect(filter.reload.query['payload']).to eq([{ 'attribute_key' => 'status' }])
+    end
+  end
 end
