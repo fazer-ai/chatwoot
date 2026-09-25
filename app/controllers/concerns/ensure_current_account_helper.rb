@@ -10,7 +10,10 @@ module EnsureCurrentAccountHelper
     account = Account.find(params[:account_id])
     render_unauthorized('Account is suspended') and return unless account.active?
 
-    authenticated_user = current_user || (Current.user if Current.user.is_a?(User))
+    context_user = Current.user
+    authenticated_user = current_user
+    authenticated_user ||= context_user if context_user.is_a?(User)
+
     if authenticated_user
       account_accessible_for_user?(account, authenticated_user)
     elsif @resource.is_a?(AgentBot)

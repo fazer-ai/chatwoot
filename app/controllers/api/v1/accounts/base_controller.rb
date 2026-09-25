@@ -8,7 +8,7 @@ class Api::V1::Accounts::BaseController < Api::BaseController
   private
 
   def validate_token_api_access
-    account = Current.account || current_account
+    account = current_account || Current.account
     return render_unauthorized('Account is suspended or inaccessible') unless account
     return if account.api_and_webhooks_enabled?
 
