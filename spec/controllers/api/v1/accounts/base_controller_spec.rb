@@ -20,4 +20,38 @@ RSpec.describe Api::V1::Accounts::BaseController do
       end
     end
   end
+
+  describe 'authentication context with Current.user' do
+    controller(Api::V1::Accounts::BaseController) do
+      def index
+        render json: { success: true, account_id: Current.account.id, user_id: Current.account_user.user_id }
+      end
+    end
+
+    let(:account) { create(:account) }
+    let(:user) { create(:user) }
+
+    before do
+      create(:account_user, account: account, user: user)
+    end
+
+    it 'authorizes requests when identity is established via Current.user' do
+      Current.user = user
+      get :index, params: { account_id: account.id }
+      expect(response).to have_http_status(:success)
+      data = JSON.parse(response.body)
+      expect(data['user_id']).to eq(user.id)
+    ensure
+      Current.reset
+    end
+
+    it 'returns unauthorized when Current.user is not a member of the account' do
+      other_user = create(:user)
+      Current.user = other_user
+      get :index, params: { account_id: account.id }
+      expect(response).to have_http_status(:unauthorized)
+    ensure
+      Current.reset
+    end
+  end
 end

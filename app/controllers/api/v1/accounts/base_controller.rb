@@ -8,7 +8,9 @@ class Api::V1::Accounts::BaseController < Api::BaseController
   private
 
   def validate_token_api_access
-    return if Current.account.api_and_webhooks_enabled?
+    account = Current.account || current_account
+    return render_unauthorized('Account is suspended or inaccessible') unless account
+    return if account.api_and_webhooks_enabled?
 
     render json: { error: 'API access is not enabled for this account' }, status: :forbidden
   end
