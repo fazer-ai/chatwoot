@@ -147,6 +147,13 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   # the stall warning cleared while the wedged socket was still there, which is the one
   # state where the UI stops telling anyone anything is wrong. The teardown callers that
   # legitimately do not care are the ones that catch it (see Channel::Whatsapp).
+  # Whether this inbox reaches any Baileys provider at all: its own URL or the
+  # installation's. Without either there is nothing to ask, and a request would go to an
+  # empty host.
+  def provider_configured?
+    provider_url.present?
+  end
+
   def disconnect_channel_provider
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
