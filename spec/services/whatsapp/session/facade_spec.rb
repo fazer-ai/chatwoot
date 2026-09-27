@@ -604,7 +604,24 @@ RSpec.describe Whatsapp::Session::Facade do
       end
     end
 
-    it 'does not connect an inbox that is not connected when its proxy changes' do
+    # The connector resumes a dropped session through the proxy it was last given, and a
+    # proxy that stopped working is the likeliest reason to be changing it.
+    context 'when the inbox is still paired but its connection dropped' do
+      before { channel.update!(provider_connection: { 'connection' => 'close', 'phone_number' => '5511900000743' }) }
+
+      it 'connects again through the new proxy' do
+        expect { name_proxy(proxy_url) }.to change { backend.commands_of('session.connect').size }.by(1)
+        expect(backend.commands_of('session.connect').last.proxy).to eq('url' => proxy_url)
+      end
+    end
+
+    it 'does not connect an inbox that was never paired when its proxy changes' do
+      expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
+    end
+
+    it 'does not connect an inbox whose pairing ended when its proxy changes' do
+      channel.update!(provider_connection: { 'connection' => 'close', 'error_code' => 'logged_out' })
+
       expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
     end
   end

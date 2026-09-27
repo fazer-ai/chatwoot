@@ -177,18 +177,23 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     Rails.logger.warn("[WHATSAPP SESSION] provider config change on inbox ##{inbox&.id} left the provider behind: #{e.message}")
   end
 
-  # The connector holds the proxy it was last given until a connect names another, so a
-  # proxy changed or cleared on an inbox that is up only takes effect once it is sent. An
-  # inbox that is not up gets it with its next connect, which is the operator's to ask for.
+  # The connector holds the proxy it was last given until a connect names another, and it
+  # resumes a dropped session through that same proxy. So a change goes out while the
+  # session is up, and also while it is down but still paired, which is the likeliest time
+  # to change it: the proxy failed and took the session with it. A pairing that ended (a
+  # logout, a wrong number) or never happened has nothing to resume, and gets the proxy
+  # with its next connect, which is the operator's to ask for.
   def follow_proxy_change
-    reassert_desired_state if proxy_changed_while_connected?
+    reassert_desired_state if proxy_changed_for_a_resumable_session?
   end
 
-  def proxy_changed_while_connected?
+  def proxy_changed_for_a_resumable_session?
     before, after = saved_change_to_provider_config
     return false if before.to_h['proxy_url'].presence == after.to_h['proxy_url'].presence
 
-    %w[open connecting].include?(provider_connection.to_h['connection'])
+    connection = provider_connection.to_h
+    %w[open connecting].include?(connection['connection']) ||
+      Whatsapp::Session::ConnectionStateWriter::PAIRING_KEYS.any? { |key| connection[key].present? }
   end
 
   # False for every save that did not touch the credentials, and for a backend with no
