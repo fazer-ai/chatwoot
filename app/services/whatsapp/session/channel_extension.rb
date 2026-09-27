@@ -153,6 +153,14 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     data.merge(connection.slice('pairing_code', 'quarantine', 'ban').compact_blank.symbolize_keys)
   end
 
+  # Up, or down but still paired: a session the connector will bring back by itself, and so
+  # one that has to hear about a new proxy before it does.
+  def resumable_session?
+    connection = provider_connection.to_h
+    %w[open connecting].include?(connection['connection']) ||
+      Whatsapp::Session::ConnectionStateWriter::PAIRING_KEYS.any? { |key| connection[key].present? }
+  end
+
   private
 
   # Two things a session inbox's config can change that the provider has to be told about,
@@ -183,17 +191,19 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # to change it: the proxy failed and took the session with it. A pairing that ended (a
   # logout, a wrong number) or never happened has nothing to resume, and gets the proxy
   # with its next connect, which is the operator's to ask for.
+  #
+  # The connect goes through a job because the save has already committed: a connector that
+  # cannot be reached right now would otherwise leave it on the old proxy for good, since
+  # saving the same address again changes nothing and sends nothing.
   def follow_proxy_change
-    reassert_desired_state if proxy_changed_for_a_resumable_session?
+    return unless proxy_changed? && resumable_session?
+
+    Whatsapp::Session::ApplyProxyJob.perform_later(id)
   end
 
-  def proxy_changed_for_a_resumable_session?
+  def proxy_changed?
     before, after = saved_change_to_provider_config
-    return false if before.to_h['proxy_url'].presence == after.to_h['proxy_url'].presence
-
-    connection = provider_connection.to_h
-    %w[open connecting].include?(connection['connection']) ||
-      Whatsapp::Session::ConnectionStateWriter::PAIRING_KEYS.any? { |key| connection[key].present? }
+    before.to_h['proxy_url'].presence != after.to_h['proxy_url'].presence
   end
 
   # False for every save that did not touch the credentials, and for a backend with no

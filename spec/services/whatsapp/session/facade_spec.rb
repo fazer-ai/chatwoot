@@ -533,7 +533,7 @@ RSpec.describe Whatsapp::Session::Facade do
     let(:proxy_url) { 'socks5://proxy-user:proxy-pass@proxy.example:1080' }
 
     def name_proxy(url)
-      channel.update!(provider_config: channel.provider_config.merge('proxy_url' => url))
+      perform_enqueued_jobs { channel.update!(provider_config: channel.provider_config.merge('proxy_url' => url)) }
     end
 
     it 'is carried by the pairing connect' do
@@ -613,6 +613,30 @@ RSpec.describe Whatsapp::Session::Facade do
         expect { name_proxy(proxy_url) }.to change { backend.commands_of('session.connect').size }.by(1)
         expect(backend.commands_of('session.connect').last.proxy).to eq('url' => proxy_url)
       end
+    end
+
+    # The save has committed by the time the connect goes out, so a connector that cannot be
+    # reached must not leave the session on the old proxy for good.
+    it 'tries the connect again when the connector could not be reached' do
+      channel.update!(provider_connection: { 'connection' => 'open' })
+      calls = 0
+      allow(backend).to receive(:connect).and_wrap_original do |original, command|
+        calls += 1
+        raise Whatsapp::Session::Errors::ProviderUnavailable, 'redis down' if calls == 1
+
+        original.call(command)
+      end
+
+      expect { name_proxy(proxy_url) }.to change { backend.commands_of('session.connect').size }.by(1)
+      expect(backend.commands_of('session.connect').last.proxy).to eq('url' => proxy_url)
+    end
+
+    it 'does not send the proxy to a session whose pairing ended before the job ran' do
+      channel.update!(provider_connection: { 'connection' => 'open' })
+      channel.update!(provider_config: channel.provider_config.merge('proxy_url' => proxy_url))
+      channel.update!(provider_connection: { 'connection' => 'close', 'error_code' => 'logged_out' })
+
+      expect { perform_enqueued_jobs }.not_to(change { backend.commands_of('session.connect').size })
     end
 
     it 'does not connect an inbox that was never paired when its proxy changes' do
