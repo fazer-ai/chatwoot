@@ -54,7 +54,7 @@
             "PAIRING_CODE_STEP_2": "Vá em Dispositivos conectados e toque em Conectar dispositivo.",
             "PAIRING_CODE_STEP_3": "Toque em \"Conectar com número de telefone\" e digite o código acima.",
             "PAIRING_CODE_EXPIRES": "O código vale por poucos minutos. Se expirar, peça outro.",
-            "RECONNECTING": "Conectando...",
+            "RECONNECTING": "Reconectando...",
             "LINK_DEVICE": "Conectar dispositivo",
             "DISCONNECT": "Desconectar",
             "CONNECTED": "Seu dispositivo foi conectado com sucesso. Agora você pode começar a enviar e receber mensagens.",
