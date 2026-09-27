@@ -232,4 +232,40 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
       expect(channel.provider_connection).not_to have_key('error_code')
     end
   end
+
+  # The connector took the socket down to dial again through the proxy the operator just
+  # saved, and it comes back within the same connect. Nothing failed: written with a
+  # sentence, the modal would show it in red with the button to pair again.
+  it 'shows a proxy change as a reconnect, with no error' do
+    allow(Rails.logger).to receive(:warn)
+    event = model::Event.build(model::Events::SessionState.new(state: 'reconnecting', reason: 'proxy_changed'), epoch: 3)
+    described_class.new(channel: channel, event: event).perform
+
+    expect(channel.reload.provider_connection).to include('connection' => 'reconnecting')
+    expect(channel.provider_connection).not_to have_key('error')
+    expect(channel.provider_connection).not_to have_key('error_code')
+    expect(Rails.logger).not_to have_received(:warn).with(/proxy_changed/)
+  end
+
+  # The session cannot get out through the proxy, so it stays down rather than going out
+  # directly. The proxy is the likely cause and the operator is the one who can fix it.
+  %w[reconnecting connecting].each do |state|
+    it "names the proxy when a session #{state} cannot get out through it" do
+      event = model::Event.build(model::Events::SessionState.new(state: state, reason: 'proxy_unreachable'), epoch: 3)
+      described_class.new(channel: channel, event: event).perform
+
+      expect(channel.reload.provider_connection).to include(
+        'connection' => state, 'error_code' => 'proxy_unreachable',
+        'error' => I18n.t('errors.inboxes.channel.provider_connection.proxy_unreachable')
+      )
+    end
+  end
+
+  it 'has a sentence naming the proxy in every locale the dashboard ships' do
+    %i[en pt_BR es].each do |locale|
+      key = 'errors.inboxes.channel.provider_connection.proxy_unreachable'
+      expect(I18n.exists?(key, locale)).to be(true), "no #{locale} sentence for proxy_unreachable"
+      expect(I18n.t(key, locale: locale)).to match(/proxy/i)
+    end
+  end
 end

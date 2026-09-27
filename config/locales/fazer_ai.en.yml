@@ -85,6 +85,7 @@ en:
           connect_failed: The connector could not reach WhatsApp. Retries continue automatically.
           disconnect_requested: 'This connection was closed here. The pairing is still valid: connect again to resume it.'
           disconnected: The connection to WhatsApp dropped. Retries continue automatically.
+          proxy_unreachable: The WhatsApp connection is not getting through this inbox's proxy. Check the proxy address in the inbox settings, or remove it to connect directly. New attempts continue automatically.
   notifications:
     notification_title:
       internal_chat_mention: You have been mentioned in %{name}

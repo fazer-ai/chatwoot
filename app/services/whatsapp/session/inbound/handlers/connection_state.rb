@@ -40,6 +40,11 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # the connection, and the operator goes looking for one.
   PAIRING_EXPIRED = %w[timeout pairing_timeout].freeze
 
+  # The connector took the socket down to dial again through the proxy the operator just
+  # saved, and it comes back within the same connect. A reconnect, not a failure: written
+  # with a sentence, the modal shows it in red next to the button to pair the phone again.
+  PROXY_CHANGED = 'proxy_changed'.freeze
+
   # A logout this installation asked for, told apart from an unlink done on the phone.
   # The connector already separates them and says which, and both arrive as
   # `session.logged_out`: collapsing the two sends an agent who just clicked disconnect
@@ -91,7 +96,7 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # the wrong number, or that names none while the inbox is quarantined, because the poll
   # and the connect answer write states without ever passing through a handler.
   def session_state
-    reason = payload.reason.to_s.in?(PAIRING_EXPIRED) ? nil : payload.reason
+    reason = payload.reason.to_s.in?([*PAIRING_EXPIRED, PROXY_CHANGED]) ? nil : payload.reason
     state(payload.state, error: reason, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end

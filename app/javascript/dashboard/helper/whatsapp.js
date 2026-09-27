@@ -1,6 +1,23 @@
 import { format, isValid } from 'date-fns';
 
 /**
+ * Whether a session inbox should surface the offline banner.
+ *
+ * A reconnect that carries no error is the connector redialling on purpose, which today
+ * is a proxy change: it is back within a couple of seconds, and a banner telling the agent
+ * to link the device again is the wrong advice for it. Every reconnect the connector did
+ * not ask for arrives with a reason, and that keeps the banner.
+ *
+ * @param {{connection?: string, error?: string}|null|undefined} providerConnection
+ * @returns {boolean}
+ */
+export const isProviderOffline = providerConnection => {
+  const connection = providerConnection?.connection;
+  if (connection === 'open') return false;
+  return !(connection === 'reconnecting' && !providerConnection?.error);
+};
+
+/**
  * Whether a baileys inbox should surface the WhatsApp reach-out restriction banner.
  *
  * The lock is only meaningful while the connection is open (otherwise the offline banner

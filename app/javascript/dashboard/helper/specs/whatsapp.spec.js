@@ -1,4 +1,5 @@
 import {
+  isProviderOffline,
   isReachoutRestricted,
   isSendStalled,
   reachoutRestrictionDeadline,
@@ -146,5 +147,33 @@ describe('#messageCapQuota', () => {
       used: 0,
       total: 100,
     });
+  });
+});
+
+describe('#isProviderOffline', () => {
+  it('is false while the connection is open', () => {
+    expect(isProviderOffline({ connection: 'open' })).toBe(false);
+  });
+
+  // A proxy change: the connector redials through the new proxy and is back within a
+  // couple of seconds. Telling the agent to link the device again is wrong advice.
+  it('is false for a reconnect that carries no error', () => {
+    expect(isProviderOffline({ connection: 'reconnecting' })).toBe(false);
+  });
+
+  it('is true for a reconnect that says what went wrong', () => {
+    expect(
+      isProviderOffline({
+        connection: 'reconnecting',
+        error: 'The proxy is not answering.',
+      })
+    ).toBe(true);
+  });
+
+  it('is true for every other state, and for no record at all', () => {
+    expect(isProviderOffline({ connection: 'close' })).toBe(true);
+    expect(isProviderOffline({ connection: 'connecting' })).toBe(true);
+    expect(isProviderOffline(undefined)).toBe(true);
+    expect(isProviderOffline(null)).toBe(true);
   });
 });
