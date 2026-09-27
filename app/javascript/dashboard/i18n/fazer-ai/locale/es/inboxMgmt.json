@@ -90,7 +90,8 @@
             },
             "PROXY_URL": {
               "LABEL": "Proxy (opcional)",
-              "PLACEHOLDER": "socks5://usuario:contraseña@host:puerto",
+              "PLACEHOLDER": "socks5://usuario:contraseña{'@'}host:puerto",
+              "DESCRIPTION": "El WhatsApp de esta bandeja sale por esta dirección. Déjalo vacío para conectar directamente.",
               "ERROR": "Usa una dirección http, https o socks5 con host"
             }
           }

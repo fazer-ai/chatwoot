@@ -17,8 +17,10 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
   # that rather than discovering it on the first connect.
   HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false).freeze
   # The way out to WhatsApp for this inbox's session. A password field because the URL
-  # carries the proxy's credentials, which the connector never echoes back (#743).
-  PROXY_URL = Field.new(name: 'proxy_url', type: 'password', secret: true).freeze
+  # carries the proxy's credentials, but not a secret: a secret input starts empty and an
+  # empty one is never saved, so the settings page could neither show that a proxy is set
+  # nor take it away, and provider_config reaches only administrators anyway (#743).
+  PROXY_URL = Field.new(name: 'proxy_url', type: 'password').freeze
 
   DESCRIPTORS = [
     Descriptor.new(

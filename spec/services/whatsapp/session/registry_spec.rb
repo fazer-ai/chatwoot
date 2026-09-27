@@ -37,6 +37,14 @@ RSpec.describe Whatsapp::Session::Registry do
     expect(beta).to contain_exactly('native', 'uazapi')
   end
 
+  # The settings page leaves a secret input empty and never saves an empty one, so a secret
+  # proxy could be set but neither seen nor taken away again.
+  it 'offers the native proxy as a masked field the settings page can clear' do
+    proxy = described_class.descriptor('native').fields.find { |field| field.name == 'proxy_url' }
+
+    expect(proxy).to have_attributes(type: 'password', required: false, secret: false)
+  end
+
   it 'reports a provider as unavailable while its backend class is missing' do
     descriptor = Whatsapp::Session::ProviderDescriptor.new(key: 'uazapi', backend: 'Whatsapp::Session::Backends::NotShippedYet')
 

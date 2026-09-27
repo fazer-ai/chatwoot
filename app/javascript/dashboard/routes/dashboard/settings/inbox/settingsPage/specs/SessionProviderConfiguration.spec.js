@@ -9,11 +9,15 @@ vi.mock('dashboard/api/channel/whatsappChannel', () => ({
 }));
 
 const mockDispatch = vi.fn();
+const mockKnownKeys = new Set();
 vi.mock('vuex', () => ({ useStore: () => ({ dispatch: mockDispatch }) }));
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual('vue-i18n');
-  return { ...actual, useI18n: () => ({ t: key => key }) };
+  return {
+    ...actual,
+    useI18n: () => ({ t: key => key, te: key => mockKnownKeys.has(key) }),
+  };
 });
 
 const mockAlert = vi.fn();
@@ -38,6 +42,13 @@ const FIELDS = [
     required: true,
     default: null,
     secret: true,
+  },
+  {
+    name: 'proxy_url',
+    type: 'password',
+    required: false,
+    default: null,
+    secret: false,
   },
   {
     name: 'mark_as_read',
@@ -92,7 +103,10 @@ const mountPage = async ({ beta = true, inbox = INBOX } = {}) => {
 };
 
 describe('SessionProviderConfiguration', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockKnownKeys.clear();
+  });
 
   // Whoever inherits an inbox never saw the picker, so the beta warning has to survive
   // on the page they manage it from.
@@ -158,5 +172,48 @@ describe('SessionProviderConfiguration', () => {
         provider_config: { ...INBOX.provider_config, token: 'new-token' },
       },
     });
+  });
+
+  // An optional field that is not a secret is served back, so the page shows it and an
+  // emptied input is a real value: that is how a proxy is taken away.
+  it('shows an optional field the inbox has and clears it when emptied', async () => {
+    const wrapper = await mountPage({
+      inbox: {
+        ...INBOX,
+        provider_config: {
+          ...INBOX.provider_config,
+          proxy_url: 'socks5://u:p@proxy.example:1080',
+        },
+      },
+    });
+    const proxy = FIELDS.find(field => field.name === 'proxy_url');
+    expect(wrapper.vm.values.proxy_url).toBe('socks5://u:p@proxy.example:1080');
+    wrapper.vm.values.proxy_url = '';
+
+    await wrapper.vm.save(proxy);
+
+    expect(mockDispatch).toHaveBeenCalledWith('inboxes/updateInbox', {
+      id: INBOX.id,
+      formData: false,
+      channel: {
+        provider_config: {
+          ...INBOX.provider_config,
+          proxy_url: '',
+        },
+      },
+    });
+  });
+
+  it('explains a field with its description when it has one', async () => {
+    const key = 'INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.PROXY_URL';
+    mockKnownKeys.add(`${key}.DESCRIPTION`);
+    const wrapper = await mountPage();
+    const proxy = FIELDS.find(field => field.name === 'proxy_url');
+    const token = FIELDS.find(field => field.name === 'token');
+
+    expect(wrapper.vm.fieldHint(proxy)).toBe(`${key}.DESCRIPTION`);
+    expect(wrapper.vm.fieldHint(token)).toBe(
+      'INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.TOKEN.PLACEHOLDER'
+    );
   });
 });

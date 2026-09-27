@@ -19,7 +19,7 @@ const props = defineProps({
 });
 
 const store = useStore();
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { descriptorFor, fetchProviders } = useWhatsappSessionProviders();
 onMounted(fetchProviders);
 
@@ -67,6 +67,13 @@ const showLinkDeviceModal = ref(false);
 
 const fieldKey = field =>
   `INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.${field.name.toUpperCase()}`;
+
+// A field that needs explaining says so in DESCRIPTION; the rest repeat their placeholder,
+// which for a token or a URL is all there is to say.
+const fieldHint = field => {
+  const key = `${fieldKey(field)}.DESCRIPTION`;
+  return te(key) ? t(key) : t(`${fieldKey(field)}.PLACEHOLDER`);
+};
 
 const isInvalid = field => {
   const value = values.value[field.name];
@@ -161,7 +168,7 @@ const save = async field => {
         v-for="field in credentialFields"
         :key="field.name"
         :title="$t(`${fieldKey(field)}.LABEL`)"
-        :sub-title="$t(`${fieldKey(field)}.PLACEHOLDER`)"
+        :sub-title="fieldHint(field)"
       >
         <div class="flex items-center justify-between flex-1 mt-2">
           <woot-input
