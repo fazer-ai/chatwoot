@@ -525,4 +525,87 @@ RSpec.describe Whatsapp::Session::Facade do
 
     expect(backend.last_command.pairing).to eq('resume')
   end
+
+  # The connector takes `proxy: {url}` on every connect, and a connect without it asks for
+  # the session to go out directly, so both ways a connect is built have to carry what the
+  # inbox names (#743).
+  describe 'the proxy the inbox names' do
+    let(:proxy_url) { 'socks5://proxy-user:proxy-pass@proxy.example:1080' }
+
+    def name_proxy(url)
+      channel.update!(provider_config: channel.provider_config.merge('proxy_url' => url))
+    end
+
+    it 'is carried by the pairing connect' do
+      name_proxy(proxy_url)
+
+      channel.request_pairing_code
+
+      expect(backend.last_command.proxy).to eq('url' => proxy_url)
+    end
+
+    it 'is carried by the connect that brings the account back' do
+      name_proxy(proxy_url)
+
+      channel.reassert_desired_state
+
+      expect(backend.commands_of('session.connect').last.proxy).to eq('url' => proxy_url)
+    end
+
+    it 'is left out when the inbox names none, which asks for a direct connection' do
+      channel.request_pairing_code
+
+      expect(backend.last_command.proxy).to be_nil
+    end
+
+    it 'refuses a URL the connector would refuse' do
+      # A fresh instance: the factory switches the validation off on the one it built.
+      saved = Channel::Whatsapp.find(channel.id)
+      with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
+        %w[socks5h://proxy.example:1080 ftp://proxy.example:21 socks5:// proxy.example:1080].each do |url|
+          saved.provider_config = channel.provider_config.merge('proxy_url' => url)
+
+          expect(saved.valid?).to be(false), "accepted #{url}"
+          expect(saved.errors[:provider_config].join).to include('proxy_url')
+        end
+      end
+    end
+
+    it 'accepts the three schemes the connector takes' do
+      saved = Channel::Whatsapp.find(channel.id)
+      with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
+        %w[http://proxy.example:3128 https://proxy.example:3129 socks5://u:p@proxy.example:1080].each do |url|
+          saved.provider_config = channel.provider_config.merge('proxy_url' => url)
+
+          expect(saved.valid?).to be(true), -> { "refused #{url}: #{saved.errors.full_messages.join}" }
+        end
+      end
+    end
+
+    context 'when the inbox is connected' do
+      before { channel.update!(provider_connection: { 'connection' => 'open' }) }
+
+      it 'connects again through the new proxy when it changes' do
+        expect { name_proxy(proxy_url) }.to change { backend.commands_of('session.connect').size }.by(1)
+        expect(backend.commands_of('session.connect').last.proxy).to eq('url' => proxy_url)
+      end
+
+      it 'connects again directly when the proxy is cleared' do
+        name_proxy(proxy_url)
+
+        expect { name_proxy('') }.to change { backend.commands_of('session.connect').size }.by(1)
+        expect(backend.commands_of('session.connect').last.proxy).to be_nil
+      end
+
+      it 'does not connect again for a change that is not the proxy' do
+        expect do
+          channel.update!(provider_config: channel.provider_config.merge('mark_as_read' => false))
+        end.not_to(change { backend.commands_of('session.connect').size })
+      end
+    end
+
+    it 'does not connect an inbox that is not connected when its proxy changes' do
+      expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
+    end
+  end
 end

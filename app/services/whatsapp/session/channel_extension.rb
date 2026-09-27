@@ -170,10 +170,25 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     previous = self.class.find(id)
     previous.provider_config = saved_change_to_provider_config.first || {}
     let_go_of(previous) if moved_instance?(previous)
+    follow_proxy_change
   rescue Whatsapp::Session::Errors::Error => e
     # This runs after the commit, so raising would answer a save that already succeeded
     # with a 500, and neither half of this is something the save depended on.
     Rails.logger.warn("[WHATSAPP SESSION] provider config change on inbox ##{inbox&.id} left the provider behind: #{e.message}")
+  end
+
+  # The connector holds the proxy it was last given until a connect names another, so a
+  # proxy changed or cleared on an inbox that is up only takes effect once it is sent. An
+  # inbox that is not up gets it with its next connect, which is the operator's to ask for.
+  def follow_proxy_change
+    reassert_desired_state if proxy_changed_while_connected?
+  end
+
+  def proxy_changed_while_connected?
+    before, after = saved_change_to_provider_config
+    return false if before.to_h['proxy_url'].presence == after.to_h['proxy_url'].presence
+
+    %w[open connecting].include?(provider_connection.to_h['connection'])
   end
 
   # False for every save that did not touch the credentials, and for a backend with no

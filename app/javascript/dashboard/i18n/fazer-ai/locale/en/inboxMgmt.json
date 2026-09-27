@@ -87,6 +87,11 @@
             "HISTORY_SYNC": {
               "LABEL": "Import older conversations when pairing",
               "DESCRIPTION": "Brings in the history the phone offers at pairing, all of it as resolved conversations. Messages received while the connection was down are recovered either way."
+            },
+            "PROXY_URL": {
+              "LABEL": "Proxy (optional)",
+              "PLACEHOLDER": "socks5://user:password@host:port",
+              "ERROR": "Use an http, https or socks5 address with a host"
             }
           }
         }

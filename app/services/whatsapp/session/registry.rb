@@ -16,6 +16,9 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
   # with everything it has (947 messages for one chat, measured), so an inbox opts into
   # that rather than discovering it on the first connect.
   HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false).freeze
+  # The way out to WhatsApp for this inbox's session. A password field because the URL
+  # carries the proxy's credentials, which the connector never echoes back (#743).
+  PROXY_URL = Field.new(name: 'proxy_url', type: 'password', secret: true).freeze
 
   DESCRIPTORS = [
     Descriptor.new(
@@ -45,7 +48,7 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
         presence_subscribe read_receipts mark_unread check_number profile_picture groups
         group_management group_admin group_invites group_join_requests media_download calls
       ],
-      fields: [MARK_AS_READ, PRESENCE_SUBSCRIBE]
+      fields: [PROXY_URL, MARK_AS_READ, PRESENCE_SUBSCRIBE]
     ),
     Descriptor.new(
       key: 'uazapi',

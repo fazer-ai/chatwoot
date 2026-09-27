@@ -87,6 +87,11 @@
             "HISTORY_SYNC": {
               "LABEL": "Importar conversaciones antiguas al vincular",
               "DESCRIPTION": "Trae el historial que el teléfono ofrece al vincular, todo como conversaciones resueltas. Los mensajes recibidos mientras la conexión estuvo caída se recuperan igual."
+            },
+            "PROXY_URL": {
+              "LABEL": "Proxy (opcional)",
+              "PLACEHOLDER": "socks5://usuario:contraseña@host:puerto",
+              "ERROR": "Usa una dirección http, https o socks5 con host"
             }
           }
         }
