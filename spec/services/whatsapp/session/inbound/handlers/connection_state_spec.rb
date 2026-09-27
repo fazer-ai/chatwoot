@@ -241,10 +241,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::ConnectionState do
     event = model::Event.build(model::Events::SessionState.new(state: 'reconnecting', reason: 'proxy_changed'), epoch: 3)
     described_class.new(channel: channel, event: event).perform
 
-    expect(channel.reload.provider_connection).to include('connection' => 'reconnecting')
+    expect(channel.reload.provider_connection).to include('connection' => 'reconnecting', 'rerouting' => true)
     expect(channel.provider_connection).not_to have_key('error')
     expect(channel.provider_connection).not_to have_key('error_code')
     expect(Rails.logger).not_to have_received(:warn).with(/proxy_changed/)
+  end
+
+  # The flag belongs to the reconnect it arrived with: the state after it replaces the
+  # whole record, and an outage that follows must not read as a deliberate reconnect.
+  it 'drops the reroute once the next state arrives' do
+    [
+      model::Events::SessionState.new(state: 'reconnecting', reason: 'proxy_changed'),
+      model::Events::SessionState.new(state: 'reconnecting', reason: 'proxy_unreachable')
+    ].each_with_index do |payload, index|
+      described_class.new(channel: channel, event: model::Event.build(payload, epoch: 3 + index)).perform
+    end
+
+    expect(channel.reload.provider_connection).not_to have_key('rerouting')
   end
 
   # The session cannot get out through the proxy, so it stays down rather than going out

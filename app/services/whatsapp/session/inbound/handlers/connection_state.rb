@@ -43,6 +43,8 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # The connector took the socket down to dial again through the proxy the operator just
   # saved, and it comes back within the same connect. A reconnect, not a failure: written
   # with a sentence, the modal shows it in red next to the button to pair the phone again.
+  # Written as `rerouting` instead, which the agent's view also receives: the error string
+  # is admin-only, so its absence cannot be what tells a deliberate reconnect apart.
   PROXY_CHANGED = 'proxy_changed'.freeze
 
   # A logout this installation asked for, told apart from an unlink done on the phone.
@@ -96,8 +98,9 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
   # the wrong number, or that names none while the inbox is quarantined, because the poll
   # and the connect answer write states without ever passing through a handler.
   def session_state
-    reason = payload.reason.to_s.in?([*PAIRING_EXPIRED, PROXY_CHANGED]) ? nil : payload.reason
-    state(payload.state, error: reason, phone_number: payload.phone, lid: payload.lid,
+    rerouting = payload.reason.to_s == PROXY_CHANGED
+    reason = payload.reason.to_s.in?(PAIRING_EXPIRED) || rerouting ? nil : payload.reason
+    state(payload.state, error: reason, rerouting: rerouting || nil, phone_number: payload.phone, lid: payload.lid,
                          quarantine: payload.quarantine, ban: payload.ban)
   end
 

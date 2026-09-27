@@ -5,9 +5,13 @@
 # `error` carries an i18n key suffix on the wire, never a provider message.
 # ConnectionStateWriter resolves it under `errors.inboxes.channel.provider_connection`
 # before persisting, so what the dashboard reads is already a sentence.
+#
+# `rerouting` marks a reconnect the connector is making on purpose (a proxy change). It
+# is agent-visible, unlike `error`, because it is the only thing that tells an agent's
+# view a deliberate reconnect apart from an outage.
 class Whatsapp::Session::Model::ConnectionState < Data.define(
   :connection, :qr_data_url, :pairing_code, :error, :epoch, :phone_number, :lid,
-  :quarantine, :ban, :reachout_time_lock, :new_chat_cap, :pairing_attempt
+  :quarantine, :ban, :reachout_time_lock, :new_chat_cap, :pairing_attempt, :rerouting
 )
   include Whatsapp::Session::Model::Serializable
 

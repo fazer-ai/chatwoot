@@ -203,16 +203,29 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   def provider_connection_data
-    data = { connection: provider_connection['connection'] }
-    data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
-    data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
-    # Agent-visible, unlike the QR and the error string: a stall carries no credential (a
-    # timeout count, a duration, what the provider decided to do and until when), and the
-    # agent is the one being told their reply went nowhere. Without it the conversation
-    # view has nothing to render, because `connection` still reads 'open' throughout.
-    data[:send_stall] = provider_connection['send_stall'] if provider_connection['send_stall'].present?
+    data = provider_connection_agent_data
     data.merge!(provider_connection_admin_data) if Current.account_user&.administrator?
     data
+  end
+
+  # The half of the connection payload every agent receives, shared by the REST serializer
+  # above and by the cable push for the same reason as the admin half below. None of it is
+  # credential-sensitive, and each piece is something the conversation view has no other
+  # way to learn:
+  #   - a send stall: a timeout count, a duration, what the provider decided to do and until
+  #     when; the agent is the one being told their reply went nowhere, and `connection`
+  #     still reads 'open' throughout;
+  #   - `rerouting`: the connector reconnecting on purpose (a proxy change). The error
+  #     string is admin-only, so without it a deliberate reconnect and an outage read the
+  #     same in an agent's view.
+  def provider_connection_agent_data(connection = provider_connection)
+    {
+      connection: connection['connection'],
+      reachout_time_lock: connection['reachout_time_lock'].presence,
+      new_chat_cap: connection['new_chat_cap'].presence,
+      send_stall: connection['send_stall'].presence,
+      rerouting: connection['rerouting'].presence
+    }.compact
   end
 
   # The admin-only half of the connection payload, shared by the REST serializer above and
