@@ -154,10 +154,11 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   end
 
   # Up, or down but still paired: a session the connector will bring back by itself, and so
-  # one that has to hear about a new proxy before it does.
+  # one that has to hear about a new proxy before it does. `connecting` alone does not
+  # count: that is also a QR pairing in progress, which a resume would only interrupt.
   def resumable_session?
     connection = provider_connection.to_h
-    %w[open connecting].include?(connection['connection']) ||
+    connection['connection'] == 'open' ||
       Whatsapp::Session::ConnectionStateWriter::PAIRING_KEYS.any? { |key| connection[key].present? }
   end
 

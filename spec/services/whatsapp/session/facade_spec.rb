@@ -639,6 +639,12 @@ RSpec.describe Whatsapp::Session::Facade do
       expect { perform_enqueued_jobs }.not_to(change { backend.commands_of('session.connect').size })
     end
 
+    it 'does not interrupt a pairing in progress when its proxy changes' do
+      channel.update!(provider_connection: { 'connection' => 'connecting' })
+
+      expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
+    end
+
     it 'does not connect an inbox that was never paired when its proxy changes' do
       expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
     end
