@@ -102,7 +102,9 @@ const save = async field => {
     });
     useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
   } catch (error) {
-    useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+    // The server says which field it refused (a proxy it would not route through, say),
+    // which is the part the operator can act on.
+    useAlert(error.message || t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
     // A switch has already moved by the time this runs, so leaving it there shows a
     // setting the server never took -- and since the next change event needs a different
     // value, retrying the one that failed means toggling away and back. Text keeps what

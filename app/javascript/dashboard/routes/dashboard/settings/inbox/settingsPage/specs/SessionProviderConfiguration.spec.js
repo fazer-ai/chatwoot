@@ -147,6 +147,31 @@ describe('SessionProviderConfiguration', () => {
     expect(wrapper.vm.values[preference.name]).toBe(true);
   });
 
+  it('says why the server refused a save', async () => {
+    const wrapper = await mountPage();
+    const proxy = FIELDS.find(field => field.name === 'proxy_url');
+    mockDispatch.mockRejectedValueOnce(
+      new Error('Provider config Invalid configuration for: proxy_url')
+    );
+    wrapper.vm.values.proxy_url = 'ftp://proxy.example:21';
+
+    await wrapper.vm.save(proxy);
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'Provider config Invalid configuration for: proxy_url'
+    );
+  });
+
+  it('falls back to the generic message when the server gave no reason', async () => {
+    const wrapper = await mountPage();
+    const proxy = FIELDS.find(field => field.name === 'proxy_url');
+    mockDispatch.mockRejectedValueOnce(new Error(''));
+
+    await wrapper.vm.save(proxy);
+
+    expect(mockAlert).toHaveBeenCalledWith('INBOX_MGMT.EDIT.API.ERROR_MESSAGE');
+  });
+
   it('keeps what was typed into a text field when the save is refused', async () => {
     const wrapper = await mountPage();
     const url = FIELDS.find(field => field.type === 'url');
