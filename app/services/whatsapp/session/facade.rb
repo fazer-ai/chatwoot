@@ -82,7 +82,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: 'resume', phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?
+        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?, proxy: proxy
       )
     )
   end
@@ -236,6 +236,14 @@ class Whatsapp::Session::Facade
     { 'auto_reject' => true } if capability?('calls')
   end
 
+  # What the inbox names as its way out, in the shape the connector takes. Nothing is a
+  # request to go out directly: every connect states the whole request, so a connect that
+  # left the proxy out would take a session off the one it had.
+  def proxy
+    url = channel.provider_config['proxy_url'].presence
+    { 'url' => url } if url
+  end
+
   def writer
     Whatsapp::Session::ConnectionStateWriter.new(channel)
   end
@@ -262,7 +270,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?
+        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?, proxy: proxy
       )
     )
   rescue Whatsapp::Session::Errors::Error

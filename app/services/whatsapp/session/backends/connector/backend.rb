@@ -82,10 +82,20 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
       true
     end
 
-    # The session id is generated when the inbox is saved; the rest of the config is
-    # optional toggles, so there is nothing that can be missing here.
-    def validate_config(_provider_config)
-      []
+    PROXY_SCHEMES = %w[http https socks5].freeze
+
+    # The session id is generated when the inbox is saved and the toggles are optional, so
+    # nothing can be missing here. What can be wrong is the proxy: the connector takes
+    # http, https or socks5 with a host and refuses anything else with `invalid_payload`,
+    # which is better said while the operator is still on the form than on the connect.
+    def validate_config(provider_config)
+      url = provider_config['proxy_url'].to_s
+      return [] if url.blank?
+
+      uri = URI.parse(url)
+      PROXY_SCHEMES.include?(uri.scheme) && uri.host.present? ? [] : ['proxy_url']
+    rescue URI::InvalidURIError
+      ['proxy_url']
     end
   end
 
