@@ -265,7 +265,10 @@ group :development, :test do
   gem 'bundle-audit', require: false
   gem 'byebug', platform: :mri
   gem 'climate_control'
-  gem 'debug', '~> 1.8'
+  # The prelude only: `debugger` still opens a session, but the gem loaded whole puts a
+  # hook on every fork whose at_exit waits for all children, and Sidekiq in development
+  # then never exits on SIGTERM (#750).
+  gem 'debug', '~> 1.8', require: 'debug/prelude'
   gem 'factory_bot_rails', '>= 6.4.3'
   gem 'listen'
   gem 'mock_redis'
