@@ -197,6 +197,7 @@ class Whatsapp::Session::ConnectionStateWriter
     payload['connection'] ||= persisted['connection']
     payload['epoch'] ||= persisted['epoch']
     carry_pairing(payload, persisted)
+    carry_rerouting(payload, persisted)
     STICKY_KEYS.each do |key|
       payload[key] = persisted[key] if payload[key].nil? && persisted[key].present?
     end
@@ -221,6 +222,19 @@ class Whatsapp::Session::ConnectionStateWriter
     # is what turns the next one into something somebody finds.
     Rails.logger.warn("[WHATSAPP] no sentence written for provider connection reason #{key.inspect}")
     key.to_s.humanize
+  end
+
+  # A reconnect the connector is making on purpose (a proxy change) arrives as
+  # `reconnecting` with `rerouting`, and then as the `connecting` of its redial, which says
+  # nothing about why. Carried onto that one only: it is still the same reconnect, and
+  # dropped there the conversation shows the banner to link the device again, and the
+  # modal the QR loader, for the second the redial takes on an account that is paired.
+  # Anything else ends it: the session opening or closing, an error, a pairing starting.
+  def carry_rerouting(payload, persisted)
+    return unless persisted['rerouting'] && payload['connection'] == 'connecting'
+    return if payload.values_at('error', 'qr_data_url', 'pairing_code').any?(&:present?)
+
+    payload['rerouting'] = true
   end
 
   def carry_pairing(payload, persisted)

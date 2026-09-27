@@ -19,7 +19,7 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
   # exactly that while a written sentence for the same failure sat under
   # `pairing_timed_out`, which nothing sends.
   %w[
-    connect_failed disconnect_requested disconnected
+    connect_failed disconnect_requested disconnected proxy_unreachable
     pairing_pair_error pairing_err-scanned-without-multidevice
     pairing_code_refused pairing_connect_failed
   ].each do |reason|
@@ -217,6 +217,35 @@ RSpec.describe Whatsapp::Session::ConnectionStateWriter do
   # takes any outstanding request with it. Without this the dump that follows the next
   # pairing would be filed as if somebody had asked for it, and tuning the window's length
   # to make that unlikely is a worse answer than removing the case.
+  # A proxy change reaches the record as `reconnecting` with `rerouting`, and then as the
+  # redial's `connecting`, which says nothing about why. Dropped there, the conversation
+  # shows the "link your device again" banner and the modal the QR loader for the second
+  # the redial takes, to an account that is paired and coming back on its own.
+  describe 'a reconnect the connector is making on purpose' do
+    before { writer.apply(state.new(connection: 'reconnecting', rerouting: true, epoch: 3)) }
+
+    it 'stays on the connecting of the redial' do
+      writer.apply(state.new(connection: 'connecting', epoch: 3))
+
+      expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'rerouting' => true)
+    end
+
+    {
+      'the session opening' => { connection: 'open' },
+      'the session closing' => { connection: 'close', error: 'connect_failed' },
+      'the redial failing at the proxy' => { connection: 'connecting', error: 'proxy_unreachable' },
+      'a pairing starting' => { connection: 'connecting', qr_data_url: 'data:image/png;base64,AAA' },
+      'a pairing code arriving' => { connection: 'connecting', pairing_code: 'ABCD-EFGH' }
+    }.each do |what, attributes|
+      it "ends with #{what}" do
+        writer.apply(state.new(connection: 'connecting', epoch: 3))
+        writer.apply(state.new(**attributes, epoch: 3))
+
+        expect(channel.reload.provider_connection).not_to have_key('rerouting')
+      end
+    end
+  end
+
   describe 'an outstanding history backfill' do
     let(:backfill) { Whatsapp::Session::HistoryBackfill }
 

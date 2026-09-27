@@ -163,6 +163,13 @@ describe('#isProviderOffline', () => {
     ).toBe(false);
   });
 
+  // The redial that follows: `connecting`, still marked, for the second it takes.
+  it('is false for the connecting of that reconnect', () => {
+    expect(
+      isProviderOffline({ connection: 'connecting', rerouting: true })
+    ).toBe(false);
+  });
+
   // What an agent receives for a real outage: no error string, which is admin-only.
   it('is true for a reconnect that is not deliberate, with or without an error', () => {
     expect(isProviderOffline({ connection: 'reconnecting' })).toBe(true);

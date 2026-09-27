@@ -61,6 +61,18 @@ describe('WhatsappLinkDeviceModal', () => {
     expect(wrapper.html()).not.toContain(LINK_DEVICE_KEY);
   });
 
+  // The redial of that reconnect is `connecting`, which is also what a pairing reads as.
+  // The account is paired: the QR loader would be asking for a scan nobody needs.
+  it('keeps showing the reconnect while its redial is connecting', () => {
+    const wrapper = mountModal(['qr_pairing'], {
+      connection: 'connecting',
+      rerouting: true,
+    });
+
+    expect(wrapper.html()).toContain(RECONNECTING_KEY);
+    expect(wrapper.html()).not.toContain(`${KEY}.LOADING_QRCODE`);
+  });
+
   it('shows the cause when a reconnect carries one', () => {
     const wrapper = mountModal(['qr_pairing'], {
       connection: 'reconnecting',
