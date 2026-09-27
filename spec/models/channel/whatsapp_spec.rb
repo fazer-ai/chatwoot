@@ -1280,6 +1280,42 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.message_templates.count).to eq(original_templates_count)
     end
 
+    # An installation with no Baileys provider at all has no session it could end, so
+    # refusing the conversion there left the inbox stuck on Baileys forever (#745). With
+    # a provider configured and not answering, the session may still be alive, and the
+    # refusal above stands.
+    context 'when no Baileys provider is configured anywhere' do
+      before do
+        stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', nil)
+        channel.update!(provider_config: {})
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      it 'converts without trying to end the old session, and says so' do
+        channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+
+        expect(channel.reload.provider).to eq('whatsapp_cloud')
+        expect(WebMock).not_to have_requested(:delete, %r{/connections/})
+        expect(Rails.logger).to have_received(:warn).with(/no baileys provider is configured/i)
+      end
+    end
+
+    context 'when the inbox names its own Baileys provider and it does not answer' do
+      before do
+        stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', nil)
+        channel.update!(provider_config: { 'provider_url' => 'http://inbox-baileys.test', 'api_key' => 'k' })
+        stub_request(:delete, %r{inbox-baileys\.test/connections/}).to_raise(Errno::ECONNREFUSED)
+      end
+
+      it 'still refuses, because that session may be alive' do
+        expect do
+          channel.convert_provider!(new_provider: 'whatsapp_cloud', new_provider_config: new_cloud_config)
+        end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
+
+        expect(channel.reload.provider).to eq('baileys')
+      end
+    end
+
     it 'swallows and logs errors raised by post-conversion template sync' do
       # Bypass both the factory's singleton `sync_templates` stub and validation,
       # so we can observe the rescue branch on the real instance.

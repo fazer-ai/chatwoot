@@ -278,7 +278,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     Rails.logger.error "Failed to disconnect channel provider: #{e.message}"
   end
 
-  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/BlockLength
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/BlockLength
   def convert_provider!(new_provider:, new_provider_config:)
     # Serialize concurrent conversions of the same inbox. Without the lock,
     # two admin requests could both pass pre-validation, race the disconnect
@@ -330,7 +330,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
           @webhook_teardown_initiated = false
         end
       end
-      provider_service.disconnect_channel_provider if provider_service.respond_to?(:disconnect_channel_provider)
+      disconnect_previous_provider(previous_provider)
 
       assign_attributes(
         provider: new_provider,
@@ -361,7 +361,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
     self
   end
-  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/BlockLength
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/BlockLength
 
   def received_messages(messages, conversation)
     return unless provider_service.respond_to?(:received_messages)
@@ -446,6 +446,23 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   private
+
+  # Ends the old provider's session before a conversion, and lets a failure abort it: a
+  # provider that is configured and does not answer may still hold a live session, and
+  # converting over it would leave two connections on one account. An installation with no
+  # provider configured at all has no session it could end, so there the conversion goes on
+  # and says so, instead of refusing forever and leaving the inbox stuck (#745).
+  def disconnect_previous_provider(previous_provider)
+    return unless provider_service.respond_to?(:disconnect_channel_provider)
+
+    if provider_service.respond_to?(:provider_configured?) && !provider_service.provider_configured?
+      Rails.logger.warn "[WHATSAPP] Converting inbox #{inbox&.id}: no #{previous_provider} provider is configured, " \
+                        'so its old session could not be ended'
+      return
+    end
+
+    provider_service.disconnect_channel_provider
+  end
 
   # `prompt_reauthorization!` is not a log line: it writes the marker, runs the handler that emails
   # the operator, invalidates the inbox cache and fires the event, and `Webhooks::WhatsappEventsJob`
