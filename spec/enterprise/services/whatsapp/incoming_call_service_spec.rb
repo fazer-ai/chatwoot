@@ -86,6 +86,24 @@ describe Whatsapp::IncomingCallService do
         hash_including(data: hash_including(recording_enabled: false))
       )
     end
+
+    # The dashboard knows a conversation by its display id: the call widget routes to it and looks it up in the
+    # store by it. Conversations of another account push this one's internal ids away from its display ids.
+    it 'names the conversation by its display id in voice_call.incoming' do
+      other_account = create(:account)
+      create_list(:conversation, 2, account: other_account)
+      allow(ActionCable.server).to receive(:broadcast)
+
+      params = call_payload(event: 'connect', session: { sdp: sdp_offer, sdp_type: 'offer' })
+      described_class.new(inbox: inbox, params: params).perform
+
+      conversation = Call.last.conversation
+      expect(conversation.display_id).not_to eq(conversation.id)
+      expect(ActionCable.server).to have_received(:broadcast).with(
+        agent.pubsub_token,
+        hash_including(event: 'voice_call.incoming', data: hash_including(conversation_id: conversation.display_id))
+      )
+    end
   end
 
   describe 'inbound connect from a username (BSUID) caller' do
