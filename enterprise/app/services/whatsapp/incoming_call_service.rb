@@ -247,6 +247,6 @@ class Whatsapp::IncomingCallService
 
   def base_payload(call)
     { account_id: inbox.account_id, id: call.id, call_id: call.provider_call_id,
-      provider: 'whatsapp', conversation_id: call.conversation_id }
+      provider: 'whatsapp', conversation_id: call.conversation.display_id }
   end
 end
