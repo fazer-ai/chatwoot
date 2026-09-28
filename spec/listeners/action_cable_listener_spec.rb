@@ -656,6 +656,23 @@ describe ActionCableListener do
       end
     end
 
+    context 'when the connection is being rerouted' do
+      let(:provider_connection) { { 'connection' => 'reconnecting', 'rerouting' => true } }
+
+      # A proxy change, which comes back on its own. The agent gets no error string, so
+      # without the flag a deliberate reconnect and a real outage read the same.
+      it 'tells the agent the reconnect is deliberate' do
+        expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+          [agent.pubsub_token],
+          'inbox.provider_connection_updated',
+          { inbox_id: inbox.id, provider_connection: { connection: 'reconnecting', rerouting: true }, account_id: account.id }
+        )
+        allow(ActionCableBroadcastJob).to receive(:perform_later).with([admin.pubsub_token], anything, anything)
+
+        listener.inbox_provider_connection_updated(event)
+      end
+    end
+
     context 'when a new-chat cap is present' do
       let(:provider_connection) do
         { 'connection' => 'open', 'new_chat_cap' => { 'capping_status' => 'CAPPED', 'total_quota' => 100, 'used_quota' => 100 } }

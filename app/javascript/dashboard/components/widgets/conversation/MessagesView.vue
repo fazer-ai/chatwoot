@@ -50,6 +50,7 @@ import WhatsappLinkDeviceModal from '../../../routes/dashboard/settings/inbox/co
 import { isInboxAdminInGroup } from 'dashboard/helper/phoneHelper';
 import {
   isReachoutRestricted,
+  isProviderOffline,
   isSendStalled,
   reachoutRestrictionDeadline,
   isMessageCapped,
@@ -423,6 +424,9 @@ export default {
     },
     inboxProviderConnection() {
       return this.currentInbox.provider_connection?.connection;
+    },
+    showProviderOffline() {
+      return isProviderOffline(this.currentInbox.provider_connection);
     },
     inboxReachoutLock() {
       return this.currentInbox.provider_connection?.reachout_time_lock;
@@ -943,7 +947,7 @@ export default {
           :inbox="currentInbox"
         />
         <Banner
-          v-if="inboxProviderConnection !== 'open' || showSendStallWarning"
+          v-if="showProviderOffline || showSendStallWarning"
           color-scheme="alert"
           class="mt-2 mx-2 rounded-lg overflow-hidden"
           :banner-message="providerConnectionBannerMessage"

@@ -24,6 +24,14 @@ const connection = computed(() => providerConnection.value?.connection);
 const qrDataUrl = computed(() => providerConnection.value?.qr_data_url);
 const pairingCode = computed(() => providerConnection.value?.pairing_code);
 const error = computed(() => providerConnection.value?.error);
+// The connector redialling on purpose (a proxy change). Its redial reads `connecting`,
+// which is also what a pairing reads as, and the account is paired: shown as the pairing,
+// the modal would put up the QR loader for a scan nobody needs.
+const reconnecting = computed(
+  () =>
+    connection.value === 'reconnecting' ||
+    (connection.value === 'connecting' && !!providerConnection.value?.rerouting)
+);
 
 // Which pairing the operator asked for, not which one the provider has answered with
 // yet: the code takes a moment to arrive, and the screen has to say what it is waiting
@@ -186,6 +194,17 @@ watchEffect(() => {
             />
           </template>
 
+          <template v-else-if="reconnecting">
+            <p>
+              {{
+                $t(
+                  'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.RECONNECTING'
+                )
+              }}
+            </p>
+            <Spinner />
+          </template>
+
           <template v-else-if="connection === 'connecting'">
             <template v-if="displayedPairing === 'code'">
               <div v-if="!pairingCode" class="flex flex-col gap-4 items-center">
@@ -290,17 +309,6 @@ watchEffect(() => {
                 @click="pairWithCode"
               />
             </template>
-          </template>
-
-          <template v-else-if="connection === 'reconnecting'">
-            <p>
-              {{
-                $t(
-                  'INBOX_MGMT.ADD.WHATSAPP.EXTERNAL_PROVIDER.LINK_DEVICE_MODAL.RECONNECTING'
-                )
-              }}
-            </p>
-            <Spinner />
           </template>
 
           <template v-else-if="connection === 'open'">

@@ -1,6 +1,26 @@
 import { format, isValid } from 'date-fns';
 
 /**
+ * Whether a session inbox should surface the offline banner.
+ *
+ * `rerouting` is the connector redialling on purpose, which today is a proxy change: it is
+ * back within a couple of seconds, and a banner telling the agent to link the device again
+ * is the wrong advice for it. It stays on the `connecting` of that redial, which is part
+ * of the same reconnect. Read from its own flag rather than from the absence of an
+ * error, because an agent never receives the error string, and a real outage would then
+ * read as a deliberate reconnect.
+ *
+ * @param {{connection?: string, rerouting?: boolean}|null|undefined} providerConnection
+ * @returns {boolean}
+ */
+export const isProviderOffline = providerConnection => {
+  const connection = providerConnection?.connection;
+  if (connection === 'open') return false;
+  const redialling = ['reconnecting', 'connecting'].includes(connection);
+  return !(redialling && providerConnection?.rerouting);
+};
+
+/**
  * Whether a baileys inbox should surface the WhatsApp reach-out restriction banner.
  *
  * The lock is only meaningful while the connection is open (otherwise the offline banner

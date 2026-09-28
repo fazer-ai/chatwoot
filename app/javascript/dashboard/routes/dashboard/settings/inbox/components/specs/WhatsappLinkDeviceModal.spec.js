@@ -9,6 +9,7 @@ const LOADING_PAIRING_CODE_KEY = `${KEY}.LOADING_PAIRING_CODE`;
 
 const DISCONNECT_KEY = `${KEY}.DISCONNECT`;
 const LINK_DEVICE_KEY = `${KEY}.LINK_DEVICE`;
+const RECONNECTING_KEY = `${KEY}.RECONNECTING`;
 
 const dispatch = vi.fn(() => Promise.resolve());
 
@@ -50,6 +51,38 @@ const mountModal = (
 beforeEach(() => dispatch.mockClear());
 
 describe('WhatsappLinkDeviceModal', () => {
+  // A proxy change: the connector redials through the new proxy on its own. The record
+  // carries no error for it, and the modal shows the reconnect rather than a failure
+  // with the button to pair the phone again.
+  it('shows a reconnect with no error as a reconnect, with nothing to pair', () => {
+    const wrapper = mountModal(['qr_pairing'], { connection: 'reconnecting' });
+
+    expect(wrapper.html()).toContain(RECONNECTING_KEY);
+    expect(wrapper.html()).not.toContain(LINK_DEVICE_KEY);
+  });
+
+  // The redial of that reconnect is `connecting`, which is also what a pairing reads as.
+  // The account is paired: the QR loader would be asking for a scan nobody needs.
+  it('keeps showing the reconnect while its redial is connecting', () => {
+    const wrapper = mountModal(['qr_pairing'], {
+      connection: 'connecting',
+      rerouting: true,
+    });
+
+    expect(wrapper.html()).toContain(RECONNECTING_KEY);
+    expect(wrapper.html()).not.toContain(`${KEY}.LOADING_QRCODE`);
+  });
+
+  it('shows the cause when a reconnect carries one', () => {
+    const wrapper = mountModal(['qr_pairing'], {
+      connection: 'reconnecting',
+      error: 'The proxy is not answering.',
+    });
+
+    expect(wrapper.html()).toContain('The proxy is not answering.');
+    expect(wrapper.html()).not.toContain(RECONNECTING_KEY);
+  });
+
   // The extension hands over Baileys credentials, so a provider that cannot consume
   // them must not be offered an install and a scan that end in a refused request.
   it('hides the session import when the provider cannot accept one', () => {

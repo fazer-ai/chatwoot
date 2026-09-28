@@ -1107,6 +1107,22 @@ RSpec.describe Channel::Whatsapp do
       end
     end
 
+    context 'when the connection is being rerouted' do
+      let(:channel) do
+        create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,
+                                  provider_connection: { 'connection' => 'reconnecting', 'rerouting' => true })
+      end
+
+      # An agent gets no error string, so this is the only thing telling a proxy change,
+      # which comes back on its own, apart from an outage.
+      it 'exposes the reroute to non-administrators' do
+        account_user = create(:account_user, account: channel.account, role: :agent)
+        allow(Current).to receive(:account_user).and_return(account_user)
+
+        expect(channel.provider_connection_data).to eq({ connection: 'reconnecting', rerouting: true })
+      end
+    end
+
     context 'when a new-chat cap is present' do
       let(:channel) do
         create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false,

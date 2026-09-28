@@ -85,6 +85,7 @@ es:
           connect_failed: El conector no pudo comunicarse con WhatsApp. Los reintentos continúan automáticamente.
           disconnect_requested: 'Esta conexión fue cerrada desde aquí. La vinculación sigue válida: conecte de nuevo para retomarla.'
           disconnected: La conexión con WhatsApp se cayó. Los reintentos continúan automáticamente.
+          proxy_unreachable: La conexión con WhatsApp no está pasando por el proxy de esta bandeja de entrada. Revisa la dirección del proxy en la configuración de la bandeja de entrada, o elimínala para conectar directamente. Los nuevos intentos continúan automáticamente.
   notifications:
     notification_title:
       internal_chat_mention: Le mencionaron en %{name}
