@@ -72,6 +72,10 @@ class Whatsapp::Session::Backends::Uazapi::Backend < Whatsapp::Session::Backend
       true
     end
 
+    # Every webhook is its own Sidekiq job, so waiting on the download holds only that one
+    # message, and consumers of `message_created` (an agent reading an image) see the file.
+    def inline_media? = true
+
     # Whether the instance is somebody else's host is not a question its address can
     # answer. A self-hosted one is reached by whatever name the network gives it, from a
     # compose service to an internal FQDN to a plain address, and reading any of those as

@@ -33,6 +33,14 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # Whether an inbound message's media is downloaded before the message is stored, so the
+    # `message_created` it raises already carries the file. Only for a backend whose events
+    # run in a job of their own: the connector's consumer thread keeps a session's events in
+    # order, and a download there would hold every event behind it.
+    def inline_media?
+      false
+    end
+
     # Whether `logout` ends the pairing or only the connection. A provider that cannot
     # unpair keeps the account's credentials whatever it is asked, so connecting again
     # resumes the very session that was just refused: what that decides is whether

@@ -88,12 +88,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   end
 
   def attach(message, media, payload)
-    attachment = message.attachments.build(
-      account_id: message.account_id,
-      file_type: media.attachment_file_type,
-      file: { io: payload.io, filename: filename(media, payload, message), content_type: payload.mime || media.mime }
-    )
-    attachment.meta = { is_recorded_audio: true } if media.voice_note
+    Whatsapp::Session::Inbound::MediaAttachment.build(message, media, payload)
     # Adding an attachment changes no column on the message, and
     # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so
     # nothing would tell the open dashboards that the bubble finally has its file: the
@@ -102,14 +97,5 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     # attachment already committed.
     message.updated_at = Time.current
     message.save!
-  end
-
-  def filename(media, payload, message)
-    return media.filename if media.filename.present?
-    return payload.filename if payload.filename.present?
-
-    mime = (payload.mime || media.mime).to_s
-    extension = ".#{mime.split(';').first.split('/').last}" if mime.present?
-    "#{media.kind}_#{message.source_id}_#{Time.current.strftime('%Y%m%d')}#{extension}"
   end
 end
