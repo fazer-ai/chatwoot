@@ -36,6 +36,7 @@ RSpec.describe Whatsapp::Baileys::HistoryImportJob do
       end
 
       expect { job.perform_now }.to have_enqueued_job(described_class).with(inbox, batch, 2, false)
+                                                                      .on_queue(slots::WAITING_QUEUE)
       expect(peak).to eq(2)
     end
 
@@ -75,7 +76,69 @@ RSpec.describe Whatsapp::Baileys::HistoryImportJob do
 
       expect(Whatsapp::Baileys::HistoryImporter).not_to have_received(:new)
       expect(enqueued['exception_executions']).to eq({})
-      expect(enqueued['scheduled_at']).to be_present
+      expect(enqueued['queue_name']).to eq(slots::WAITING_QUEUE)
+    end
+
+    # A batch sleeping out a fixed delay is nowhere near the slot when it frees up, and at a
+    # cap of 1 that left the slot idle for most of every window. The waiting queue has no
+    # timer: whoever gives a slot back wakes the batch that has waited longest.
+    it 'files a batch that found no slot in the waiting queue, with no delay' do
+      2.times { slots.claim(2) }
+      importing { nil }
+
+      job.perform_now
+      enqueued = ActiveJob::Base.queue_adapter.enqueued_jobs.last
+
+      expect(enqueued['queue_name']).to eq(slots::WAITING_QUEUE)
+      expect(enqueued['scheduled_at']).to be_nil
+    end
+
+    it 'wakes the waiting batches when it gives its slot back' do
+      allow(slots).to receive(:top_up)
+      importing { nil }
+
+      job.perform_now
+
+      expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
+    end
+
+    it 'wakes the waiting batches when it gives back the slot of an import that failed' do
+      allow(slots).to receive(:top_up)
+      importing { raise ArgumentError, 'broken batch' }
+
+      expect { job.perform_now }.to raise_error(ArgumentError)
+      expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
+    end
+
+    # A slot can be given back between the claim that found none and the line that files
+    # the batch, and then the batch waits with nobody left to wake it.
+    it 'wakes the waiting batches after filing one, in case a slot freed up meanwhile' do
+      2.times { slots.claim(2) }
+      allow(slots).to receive(:top_up)
+      importing { nil }
+
+      job.perform_now
+
+      expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
+    end
+
+    # A woken batch that never takes a slot gives none back, so without this the next one
+    # waits for the sweep.
+    it 'wakes the next batch when it is dropped for an inbox that is gone' do
+      allow(slots).to receive(:top_up)
+
+      described_class.perform_now(nil, batch, nil, false)
+
+      expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
+    end
+
+    # The waiting queue is where a batch sits, not where it runs: a woken batch that finds
+    # its chat busy goes back to the chat lock's retries on its own queue.
+    it 'retries a woken batch on its own queue when the chat is busy' do
+      importing { raise Whatsapp::Session::Inbound::Locks::Busy, 'chat locked' }
+      woken = job.tap { |j| j.queue_name = slots::WAITING_QUEUE }
+
+      expect { woken.perform_now }.to have_enqueued_job(described_class).on_queue(described_class.queue_name)
     end
 
     # A worker killed mid-import never runs its `ensure`. The slot it held has to come
