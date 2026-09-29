@@ -27,10 +27,13 @@ module AccountWhatsappProviders
 
   # Deliberately not on the super admin form, either of them: these are console switches by
   # decision, so that offering the native channel to an account is a step somebody takes on
-  # purpose rather than a checkbox next to the ordinary account settings.
+  # purpose rather than a checkbox next to the ordinary account settings. No API writes them
+  # either: the account endpoint permits only its own list of settings, and the Platform API
+  # does not take `settings` at all, so an installation that creates accounts through it
+  # still enables the native channel from a console.
   #
-  # The cast stays because the value can still arrive as a string, from the settings API or
-  # from a console line that types "1", and the settings JSON schema only accepts booleans.
+  # The cast stays because a console line can type "1", and the settings JSON schema only
+  # accepts booleans.
   def whatsapp_native_enabled=(value)
     super(ActiveModel::Type::Boolean.new.cast(value))
   end
