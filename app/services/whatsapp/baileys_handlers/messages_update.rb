@@ -30,11 +30,15 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
   def update_status
     status = status_mapper
     update_last_seen_at if incoming? && status == 'read'
-    return unless status.present? && status_transition_allowed?(status)
+    # Messages::StatusUpdateService refuses an unknown status and a move backwards, but lets
+    # any message become `failed`, and a message the contact has read cannot have failed.
+    return if @message.status == 'read'
 
-    attrs = { status: status }
-    attrs[:external_error] = extract_external_error if status == 'failed'
-    @message.update!(attrs)
+    # The service is also what clears external_error when a message leaves `failed`;
+    # writing the status here instead left a delivered message showing the error of an
+    # earlier attempt.
+    error = extract_external_error if status == 'failed'
+    Messages::StatusUpdateService.new(@message, status, error).perform
   end
 
   def extract_external_error
@@ -96,13 +100,6 @@ module Whatsapp::BaileysHandlers::MessagesUpdate
     @read_receipt_ids ||= Array(processed_params[:data]).filter_map do |update|
       update.dig(:key, :id) if update.dig(:key, :fromMe).blank? && update.dig(:update, :status) == 4
     end
-  end
-
-  def status_transition_allowed?(new_status)
-    return false if @message.status == 'read'
-    return false if @message.status == 'delivered' && new_status == 'sent'
-
-    true
   end
 
   def handle_edited_content
