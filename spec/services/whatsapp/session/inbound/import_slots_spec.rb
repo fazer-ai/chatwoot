@@ -7,7 +7,8 @@ RSpec.describe Whatsapp::Session::Inbound::ImportSlots, :redis_streams do
   let(:redis) { Redis.new(Redis::Config.app) }
   let(:prefix) { "wactest:import_slots:#{SecureRandom.hex(8)}" }
   let(:waiting) { "#{prefix}:waiting" }
-  let(:target) { "#{prefix}:low" }
+  let(:queue) { "#{prefix}:low" }
+  let(:target) { "queue:#{queue}" }
 
   after do
     redis.del(waiting, target)
@@ -25,7 +26,7 @@ RSpec.describe Whatsapp::Session::Inbound::ImportSlots, :redis_streams do
     described_class.claim(4)
     described_class.claim(4)
 
-    woken = described_class.top_up(into: target, limit: 4, waiting: waiting)
+    woken = described_class.top_up(into: queue, limit: 4, waiting: waiting)
 
     expect(woken).to eq(2)
     expect(redis.lrange(waiting, 0, -1)).to eq(['third'])
@@ -36,14 +37,14 @@ RSpec.describe Whatsapp::Session::Inbound::ImportSlots, :redis_streams do
     queued('first')
     2.times { described_class.claim(2) }
 
-    expect(described_class.top_up(into: target, limit: 2, waiting: waiting)).to eq(0)
+    expect(described_class.top_up(into: queue, limit: 2, waiting: waiting)).to eq(0)
     expect(redis.llen(waiting)).to eq(1)
   end
 
   it 'stops at an empty waiting queue' do
     queued('only')
 
-    expect(described_class.top_up(into: target, limit: 4, waiting: waiting)).to eq(1)
+    expect(described_class.top_up(into: queue, limit: 4, waiting: waiting)).to eq(1)
     expect(redis.lrange(target, 0, -1)).to eq(['only'])
   end
 
