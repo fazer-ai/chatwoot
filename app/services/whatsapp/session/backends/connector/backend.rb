@@ -22,6 +22,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # holding a worker indefinitely.
   MEDIA_SEND_MAX_TIMEOUT = ENV.fetch('WHATSAPP_MEDIA_SEND_MAX_TIMEOUT', 180).to_i
 
+  # Seconds between the attempts at a group creation the connector answered `not_settled`.
+  # Four attempts over three and a half seconds: the notification that settles one
+  # ordinarily arrives within seconds, and the creation runs inside an HTTP request.
+  NOT_SETTLED_WAITS = [0.5, 1, 2].freeze
+
   # --- the ceiling on a published command ------------------------------------------
   #
   # A published command carries no `reply_to`, so nobody here is waiting to give up on it
@@ -281,8 +286,27 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
   # --- groups --------------------------------------------------------------------
 
+  # The connector writes a group creation down before it asks WhatsApp, so a retry under
+  # the same key collects the group the first attempt made, and a retry under a fresh key
+  # makes a second one. `not_settled` says WhatsApp has not yet named which request made
+  # which group, which ordinarily takes seconds. The contract also names the state asking
+  # does not resolve, an intent recorded whose request never went out, so the waits are
+  # bounded and what survives them is logged as stranded rather than retried further.
   def create_group(command)
-    model::GroupInfo.from_h(client.call(command))
+    key = "group:#{SecureRandom.uuid}"
+    waits = NOT_SETTLED_WAITS.dup
+    begin
+      model::GroupInfo.from_h(client.call(command, idempotency_key: key))
+    rescue Whatsapp::Session::Errors::NotSettled
+      wait = waits.shift
+      if wait.nil?
+        Rails.logger.error("[WHATSAPP] group.create #{key} on session #{session_id} is stranded: " \
+                           "still not settled after #{NOT_SETTLED_WAITS.size + 1} attempts")
+        raise
+      end
+      Kernel.sleep(wait)
+      retry
+    end
   end
 
   def group_info(command)
