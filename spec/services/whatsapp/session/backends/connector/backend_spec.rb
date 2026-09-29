@@ -228,6 +228,76 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(result.message_id).to eq('3EB0AAAA')
   end
 
+  # The connector records a group creation before asking WhatsApp, and a retry under the same key collects the
+  # group the first attempt made. Retried under a fresh key it makes a second group.
+  describe 'a group creation' do
+    let(:command) do
+      model::Commands::GroupCreate.new(subject: 'Equipe', participants: [model::Address.phone('5541999990000')])
+    end
+    let(:keys) { [] }
+    let(:answers) { [] }
+
+    before do
+      allow(Kernel).to receive(:sleep)
+      allow(client).to receive(:call).with(an_instance_of(model::Commands::GroupCreate), any_args) do |_, **options|
+        keys << options[:idempotency_key]
+        answer = answers.shift || results['group.create']
+        raise answer if answer.is_a?(Exception)
+
+        answer
+      end
+    end
+
+    def not_settled = Whatsapp::Session::Errors.build('not_settled', 'group.create: not settled yet')
+
+    it 'goes out once, under an idempotency key' do
+      info = backend.create_group(command)
+
+      expect(info.group.id).to eq('120363040000000001')
+      expect(keys.size).to eq(1)
+      expect(keys.first).to be_present
+    end
+
+    it 'asks again under the same key while the outcome is not settled, and hands back the group it made' do
+      answers.push(not_settled, not_settled)
+
+      info = backend.create_group(command)
+
+      expect(info.group.id).to eq('120363040000000001')
+      expect(keys.size).to eq(3)
+      expect(keys.uniq.size).to eq(1)
+      expect(Kernel).to have_received(:sleep).twice
+    end
+
+    it 'stops after a bounded number of attempts and says the intent is stranded' do
+      answers.concat(Array.new(50) { not_settled })
+      allow(Rails.logger).to receive(:error)
+
+      expect { backend.create_group(command) }
+        .to raise_error(Whatsapp::Session::Errors::Error) { |error|
+          expect(error.code).to eq('not_settled')
+          expect(error).not_to be_retryable
+        }
+      expect(keys.size).to be_between(2, 10)
+      expect(keys.uniq.size).to eq(1)
+      expect(Rails.logger).to have_received(:error).with(/stranded/)
+    end
+
+    it 'does not ask again after any other failure' do
+      answers.push(Whatsapp::Session::Errors.build('not_connected'))
+
+      expect { backend.create_group(command) }.to raise_error(Whatsapp::Session::Errors::NotConnected)
+      expect(keys.size).to eq(1)
+    end
+
+    it 'gives each creation a key of its own' do
+      backend.create_group(command)
+      backend.create_group(command)
+
+      expect(keys.uniq.size).to eq(2)
+    end
+  end
+
   # The connector has to fetch the file from this app's storage, encrypt it and upload it
   # to WhatsApp before it can answer, and the default wait covers only a few megabytes of
   # that. A file past it failed on the deadline, was retried, and failed at the same

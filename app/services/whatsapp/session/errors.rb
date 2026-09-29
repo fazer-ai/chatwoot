@@ -148,6 +148,16 @@ module Whatsapp::Session::Errors
     end
   end
 
+  # A `group.create` whose outcome WhatsApp has not decided yet: the connector recorded the
+  # attempt and is waiting for the notification that names which request made which group.
+  # The connector backend asks again under the same idempotency key a few times, and this
+  # is what is left once it stops, most likely an intent recorded whose request never
+  # reached WhatsApp. Not retryable from outside: a caller running the creation again would
+  # do it under a fresh key, which is exactly how a second group gets made.
+  class NotSettled < Error
+    CODE = 'not_settled'.freeze
+  end
+
   # Another worker is already handling this provider message id.
   class MessageAlreadyProcessing < Error
     CODE = 'message_already_processing'.freeze
@@ -169,7 +179,7 @@ module Whatsapp::Session::Errors
     Quarantined, ClientOutdated, Timeout, Expired, Unauthorized, NotSupported, InvalidPayload,
     InvalidConfig, InvalidEvent, RateLimited, MediaTooLarge, MediaUnavailable,
     RecipientNotOnWhatsapp, GroupParticipantNotAllowed, MessageAlreadyProcessing, EventOutOfOrder,
-    NotAttempted
+    NotAttempted, NotSettled
   ].freeze
 
   BY_CODE = CLASSES.index_by { |klass| klass::CODE }.freeze
@@ -182,10 +192,7 @@ module Whatsapp::Session::Errors
   #   its `ref.url` at) did not answer. Internal already is a ProviderUnavailable and
   #   already retryable, so the fallback treats it exactly as a class of its own would;
   #   what a class would add is the code on the exception, which nothing reads yet.
-  # - `not_settled`: a `group.create` whose outcome WhatsApp has not decided yet. Its
-  #   answer is a bounded retry under the same idempotency key, which the group creation
-  #   path does not do yet, so a class here would promise a behavior nothing delivers.
-  UNMAPPED_WIRE_CODES = %w[provider_unavailable not_settled].freeze
+  UNMAPPED_WIRE_CODES = %w[provider_unavailable].freeze
 
   # A newer connector may answer with a code this version does not know yet. Additive
   # evolution is part of the contract, so an unknown code degrades to Internal instead
