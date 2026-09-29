@@ -137,5 +137,15 @@ RSpec.describe Whatsapp::Session::ConnectionCheckJob do
 
       expect { described_class.perform_now }.not_to have_enqueued_job(Whatsapp::Session::ConnectionCheckJob)
     end
+
+    # A poll that lands mid-reconnect writes `connecting`, and nothing but the next poll
+    # would ever write `open` over it on an instance that reconnects on its own.
+    it 'brings a session caught mid-reconnect back to open once the provider confirms it' do
+      Whatsapp::Session::ConnectionStateWriter.new(channel).apply(model::ConnectionState.new(connection: 'connecting'))
+
+      perform_enqueued_jobs { described_class.perform_now }
+
+      expect(channel.reload.provider_connection['connection']).to eq('open')
+    end
   end
 end
