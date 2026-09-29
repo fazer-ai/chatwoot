@@ -136,7 +136,7 @@ RSpec.describe Whatsapp::Baileys::HistoryImportJob do
     # no longer deserialize and the batch is dropped there, holding no slot and waking nobody.
     it 'wakes the next batch when it is dropped for an inbox that no longer deserializes' do
       serialized = job.serialize
-      inbox.destroy!
+      serialized['arguments'][0] = { '_aj_globalid' => "gid://#{GlobalID.app}/Inbox/0" }
       allow(slots).to receive(:top_up)
 
       ActiveJob::Base.execute(serialized)

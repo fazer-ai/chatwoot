@@ -20,6 +20,15 @@ class Whatsapp::Baileys::HistoryImportJob < ApplicationJob
   # group of 8,545 messages lost eleven batches to its own siblings.
   retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 40
 
+  # An inbox deleted while its batches waited fails them before `perform`: the arguments no
+  # longer deserialize. ApplicationJob drops such a job, and this one does too, but a woken
+  # batch dropped there took no slot and gives none back, so the batch behind it is woken
+  # here rather than by the sweep a minute later.
+  discard_on ActiveJob::DeserializationError do |job, error|
+    Rails.logger.info("Skipping #{job.class} because of ActiveJob::DeserializationError (#{error.message})")
+    Whatsapp::Session::Inbound::ImportSlots.top_up(into: job.class.queue_name)
+  end
+
   # Everything past `requested` says how to file this dump rather than what is in it, and
   # it is collected rather than listed because the list grows: each entry has to keep a
   # default for the jobs already queued when it shipped, and a job argument list is a
