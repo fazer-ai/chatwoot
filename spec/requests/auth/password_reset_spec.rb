@@ -34,6 +34,39 @@ RSpec.describe 'Password reset', type: :request do
     expect(response.parsed_body['message']).to eq('Invalid token')
   end
 
+  # An agent invitation links to this same flow with a token minted when the email goes out,
+  # and the reset is what confirms the invitee: an unconfirmed account holds an invitation.
+  context 'when the account was invited and never confirmed' do
+    let(:user) { create(:user, password: 'Password1!', password_confirmation: 'Password1!', skip_confirmation: false) }
+
+    it 'accepts the invitation days after it was sent' do
+      user.update_column(:reset_password_sent_at, 2.days.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      put '/auth/password', params: params, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.valid_password?('Password2!')).to be(true)
+      expect(user).to be_confirmed
+    end
+
+    it 'refuses an invitation token that was never sent' do
+      user.update_column(:reset_password_sent_at, nil) # rubocop:disable Rails/SkipsModelValidations
+
+      put '/auth/password', params: params, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'refuses an invitation past its own window' do
+      user.update_column(:reset_password_sent_at, 8.days.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      put '/auth/password', params: params, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(user.reload.valid_password?('Password1!')).to be(true)
+    end
+  end
+
   it 'refuses a token that was never sent' do
     user.update_column(:reset_password_sent_at, nil) # rubocop:disable Rails/SkipsModelValidations
 
