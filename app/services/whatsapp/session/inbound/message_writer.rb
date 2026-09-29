@@ -2,9 +2,10 @@
 # contacts). Every provider in the session family goes through this one writer, so the
 # stored shape does not depend on who delivered the message.
 #
-# Media is not downloaded here: the bytes are fetched by MediaFetchJob and attached
-# afterwards. Downloading inline would stall the consumer thread that keeps a session's
-# events in order, and the attachment lands within seconds either way.
+# Media is downloaded here only for a backend that asks for it (`inline_media?`), so the
+# message is stored with its file and `message_created` carries it. Everywhere else the
+# bytes are fetched by MediaFetchJob and attached afterwards: downloading inline would
+# stall the consumer thread that keeps a session's events in order.
 class Whatsapp::Session::Inbound::MessageWriter
   # The key a recovered row carries while it still owes an announcement. Written in the same save as
   # the content and taken off once the announcement is enqueued, so it names a debt rather than a fact
@@ -201,6 +202,9 @@ class Whatsapp::Session::Inbound::MessageWriter
 
     message = conversation.messages.build(content: message_content, **message_attributes)
     attach_location(message)
+    # Not for an imported message: a history batch holds the chat for hundreds of messages,
+    # and a download each would hold it for all their files. The fetch below collects those.
+    Whatsapp::Session::Inbound::MediaAttachment.download(message, inbound) unless imported
     message.save!
     enqueue_media_fetch(message)
     acknowledge([message])
