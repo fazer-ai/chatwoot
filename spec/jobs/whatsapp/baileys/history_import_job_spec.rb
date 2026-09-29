@@ -132,6 +132,18 @@ RSpec.describe Whatsapp::Baileys::HistoryImportJob do
       expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
     end
 
+    # An inbox deleted while its batches waited fails them before `perform`: the arguments
+    # no longer deserialize and the batch is dropped there, holding no slot and waking nobody.
+    it 'wakes the next batch when it is dropped for an inbox that no longer deserializes' do
+      serialized = job.serialize
+      inbox.destroy!
+      allow(slots).to receive(:top_up)
+
+      ActiveJob::Base.execute(serialized)
+
+      expect(slots).to have_received(:top_up).with(into: described_class.queue_name)
+    end
+
     # The waiting queue is where a batch sits, not where it runs: a woken batch that finds
     # its chat busy goes back to the chat lock's retries on its own queue.
     it 'retries a woken batch on its own queue when the chat is busy' do
