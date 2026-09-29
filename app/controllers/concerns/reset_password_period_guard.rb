@@ -16,7 +16,10 @@ module ResetPasswordPeriodGuard
   def update
     digest = Devise.token_generator.digest(self, :reset_password_token, params[:reset_password_token])
     recoverable = User.find_by(reset_password_token: digest)
-    return super if recoverable.nil? || reset_token_in_period?(recoverable)
+    # One transaction, because the reset confirms the account before it validates the new
+    # password: a password the server rejects would otherwise leave an invitee confirmed, and
+    # the retry with the same invitation would fall into the 6-hour window.
+    return ActiveRecord::Base.transaction { super } if recoverable.nil? || reset_token_in_period?(recoverable)
 
     render json: { message: 'Invalid token', redirect_url: '/' }, status: :unprocessable_entity
   end

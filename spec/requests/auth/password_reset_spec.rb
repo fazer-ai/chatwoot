@@ -49,6 +49,20 @@ RSpec.describe 'Password reset', type: :request do
       expect(user).to be_confirmed
     end
 
+    # The reset confirms the account before the new password is validated: a rejected password
+    # must not leave it confirmed, or the retry falls into the 6-hour window.
+    it 'still accepts the invitation after a password the server rejects' do
+      user.update_column(:reset_password_sent_at, 2.days.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      put '/auth/password', params: params.merge(password: 'short', password_confirmation: 'short'), as: :json
+      expect(response).not_to have_http_status(:ok)
+      expect(user.reload).not_to be_confirmed
+
+      put '/auth/password', params: params, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(user.reload.valid_password?('Password2!')).to be(true)
+    end
+
     it 'refuses an invitation token that was never sent' do
       user.update_column(:reset_password_sent_at, nil) # rubocop:disable Rails/SkipsModelValidations
 
