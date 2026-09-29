@@ -24,6 +24,15 @@ module Whatsapp::Session::Inbound::ImportSlots
   # optimistic transaction loses to another worker; losing a few times in a row is read as
   # no slot, and the job simply comes back later.
   ATTEMPTS = 5
+  # Where a batch that found every slot taken waits. No Sidekiq process reads it, so nothing
+  # in it runs until somebody moves it out: whoever gives a slot back, a batch that has just
+  # joined it and finds a slot free, and the minute sweep for a slot nobody gave back.
+  #
+  # It replaced a fixed delay of 15 to 30 seconds, which left a freed slot idle until one of
+  # the delayed batches happened to come back: at a cap of 1, twenty batches of 0.7 s took
+  # 380 s. Sidekiq's scheduled poller runs every few seconds on its own, so no shorter delay
+  # could have closed the gap either.
+  WAITING_QUEUE = 'history_import_waiting'.freeze
 
   module_function
 
@@ -43,6 +52,30 @@ module Whatsapp::Session::Inbound::ImportSlots
   def concurrency
     value = Integer(ENV.fetch('HISTORY_IMPORT_MAX_CONCURRENCY', ''), exception: false)
     value&.positive? ? value : DEFAULT_CONCURRENCY
+  end
+
+  # Moves the oldest waiting batches, as many as there are free slots, to the head of the
+  # queue they run from, so they are the next thing fetched there. Sidekiq pushes on the left
+  # and fetches from the right: the block is taken off the right of the waiting queue and
+  # pushed onto the right of the other in the same order, oldest outermost. One script, so a
+  # batch is in one list or the other and never in neither.
+  WAKE = <<~LUA.freeze
+    local count = tonumber(ARGV[1])
+    if count <= 0 then return 0 end
+    local batches = redis.call('LRANGE', KEYS[1], -count, -1)
+    if #batches == 0 then return 0 end
+    redis.call('LTRIM', KEYS[1], 0, -(#batches + 1))
+    redis.call('RPUSH', KEYS[2], unpack(batches))
+    return #batches
+  LUA
+
+  # Says how many it woke. Two callers can see the same free slot and both wake a batch; the
+  # one that loses the claim goes back to waiting, which costs a job and not a slot.
+  def top_up(into:, limit: concurrency, waiting: "queue:#{WAITING_QUEUE}")
+    free = limit - taken
+    return 0 unless free.positive?
+
+    Sidekiq.redis { |conn| conn.call('EVAL', WAKE, 2, waiting, "queue:#{into}", free) }
   end
 
   def taken
