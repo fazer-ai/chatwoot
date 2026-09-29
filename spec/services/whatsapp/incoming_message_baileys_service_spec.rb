@@ -1506,6 +1506,39 @@ describe Whatsapp::IncomingMessageBaileysService do
           expect(message.reload.status).to eq('failed')
           expect(message.external_error).to be_blank
         end
+
+        { 1 => 'sent', 2 => 'sent', 3 => 'delivered', 4 => 'read' }.each do |baileys_status, status|
+          it "clears the external_error when a failed message moves to #{status} (Baileys #{baileys_status})" do
+            message.update!(status: 'failed', external_error: 'WhatsApp error 479')
+            update_payload[:update][:status] = baileys_status
+
+            described_class.new(inbox: inbox, params: params).perform
+
+            expect(message.reload.status).to eq(status)
+            expect(message.external_error).to be_nil
+          end
+        end
+
+        it 'keeps the external_error of a failed message on an update that maps to no status' do
+          message.update!(status: 'failed', external_error: 'WhatsApp error 479')
+          update_payload[:update][:status] = 5
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.status).to eq('failed')
+          expect(message.external_error).to eq('WhatsApp error 479')
+        end
+
+        it "does not mark a 'read' message as failed" do
+          message.update!(status: 'read')
+          update_payload[:update][:status] = 0
+          update_payload[:update][:messageStubParameters] = ['479']
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(message.reload.status).to eq('read')
+          expect(message.external_error).to be_nil
+        end
       end
 
       context 'when is a content update' do
@@ -1669,6 +1702,15 @@ describe Whatsapp::IncomingMessageBaileysService do
         described_class.new(inbox: inbox, params: params).perform
 
         expect(message.reload.status).to eq('delivered')
+      end
+
+      it 'clears the external_error when a failed message is delivered' do
+        message.update!(status: 'failed', external_error: 'WhatsApp error 479')
+
+        described_class.new(inbox: inbox, params: params).perform
+
+        expect(message.reload.status).to eq('delivered')
+        expect(message.external_error).to be_nil
       end
 
       it 'does not downgrade a read message on receiptTimestamp' do
