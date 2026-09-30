@@ -205,6 +205,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  # Pointed at another instance of the same provider while the slice waited: the provider
+  # did not change, the account behind the inbox did.
+  it 'files nothing once the inbox points at another instance' do
+    perform_enqueued_jobs(only: []) { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }
+    channel.update_columns(provider_config: channel.provider_config.merge('token' => 'another')) # rubocop:disable Rails/SkipsModelValidations
+
+    perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+
+    expect(inbox.messages).to be_empty
+  end
+
   describe 'what it refuses' do
     it 'ignores a kind it does not import' do
       chats = model::Event.build(model::Events::HistorySync.new(kind: 'chats', data: { 'chats' => [] }))

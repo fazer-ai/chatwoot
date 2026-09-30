@@ -20,6 +20,17 @@ RSpec.describe Whatsapp::Session::DeferredEventJob do
     expect(message.reload.content).to eq('corrigido')
   end
 
+  it 'drops the event once the inbox holds another account' do
+    conversation = create(:conversation, inbox: inbox, account: inbox.account)
+    message = create(:message, conversation: conversation, inbox: inbox, account: inbox.account, source_id: '3EB0LATE', content: 'original')
+    frame = edit.to_frame
+    channel.update_columns(provider: 'uazapi', provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x' }) # rubocop:disable Rails/SkipsModelValidations
+
+    described_class.perform_now(channel, frame)
+
+    expect(message.reload.content).to eq('original')
+  end
+
   it 'tries again while the message is still missing' do
     expect { described_class.perform_now(channel, edit.to_frame) }.to have_enqueued_job(described_class)
   end

@@ -100,6 +100,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     it 'tells the thread somebody is reading, so the button goes without a reload' do
       thread = threads_of(a_contact, phone, %i[open]).first
       allow(ActionCableListener.instance).to receive(:conversation_updated)
+      expect(EventDispatcherJob).not_to receive(:perform_later)
 
       deliver(slice([], exhausted: true))
 
@@ -150,6 +151,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.where(source_id: newer.map(&:id)).map { |row| row.conversation.status }.uniq).to eq(['open'])
     end
 
+    # A press on one chat opens a window for the whole inbox, and a pairing dump arriving
+    # at the same time is not what was asked for: the connector says which slice answers.
+    it 'keeps the dump volunteered while a request is pending out of the archive' do
+      cover!(4.days.ago)
+      Whatsapp::Session::HistoryBackfill.open!(channel)
+
+      deliver(slice([historical('3EB0VOL', 10.days.ago)], sync: 'full'))
+
+      expect(inbox.messages.where(source_id: '3EB0VOL')).to be_empty
+    ensure
+      Whatsapp::Session::HistoryBackfill.close!(channel)
+    end
+
     # The phone pages back only from a message it dumped, so the newest one dropped is kept
     # as the anchor a later request for the chat starts from.
     it 'keeps where the dropped archive ended, to page back from later' do
@@ -161,6 +175,15 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.where(source_id: dropped.map(&:id))).to be_empty
       anchor = Whatsapp::Session::HistoryAnchors.recall(inbox, [chat])
       expect(anchor).to have_attributes(id: '3EB0DROP8', timestamp: dropped[1].timestamp, from_me: false)
+    end
+
+    it 'keeps the newest dropped message whatever order the slices arrive in' do
+      cover!(4.days.ago)
+
+      deliver(slice([historical('3EB0LATER', 8.days.ago)], sync: 'full'))
+      deliver(slice([historical('3EB0EARLIER', 20.days.ago)], sync: 'full'))
+
+      expect(Whatsapp::Session::HistoryAnchors.recall(inbox, [chat]).id).to eq('3EB0LATER')
     end
 
     it 'archives the dump in silence when the setting is on' do

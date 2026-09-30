@@ -68,7 +68,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
     end
     # After the messages, so a slice that is both the last of a chat and the first this
     # inbox sees of it marks the thread its own messages just opened.
-    marked = mark_exhausted
+    marked = announcing { mark_exhausted }
     batches.empty? && !marked ? :ignored : :handled
   end
 
@@ -238,7 +238,8 @@ class Whatsapp::Session::Inbound::HistoryImporter
       conversation.update!(additional_attributes: (conversation.additional_attributes || {}).merge('history_exhausted' => true))
       # Said out loud: `history_exhausted` is not among the keys whose change announces a
       # conversation, and the thread somebody is reading has to drop the button now, not
-      # on the next reload.
+      # on the next reload. Inside `announcing`, so the dashboard hears it and nothing
+      # else does: no automation or webhook fires for every old thread of the contact.
       conversation.dispatch_conversation_updated_event(conversation.previous_changes)
     end
     true

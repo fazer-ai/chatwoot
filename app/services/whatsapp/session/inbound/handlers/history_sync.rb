@@ -62,9 +62,14 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   # to ask for messages *after* a point: the on-demand request only walks backwards, and
   # the phone's own account of what was missed arrives on its own after a pairing. Refusing
   # it threw away the only copy of the weekend.
+  #
+  # The window is only for a provider that does not type its slices. One that does says
+  # which slice answers a request, and a window opened for one chat would otherwise pass
+  # every other chat's archive in a dump that happened to be arriving at the same time.
   def asked_for?
     return true if on_demand?
     return true if channel.provider_service.try(:history_sync?)
+    return false if data['sync'].present?
     return false unless Whatsapp::Session::HistoryBackfill.pending?(channel)
 
     # Held open for as long as the answer keeps coming: a dump arrives in several frames,

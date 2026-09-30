@@ -745,6 +745,15 @@ RSpec.describe Whatsapp::Session::Facade do
       Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
     end
 
+    it 'pages back from the message the caller names' do
+      named = stored(conversation, '3EB0NAMED', 1.hour.ago)
+      stored(conversation, '3EB0OLDER', 2.days.ago)
+
+      facade.request_history(contact, before: named)
+
+      expect(backend.last_command.before.id).to eq('3EB0NAMED')
+    end
+
     # Without an anchor the connector refuses the request as unsupported, so none is sent.
     it 'asks nothing for a contact with no stored message to page back from' do
       conversation

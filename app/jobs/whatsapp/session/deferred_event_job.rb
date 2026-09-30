@@ -21,6 +21,11 @@ class Whatsapp::Session::DeferredEventJob < ApplicationJob
   # `frame` is the event as the connector published it, so the retry reads exactly what the
   # consumer read.
   def perform(channel, frame)
+    # The channel is read as it is now, so the dispatcher's own check against a conversion
+    # compares the new provider with itself. The frame still names the session it came
+    # from, and an inbox that no longer holds it is not where this edit belongs.
+    return unless channel.provider == 'native' && channel.provider_config&.dig('session_id') == frame['sid']
+
     event = Whatsapp::Session::Model::Event.from_frame(frame)
     return unless Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred
 
