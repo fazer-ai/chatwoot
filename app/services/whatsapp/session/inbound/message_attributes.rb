@@ -76,7 +76,11 @@ class Whatsapp::Session::Inbound::MessageAttributes
       # Not the same statement as `external_created_at`, which every session message
       # carries: this one says the row was filed after the fact, which is what a report
       # excluding backfilled traffic, or a bubble explaining an old date, has to read.
-      imported: (true if imported)
+      imported: (true if imported),
+      # The archive half of an import, as opposed to the gap: history nobody is waiting on,
+      # which the dashboard may show when somebody asked for it but never alerts about.
+      # Read off the level the importer writes it under, which is where that is decided.
+      history_archive: (true if imported && Import::SilentWrite.archive?)
     }
   end
 

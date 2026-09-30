@@ -210,7 +210,11 @@ class ActionCableConnector extends BaseActionCableConnector {
       conversation: { last_activity_at: lastActivityAt },
       conversation_id: conversationId,
     } = data;
-    DashboardAudioNotificationHelper.onNewMessage(data);
+    // History somebody asked for is shown as it lands, but it is not new mail and
+    // must not sound or flash for the rest of the inbox.
+    if (!data.content_attributes?.history_archive) {
+      DashboardAudioNotificationHelper.onNewMessage(data);
+    }
     this.app.$store.dispatch('addMessage', data);
     this.app.$store.dispatch('updateConversationLastActivity', {
       lastActivityAt,

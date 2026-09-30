@@ -294,6 +294,14 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(levels).to eq([[true, true], [true, true]])
     end
 
+    # The dashboard shows it, and it still says it is archive, so no alert sounds for it.
+    it 'marks the answer as archive and the gap as not' do
+      deliver(slice([historical('3EB0OLDPAGE', 3.days.ago), historical('3EB0FRESH', 1.hour.ago)]))
+
+      expect(inbox.messages.find_by(source_id: '3EB0OLDPAGE').content_attributes['history_archive']).to be(true)
+      expect(inbox.messages.find_by(source_id: '3EB0FRESH').content_attributes['history_archive']).to be_nil
+    end
+
     it 'files the full dump without a word to the dashboard' do
       deliver(slice([3, 4, 5].map { |days| historical("3EB0FUL#{days}", days.days.ago) }, sync: 'full'))
 

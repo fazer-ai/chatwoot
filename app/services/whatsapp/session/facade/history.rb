@@ -53,12 +53,16 @@ module Whatsapp::Session::Facade::History
     capability?('history_sync') && (backend.class.history_on_every_connect? || history_sync?)
   end
 
+  # The oldest imported message first, because only a dump message is an anchor the phone
+  # answers, and a live row older than the dump would otherwise keep every request on the
+  # same page. Then where a dropped archive ended, then whatever is oldest.
   def anchor_for(contact)
-    oldest = oldest_stored_message(contact)
-    return model::Commands::HistoryAnchor.for_message(oldest) if oldest&.content_attributes&.dig('imported')
+    stored = stored_messages(contact)
+    oldest = stored.where(Import::IMPORTED_SQL).first
+    return model::Commands::HistoryAnchor.for_message(oldest) if oldest
 
     Whatsapp::Session::HistoryAnchors.recall(channel.inbox, addresses_of(contact)) ||
-      model::Commands::HistoryAnchor.for_message(oldest)
+      model::Commands::HistoryAnchor.for_message(stored.first)
   end
 
   # Every address the chat may have been dumped under: the dump names it the way the phone
@@ -68,10 +72,9 @@ module Whatsapp::Session::Facade::History
     [model::Address.for_contact(contact), model::Address.phone(contact.phone_number), lid].compact
   end
 
-  def oldest_stored_message(contact)
+  def stored_messages(contact)
     Message.where(conversation_id: contact.conversations.where(inbox_id: channel.inbox.id).select(:id))
            .where.not(source_id: nil)
            .reorder(created_at: :asc, id: :asc)
-           .first
   end
 end

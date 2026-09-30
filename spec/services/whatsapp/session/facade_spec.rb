@@ -745,6 +745,21 @@ RSpec.describe Whatsapp::Session::Facade do
       Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
     end
 
+    # A live row can be older than the whole dump, and the phone never pages from it: the
+    # oldest imported page is where the next request has to start, or every press asks for
+    # the same page again.
+    it 'pages back from the oldest imported message even with an older live one stored' do
+      stored(conversation, '3EB0ANCIENT', 1.year.ago)
+      page = stored(conversation, '3EB0PAGE', 1.month.ago)
+      page.update!(content_attributes: { 'imported' => true })
+      newer_page = stored(conversation, '3EB0NEWERPAGE', 1.week.ago)
+      newer_page.update!(content_attributes: { 'imported' => true })
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0PAGE')
+    end
+
     it 'pages back from the message the caller names' do
       named = stored(conversation, '3EB0NAMED', 1.hour.ago)
       stored(conversation, '3EB0OLDER', 2.days.ago)

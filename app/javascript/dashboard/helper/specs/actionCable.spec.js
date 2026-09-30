@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest';
 import ActionCableConnector from '../actionCable';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import DashboardAudioNotificationHelper from '../AudioAlerts/DashboardAudioNotificationHelper';
 
 vi.mock('shared/helpers/mitt', () => ({
   emitter: {
@@ -46,6 +47,41 @@ describe('ActionCableConnector - Copilot Tests', () => {
     vi.restoreAllMocks();
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  describe('message.created event handler', () => {
+    const message = contentAttributes => ({
+      id: 1,
+      conversation_id: 7,
+      conversation: { last_activity_at: 1 },
+      content_attributes: contentAttributes,
+    });
+
+    it('alerts for a new message', () => {
+      const alert = vi
+        .spyOn(DashboardAudioNotificationHelper, 'onNewMessage')
+        .mockImplementation(() => {});
+      actionCable.onMessageCreated(message({}));
+      expect(alert).toHaveBeenCalled();
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'addMessage',
+        expect.anything()
+      );
+    });
+
+    it('shows archived history without alerting about it', () => {
+      const alert = vi
+        .spyOn(DashboardAudioNotificationHelper, 'onNewMessage')
+        .mockImplementation(() => {});
+      actionCable.onMessageCreated(
+        message({ imported: true, history_archive: true })
+      );
+      expect(alert).not.toHaveBeenCalled();
+      expect(mockDispatch).toHaveBeenCalledWith(
+        'addMessage',
+        expect.anything()
+      );
+    });
   });
 
   describe('contact.group_synced event handler', () => {
