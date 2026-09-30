@@ -220,8 +220,13 @@ class Whatsapp::Session::Inbound::HistoryImporter
     (@subjects ||= {}).fetch(group.id) { @subjects[group.id] = (group_name if unnamed?(group)) }
   end
 
+  # The account's contact for the group, not only this inbox's: another inbox may already
+  # know it, and the builder reuses that contact by identifier, so a name decided here
+  # lands on every inbox that shares it.
   def unnamed?(group)
-    known = inbox.contact_inboxes.find_by(source_id: group.id)&.contact&.name
+    contact = inbox.contact_inboxes.find_by(source_id: group.id)&.contact ||
+              inbox.account.contacts.find_by(identifier: group.to_jid)
+    known = contact&.name
     known.blank? || [group.id, group.to_jid].include?(known)
   end
 

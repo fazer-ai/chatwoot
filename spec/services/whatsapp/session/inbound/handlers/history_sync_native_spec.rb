@@ -329,6 +329,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       slice(ids.each_with_index.map { |id, days| historical(id, (days + 1).days.ago, chat: group) }, chat: group, name: name)
     end
 
+    it 'leaves alone a group another inbox of the account already named' do
+      elsewhere = model::Address.group('120363400000000003')
+      contact = create(:contact, account: inbox.account, name: 'Nome de Outra Inbox', identifier: elsewhere.to_jid, group_type: :group)
+      create(:contact_inbox, contact: contact, inbox: create(:inbox, account: inbox.account), source_id: elsewhere.id)
+
+      deliver(group_slice(elsewhere, 'Nome do Dump', %w[3EB0G31]))
+
+      expect(contact.reload.name).to eq('Nome de Outra Inbox')
+    end
+
     it 'names a group filed under its own id, and leaves a named one alone' do
       deliver(group_slice(unnamed, 'Grupo WAC 407', %w[3EB0G11 3EB0G12]))
       deliver(group_slice(named, 'Outro Nome', %w[3EB0G21 3EB0G22]))
