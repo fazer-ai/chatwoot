@@ -30,6 +30,8 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # lands on the chat right then is parked with the lock about to come free.
   BUSY_WAITS = [5, 15, 30, 60, 60, 60, 60, 60].freeze
   PAUSE_SLICE = 0.5
+  # How long an event about a message not stored yet waits before its first retry.
+  DEFERRED_WAIT = 30.seconds
   # How long the shard waits out an outage before it tries its backlog again.
   STALL_WAIT = 30
 
@@ -235,7 +237,10 @@ class Whatsapp::Connector::Consumer::ShardWorker
     return orphaned(event) if channel.nil?
     return unless cursor.behind?(event)
 
-    Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+    outcome = Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event)
+    # Its target may be a history message still queued for import, which the stream's
+    # order no longer covers: tried again off the shard rather than waited on here.
+    Whatsapp::Session::DeferredEventJob.set(wait: DEFERRED_WAIT).perform_later(channel, event.to_frame) if outcome == :deferred
     mark_processed(event)
   end
 

@@ -111,7 +111,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
       # is the only part of that offer this inbox is missing. A first pairing has no
       # coverage at all, so `gap?` calls the whole pile archive and this drops all of it,
       # which is what the old outright refusal was protecting.
-      archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
+      archived = file_archive(runs[false])
       gap = announcing { import_run(runs[true], archived: false) }
       settle(archived, gap)
     end
@@ -196,6 +196,16 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # conversation instead of once per message, and only in the direction that is true.
   # Raises the flag for the stretch it wraps. Only the gap ever asks for it, and only the
   # dashboard push gets through: see Import::SilentWrite.
+  # Filed when somebody asked for it. When nobody did, nothing is filed, but the newest
+  # message of what was dropped is kept as the place a later request for this chat can
+  # page back from: see HistoryAnchors.
+  def file_archive(run)
+    return maybe_announcing { import_run(run, archived: true) } if requested
+
+    Whatsapp::Session::HistoryAnchors.remember(inbox, run.max_by { |message| message.timestamp.to_i }) if run.present?
+    []
+  end
+
   def announcing(&) = Import::SilentWrite.wrap(announce: true, &)
   def maybe_announcing(&) = announce ? announcing(&) : yield
 
@@ -226,6 +236,10 @@ class Whatsapp::Session::Inbound::HistoryImporter
       next if conversation.additional_attributes&.dig('history_exhausted')
 
       conversation.update!(additional_attributes: (conversation.additional_attributes || {}).merge('history_exhausted' => true))
+      # Said out loud: `history_exhausted` is not among the keys whose change announces a
+      # conversation, and the thread somebody is reading has to drop the button now, not
+      # on the next reload.
+      conversation.dispatch_conversation_updated_event(conversation.previous_changes)
     end
     true
   end

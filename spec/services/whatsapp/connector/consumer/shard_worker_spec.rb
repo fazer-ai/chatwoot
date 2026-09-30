@@ -215,6 +215,16 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(inbox.messages.pluck(:source_id)).to eq(['3EB0AAAA0001'])
   end
 
+  # A history slice is filed by a job, so an edit that follows it on the stream can find
+  # its target still waiting in the import queue.
+  it 'hands an event about a message not stored yet to a retry, and moves on' do
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch).and_return(:deferred)
+    redis.xadd(stream, frame)
+
+    expect { expect(worker.poll).to eq(1) }.to have_enqueued_job(Whatsapp::Session::DeferredEventJob)
+      .with(channel, hash_including('type' => 'message.received'))
+  end
+
   it 'leaves an entry pending when it is stopped mid-retry' do
     stub_const("#{described_class}::RETRY_WAITS", [0, 0])
     allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch) do

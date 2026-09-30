@@ -45,7 +45,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
   def cover!(at)
     other = create(:conversation, inbox: inbox, account: inbox.account)
-    create(:message, conversation: other, inbox: inbox, account: inbox.account, source_id: 'LIVE00', created_at: at)
+    create(:message, conversation: other, inbox: inbox, account: inbox.account, source_id: "LIVE#{SecureRandom.hex(4)}", created_at: at)
   end
 
   def exhausted?(conversation) = conversation.reload.additional_attributes&.dig('history_exhausted') == true
@@ -97,6 +97,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect((by_phone + by_lid).map { |thread| exhausted?(thread) }).to eq([true, true, true])
     end
 
+    it 'tells the thread somebody is reading, so the button goes without a reload' do
+      thread = threads_of(a_contact, phone, %i[open]).first
+      allow(ActionCableListener.instance).to receive(:conversation_updated)
+
+      deliver(slice([], exhausted: true))
+
+      expect(ActionCableListener.instance).to have_received(:conversation_updated)
+        .with(having_attributes(data: hash_including(conversation: thread))).at_least(:once)
+    end
+
     it 'marks only when the slice says so, and after its messages are filed' do
       thread = threads_of(a_contact, phone, %i[open]).first
       first = [0, 1, 2].map { |minute| historical("3EB0A#{minute}", 5.days.ago + minute.minutes) }
@@ -114,6 +124,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  describe 'a slice that waited while the inbox moved on' do
+    # A native inbox keeps its session id for good, so what moves it is a conversion to
+    # another provider; written past the callbacks, which is all the job gets to see.
+    it 'files nothing once the inbox has moved to another provider' do
+      dispatch(slice([historical('3EB0MOVED', 2.days.ago)]))
+      channel.update_columns(provider: 'uazapi', provider_config: { 'base_url' => 'https://uazapi.test', 'token' => 'x' }) # rubocop:disable Rails/SkipsModelValidations
+
+      perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+
+      expect(inbox.messages.where(source_id: '3EB0MOVED')).to be_empty
+    end
+  end
+
   describe 'what the setting decides' do
     it 'files only what arrived while the session was down when nobody asked' do
       watermark = 4.days.ago
@@ -125,6 +148,19 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
       expect(inbox.messages.where(source_id: older.map(&:id))).to be_empty
       expect(inbox.messages.where(source_id: newer.map(&:id)).map { |row| row.conversation.status }.uniq).to eq(['open'])
+    end
+
+    # The phone pages back only from a message it dumped, so the newest one dropped is kept
+    # as the anchor a later request for the chat starts from.
+    it 'keeps where the dropped archive ended, to page back from later' do
+      cover!(4.days.ago)
+      dropped = [10, 8, 9].map { |days| historical("3EB0DROP#{days}", days.days.ago) }
+
+      deliver(slice(dropped, sync: 'full'))
+
+      expect(inbox.messages.where(source_id: dropped.map(&:id))).to be_empty
+      anchor = Whatsapp::Session::HistoryAnchors.recall(inbox, [chat])
+      expect(anchor).to have_attributes(id: '3EB0DROP8', timestamp: dropped[1].timestamp, from_me: false)
     end
 
     it 'archives the dump in silence when the setting is on' do
@@ -220,6 +256,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(image.attachments).to be_empty
       expect(enqueued_jobs.map { |job| job['job_class'] }).not_to include('Whatsapp::Session::MediaFetchJob')
     end
+  end
+
+  # A provider whose history does carry the file's reference (uazapi) still gets it fetched.
+  it 'leaves an imported file that can still be fetched as a file' do
+    threads_of(a_contact, phone, %i[open])
+    ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
+    fetchable = historical('3EB0REF', 1.day.ago, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+    deliver(slice([fetchable]))
+
+    expect(inbox.messages.find_by(source_id: '3EB0REF').content_attributes['is_unsupported']).to be_nil
+  end
+
+  # The boundary is read once, when the slice is read, and handed to the job: slices of one
+  # dump run in parallel, and one reading it for itself would measure against what the
+  # others had already written.
+  it 'files a slice against the boundary read when it arrived, not when its job ran' do
+    cover!(1.day.ago)
+    dispatch(slice([historical('3EB0HALF', 12.hours.ago)], sync: 'recent'))
+    cover!(1.minute.ago)
+
+    perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+
+    expect(inbox.messages.find_by(source_id: '3EB0HALF').conversation.status).to eq('open')
   end
 
   describe 'the same message twice' do

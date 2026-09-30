@@ -46,7 +46,7 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   # Left off when there is nothing to say, so a job queued by this build stays readable by
   # the build before it for everything but what this build added.
   def filing
-    filing = { announce: on_demand? }
+    filing = { announce: on_demand?, identity: Whatsapp::Session::HistoryImportJob.identity(channel) }
     filing[:group_name] = data['name'] if data['name'].present?
     filing[:exhausted] = exhausted.to_h if exhausted
     filing

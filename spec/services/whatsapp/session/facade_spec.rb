@@ -723,6 +723,28 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(backend.last_command.before.timestamp).to eq(1_755_430_000_000)
     end
 
+    # Anchored on a message that arrived live the phone never answers, so what the import
+    # dropped from the dump is asked instead, and a dump message the inbox kept wins over it.
+    it 'pages back from where the dropped archive ended when the oldest stored message arrived live' do
+      stored(conversation, '3EB0LIVE', 1.hour.ago)
+      Whatsapp::Session::HistoryAnchors.remember(
+        inbox, model::InboundMessage.new(id: '3EB0DUMPED', chat: model::Address.phone('5541999990000'), from_me: true,
+                                         timestamp: 1_755_430_000_000, content: model::Content::Text.new(body: 'x'))
+      )
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before).to have_attributes(id: '3EB0DUMPED', timestamp: 1_755_430_000_000, from_me: true)
+
+      imported = stored(conversation, '3EB0KEPT', 2.days.ago)
+      imported.update!(content_attributes: { 'imported' => true })
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0KEPT')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
+    end
+
     # Without an anchor the connector refuses the request as unsupported, so none is sent.
     it 'asks nothing for a contact with no stored message to page back from' do
       conversation

@@ -22,6 +22,15 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
     Whatsapp::Session::Inbound::ImportSlots.top_up(into: job.class.queue_name)
   end
 
+  # Who the slice was read from, which the job reads back before writing: while it waited
+  # the inbox may have moved to another provider, or been pointed at another instance or
+  # session of the same one, and a pile from the previous account filed here would be
+  # somebody else's conversations. The dispatcher asks the same question of an event;
+  # this is the same event arriving late.
+  def self.identity(channel)
+    [channel.provider, Whatsapp::Session::Registry.instance_fingerprint(channel) || channel.provider_config&.dig('session_id')]
+  end
+
   # `messages` are the slice as the contract puts it on the wire. Everything after
   # `requested` says how to file it rather than what is in it, and is collected rather than
   # listed for the reason the Baileys job gives: a job's arguments outlive the deploy that
@@ -29,7 +38,9 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   def perform(inbox, messages, watermark, requested, **filing)
     self.queue_name = self.class.queue_name
     channel = inbox&.channel
-    return slots.top_up(into: queue_name) unless channel.respond_to?(:session_capabilities)
+    # Dropped without taking a slot, so it gives none back: the batch behind it is woken
+    # here or it waits for the sweep.
+    return slots.top_up(into: queue_name) unless same_account?(channel, filing[:identity])
 
     held = false
     slots.with_slot do
@@ -46,6 +57,12 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   private
 
   def slots = Whatsapp::Session::Inbound::ImportSlots
+
+  def same_account?(channel, identity)
+    return false unless channel.is_a?(Channel::Whatsapp) && Whatsapp::Session::Registry.session_provider?(channel.provider)
+
+    identity.nil? || Array(identity) == self.class.identity(channel)
+  end
 
   def import(channel, messages, watermark, requested, filing)
     Whatsapp::Session::Inbound::HistoryImporter.new(

@@ -14,21 +14,21 @@ module Whatsapp::Session::Facade::History
   #
   # A backend that can only page backwards from a message gets the oldest one this inbox
   # holds for the contact, across every thread it opened, which is where the phone's copy
-  # and ours stop overlapping. With nothing stored there is nothing to page from, and
-  # nothing is asked: the answer is false rather than a request the provider refuses.
+  # and ours stop overlapping. When that one arrived live rather than out of a dump, the
+  # phone will not page from it, and the key kept from the archive the import dropped is
+  # asked instead (see HistoryAnchors). With nothing to page from, nothing is asked: the
+  # answer is false rather than a request the provider refuses.
   def request_history(contact, count: nil, before: nil)
     raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.history_sync_unsupported') unless capability?('history_sync')
 
-    if backend.class.history_needs_anchor?
-      before ||= oldest_stored_message(contact)
-      return false if before.nil?
+    anchor = model::Commands::HistoryAnchor.for_message(before)
+    if backend.class.history_needs_anchor? && before.nil?
+      anchor = anchor_for(contact)
+      return false if anchor.nil?
     end
 
     backend.request_history(
-      model::Commands::HistoryRequest.new(
-        chat: model::Address.for_contact(contact), count: count,
-        before: model::Commands::HistoryAnchor.for_message(before)
-      )
+      model::Commands::HistoryRequest.new(chat: model::Address.for_contact(contact), count: count, before: anchor)
     )
     true
   end
@@ -51,6 +51,21 @@ module Whatsapp::Session::Facade::History
   # arrives inside the history dump: see Backend.history_on_every_connect?.
   def history_on_connect?
     capability?('history_sync') && (backend.class.history_on_every_connect? || history_sync?)
+  end
+
+  def anchor_for(contact)
+    oldest = oldest_stored_message(contact)
+    return model::Commands::HistoryAnchor.for_message(oldest) if oldest&.content_attributes&.dig('imported')
+
+    Whatsapp::Session::HistoryAnchors.recall(channel.inbox, addresses_of(contact)) ||
+      model::Commands::HistoryAnchor.for_message(oldest)
+  end
+
+  # Every address the chat may have been dumped under: the dump names it the way the phone
+  # holds it, which is not always the way the contact row does.
+  def addresses_of(contact)
+    lid = model::Address.lid(contact.identifier) if contact.identifier.to_s.end_with?('@lid')
+    [model::Address.for_contact(contact), model::Address.phone(contact.phone_number), lid].compact
   end
 
   def oldest_stored_message(contact)
