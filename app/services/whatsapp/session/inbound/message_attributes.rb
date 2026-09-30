@@ -50,7 +50,11 @@ class Whatsapp::Session::Inbound::MessageAttributes
   def content_type = content&.wire_type
   def incoming? = inbound.incoming?
 
+  # A card with readable text stays a card: only its header is missing, and marking the whole
+  # row unsupported would hide the text and buttons it does have.
   def unfetchable_media?
+    return false if content_type == 'rich' && content.preview_text.present?
+
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     media.present? && media.ref.blank?
   end

@@ -384,6 +384,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(enqueued_jobs.map { |job| job['job_class'] }).not_to include('Whatsapp::Session::MediaFetchJob')
     end
 
+    # A card is still readable without its header, so it stays a card.
+    it 'keeps a card with text readable when only its header picture is missing' do
+      card = model::Content::Rich.new(kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega',
+                                      media: model::Content::Media.new(kind: 'image', mime: 'image/jpeg'))
+
+      deliver(slice([historical('3EB0CARD', 2.days.ago, content: card)]))
+
+      expect(inbox.messages.find_by(source_id: '3EB0CARD').content_attributes['is_unsupported']).to be_nil
+    end
+
     # A caption edit is not the file: the bubble has to keep saying the file is missing.
     it 'keeps the picture marked missing after its caption is edited' do
       deliver(slice(messages))
