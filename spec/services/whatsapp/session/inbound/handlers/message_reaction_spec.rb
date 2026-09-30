@@ -186,6 +186,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
       expect(removed.content_attributes['deleted']).to be(true)
     end
 
+    # Replayed late, off the ordered stream, after the sender reacted again: the removal
+    # is about the reaction before, and the one on the bubble now stays.
+    it 'leaves a newer reaction alone when the removal is older than it' do
+      inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").find_each do |row|
+        row.update!(content: '❤️', content_attributes: row.content_attributes.merge('external_created_at' => 1_755_440_100))
+      end
+
+      dispatch
+
+      kept = inbox.messages.find_by("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
+      expect(kept.content).to eq('❤️')
+      expect(kept.content_attributes['deleted']).to be_nil
+    end
+
     it 'ignores a removal with nothing left to remove' do
       inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
            .update_all(content: '') # rubocop:disable Rails/SkipsModelValidations

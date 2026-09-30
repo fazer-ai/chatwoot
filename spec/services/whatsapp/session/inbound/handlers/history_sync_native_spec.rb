@@ -74,12 +74,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
     end
 
+    # The key lives as long as slices keep arriving, so a lost one is dropped by its age.
     it 'forgets a slice that never finished once it is older than a day' do
-      Whatsapp::Session::HistoryImportJob.queued(inbox, 'lost-job')
+      importer = Whatsapp::Session::HistoryImportJob
+      importer.queued(inbox, 'lost-job')
+      travel(importer::PENDING_TTL - 1.hour)
+      importer.queued(inbox, 'later-job')
+      importer.finished(inbox, 'later-job')
+      travel(2.hours)
 
-      travel(Whatsapp::Session::HistoryImportJob::PENDING_TTL + 1.minute) do
-        expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
-      end
+      expect(importer.pending?(inbox)).to be(false)
     ensure
       Redis::Alfred.delete(Whatsapp::Session::HistoryImportJob.pending_key(inbox))
     end

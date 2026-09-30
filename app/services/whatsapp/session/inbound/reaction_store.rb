@@ -85,9 +85,19 @@ class Whatsapp::Session::Inbound::ReactionStore
 
     # Merged under the row lock: the hash is read to be written back, so reading it off
     # an instance loaded earlier drops whatever another worker put there in between.
-    existing.with_lock do
+    #
+    # Refused when the removal is older than the reaction stored, the same way a stale
+    # swap is: a removal can be replayed late, off the ordered stream, when the message it
+    # is about was waiting for its history import, and by then the sender may have reacted
+    # again.
+    removed = existing.with_lock do
+      next false if stale?(existing)
+
       existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
+      true
     end
+    return nil unless removed
+
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
