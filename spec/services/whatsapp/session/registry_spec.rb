@@ -51,6 +51,16 @@ RSpec.describe Whatsapp::Session::Registry do
     expect(descriptor.available?).to be(false)
   end
 
+  # The connector publishes the phone's history and pages it back on request, so the
+  # native inbox offers both, with the same setting the other history providers show.
+  it 'declares history on native, with the setting that decides the archive' do
+    native = described_class.descriptor('native')
+
+    expect(native.capabilities).to include('history_sync', 'groups', 'media_download', 'calls', 'code_pairing')
+    expect(native.fields.map(&:name)).to include('history_sync')
+    expect(described_class.descriptor('uazapi').capabilities).to include('history_sync')
+  end
+
   it 'requires a deployed connector before native can be used' do
     descriptor = Whatsapp::Session::ProviderDescriptor.new(key: 'native', backend: 'Whatsapp::Session::Backends::Fake')
 

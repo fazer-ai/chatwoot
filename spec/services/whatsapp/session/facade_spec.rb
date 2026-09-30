@@ -655,4 +655,81 @@ RSpec.describe Whatsapp::Session::Facade do
       expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
     end
   end
+
+  describe 'history on a backend that pages from a message' do
+    let(:model) { Whatsapp::Session::Model }
+
+    before do
+      allow(backend.class).to receive_messages(history_on_every_connect?: true, history_needs_anchor?: true)
+    end
+
+    def stored(conversation, source_id, at, outgoing: false)
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: source_id,
+                       created_at: at, message_type: outgoing ? :outgoing : :incoming)
+    end
+
+    # What arrived while the session was down comes in the same dump as the archive, so a
+    # connect that asked for no history would lose it. The setting decides the archive only.
+    it 'asks for history on every connect, with the setting off' do
+      channel.request_pairing_code
+      channel.reassert_desired_state
+
+      expect(backend.commands_of('session.connect').map(&:history_sync)).to eq([true, true])
+    end
+
+    it 'still asks for it with the setting on' do
+      channel.update!(provider_config: channel.provider_config.merge('history_sync' => true))
+
+      channel.request_pairing_code
+
+      expect(backend.last_command.history_sync).to be(true)
+    end
+
+    it 'leaves history off on a backend whose connect follows the setting' do
+      allow(backend.class).to receive(:history_on_every_connect?).and_return(false)
+
+      channel.request_pairing_code
+
+      expect(backend.last_command.history_sync).to be(false)
+    end
+
+    # The phone only walks back from a message it is shown, and the one to show it is the
+    # oldest this inbox holds for the chat, whichever thread it is in: the thread on the
+    # screen is usually the newest.
+    it 'pages back from the oldest message the contact has in any thread of the inbox' do
+      older = create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox, account: channel.account,
+                                    status: :resolved)
+      oldest = stored(older, '3EB0OLDEST', 3.days.ago, outgoing: true)
+      stored(older, '3EB0MIDDLE', 2.days.ago)
+      stored(conversation, '3EB0NEWEST', 1.hour.ago)
+      create(:message, conversation: older, inbox: inbox, account: channel.account, source_id: nil, created_at: 4.days.ago,
+                       message_type: :activity)
+
+      expect(facade.request_history(contact)).to be(true)
+
+      request = backend.last_command
+      expect(request).to be_a(model::Commands::HistoryRequest)
+      expect(request.chat.to_h).to eq(model::Address.for_contact(contact).to_h)
+      expect(request.before).to have_attributes(id: '3EB0OLDEST', from_me: true)
+      expect(request.before.timestamp).to be_within(1000).of((oldest.created_at.to_f * 1000).to_i)
+    end
+
+    it 'times the anchor by the clock WhatsApp gave the message, when the row has it' do
+      message = stored(conversation, '3EB0TIMED', 1.hour.ago)
+      message.update!(content_attributes: { 'external_created_at' => 1_755_430_000 })
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.timestamp).to eq(1_755_430_000_000)
+    end
+
+    # Without an anchor the connector refuses the request as unsupported, so none is sent.
+    it 'asks nothing for a contact with no stored message to page back from' do
+      conversation
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: nil, private: true)
+
+      expect(facade.request_history(contact)).to be(false)
+      expect(backend.commands_of('history.request')).to be_empty
+    end
+  end
 end

@@ -110,6 +110,26 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(described_class.capabilities).to eq(Whatsapp::Session::Registry.descriptor('native').capabilities)
   end
 
+  # The connector answers `history.request` with `null` once the phone was asked, and
+  # refuses one with no anchor; the answer itself comes back as `history.sync`.
+  it 'carries a history request to the session and waits for the connector to take it' do
+    request = model::Commands::HistoryRequest.new(
+      chat: model::Address.phone('5541999990000'), count: 50,
+      before: model::Commands::HistoryAnchor.new(id: '3EB0OLDEST', timestamp: 1_755_430_000_000, from_me: false)
+    )
+
+    expect(backend.request_history(request)).to be_nil
+    expect(client).to have_received(:call).with(request)
+    expect(request.to_h).to include('chat' => { 'kind' => 'phone', 'id' => '5541999990000' },
+                                    'before' => { 'id' => '3EB0OLDEST', 'timestamp' => 1_755_430_000_000, 'from_me' => false })
+  end
+
+  it 'asks for history on every connect and pages only from a message' do
+    expect(described_class.history_on_every_connect?).to be(true)
+    expect(described_class.history_needs_anchor?).to be(true)
+    expect(Whatsapp::Session::Backend.history_on_every_connect?).to be(false)
+  end
+
   it 'refuses to work without the session id the inbox should have generated' do
     channel.update_columns(provider_config: {}) # rubocop:disable Rails/SkipsModelValidations
 
