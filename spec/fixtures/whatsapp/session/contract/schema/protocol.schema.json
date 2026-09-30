@@ -394,7 +394,7 @@
             { "properties": { "type": { "const": "group.activity" }, "payload": { "$ref": "#/definitions/event_group_activity" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.offer" }, "payload": { "$ref": "#/definitions/event_call_offer" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/event_call_terminate" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "history.sync" }, "payload": { "type": "object" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "history.sync" }, "payload": { "$ref": "#/definitions/event_history_sync" } }, "required": ["type"] },
             { "properties": { "type": { "const": "raw" }, "payload": { "$ref": "#/definitions/event_raw" } }, "required": ["type"] }
           ]
         }
@@ -511,6 +511,30 @@
         "code": { "type": "string" }
       },
       "required": ["code"],
+      "additionalProperties": true
+    },
+    "event_history_sync": {
+      "type": "object",
+      "description": "a batch of history, discriminated by kind; the only kind is messages",
+      "properties": {
+        "kind": { "const": "messages" },
+        "progress": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "data": { "$ref": "#/definitions/history_messages" }
+      },
+      "required": ["kind", "data"],
+      "additionalProperties": true
+    },
+    "history_messages": {
+      "type": "object",
+      "description": "one slice of one chat's history, oldest first; a chat whose history is longer than a slice arrives in several",
+      "properties": {
+        "sync": { "enum": ["bootstrap", "recent", "full", "on_demand"], "description": "why the phone sent it: the dump a newly linked device receives, or the answer to history.request" },
+        "chat": { "$ref": "#/definitions/address" },
+        "name": { "type": ["string", "null"], "description": "the group's subject, when the phone sent one" },
+        "messages": { "type": "array", "items": { "$ref": "#/definitions/inbound_message" } },
+        "exhausted": { "type": "boolean", "description": "the phone has nothing older for this chat" }
+      },
+      "required": ["sync", "chat", "messages"],
       "additionalProperties": true
     },
     "event_message_received": {

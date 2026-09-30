@@ -85,10 +85,15 @@ module Import::SilentWrite
   # importer running inside another silenced block does not un-silence it on the way out.
   # That restore is what lets the gap run raise the level for its own stretch and hand the
   # archive level back afterwards, inside one enclosing `wrap`.
-  def wrap(announce: false, indexing: false)
+  #
+  # `archive` is for the one stretch that is both: history somebody pressed a button for,
+  # which is still history. It reaches the dashboard like `:announce` and keeps every
+  # archive-only guard like `:silent`, so an old row does not route a thread, start a bot
+  # or hold a scheduled send just because somebody is watching it arrive.
+  def wrap(announce: false, indexing: false, archive: false)
     previous = ActiveSupport::IsolatedExecutionState[KEY]
     previously_indexing = ActiveSupport::IsolatedExecutionState[INDEXING_KEY]
-    ActiveSupport::IsolatedExecutionState[KEY] = announce ? :announce : :silent
+    ActiveSupport::IsolatedExecutionState[KEY] = level(announce, archive)
     ActiveSupport::IsolatedExecutionState[INDEXING_KEY] = true if indexing
     yield
   ensure
@@ -104,14 +109,20 @@ module Import::SilentWrite
   # that checks it still has to check `on?` first to tell "importing, announcing" from
   # "not importing at all", which is the ordinary case and must go through untouched.
   def announce?
-    ActiveSupport::IsolatedExecutionState[KEY] == :announce
+    %i[announce announced_archive].include?(ActiveSupport::IsolatedExecutionState[KEY])
   end
 
   # Writing history nobody is waiting on. The level a guard should read when what it
   # suppresses would change where a conversation goes or what state it is in, rather than
   # merely stopping a side effect.
   def archive?
-    ActiveSupport::IsolatedExecutionState[KEY] == :silent
+    %i[silent announced_archive].include?(ActiveSupport::IsolatedExecutionState[KEY])
+  end
+
+  def level(announce, archive)
+    return :silent unless announce
+
+    archive ? :announced_archive : :announce
   end
 
   # Whether the writer has taken the search index on itself. Only the guard on

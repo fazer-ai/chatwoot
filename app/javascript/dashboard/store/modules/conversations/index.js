@@ -42,6 +42,34 @@ const preserveConversationMessageState = (
 });
 
 // mutations
+// MessageFinder's page size: a first page shorter than this is the whole thread.
+const MESSAGE_PAGE_SIZE = 20;
+
+const holdsTheStart = chat =>
+  Boolean(
+    chat.allMessagesLoaded ||
+      (chat.dataFetched && chat.messages.length < MESSAGE_PAGE_SIZE)
+  );
+
+// Imported history is older than what the thread shows, so it goes in by time
+// rather than at the end. Older than the first loaded message, it only goes in
+// when the thread is loaded back to its start: otherwise the older pages are
+// still to be fetched, and the first message is the cursor they are fetched
+// from, so putting history in front of it would skip everything in between.
+// It is on the server either way, and paging back brings it.
+const insertImported = (chat, message) => {
+  const first = chat.messages[0];
+  const before = other =>
+    other.created_at > message.created_at ||
+    (other.created_at === message.created_at && other.id > message.id);
+  if (!first || before(first)) {
+    if (!holdsTheStart(chat)) return;
+    chat.allMessagesLoaded = true;
+  }
+  const at = chat.messages.findIndex(before);
+  chat.messages.splice(at === -1 ? chat.messages.length : at, 0, message);
+};
+
 export const mutations = {
   [types.SET_ALL_CONVERSATION](_state, conversationList) {
     const newAllConversations = [..._state.allConversations];
@@ -267,15 +295,24 @@ export const mutations = {
       if (hasExistingTs && (!hasIncomingTs || incomingTs < existingTs)) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
-      chat.messages.push(message);
-      chat.timestamp = message.created_at;
+      // History arriving in answer to "load older messages" is older than
+      // what the thread already shows: it goes in where it belongs by time,
+      // and it moves neither the conversation's place in the list nor the
+      // viewport of the agent who asked for it.
+      const isImported = message.content_attributes?.imported === true;
+      if (isImported) {
+        insertImported(chat, message);
+      } else {
+        chat.messages.push(message);
+      }
+      if (!isImported) chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;
       // Reactions render as chips on their parent bubble, not as standalone
       // rows, so jumping the viewport to the bottom on every toggle would
       // yank the user away from whatever older message they reacted to.
       const isReaction = message.content_attributes?.is_reaction === true;
-      if (selectedChatId === conversationId && !isReaction) {
+      if (selectedChatId === conversationId && !isReaction && !isImported) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     }
@@ -326,7 +363,12 @@ export const mutations = {
       // `event_metadata.source = 'reaction_toggle'` so we can skip scroll
       // unconditionally — heuristics on `last_non_activity_message` miss the
       // case where newer non-reaction messages exist after the reacted target.
-      const isReactionUpdate = eventMetadata?.source === 'reaction_toggle';
+      // `history_exhausted` only drops the "load older messages" control at the
+      // top of the thread, where the agent who asked is reading.
+      const isReactionUpdate = [
+        'reaction_toggle',
+        'history_exhausted',
+      ].includes(eventMetadata?.source);
       if (_state.selectedChatId === conversation.id && !isReactionUpdate) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }

@@ -1,7 +1,15 @@
 require 'rails_helper'
 
 RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
-  subject(:dispatch) { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }
+  # The handler queues each slice and the job files it, so both run here: what is asserted
+  # is where the messages end up.
+  subject(:dispatch) { deliver(event) }
+
+  def deliver(frame)
+    perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob) { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, frame) }
+  end
+
+  after { Redis::Alfred.delete(Whatsapp::Session::Inbound::ImportSlots::KEY) }
 
   let(:channel) do
     create(:channel_whatsapp, provider: 'uazapi', validate_provider_config: false, sync_templates: false,
@@ -135,7 +143,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     it 'is idempotent' do
       dispatch
 
-      expect { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }.not_to change(inbox.messages, :count)
+      expect { deliver(event) }.not_to change(inbox.messages, :count)
     end
   end
 
@@ -195,6 +203,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
       expect(inbox.messages.find_by(source_id: 'HIST01').conversation.status).to eq('resolved')
     end
+  end
+
+  # Pointed at another instance of the same provider while the slice waited: the provider
+  # did not change, the account behind the inbox did.
+  it 'files nothing once the inbox points at another instance' do
+    perform_enqueued_jobs(only: []) { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) }
+    channel.update_columns(provider_config: channel.provider_config.merge('token' => 'another')) # rubocop:disable Rails/SkipsModelValidations
+
+    perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+
+    expect(inbox.messages).to be_empty
   end
 
   describe 'what it refuses' do
@@ -259,10 +278,10 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
 
     it 'ignores history on a provider that does not declare the capability' do
-      native = create(:channel_whatsapp, provider: 'native', validate_provider_config: false, sync_templates: false)
+      allow(channel).to receive(:session_capabilities).and_return(%w[groups media_download])
 
-      expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(native, event)).to eq(:ignored)
-      expect(native.inbox.messages).to be_empty
+      expect(dispatch).to eq(:ignored)
+      expect(inbox.messages).to be_empty
     end
   end
 end

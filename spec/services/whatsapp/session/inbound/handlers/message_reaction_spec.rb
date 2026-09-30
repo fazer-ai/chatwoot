@@ -168,6 +168,53 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     expect(stored.content).to eq('❤️')
   end
 
+  # Replayed off the ordered stream, a reaction can run after the removal that followed it
+  # on the phone; the removal is where the phone ended.
+  it 'refuses a reaction older than a removal already applied' do
+    target
+    create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                     message_type: :incoming, sender: contact, content: '',
+                     content_attributes: { is_reaction: true, in_reply_to_external_id: '3EB0TARGET', deleted: true,
+                                           external_created_at: 1_755_440_100 })
+
+    expect(dispatch).to eq(:ignored)
+
+    expect(inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").where.not(content: '')).to be_empty
+  end
+
+  # add A, remove, add B, remove, replayed as A, remove, remove, B: the second removal
+  # finds nothing active and still has to count, or B comes back.
+  it 'keeps a reaction removed however its toggles are replayed' do
+    target
+    toggle = lambda do |id, emoji, second|
+      event = model::Event.build(reaction.with(id: id, emoji: emoji, timestamp: (1_755_440_000 + second) * 1000))
+      described_class.new(channel: channel, event: event).perform
+    end
+
+    toggle.call('3EB0A', '👍', 1)
+    toggle.call('3EB0R1', nil, 2)
+    toggle.call('3EB0R2', nil, 4)
+    toggle.call('3EB0B', '❤️', 3)
+
+    active = inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").where.not(content: '')
+    expect(active).to be_empty
+  end
+
+  # The removal dates the tombstone it leaves, so a reaction older than the removal but
+  # newer than what was removed is still refused when it is replayed afterwards.
+  it 'refuses a reaction replayed after a removal that came later on the phone' do
+    target
+    toggle = lambda do |id, emoji, second|
+      event = model::Event.build(reaction.with(id: id, emoji: emoji, timestamp: (1_755_440_000 + second) * 1000))
+      described_class.new(channel: channel, event: event).perform
+    end
+
+    toggle.call('3EB0A', '👍', 1)
+    toggle.call('3EB0R', nil, 3)
+
+    expect(toggle.call('3EB0B', '❤️', 2)).to eq(:ignored)
+  end
+
   context 'when the contact takes the reaction back' do
     let(:emoji) { nil }
 
@@ -184,6 +231,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
       removed = inbox.messages.find_by("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
       expect(removed.content).to eq('')
       expect(removed.content_attributes['deleted']).to be(true)
+    end
+
+    # Replayed late, off the ordered stream, after the sender reacted again: the removal
+    # is about the reaction before, and the one on the bubble now stays.
+    it 'leaves a newer reaction alone when the removal is older than it' do
+      inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").find_each do |row|
+        row.update!(content: '❤️', content_attributes: row.content_attributes.merge('external_created_at' => 1_755_440_100))
+      end
+
+      expect(dispatch).to eq(:ignored)
+
+      kept = inbox.messages.find_by("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
+      expect(kept.content).to eq('❤️')
+      expect(kept.content_attributes['deleted']).to be_nil
     end
 
     it 'ignores a removal with nothing left to remove' do

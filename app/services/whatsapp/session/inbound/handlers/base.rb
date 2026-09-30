@@ -6,10 +6,11 @@
 #   :duplicate the event had already been processed
 #   :deferred  the message this event is about is not stored yet
 #
-# `:deferred` is about delivery order, and only an unordered transport can act on it: an
-# HTTP webhook can run an edit before the message it edits, so its job retries. The
-# connector delivers a session's events in order, so there the target is genuinely absent
-# and the answer means the same as `:ignored`.
+# `:deferred` is about delivery order. An HTTP webhook can run an edit before the message
+# it edits, so its job retries. The connector delivers a session's events in order, but a
+# history slice is filed by a job of its own, so a target can still be waiting for its
+# import: the consumer hands the event to Whatsapp::Session::DeferredEventJob, which tries
+# again for a while and then drops it.
 class Whatsapp::Session::Inbound::Handlers::Base
   attr_reader :channel, :event, :instance
 

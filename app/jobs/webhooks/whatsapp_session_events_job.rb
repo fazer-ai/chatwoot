@@ -19,6 +19,8 @@
 class Webhooks::WhatsappSessionEventsJob < ApplicationJob
   queue_as :high
 
+  PENDING_IMPORT_WAIT = 1.minute
+
   # Another worker holds the chat or the message: retried rather than waited on, so a
   # Sidekiq thread is never parked on Redis.
   #
@@ -56,6 +58,9 @@ class Webhooks::WhatsappSessionEventsJob < ApplicationJob
 
     deferred = dispatch(channel, translator.new(channel, payload).perform, instance)
     return if deferred.empty?
+    # A history slice still queued may be carrying the target, and a slice can wait for an
+    # import slot for longer than the ladder below lasts: waited out without spending it.
+    return retry_job(wait: PENDING_IMPORT_WAIT) if Whatsapp::Session::HistoryImportJob.pending?(channel.inbox)
 
     raise Whatsapp::Session::Errors::EventOutOfOrder,
           "#{deferred.map(&:type).uniq.join(', ')} arrived before the messages they refer to"

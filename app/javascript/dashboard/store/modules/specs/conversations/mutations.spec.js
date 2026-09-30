@@ -186,6 +186,89 @@ describe('#mutations', () => {
       expect(emitter.emit).not.toHaveBeenCalled();
     });
 
+    it('keeps the viewport and the list order for imported history', () => {
+      const state = {
+        allConversations: [
+          { id: 1, dataFetched: true, messages: [], timestamp: 1602256198 },
+        ],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        conversation_id: 1,
+        content: 'mensagem antiga',
+        created_at: 1500000000,
+        content_attributes: { imported: true },
+      });
+      expect(emitter.emit).not.toHaveBeenCalled();
+      expect(state.allConversations[0].timestamp).toBe(1602256198);
+      expect(state.allConversations[0].messages).toHaveLength(1);
+    });
+
+    it('leaves older history to pagination while older pages are unloaded', () => {
+      const messages = Array.from({ length: 20 }, (_, index) => ({
+        id: 100 + index,
+        conversation_id: 1,
+        created_at: 1600000000 + index,
+      }));
+      const state = {
+        allConversations: [{ id: 1, dataFetched: true, messages }],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        id: 5,
+        conversation_id: 1,
+        created_at: 1500000000,
+        content_attributes: { imported: true },
+      });
+      expect(state.allConversations[0].messages[0].id).toBe(100);
+      expect(state.allConversations[0].messages).toHaveLength(20);
+    });
+
+    it('puts imported history where it belongs by time', () => {
+      const state = {
+        allConversations: [
+          {
+            id: 1,
+            dataFetched: true,
+            messages: [
+              { id: 10, conversation_id: 1, created_at: 1600000000 },
+              { id: 11, conversation_id: 1, created_at: 1700000000 },
+            ],
+          },
+        ],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        id: 5,
+        conversation_id: 1,
+        created_at: 1500000000,
+        content_attributes: { imported: true },
+      });
+      mutations[types.ADD_MESSAGE](state, {
+        id: 6,
+        conversation_id: 1,
+        created_at: 1650000000,
+        content_attributes: { imported: true },
+      });
+      expect(state.allConversations[0].messages.map(m => m.id)).toEqual([
+        5, 10, 6, 11,
+      ]);
+    });
+
+    it('skips SCROLL_TO_MESSAGE when the history of the thread is exhausted', () => {
+      const state = {
+        allConversations: [{ id: 1, updated_at: 1 }],
+        selectedChatId: 1,
+      };
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        additional_attributes: { history_exhausted: true },
+        event_metadata: { source: 'history_exhausted' },
+      });
+      expect(emitter.emit).not.toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
+    });
+
     it('update message if it exist in the store', () => {
       global.bus = { $emit: vi.fn() };
       const state = {

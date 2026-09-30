@@ -106,6 +106,8 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
                             filename: 'fake-media', size: 10)
   end
 
+  def request_history(command) = record(command) && nil
+
   def send_chat_presence(command)
     record(command)
     true

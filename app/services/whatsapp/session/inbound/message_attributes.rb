@@ -6,6 +6,19 @@
 # placeholder that later receives its message settles under exactly the attributes the
 # writing path would have given it.
 class Whatsapp::Session::Inbound::MessageAttributes
+  # Marks an imported file whose bytes did not come with the dump. Not a verdict on the
+  # file, so a later delivery of the same message that carries its reference fills it in.
+  # Its own key rather than an `unsupported_reason`: a reason says the row is a placeholder
+  # for a message it failed to read, which an edit is allowed to settle, and a new caption
+  # is no answer to a file that is still missing.
+  HISTORY_MEDIA = 'history_media'.freeze
+
+  # Unsupported for good, as opposed to an imported file that is still waiting for its bytes.
+  def self.given_up?(message)
+    attributes = message.content_attributes || {}
+    attributes['is_unsupported'].present? && attributes[HISTORY_MEDIA].blank?
+  end
+
   def initialize(inbound:, imported: false)
     @inbound = inbound
     @imported = imported
@@ -17,8 +30,14 @@ class Whatsapp::Session::Inbound::MessageAttributes
 
   # A rich card with no text and no media header renders as an empty bubble, which is
   # what the unsupported flag exists for.
+  #
+  # So is an imported file that came with no reference to its bytes. On the live path a
+  # media message without one is followed by `media.download_failed`, which is what asks
+  # for the file again; nothing follows a message out of a history dump, so the row would
+  # be a bubble waiting forever for a file nobody is going to fetch.
   def unsupported?
     return true if content_type == 'unsupported'
+    return true if imported && unfetchable_media?
 
     content_type == 'rich' && content.preview_text.blank? && content.media.blank?
   end
@@ -30,6 +49,15 @@ class Whatsapp::Session::Inbound::MessageAttributes
   def content = inbound.content
   def content_type = content&.wire_type
   def incoming? = inbound.incoming?
+
+  # A card with readable text stays a card: only its header is missing, and marking the whole
+  # row unsupported would hide the text and buttons it does have.
+  def unfetchable_media?
+    return false if content_type == 'rich' && content.preview_text.present?
+
+    media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
+    media.present? && media.ref.blank?
+  end
 
   def origin
     {
@@ -52,7 +80,11 @@ class Whatsapp::Session::Inbound::MessageAttributes
       # Not the same statement as `external_created_at`, which every session message
       # carries: this one says the row was filed after the fact, which is what a report
       # excluding backfilled traffic, or a bubble explaining an old date, has to read.
-      imported: (true if imported)
+      imported: (true if imported),
+      # The archive half of an import, as opposed to the gap: history nobody is waiting on,
+      # which the dashboard may show when somebody asked for it but never alerts about.
+      # Read off the level the importer writes it under, which is where that is decided.
+      history_archive: (true if imported && Import::SilentWrite.archive?)
     }
   end
 
@@ -65,6 +97,8 @@ class Whatsapp::Session::Inbound::MessageAttributes
       # `is_unsupported` cannot: a media download that gave up raises the same flag on a
       # message that arrived perfectly well.
       unsupported_reason: (content.reason if content_type == 'unsupported'),
+      # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
+      history_media: (true if imported && unfetchable_media?),
       pending_media: pending_media,
       rich: (content.to_content_attribute if content_type == 'rich')
     }

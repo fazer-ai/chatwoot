@@ -56,6 +56,7 @@ class Whatsapp::Session::Inbound::ReactionStore
   def write(conversation)
     existing = find_existing
     return replace(existing) if existing
+    return nil if removed_later?
 
     conversation.messages.create!(account_id: inbox.account_id, inbox_id: inbox.id, source_id: reaction.id,
                                   sender: reaction.from_me ? nil : sender,
@@ -81,18 +82,48 @@ class Whatsapp::Session::Inbound::ReactionStore
   # removal made on the connected phone (the row is still active, stored sender-less).
   def remove
     existing = find_existing
-    return if existing.nil?
+    return note_removal if existing.nil?
 
     # Merged under the row lock: the hash is read to be written back, so reading it off
     # an instance loaded earlier drops whatever another worker put there in between.
-    existing.with_lock do
-      existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
+    #
+    # Refused when the removal is older than the reaction stored, the same way a stale
+    # swap is: a removal can be replayed late, off the ordered stream, when the message it
+    # is about was waiting for its history import, and by then the sender may have reacted
+    # again.
+    removed = existing.with_lock do
+      next false if stale?(existing)
+
+      # Stamped with the removal's own time, which is what a reaction replayed after it
+      # is compared against: see `removed_later?`.
+      existing.update!(content: '', content_attributes: existing.content_attributes.merge(
+        { 'deleted' => true, 'external_created_at' => created_at }.compact
+      ))
+      true
     end
+    return nil unless removed
+
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
   end
 
+  # A removal with nothing active left to remove still says when the phone last took the
+  # reaction back, and a reaction replayed after it has to be measured against that: kept on
+  # the newest deleted row. Answers nil, which is what a removal with nothing to do is.
+  def note_removal
+    tombstone = latest_tombstone
+    return if created_at.blank? || tombstone.nil? || tombstone.external_created_at.to_i >= created_at
+
+    tombstone.with_lock { tombstone.update!(content_attributes: tombstone.content_attributes.merge('external_created_at' => created_at)) }
+    nil
+  end
+
   private
+
+  def latest_tombstone
+    rows = self.class.rows(inbox: inbox, target_id: reaction.target_id, sender: sender, from_me: reaction.from_me)
+    rows.select { |row| row.content_attributes['deleted'] }.max_by { |row| row.external_created_at.to_i }
+  end
 
   # WhatsApp gives a changed reaction a new id, so the same sender swapping one emoji
   # for another arrives as a fresh event rather than as an edit. One row per (target,
@@ -120,6 +151,16 @@ class Whatsapp::Session::Inbound::ReactionStore
 
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
+  end
+
+  # A reaction older than a removal already applied for the same sender and target. Events
+  # replayed off the ordered stream, while the message they annotate waited for its history
+  # import, can run in any order, and the removal is what the phone ended on.
+  def removed_later?
+    return false if created_at.blank?
+
+    rows = self.class.rows(inbox: inbox, target_id: reaction.target_id, sender: sender, from_me: reaction.from_me)
+    rows.any? { |row| row.content_attributes['deleted'] && row.external_created_at.to_i > created_at }
   end
 
   def stale?(existing)

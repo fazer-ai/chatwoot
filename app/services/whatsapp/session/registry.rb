@@ -45,12 +45,17 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # offer through the dispatcher. It does not promise a call can be answered: the
       # contract has no command for that, and neither does whatsmeow. What it promises
       # is that a call reaches the inbox, which is what an agent can act on.
+      #
+      # `history_sync` is the phone's history, published by the connector as `history.sync`
+      # and asked for with `history.request`. The field decides only whether the archive is
+      # filed: the connect always asks for history, because what arrived while the session
+      # was down comes in the same dump, and that part is filed with the field off too.
       capabilities: %w[
         qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
         presence_subscribe read_receipts mark_unread check_number profile_picture groups
-        group_management group_admin group_invites group_join_requests media_download calls
+        group_management group_admin group_invites group_join_requests media_download calls history_sync
       ],
-      fields: [PROXY_URL, MARK_AS_READ, PRESENCE_SUBSCRIBE]
+      fields: [PROXY_URL, MARK_AS_READ, PRESENCE_SUBSCRIBE, HISTORY_SYNC]
     ),
     Descriptor.new(
       key: 'uazapi',

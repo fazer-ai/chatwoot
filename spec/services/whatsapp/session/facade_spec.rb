@@ -655,4 +655,141 @@ RSpec.describe Whatsapp::Session::Facade do
       expect { name_proxy(proxy_url) }.not_to(change { backend.commands_of('session.connect').size })
     end
   end
+
+  describe 'history on a backend that pages from a message' do
+    let(:model) { Whatsapp::Session::Model }
+
+    before do
+      allow(backend.class).to receive_messages(history_on_every_connect?: true, history_needs_anchor?: true)
+    end
+
+    def stored(conversation, source_id, at, outgoing: false)
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: source_id,
+                       created_at: at, message_type: outgoing ? :outgoing : :incoming)
+    end
+
+    # What arrived while the session was down comes in the same dump as the archive, so a
+    # connect that asked for no history would lose it. The setting decides the archive only.
+    it 'asks for history on every connect, with the setting off' do
+      channel.request_pairing_code
+      channel.reassert_desired_state
+
+      expect(backend.commands_of('session.connect').map(&:history_sync)).to eq([true, true])
+    end
+
+    it 'still asks for it with the setting on' do
+      channel.update!(provider_config: channel.provider_config.merge('history_sync' => true))
+
+      channel.request_pairing_code
+
+      expect(backend.last_command.history_sync).to be(true)
+    end
+
+    it 'leaves history off on a backend whose connect follows the setting' do
+      allow(backend.class).to receive(:history_on_every_connect?).and_return(false)
+
+      channel.request_pairing_code
+
+      expect(backend.last_command.history_sync).to be(false)
+    end
+
+    # The phone only walks back from a message it is shown, and the one to show it is the
+    # oldest this inbox holds for the chat, whichever thread it is in: the thread on the
+    # screen is usually the newest.
+    it 'pages back from the oldest message the contact has in any thread of the inbox' do
+      older = create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox, account: channel.account,
+                                    status: :resolved)
+      oldest = stored(older, '3EB0OLDEST', 3.days.ago, outgoing: true)
+      stored(older, '3EB0MIDDLE', 2.days.ago)
+      stored(conversation, '3EB0NEWEST', 1.hour.ago)
+      create(:message, conversation: older, inbox: inbox, account: channel.account, source_id: nil, created_at: 4.days.ago,
+                       message_type: :activity)
+
+      expect(facade.request_history(contact)).to be(true)
+
+      request = backend.last_command
+      expect(request).to be_a(model::Commands::HistoryRequest)
+      expect(request.chat.to_h).to eq(model::Address.for_contact(contact).to_h)
+      expect(request.before).to have_attributes(id: '3EB0OLDEST', from_me: true)
+      expect(request.before.timestamp).to be_within(1000).of((oldest.created_at.to_f * 1000).to_i)
+    end
+
+    it 'times the anchor by the clock WhatsApp gave the message, when the row has it' do
+      message = stored(conversation, '3EB0TIMED', 1.hour.ago)
+      message.update!(content_attributes: { 'external_created_at' => 1_755_430_000 })
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.timestamp).to eq(1_755_430_000_000)
+    end
+
+    # Anchored on a message that arrived live the phone never answers, so what the import
+    # dropped from the dump is asked instead, and a dump message the inbox kept wins over it.
+    it 'pages back from where the dropped archive ended when the oldest stored message arrived live' do
+      stored(conversation, '3EB0LIVE', 1.hour.ago)
+      Whatsapp::Session::HistoryAnchors.remember(
+        inbox, model::InboundMessage.new(id: '3EB0DUMPED', chat: model::Address.phone('5541999990000'), from_me: true,
+                                         timestamp: 1_755_430_000_000, content: model::Content::Text.new(body: 'x'))
+      )
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before).to have_attributes(id: '3EB0DUMPED', timestamp: 1_755_430_000_000, from_me: true)
+
+      imported = stored(conversation, '3EB0KEPT', 2.days.ago)
+      imported.update!(content_attributes: { 'imported' => true })
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0KEPT')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
+    end
+
+    # A live row can be older than the whole dump, and the phone never pages from it: the
+    # oldest imported page is where the next request has to start, or every press asks for
+    # the same page again.
+    it 'pages back from the oldest imported message even with an older live one stored' do
+      stored(conversation, '3EB0ANCIENT', 1.year.ago)
+      page = stored(conversation, '3EB0PAGE', 1.month.ago)
+      page.update!(content_attributes: { 'imported' => true })
+      newer_page = stored(conversation, '3EB0NEWERPAGE', 1.week.ago)
+      newer_page.update!(content_attributes: { 'imported' => true })
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0PAGE')
+    end
+
+    it 'finds the dropped archive under the other spelling of the number' do
+      stored(conversation, '3EB0LIVE9', 1.hour.ago)
+      Whatsapp::Session::HistoryAnchors.remember(
+        inbox, model::InboundMessage.new(id: '3EB0SPELT', chat: model::Address.phone('554199990000'), from_me: false,
+                                         timestamp: 1_755_430_000_000, content: model::Content::Text.new(body: 'x'))
+      )
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0SPELT')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
+    end
+
+    it 'pages back from the message the caller names' do
+      named = stored(conversation, '3EB0NAMED', 1.hour.ago)
+      stored(conversation, '3EB0OLDER', 2.days.ago)
+
+      facade.request_history(contact, before: named)
+
+      expect(backend.last_command.before.id).to eq('3EB0NAMED')
+    end
+
+    # Without an anchor the connector refuses the request as unsupported, so none is sent.
+    it 'asks nothing for a contact with no stored message to page back from' do
+      conversation
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: nil, private: true)
+
+      expect(facade.request_history(contact)).to be(false)
+      expect(backend.commands_of('history.request')).to be_empty
+    end
+  end
 end

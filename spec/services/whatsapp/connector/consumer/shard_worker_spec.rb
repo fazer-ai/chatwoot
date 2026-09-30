@@ -189,6 +189,42 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(inbox.messages.pluck(:source_id)).to eq(['3EB0AAAA0001'])
   end
 
+  # A history import leases the chat for IMPORT_CHAT_LOCK_TTL, and a worker killed in the
+  # middle of one never gives it back: the live message behind it has to wait the lease
+  # out rather than be parked with the lock about to come free. The waits are zeroed to
+  # run the ladder, so what is measured is that every rung is climbed before parking and
+  # that the rungs add up past the lease.
+  it 'outlasts the lease a dead history import leaves on the chat' do
+    ladder = described_class::BUSY_WAITS
+    expect(ladder.sum).to be > Whatsapp::Session::Inbound::Locks::IMPORT_CHAT_LOCK_TTL.to_i
+
+    stub_const("#{described_class}::RETRY_WAITS", [])
+    stub_const("#{described_class}::BUSY_WAITS", Array.new(ladder.size, 0))
+    attempts = 0
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch).and_wrap_original do |original, *args|
+      attempts += 1
+      raise Whatsapp::Session::Inbound::Locks::Busy, 'an import holds it' if attempts <= ladder.size
+
+      original.call(*args)
+    end
+    redis.xadd(stream, frame)
+
+    expect(worker.poll).to eq(1)
+
+    expect(redis.llen("#{prefix}dlq:events")).to eq(0)
+    expect(inbox.messages.pluck(:source_id)).to eq(['3EB0AAAA0001'])
+  end
+
+  # A history slice is filed by a job, so an edit that follows it on the stream can find
+  # its target still waiting in the import queue.
+  it 'hands an event about a message not stored yet to a retry, and moves on' do
+    allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch).and_return(:deferred)
+    redis.xadd(stream, frame)
+
+    expect { expect(worker.poll).to eq(1) }.to have_enqueued_job(Whatsapp::Session::DeferredEventJob)
+      .with(channel, hash_including('type' => 'message.received'))
+  end
+
   it 'leaves an entry pending when it is stopped mid-retry' do
     stub_const("#{described_class}::RETRY_WAITS", [0, 0])
     allow(Whatsapp::Session::Inbound::Dispatcher).to receive(:dispatch) do

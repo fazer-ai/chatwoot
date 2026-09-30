@@ -194,3 +194,7 @@ app/controllers/concerns/group_channel_resolver.rb: Handle zero accessible group
 # (fazer-ai/chatwoot#660).
 app/models/message.rb: Include Telegram edits in the new trigger  # PR#658
 app/controllers/api/v1/accounts/conversations/messages_controller.rb: Keep pending edits out of queued automation evaluations  # PR#658
+# O relógio de uma reação é o `external_created_at`, em segundos, em todo o caminho de reações
+# (o stale? da troca de emoji já compara assim, e empate no mesmo segundo passa por desenho).
+# Reordenar dentro do mesmo segundo exigiria outra coluna de milissegundos só para isto.
+app/services/whatsapp/session/inbound/reaction_store.rb: Preserve subsecond ordering when comparing reaction removals  # PR#772

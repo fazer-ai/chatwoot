@@ -131,11 +131,15 @@ module Whatsapp::Session::Model::Commands
     include Serializable
     defaults from_me: false
 
-    # The anchor a stored message stands for.
+    # The anchor a stored message stands for, timed by WhatsApp's own clock when the row has
+    # it: that is the number the phone indexed the message by, while `created_at` on a live
+    # row is when it was filed here.
     def self.for_message(message)
       return if message.blank?
 
-      new(id: message.source_id, timestamp: (message.created_at.to_f * 1000).to_i, from_me: message.outgoing?)
+      sent = message.content_attributes&.dig('external_created_at').presence
+      timestamp = sent ? sent.to_i * 1000 : (message.created_at.to_f * 1000).to_i
+      new(id: message.source_id, timestamp: timestamp, from_me: message.outgoing?)
     end
   end
 
