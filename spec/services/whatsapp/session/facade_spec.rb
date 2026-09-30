@@ -760,6 +760,20 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(backend.last_command.before.id).to eq('3EB0PAGE')
     end
 
+    it 'finds the dropped archive under the other spelling of the number' do
+      stored(conversation, '3EB0LIVE9', 1.hour.ago)
+      Whatsapp::Session::HistoryAnchors.remember(
+        inbox, model::InboundMessage.new(id: '3EB0SPELT', chat: model::Address.phone('554199990000'), from_me: false,
+                                         timestamp: 1_755_430_000_000, content: model::Content::Text.new(body: 'x'))
+      )
+
+      facade.request_history(contact)
+
+      expect(backend.last_command.before.id).to eq('3EB0SPELT')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryAnchors.key(inbox))
+    end
+
     it 'pages back from the message the caller names' do
       named = stored(conversation, '3EB0NAMED', 1.hour.ago)
       stored(conversation, '3EB0OLDER', 2.days.ago)

@@ -267,11 +267,21 @@ export const mutations = {
       if (hasExistingTs && (!hasIncomingTs || incomingTs < existingTs)) return;
       chat.messages[pendingMessageIndex] = message;
     } else {
-      chat.messages.push(message);
       // History arriving in answer to "load older messages" is older than
-      // what the thread already shows: it moves neither the conversation's
-      // place in the list nor the viewport of the agent who asked for it.
+      // what the thread already shows: it goes in where it belongs by time,
+      // and it moves neither the conversation's place in the list nor the
+      // viewport of the agent who asked for it.
       const isImported = message.content_attributes?.imported === true;
+      if (isImported) {
+        const at = chat.messages.findIndex(
+          other =>
+            other.created_at > message.created_at ||
+            (other.created_at === message.created_at && other.id > message.id)
+        );
+        chat.messages.splice(at === -1 ? chat.messages.length : at, 0, message);
+      } else {
+        chat.messages.push(message);
+      }
       if (!isImported) chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;

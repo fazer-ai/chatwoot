@@ -67,9 +67,12 @@ module Whatsapp::Session::Facade::History
 
   # Every address the chat may have been dumped under: the dump names it the way the phone
   # holds it, which is not always the way the contact row does.
+  # The other spelling of a Brazilian or Argentinian mobile number too, which is how a dump
+  # can name a contact stored under the first.
   def addresses_of(contact)
     lid = model::Address.lid(contact.identifier) if contact.identifier.to_s.end_with?('@lid')
-    [model::Address.for_contact(contact), model::Address.phone(contact.phone_number), lid].compact
+    phones = Whatsapp::Session::PhoneMatch.variants(contact.phone_number).map { |number| model::Address.phone(number) }
+    [model::Address.for_contact(contact), *phones, lid].compact.uniq(&:to_jid)
   end
 
   def stored_messages(contact)
