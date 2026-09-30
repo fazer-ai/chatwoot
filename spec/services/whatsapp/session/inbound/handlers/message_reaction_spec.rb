@@ -200,6 +200,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     expect(active).to be_empty
   end
 
+  # The removal dates the tombstone it leaves, so a reaction older than the removal but
+  # newer than what was removed is still refused when it is replayed afterwards.
+  it 'refuses a reaction replayed after a removal that came later on the phone' do
+    target
+    toggle = lambda do |id, emoji, second|
+      event = model::Event.build(reaction.with(id: id, emoji: emoji, timestamp: (1_755_440_000 + second) * 1000))
+      described_class.new(channel: channel, event: event).perform
+    end
+
+    toggle.call('3EB0A', '👍', 1)
+    toggle.call('3EB0R', nil, 3)
+
+    expect(toggle.call('3EB0B', '❤️', 2)).to eq(:ignored)
+  end
+
   context 'when the contact takes the reaction back' do
     let(:emoji) { nil }
 

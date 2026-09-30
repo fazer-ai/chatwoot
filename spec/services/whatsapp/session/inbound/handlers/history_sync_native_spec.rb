@@ -128,7 +128,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       deliver(slice([], exhausted: true))
 
       expect(ActionCableListener.instance).to have_received(:conversation_updated)
-        .with(having_attributes(data: hash_including(conversation: thread))).at_least(:once)
+        .with(having_attributes(data: hash_including(conversation: thread, broadcast_metadata: { source: 'history_exhausted' })))
+        .at_least(:once)
     end
 
     # A dump nobody asked for drops its archive, so it cannot also say the chat is done.
