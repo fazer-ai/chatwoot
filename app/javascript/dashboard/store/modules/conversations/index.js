@@ -42,6 +42,34 @@ const preserveConversationMessageState = (
 });
 
 // mutations
+// MessageFinder's page size: a first page shorter than this is the whole thread.
+const MESSAGE_PAGE_SIZE = 20;
+
+const holdsTheStart = chat =>
+  Boolean(
+    chat.allMessagesLoaded ||
+      (chat.dataFetched && chat.messages.length < MESSAGE_PAGE_SIZE)
+  );
+
+// Imported history is older than what the thread shows, so it goes in by time
+// rather than at the end. Older than the first loaded message, it only goes in
+// when the thread is loaded back to its start: otherwise the older pages are
+// still to be fetched, and the first message is the cursor they are fetched
+// from, so putting history in front of it would skip everything in between.
+// It is on the server either way, and paging back brings it.
+const insertImported = (chat, message) => {
+  const first = chat.messages[0];
+  const before = other =>
+    other.created_at > message.created_at ||
+    (other.created_at === message.created_at && other.id > message.id);
+  if (!first || before(first)) {
+    if (!holdsTheStart(chat)) return;
+    chat.allMessagesLoaded = true;
+  }
+  const at = chat.messages.findIndex(before);
+  chat.messages.splice(at === -1 ? chat.messages.length : at, 0, message);
+};
+
 export const mutations = {
   [types.SET_ALL_CONVERSATION](_state, conversationList) {
     const newAllConversations = [..._state.allConversations];
@@ -273,12 +301,7 @@ export const mutations = {
       // viewport of the agent who asked for it.
       const isImported = message.content_attributes?.imported === true;
       if (isImported) {
-        const at = chat.messages.findIndex(
-          other =>
-            other.created_at > message.created_at ||
-            (other.created_at === message.created_at && other.id > message.id)
-        );
-        chat.messages.splice(at === -1 ? chat.messages.length : at, 0, message);
+        insertImported(chat, message);
       } else {
         chat.messages.push(message);
       }

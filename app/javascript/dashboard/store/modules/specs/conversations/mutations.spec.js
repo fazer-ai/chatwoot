@@ -188,7 +188,9 @@ describe('#mutations', () => {
 
     it('keeps the viewport and the list order for imported history', () => {
       const state = {
-        allConversations: [{ id: 1, messages: [], timestamp: 1602256198 }],
+        allConversations: [
+          { id: 1, dataFetched: true, messages: [], timestamp: 1602256198 },
+        ],
         selectedChatId: 1,
       };
       mutations[types.ADD_MESSAGE](state, {
@@ -202,11 +204,32 @@ describe('#mutations', () => {
       expect(state.allConversations[0].messages).toHaveLength(1);
     });
 
+    it('leaves older history to pagination while older pages are unloaded', () => {
+      const messages = Array.from({ length: 20 }, (_, index) => ({
+        id: 100 + index,
+        conversation_id: 1,
+        created_at: 1600000000 + index,
+      }));
+      const state = {
+        allConversations: [{ id: 1, dataFetched: true, messages }],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        id: 5,
+        conversation_id: 1,
+        created_at: 1500000000,
+        content_attributes: { imported: true },
+      });
+      expect(state.allConversations[0].messages[0].id).toBe(100);
+      expect(state.allConversations[0].messages).toHaveLength(20);
+    });
+
     it('puts imported history where it belongs by time', () => {
       const state = {
         allConversations: [
           {
             id: 1,
+            dataFetched: true,
             messages: [
               { id: 10, conversation_id: 1, created_at: 1600000000 },
               { id: 11, conversation_id: 1, created_at: 1700000000 },
