@@ -31,6 +31,32 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
     [channel.provider, Whatsapp::Session::Registry.instance_fingerprint(channel) || channel.provider_config&.dig('session_id')]
   end
 
+  # Which slices of an inbox are still queued, so an event about a message one of them
+  # carries knows to keep waiting (see DeferredEventJob). A slice can wait for a slot for as
+  # long as the dump ahead of it takes, which no fixed retry ladder outlasts. A job that
+  # never finishes is forgotten after PENDING_TTL rather than holding the events forever.
+  PENDING_TTL = 24.hours
+
+  def self.queued(inbox, job_id)
+    Redis::Alfred.with do |conn|
+      conn.zadd(pending_key(inbox), Time.now.to_f, job_id)
+      conn.expire(pending_key(inbox), PENDING_TTL.to_i)
+    end
+  end
+
+  def self.pending?(inbox)
+    Redis::Alfred.with do |conn|
+      conn.zremrangebyscore(pending_key(inbox), '-inf', Time.now.to_f - PENDING_TTL.to_i)
+      conn.zcard(pending_key(inbox)).positive?
+    end
+  end
+
+  def self.finished(inbox, job_id)
+    Redis::Alfred.with { |conn| conn.zrem(pending_key(inbox), job_id) }
+  end
+
+  def self.pending_key(inbox) = "WHATSAPP::HISTORY_IMPORTS_PENDING::#{inbox.id}"
+
   # `messages` are the slice as the contract puts it on the wire. Everything after
   # `requested` says how to file it rather than what is in it, and is collected rather than
   # listed for the reason the Baileys job gives: a job's arguments outlive the deploy that
@@ -40,13 +66,14 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
     channel = inbox&.channel
     # Dropped without taking a slot, so it gives none back: the batch behind it is woken
     # here or it waits for the sweep.
-    return slots.top_up(into: queue_name) unless same_account?(channel, filing[:identity])
+    return skip(inbox) unless same_account?(channel, filing[:identity])
 
     held = false
     slots.with_slot do
       held = true
       import(channel, messages, watermark, requested, filing)
     end
+    self.class.finished(inbox, job_id)
   rescue Whatsapp::Session::Inbound::ImportSlots::Full
     retry_job(queue: slots::WAITING_QUEUE)
     slots.top_up(into: self.class.queue_name)
@@ -57,6 +84,11 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   private
 
   def slots = Whatsapp::Session::Inbound::ImportSlots
+
+  def skip(inbox)
+    self.class.finished(inbox, job_id) if inbox
+    slots.top_up(into: queue_name)
+  end
 
   def same_account?(channel, identity)
     return false unless channel.is_a?(Channel::Whatsapp) && Whatsapp::Session::Registry.session_provider?(channel.provider)

@@ -125,6 +125,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  # An edit that follows a slice on the stream can reach its target before the slice is
+  # filed, and the slice can wait for a slot for as long as the dump ahead of it takes.
+  describe 'an edit that overtakes its slice' do
+    let(:edit) do
+      payload = model::Events::MessageEdited.new(message_id: '3EB0OVER', chat: chat, timestamp: 1_755_440_000_000,
+                                                 content: model::Content::Text.new(body: 'editada'))
+      model::Event.build(payload, id: 'evt-7', sid: channel.provider_config['session_id'], epoch: 1, seq: 7, ts: 1, inst: 'c')
+    end
+
+    it 'waits while the slice is queued, without spending its retries, and applies once it is filed' do
+      threads_of(a_contact, phone, %i[open])
+      dispatch(slice([historical('3EB0OVER', 2.days.ago)]))
+
+      expect { Whatsapp::Session::DeferredEventJob.perform_now(channel, edit.to_frame) }
+        .to have_enqueued_job(Whatsapp::Session::DeferredEventJob).with(channel, edit.to_frame)
+
+      perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
+
+      Whatsapp::Session::DeferredEventJob.perform_now(channel, edit.to_frame)
+      expect(inbox.messages.find_by(source_id: '3EB0OVER').content).to eq('editada')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryImportJob.pending_key(inbox))
+    end
+  end
+
   describe 'a slice that waited while the inbox moved on' do
     # A native inbox keeps its session id for good, so what moves it is a conversion to
     # another provider; written past the callbacks, which is all the job gets to see.
@@ -290,6 +316,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(image.content_attributes['is_unsupported']).to be(true)
       expect(image.attachments).to be_empty
       expect(enqueued_jobs.map { |job| job['job_class'] }).not_to include('Whatsapp::Session::MediaFetchJob')
+    end
+
+    # A caption edit is not the file: the bubble has to keep saying the file is missing.
+    it 'keeps the picture marked missing after its caption is edited' do
+      deliver(slice(messages))
+      edit = model::Event.build(model::Events::MessageEdited.new(message_id: '3EB0M2', chat: chat, timestamp: 1_755_440_000_000,
+                                                                 content: model::Content::Text.new(body: 'legenda nova')))
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, edit)
+
+      expect(inbox.messages.find_by(source_id: '3EB0M2').content_attributes['is_unsupported']).to be(true)
     end
 
     # The same message delivered again with its reference, which a dump that overlaps the

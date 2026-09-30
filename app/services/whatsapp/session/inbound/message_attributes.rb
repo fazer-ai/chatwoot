@@ -6,15 +6,17 @@
 # placeholder that later receives its message settles under exactly the attributes the
 # writing path would have given it.
 class Whatsapp::Session::Inbound::MessageAttributes
-  # Why an imported file has no bytes: the dump carried no reference to them. Not a verdict
-  # on the file, so a later delivery of the same message that does carry one fills it in.
+  # Marks an imported file whose bytes did not come with the dump. Not a verdict on the
+  # file, so a later delivery of the same message that carries its reference fills it in.
+  # Its own key rather than an `unsupported_reason`: a reason says the row is a placeholder
+  # for a message it failed to read, which an edit is allowed to settle, and a new caption
+  # is no answer to a file that is still missing.
   HISTORY_MEDIA = 'history_media'.freeze
 
-  # Unsupported for good, as opposed to an imported file whose reference simply did not
-  # come with the dump: that one is still waiting for its bytes.
+  # Unsupported for good, as opposed to an imported file that is still waiting for its bytes.
   def self.given_up?(message)
     attributes = message.content_attributes || {}
-    attributes['is_unsupported'].present? && attributes['unsupported_reason'] != HISTORY_MEDIA
+    attributes['is_unsupported'].present? && attributes[HISTORY_MEDIA].blank?
   end
 
   def initialize(inbound:, imported: false)
@@ -86,16 +88,12 @@ class Whatsapp::Session::Inbound::MessageAttributes
       # Why there is no body, which is what says whether the message can still turn up.
       # `is_unsupported` cannot: a media download that gave up raises the same flag on a
       # message that arrived perfectly well.
-      unsupported_reason: unsupported_reason,
+      unsupported_reason: (content.reason if content_type == 'unsupported'),
+      # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
+      history_media: (true if imported && unfetchable_media?),
       pending_media: pending_media,
       rich: (content.to_content_attribute if content_type == 'rich')
     }
-  end
-
-  def unsupported_reason
-    return content.reason if content_type == 'unsupported'
-
-    HISTORY_MEDIA if imported && unfetchable_media?
   end
 
   # Both namespaces, because WhatsApp names the same person by phone in one event and by

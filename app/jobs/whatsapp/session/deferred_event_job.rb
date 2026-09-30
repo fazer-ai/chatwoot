@@ -13,6 +13,8 @@
 class Whatsapp::Session::DeferredEventJob < ApplicationJob
   queue_as :low
 
+  PENDING_WAIT = 1.minute
+
   retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 20
   retry_on Whatsapp::Session::Errors::EventOutOfOrder, wait: :polynomially_longer, attempts: 5 do |job, error|
     Rails.logger.warn("[WHATSAPP SESSION] giving up on a deferred event for channel ##{job.arguments.first&.id}: #{error.message}")
@@ -28,6 +30,9 @@ class Whatsapp::Session::DeferredEventJob < ApplicationJob
 
     event = Whatsapp::Session::Model::Event.from_frame(frame)
     return unless Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, event) == :deferred
+    # A slice still queued may be carrying the target, and it can wait for a slot longer than
+    # the ladder below lasts: waited out without spending the ladder.
+    return retry_job(wait: PENDING_WAIT) if Whatsapp::Session::HistoryImportJob.pending?(channel.inbox)
 
     raise Whatsapp::Session::Errors::EventOutOfOrder, "#{event.type} arrived before the message it refers to"
   end

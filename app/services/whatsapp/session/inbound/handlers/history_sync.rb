@@ -16,9 +16,10 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
     return :ignored unless payload.kind == 'messages'
     return :ignored if messages.empty? && exhausted.nil?
 
-    Whatsapp::Session::HistoryImportJob.perform_later(
+    job = Whatsapp::Session::HistoryImportJob.perform_later(
       inbox, messages, inbound::Coverage.watermark(inbox), asked_for?, **filing
     )
+    Whatsapp::Session::HistoryImportJob.queued(inbox, job.job_id) if job
     :handled
   end
 

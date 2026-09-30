@@ -67,10 +67,18 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # loads forever. Under lock and off a reloaded row: `is_unsupported` is a
   # content_attributes flag, and a revoke that landed during the download would be
   # rewritten away by this.
+  #
+  # An imported file stops waiting here too, or every later delivery of the same message
+  # would ask again for bytes the provider has just said it will not hand over.
   def give_up(message, reason)
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
     message.update_under_lock!(is_unsupported: true)
+    return if message.content_attributes&.dig(history_media).blank?
+
+    message.with_lock { message.update!(content_attributes: message.content_attributes.except(history_media)) }
   end
+
+  def history_media = Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA
 
   # The ref alone is not enough to ask for a second time: a blob the provider has already
   # dropped is fetched again from the message it came from, so the command carries the
@@ -90,8 +98,8 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   def attach(message, media, payload)
     Whatsapp::Session::Inbound::MediaAttachment.build(message, media, payload)
     # An imported file that was only waiting for its reference is a file again.
-    if message.content_attributes&.dig('unsupported_reason') == Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA
-      message.content_attributes = message.content_attributes.except('is_unsupported', 'unsupported_reason')
+    if message.content_attributes&.dig(history_media).present?
+      message.content_attributes = message.content_attributes.except('is_unsupported', history_media)
     end
     # Adding an attachment changes no column on the message, and
     # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so
