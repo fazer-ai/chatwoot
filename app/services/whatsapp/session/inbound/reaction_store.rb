@@ -82,7 +82,7 @@ class Whatsapp::Session::Inbound::ReactionStore
   # removal made on the connected phone (the row is still active, stored sender-less).
   def remove
     existing = find_existing
-    return if existing.nil?
+    return note_removal if existing.nil?
 
     # Merged under the row lock: the hash is read to be written back, so reading it off
     # an instance loaded earlier drops whatever another worker put there in between.
@@ -107,7 +107,23 @@ class Whatsapp::Session::Inbound::ReactionStore
     existing
   end
 
+  # A removal with nothing active left to remove still says when the phone last took the
+  # reaction back, and a reaction replayed after it has to be measured against that: kept on
+  # the newest deleted row. Answers nil, which is what a removal with nothing to do is.
+  def note_removal
+    tombstone = latest_tombstone
+    return if created_at.blank? || tombstone.nil? || tombstone.external_created_at.to_i >= created_at
+
+    tombstone.with_lock { tombstone.update!(content_attributes: tombstone.content_attributes.merge('external_created_at' => created_at)) }
+    nil
+  end
+
   private
+
+  def latest_tombstone
+    rows = self.class.rows(inbox: inbox, target_id: reaction.target_id, sender: sender, from_me: reaction.from_me)
+    rows.select { |row| row.content_attributes['deleted'] }.max_by { |row| row.external_created_at.to_i }
+  end
 
   # WhatsApp gives a changed reaction a new id, so the same sender swapping one emoji
   # for another arrives as a fresh event rather than as an edit. One row per (target,

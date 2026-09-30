@@ -201,6 +201,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  describe 'a slice that waited while the inbox was re-pointed at another number' do
+    it 'files nothing, though the session id stayed' do
+      dispatch(slice([historical('3EB0OTHERNUM', 2.days.ago)]))
+      channel.update_columns(phone_number: '+5541988887777') # rubocop:disable Rails/SkipsModelValidations
+
+      perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
+
+      expect(inbox.messages.where(source_id: '3EB0OTHERNUM')).to be_empty
+    end
+  end
+
   describe 'what the setting decides' do
     it 'files only what arrived while the session was down when nobody asked' do
       watermark = 4.days.ago

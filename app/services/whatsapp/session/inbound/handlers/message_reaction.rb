@@ -30,8 +30,13 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
   def remove
     known = payload.from_me ? nil : inbound::ContactLookup.contact(inbox: inbox, party: peer_party)
     return :deferred unless recorded?(known)
-    return :ignored unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id,
-                                                          sender: known, from_me: payload.from_me)
+
+    unless inbound::ReactionStore.active?(inbox: inbox, target_id: payload.target_id, sender: known, from_me: payload.from_me)
+      # Nothing to take away, but the removal still dates the last one: a reaction replayed
+      # after it, off the ordered stream, is measured against this.
+      store(known).note_removal
+      return :ignored
+    end
 
     store(sender_contact).remove ? :handled : :ignored
   end

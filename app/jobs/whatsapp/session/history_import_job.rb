@@ -26,9 +26,11 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   # the inbox may have moved to another provider, or been pointed at another instance or
   # session of the same one, and a pile from the previous account filed here would be
   # somebody else's conversations. The dispatcher asks the same question of an event;
-  # this is the same event arriving late.
+  # this is the same event arriving late. The number is part of it because a native inbox
+  # keeps its session id when it is re-pointed at another number and paired again.
   def self.identity(channel)
-    [channel.provider, Whatsapp::Session::Registry.instance_fingerprint(channel) || channel.provider_config&.dig('session_id')]
+    [channel.provider, Whatsapp::Session::Registry.instance_fingerprint(channel) || channel.provider_config&.dig('session_id'),
+     channel.phone_number.to_s]
   end
 
   # Which slices of an inbox are still queued, so an event about a message one of them

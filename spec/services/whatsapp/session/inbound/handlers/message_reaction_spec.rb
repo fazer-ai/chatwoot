@@ -182,6 +182,24 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     expect(inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").where.not(content: '')).to be_empty
   end
 
+  # add A, remove, add B, remove, replayed as A, remove, remove, B: the second removal
+  # finds nothing active and still has to count, or B comes back.
+  it 'keeps a reaction removed however its toggles are replayed' do
+    target
+    toggle = lambda do |id, emoji, second|
+      event = model::Event.build(reaction.with(id: id, emoji: emoji, timestamp: (1_755_440_000 + second) * 1000))
+      described_class.new(channel: channel, event: event).perform
+    end
+
+    toggle.call('3EB0A', '👍', 1)
+    toggle.call('3EB0R1', nil, 2)
+    toggle.call('3EB0R2', nil, 4)
+    toggle.call('3EB0B', '❤️', 3)
+
+    active = inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").where.not(content: '')
+    expect(active).to be_empty
+  end
+
   context 'when the contact takes the reaction back' do
     let(:emoji) { nil }
 
