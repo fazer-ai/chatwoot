@@ -16,14 +16,24 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
     return :ignored unless payload.kind == 'messages'
     return :ignored if messages.empty? && exhausted.nil?
 
-    job = Whatsapp::Session::HistoryImportJob.perform_later(
-      inbox, messages, inbound::Coverage.watermark(inbox), asked_for?, **filing
-    )
-    Whatsapp::Session::HistoryImportJob.queued(inbox, job.job_id) if job
+    queue_import
     :handled
   end
 
   private
+
+  # Registered as pending before it can run, never after: a worker can pick a slice up the
+  # moment it is enqueued, and a `finished` that lands before the registration would leave
+  # a job that is already done holding every deferred event of the inbox for a day.
+  def queue_import
+    importer = Whatsapp::Session::HistoryImportJob
+    job = importer.new(inbox, messages, inbound::Coverage.watermark(inbox), asked_for?, **filing)
+    importer.queued(inbox, job.job_id)
+    importer.finished(inbox, job.job_id) unless job.enqueue
+  rescue StandardError
+    importer.finished(inbox, job.job_id) if job
+    raise
+  end
 
   def data = @data ||= payload.data.to_h.stringify_keys
 

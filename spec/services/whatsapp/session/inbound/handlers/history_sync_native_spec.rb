@@ -65,6 +65,25 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.count).to eq(100)
     end
 
+    # A worker can take the slice the moment it is enqueued, so it is on record as pending
+    # before that, and a slice filed at once leaves nothing pending behind it.
+    it 'leaves nothing pending once the slice is filed, however fast that happens' do
+      deliver(frame)
+
+      expect(inbox.messages.count).to eq(100)
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
+    end
+
+    it 'forgets a slice that never finished once it is older than a day' do
+      Whatsapp::Session::HistoryImportJob.queued(inbox, 'lost-job')
+
+      travel(Whatsapp::Session::HistoryImportJob::PENDING_TTL + 1.minute) do
+        expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
+      end
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryImportJob.pending_key(inbox))
+    end
+
     it 'waits for an import slot, and files the slice once one is given back' do
       tokens = Array.new(slots.concurrency) { |index| "held-#{index}" }
       Redis::Alfred.with { |conn| tokens.each { |token| conn.zadd(slots::KEY, Time.now.to_f + 300, token) } }
@@ -138,8 +157,10 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       threads_of(a_contact, phone, %i[open])
       dispatch(slice([historical('3EB0OVER', 2.days.ago)]))
 
-      expect { Whatsapp::Session::DeferredEventJob.perform_now(channel, edit.to_frame) }
-        .to have_enqueued_job(Whatsapp::Session::DeferredEventJob).with(channel, edit.to_frame)
+      freeze_time do
+        expect { Whatsapp::Session::DeferredEventJob.perform_now(channel, edit.to_frame) }
+          .to have_enqueued_job(Whatsapp::Session::DeferredEventJob).with(channel, edit.to_frame).at(1.minute.from_now)
+      end
 
       perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
       expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
@@ -161,6 +182,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
 
       expect(inbox.messages.where(source_id: '3EB0MOVED')).to be_empty
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
     end
   end
 

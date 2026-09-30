@@ -64,6 +64,18 @@ RSpec.describe Webhooks::WhatsappSessionEventsJob do
     it 'comes back later instead of dropping it' do
       expect { job.perform_now(channel, body) }.to have_enqueued_job(described_class)
     end
+
+    # A history slice waiting for an import slot can hold the message for longer than the
+    # ladder lasts, so while one is queued the wait does not spend it.
+    it 'waits out a history import still queued for the inbox, a minute at a time' do
+      Whatsapp::Session::HistoryImportJob.queued(channel.inbox, 'slice-1')
+
+      freeze_time do
+        expect { job.perform_now(channel, body) }.to have_enqueued_job(described_class).at(1.minute.from_now)
+      end
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryImportJob.pending_key(channel.inbox))
+    end
   end
 
   # A bulk deletion is one event per message id. Stopping at the first one whose message
