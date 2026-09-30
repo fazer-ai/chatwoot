@@ -14,6 +14,7 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
     # labels. Only messages are imported, and a kind this layer does not know is dropped
     # rather than guessed at.
     return :ignored unless payload.kind == 'messages'
+    return :ignored if system_chat?
     return :ignored if messages.empty? && exhausted.nil?
 
     queue_import
@@ -36,6 +37,13 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   end
 
   def data = @data ||= payload.data.to_h.stringify_keys
+
+  # WhatsApp's own account (0@s.whatsapp.net), which files years of notices in a dump. It is
+  # nobody to talk to, and +0 is not a number a contact can hold, so every slice of it failed
+  # the phone validation. The Baileys import drops it for the same reason (SYSTEM_JID).
+  SYSTEM_CHAT = { 'kind' => 'phone', 'id' => '0' }.freeze
+
+  def system_chat? = data['chat'].to_h.stringify_keys.slice('kind', 'id') == SYSTEM_CHAT
 
   # The slice as the wire carried it: the job rehydrates each message into the same
   # InboundMessage the live path reads.

@@ -15,7 +15,12 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
 
   # The same budget as the Baileys job, for the same reason: what a slice waits out on the
   # chat lock is mostly the slices of the same chat queued ahead of it.
-  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: 40
+  BUSY_ATTEMPTS = 40
+  retry_on Whatsapp::Session::Inbound::Locks::Busy, wait: 30.seconds, attempts: BUSY_ATTEMPTS do |job, error|
+    inbox = job.arguments.first
+    job.class.finished(inbox, job.job_id) if inbox.is_a?(Inbox)
+    raise error
+  end
 
   discard_on ActiveJob::DeserializationError do |job, error|
     Rails.logger.info("Skipping #{job.class} because of ActiveJob::DeserializationError (#{error.message})")
@@ -79,6 +84,13 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   rescue Whatsapp::Session::Inbound::ImportSlots::Full
     retry_job(queue: slots::WAITING_QUEUE)
     slots.top_up(into: self.class.queue_name)
+  # A slice that failed stops holding the inbox's deferred events: Sidekiq retries it for
+  # weeks, and they would wait on it for the whole PENDING_TTL. Only the chat lock sends it
+  # back to wait as the same job, so only that keeps it pending, until its last attempt
+  # (the block on retry_on above).
+  rescue StandardError => e
+    let_go(inbox, e)
+    raise
   ensure
     slots.top_up(into: self.class.queue_name) if held
   end
@@ -86,6 +98,10 @@ class Whatsapp::Session::HistoryImportJob < ApplicationJob
   private
 
   def slots = Whatsapp::Session::Inbound::ImportSlots
+
+  def let_go(inbox, error)
+    self.class.finished(inbox, job_id) if inbox && !error.is_a?(Whatsapp::Session::Inbound::Locks::Busy)
+  end
 
   def skip(inbox)
     self.class.finished(inbox, job_id) if inbox

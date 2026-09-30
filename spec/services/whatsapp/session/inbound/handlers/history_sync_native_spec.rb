@@ -102,6 +102,59 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob)
       expect(inbox.messages.count).to eq(100)
     end
+
+    # Sidekiq retries a failed slice for weeks, and every deferred event of the inbox would
+    # wait on it for a day. Only the chat lock's own retry keeps it pending.
+    it 'stops holding the deferred events once its slice fails' do
+      allow(Whatsapp::Session::Inbound::HistoryImporter).to receive(:new).and_raise(ActiveRecord::RecordNotSaved, 'invalid phone')
+
+      dispatch(frame)
+      job = import_jobs.first
+      expect { ActiveJob::Base.execute(job) }.to raise_error(ActiveRecord::RecordNotSaved)
+
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
+    end
+
+    it 'stays pending while the chat lock sends it back to wait' do
+      busy = Whatsapp::Session::Inbound::Locks::Busy.new('busy')
+      allow(Whatsapp::Session::Inbound::HistoryImporter).to receive(:new).and_raise(busy)
+
+      dispatch(frame)
+      perform_enqueued_jobs(only: Whatsapp::Session::HistoryImportJob, queue: 'low')
+
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryImportJob.pending_key(inbox))
+    end
+
+    it 'stops holding them once the chat lock has had its last attempt' do
+      allow(Whatsapp::Session::Inbound::HistoryImporter).to receive(:new).and_raise(Whatsapp::Session::Inbound::Locks::Busy)
+      dispatch(frame)
+      busy = [Whatsapp::Session::Inbound::Locks::Busy].to_s
+      last = Whatsapp::Session::HistoryImportJob::BUSY_ATTEMPTS - 1
+      job = import_jobs.first.merge('exception_executions' => { busy => last })
+
+      expect { ActiveJob::Base.execute(job) }.to raise_error(Whatsapp::Session::Inbound::Locks::Busy)
+
+      expect(Whatsapp::Session::HistoryImportJob.pending?(inbox)).to be(false)
+    end
+  end
+
+  # WhatsApp's own account (0@s.whatsapp.net) files years of notices in the dump. It is
+  # nobody to talk to, and its number, +0, is not one a contact can hold: every slice of it
+  # failed on the phone validation, measured on a real pairing.
+  describe "WhatsApp's own account" do
+    before { channel.update!(provider_config: channel.provider_config.merge('history_sync' => true)) }
+
+    it 'files nothing from it and queues nothing for it' do
+      system = model::Address.phone('0')
+      frame = slice([historical('3EB0SYS1', 2.days.ago, chat: system)], sync: 'full', chat: system)
+
+      expect(dispatch(frame)).to eq(:ignored)
+
+      expect(import_jobs).to be_empty
+      expect(inbox.contacts.count).to eq(0)
+    end
   end
 
   describe 'the end of the history' do
