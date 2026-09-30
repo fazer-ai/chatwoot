@@ -89,6 +89,10 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
 
   def attach(message, media, payload)
     Whatsapp::Session::Inbound::MediaAttachment.build(message, media, payload)
+    # An imported file that was only waiting for its reference is a file again.
+    if message.content_attributes&.dig('unsupported_reason') == Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA
+      message.content_attributes = message.content_attributes.except('is_unsupported', 'unsupported_reason')
+    end
     # Adding an attachment changes no column on the message, and
     # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so
     # nothing would tell the open dashboards that the bubble finally has its file: the

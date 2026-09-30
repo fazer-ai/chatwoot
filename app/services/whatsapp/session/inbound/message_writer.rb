@@ -48,7 +48,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     # that follows this message is what knows the difference, and Handlers::
     # MediaDownloadFailed queues the fetch for the one file worth asking about.
     return if media.nil? || media.ref.blank?
-    return if message.attachments.any? || message.content_attributes['is_unsupported']
+    return if message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
 
     Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
   end

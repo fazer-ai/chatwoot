@@ -16,6 +16,17 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
 
   before { allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend) }
 
+  it 'turns an imported placeholder back into the file once its bytes arrive' do
+    message.update!(content_attributes: { 'is_unsupported' => true, 'unsupported_reason' => 'history_media', 'imported' => true })
+
+    described_class.perform_now(message, media.to_h)
+
+    message.reload
+    expect(message.attachments.first).to have_attributes(file_type: 'image')
+    expect(message.content_attributes).not_to include('is_unsupported', 'unsupported_reason')
+    expect(message.content_attributes['imported']).to be(true)
+  end
+
   it 'attaches the bytes it downloaded' do
     described_class.perform_now(message, media.to_h)
 

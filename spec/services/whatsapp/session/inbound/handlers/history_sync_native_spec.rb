@@ -219,6 +219,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.where(source_id: %w[3EB0ASK3 3EB0ASK4 3EB0ASK5]).count).to eq(3)
     end
 
+    it 'files the answer as history even while announcing it' do
+      levels = []
+      allow(Whatsapp::Session::Inbound::MessageWriter).to receive(:new).and_wrap_original do |original, **kwargs|
+        levels << [Import::SilentWrite.announce?, Import::SilentWrite.archive?]
+        original.call(**kwargs)
+      end
+
+      deliver(slice([3, 4].map { |days| historical("3EB0LVL#{days}", days.days.ago) }))
+
+      expect(levels).to eq([[true, true], [true, true]])
+    end
+
     it 'files the full dump without a word to the dashboard' do
       deliver(slice([3, 4, 5].map { |days| historical("3EB0FUL#{days}", days.days.ago) }, sync: 'full'))
 
@@ -278,6 +290,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(image.content_attributes['is_unsupported']).to be(true)
       expect(image.attachments).to be_empty
       expect(enqueued_jobs.map { |job| job['job_class'] }).not_to include('Whatsapp::Session::MediaFetchJob')
+    end
+
+    # The same message delivered again with its reference, which a dump that overlaps the
+    # live stream does: the placeholder is waiting for exactly that.
+    it 'fetches the file when the message comes again with its reference' do
+      deliver(slice(messages))
+      image = inbox.messages.find_by(source_id: '3EB0M2')
+      ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
+      again = historical('3EB0M2', 3.days.ago + 1.minute, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+      expect { Whatsapp::Session::Inbound::MessageWriter.fetch_media_for(image, again) }
+        .to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
     end
   end
 

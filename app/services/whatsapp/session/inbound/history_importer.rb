@@ -207,7 +207,8 @@ class Whatsapp::Session::Inbound::HistoryImporter
   end
 
   def announcing(&) = Import::SilentWrite.wrap(announce: true, &)
-  def maybe_announcing(&) = announce ? announcing(&) : yield
+  # The archive half of an answer somebody is watching: announced, and still archive.
+  def maybe_announcing(&) = announce ? Import::SilentWrite.wrap(announce: true, archive: true, &) : yield
 
   # The name the phone gives a group, for a group this inbox has no name for yet: one it
   # has never seen, or one filed under its own id because nothing had named it. A name
