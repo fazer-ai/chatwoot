@@ -193,7 +193,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
         row.update!(content: '❤️', content_attributes: row.content_attributes.merge('external_created_at' => 1_755_440_100))
       end
 
-      dispatch
+      expect(dispatch).to eq(:ignored)
 
       kept = inbox.messages.find_by("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'")
       expect(kept.content).to eq('❤️')

@@ -27,7 +27,7 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   # a job that is already done holding every deferred event of the inbox for a day.
   def queue_import
     importer = Whatsapp::Session::HistoryImportJob
-    job = importer.new(inbox, messages, inbound::Coverage.watermark(inbox), asked_for?, **filing)
+    job = importer.new(inbox, messages, inbound::Coverage.watermark(inbox), requested?, **filing)
     importer.queued(inbox, job.job_id)
     importer.finished(inbox, job.job_id) unless job.enqueue
   rescue StandardError
@@ -59,7 +59,9 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   def filing
     filing = { announce: on_demand?, identity: Whatsapp::Session::HistoryImportJob.identity(channel) }
     filing[:group_name] = data['name'] if data['name'].present?
-    filing[:exhausted] = exhausted.to_h if exhausted
+    # Only with the archive it closes: marking a chat finished on a dump whose archive was
+    # dropped would take the button away from the only way left to fetch that archive.
+    filing[:exhausted] = exhausted.to_h if exhausted && requested?
     filing
   end
 
@@ -77,6 +79,13 @@ class Whatsapp::Session::Inbound::Handlers::HistorySync < Whatsapp::Session::Inb
   # The window is only for a provider that does not type its slices. One that does says
   # which slice answers a request, and a window opened for one chat would otherwise pass
   # every other chat's archive in a dump that happened to be arriving at the same time.
+  # Asked once: the answer opens the backfill window as a side effect.
+  def requested?
+    return @requested if defined?(@requested)
+
+    @requested = asked_for?
+  end
+
   def asked_for?
     return true if on_demand?
     return true if channel.provider_service.try(:history_sync?)

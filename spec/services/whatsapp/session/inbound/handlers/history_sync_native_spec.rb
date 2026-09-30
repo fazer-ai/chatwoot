@@ -131,6 +131,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
         .with(having_attributes(data: hash_including(conversation: thread))).at_least(:once)
     end
 
+    # A dump nobody asked for drops its archive, so it cannot also say the chat is done.
+    it 'does not mark the chat from a dump whose archive was dropped' do
+      thread = threads_of(a_contact, phone, %i[open]).first
+      cover!(1.day.ago)
+
+      deliver(slice([historical('3EB0UNASKED', 30.days.ago)], sync: 'full', exhausted: true))
+
+      expect(inbox.messages.where(source_id: '3EB0UNASKED')).to be_empty
+      expect(exhausted?(thread)).to be(false)
+    end
+
     it 'marks only when the slice says so, and after its messages are filed' do
       thread = threads_of(a_contact, phone, %i[open]).first
       first = [0, 1, 2].map { |minute| historical("3EB0A#{minute}", 5.days.ago + minute.minutes) }
