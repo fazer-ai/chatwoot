@@ -17,8 +17,14 @@ class Whatsapp::Session::Inbound::MessageAttributes
 
   # A rich card with no text and no media header renders as an empty bubble, which is
   # what the unsupported flag exists for.
+  #
+  # So is an imported file that came with no reference to its bytes. On the live path a
+  # media message without one is followed by `media.download_failed`, which is what asks
+  # for the file again; nothing follows a message out of a history dump, so the row would
+  # be a bubble waiting forever for a file nobody is going to fetch.
   def unsupported?
     return true if content_type == 'unsupported'
+    return true if imported && unfetchable_media?
 
     content_type == 'rich' && content.preview_text.blank? && content.media.blank?
   end
@@ -30,6 +36,11 @@ class Whatsapp::Session::Inbound::MessageAttributes
   def content = inbound.content
   def content_type = content&.wire_type
   def incoming? = inbound.incoming?
+
+  def unfetchable_media?
+    media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
+    media.present? && media.ref.blank?
+  end
 
   def origin
     {

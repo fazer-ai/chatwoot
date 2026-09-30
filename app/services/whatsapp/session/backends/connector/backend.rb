@@ -87,6 +87,16 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
       true
     end
 
+    # The connector files what arrived while the session was down in the same dump as the
+    # archive, and publishes neither without being asked at connect.
+    def history_on_every_connect?
+      true
+    end
+
+    def history_needs_anchor?
+      true
+    end
+
     PROXY_SCHEMES = %w[http https socks5].freeze
 
     # The session id is generated when the inbox is saved and the toggles are optional, so
@@ -231,6 +241,15 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
   def react_message(command)
     model::SendResult.from_h(client.call(command, idempotency_key: "msg:#{command.message_id}"))
+  end
+
+  # The answer is not this call's: the phone answers, when it is awake to, with
+  # `history.sync` events typed `on_demand`. A call rather than a publish so a refusal
+  # (a session that went down since the button was offered, an anchor the connector will
+  # not take) reaches the job that asked instead of being logged by nobody.
+  def request_history(command)
+    client.call(command)
+    nil
   end
 
   def mark_read(command)

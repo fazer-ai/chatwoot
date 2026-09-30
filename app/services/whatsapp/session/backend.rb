@@ -50,6 +50,21 @@ class Whatsapp::Session::Backend
       false
     end
 
+    # Whether every connect asks for the phone's history, whatever the inbox setting says.
+    # A provider that publishes what arrived while the session was down only as part of the
+    # history dump needs the dump on every connect, or that part is lost with the rest;
+    # the setting then decides only whether the archive it also carries is filed.
+    def history_on_every_connect?
+      false
+    end
+
+    # Whether a history request has to name a message to page back from. WhatsApp itself
+    # only walks backwards from a message it is shown; a provider that asks it directly
+    # answers a request with no anchor `unsupported`, so the anchor is found here instead.
+    def history_needs_anchor?
+      false
+    end
+
     # Whether this inbox's provider runs outside the deployment's network. What it decides
     # is the address outbound media is offered at: a service on the far side of the
     # firewall fetches the attachment over the internet and can never resolve

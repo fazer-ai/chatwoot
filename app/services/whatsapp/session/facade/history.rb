@@ -11,8 +11,18 @@ module Whatsapp::Session::Facade::History
   # `before` is the stored message to page backwards from, or nil to start from the oldest
   # the provider knows. A message rather than an id: the anchor needs its timestamp and its
   # direction too, and the row is the one place that has all three together.
+  #
+  # A backend that can only page backwards from a message gets the oldest one this inbox
+  # holds for the contact, across every thread it opened, which is where the phone's copy
+  # and ours stop overlapping. With nothing stored there is nothing to page from, and
+  # nothing is asked: the answer is false rather than a request the provider refuses.
   def request_history(contact, count: nil, before: nil)
     raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.inboxes.channel.history_sync_unsupported') unless capability?('history_sync')
+
+    if backend.class.history_needs_anchor?
+      before ||= oldest_stored_message(contact)
+      return false if before.nil?
+    end
 
     backend.request_history(
       model::Commands::HistoryRequest.new(
@@ -33,5 +43,20 @@ module Whatsapp::Session::Facade::History
   # it, so with this off the request would go out and the reply would be dropped.
   def history_sync?
     capability?('history_sync') && ActiveModel::Type::Boolean.new.cast(channel.provider_config&.dig('history_sync')).present?
+  end
+
+  private
+
+  # What a connect asks for, which is the setting except on a backend whose gap only ever
+  # arrives inside the history dump: see Backend.history_on_every_connect?.
+  def history_on_connect?
+    capability?('history_sync') && (backend.class.history_on_every_connect? || history_sync?)
+  end
+
+  def oldest_stored_message(contact)
+    Message.where(conversation_id: contact.conversations.where(inbox_id: channel.inbox.id).select(:id))
+           .where.not(source_id: nil)
+           .reorder(created_at: :asc, id: :asc)
+           .first
   end
 end

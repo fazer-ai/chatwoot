@@ -18,7 +18,9 @@
 #                    The one exception follows the same split: the gap half is written
 #                    announcing, so the queue an operator is watching updates itself,
 #                    while the archive stays silent because a reader has nothing to gain
-#                    from eight hundred backdated rows arriving one cable frame at a time.
+#                    from eight hundred backdated rows arriving one cable frame at a time,
+#                    unless the pile answers a press of the button: then somebody is
+#                    watching the thread for exactly those rows (`announce`).
 class Whatsapp::Session::Inbound::HistoryImporter
   include Import::HistorySettlement
 
@@ -34,25 +36,40 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # which happens at every pairing, and then only the gap is filed: see `import_chat`.
   attr_reader :requested
 
-  def initialize(channel:, messages:, requested: true)
+  # How the pile is filed, beyond what is in it. `announce` is true for an answer somebody
+  # is watching arrive, which files the archive half announcing too; `group_name` is what
+  # the phone calls the group the slice is about; `exhausted` is the chat the phone said
+  # it has nothing older for.
+  attr_reader :announce, :group_name, :exhausted
+
+  UNREAD = Object.new.freeze
+
+  # `watermark` is read here when the caller did not read it first. A caller filing
+  # slices in parallel reads it once and hands it to all of them: see HistoryImportJob.
+  def initialize(channel:, messages:, requested: true, watermark: UNREAD, announce: false, group_name: nil, exhausted: nil) # rubocop:disable Metrics/ParameterLists
     @channel = channel
     @messages = messages
     @requested = requested
+    @watermark = watermark
+    @announce = announce
+    @group_name = group_name.presence
+    @exhausted = exhausted
     @opened = Set.new
   end
 
   def perform
     batches = importable.group_by { |message| message.chat.to_jid }
-    return :ignored if batches.empty?
-
     # Read once, before anything is written. Every message in the run is classified
     # against the same boundary, or the first imported message would move the line the
     # rest of its own batch is measured against.
-    watermark = inbound::Coverage.watermark(inbox)
+    watermark = @watermark.equal?(UNREAD) ? inbound::Coverage.watermark(inbox) : @watermark
     Import::SilentWrite.wrap do
       batches.each_value { |batch| import_chat(batch, watermark) }
     end
-    :handled
+    # After the messages, so a slice that is both the last of a chat and the first this
+    # inbox sees of it marks the thread its own messages just opened.
+    marked = mark_exhausted
+    batches.empty? && !marked ? :ignored : :handled
   end
 
   private
@@ -94,7 +111,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
       # is the only part of that offer this inbox is missing. A first pairing has no
       # coverage at all, so `gap?` calls the whole pile archive and this drops all of it,
       # which is what the old outright refusal was protecting.
-      archived = requested ? import_run(runs[false], archived: true) : []
+      archived = requested ? maybe_announcing { import_run(runs[false], archived: true) } : []
       gap = announcing { import_run(runs[true], archived: false) }
       settle(archived, gap)
     end
@@ -147,7 +164,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # is resolved per message. Its own contact and thread are looked up each time too, which
   # is a query a group batch pays and a 1:1 batch does not.
   def import_group(message, archived)
-    resolver = inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender)
+    resolver = inbound::GroupResolver.new(inbox: inbox, group: message.chat, sender: message.sender, subject: subject_for(message.chat))
     group = resolver.perform
     conversation = track(resolver.conversation_for(group.group_contact_inbox, archived: archived, occurred_at: message.sent_at))
 
@@ -180,4 +197,56 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # Raises the flag for the stretch it wraps. Only the gap ever asks for it, and only the
   # dashboard push gets through: see Import::SilentWrite.
   def announcing(&) = Import::SilentWrite.wrap(announce: true, &)
+  def maybe_announcing(&) = announce ? announcing(&) : yield
+
+  # The name the phone gives a group, for a group this inbox has no name for yet: one it
+  # has never seen, or one filed under its own id because nothing had named it. A name
+  # already there came from the group's own events or a roster sync, which are newer than
+  # anything in a dump, so it is left alone.
+  def subject_for(group)
+    return if group_name.blank?
+
+    (@subjects ||= {}).fetch(group.id) { @subjects[group.id] = (group_name if unnamed?(group)) }
+  end
+
+  def unnamed?(group)
+    known = inbox.contact_inboxes.find_by(source_id: group.id)&.contact&.name
+    known.blank? || [group.id, group.to_jid].include?(known)
+  end
+
+  # The phone saying this chat has nothing older, which it says on the answer to a request
+  # and nowhere else. Recorded on every thread of the chat rather than the one somebody was
+  # reading: the request pages back from the oldest message across all of them, so the
+  # answer is about the chat. Looked up the way the live path finds a contact, because the
+  # answer can address the chat by the other half of the phone and LID pair.
+  def mark_exhausted
+    return false if exhausted.blank?
+
+    conversations_for(exhausted).find_each do |conversation|
+      next if conversation.additional_attributes&.dig('history_exhausted')
+
+      conversation.update!(additional_attributes: (conversation.additional_attributes || {}).merge('history_exhausted' => true))
+    end
+    true
+  end
+
+  def conversations_for(chat)
+    contact_inbox = contact_inbox_for(chat)
+    return Conversation.none if contact_inbox.blank?
+
+    inbox.conversations.where(contact_id: contact_inbox.contact_id)
+  end
+
+  # A LID alone finds nothing in ContactLookup when the row is still keyed by the phone,
+  # and the contact then knows its LID only as its identifier.
+  def contact_inbox_for(chat)
+    return inbox.contact_inboxes.find_by(source_id: chat.id) if chat.group?
+
+    inbound::ContactLookup.find(inbox: inbox, party: party_for(chat)) ||
+      (inbox.contact_inboxes.joins(:contact).find_by(contact: { identifier: chat.to_jid }) if chat.lid?)
+  end
+
+  def party_for(chat)
+    chat.lid? ? Whatsapp::Session::Model::Party.new(lid: chat.id) : Whatsapp::Session::Model::Party.new(phone: chat.id)
+  end
 end

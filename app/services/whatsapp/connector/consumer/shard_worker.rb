@@ -23,7 +23,12 @@ class Whatsapp::Connector::Consumer::ShardWorker
   # that group have to wait it out. Waiting stalls the shard, which is what ordering
   # costs: skipping ahead would hand the session its events out of order, and there is
   # no way to put one back.
-  BUSY_WAITS = [5, 15, 30, 60, 60].freeze
+  #
+  # The longest holder is a history import, whose lease is IMPORT_CHAT_LOCK_TTL: an import
+  # yields to a waiter before it starts, but a worker killed mid-import leaves the lease to
+  # run out on its own. So the ladder has to outlast that lease, or a live message that
+  # lands on the chat right then is parked with the lock about to come free.
+  BUSY_WAITS = [5, 15, 30, 60, 60, 60, 60, 60].freeze
   PAUSE_SLICE = 0.5
   # How long the shard waits out an outage before it tries its backlog again.
   STALL_WAIT = 30

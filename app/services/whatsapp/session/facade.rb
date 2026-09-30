@@ -82,7 +82,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: 'resume', phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?, proxy: proxy
+        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
       )
     )
   end
@@ -270,7 +270,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_sync?, proxy: proxy
+        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
       )
     )
   rescue Whatsapp::Session::Errors::Error
