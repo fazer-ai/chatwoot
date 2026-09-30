@@ -168,6 +168,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReaction do
     expect(stored.content).to eq('❤️')
   end
 
+  # Replayed off the ordered stream, a reaction can run after the removal that followed it
+  # on the phone; the removal is where the phone ended.
+  it 'refuses a reaction older than a removal already applied' do
+    target
+    create(:message, conversation: conversation, inbox: inbox, account: channel.account,
+                     message_type: :incoming, sender: contact, content: '',
+                     content_attributes: { is_reaction: true, in_reply_to_external_id: '3EB0TARGET', deleted: true,
+                                           external_created_at: 1_755_440_100 })
+
+    expect(dispatch).to eq(:ignored)
+
+    expect(inbox.messages.where("(content_attributes#>>'{}')::jsonb->>'is_reaction' = 'true'").where.not(content: '')).to be_empty
+  end
+
   context 'when the contact takes the reaction back' do
     let(:emoji) { nil }
 

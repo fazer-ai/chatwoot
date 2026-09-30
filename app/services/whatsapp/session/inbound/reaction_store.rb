@@ -56,6 +56,7 @@ class Whatsapp::Session::Inbound::ReactionStore
   def write(conversation)
     existing = find_existing
     return replace(existing) if existing
+    return nil if removed_later?
 
     conversation.messages.create!(account_id: inbox.account_id, inbox_id: inbox.id, source_id: reaction.id,
                                   sender: reaction.from_me ? nil : sender,
@@ -93,7 +94,11 @@ class Whatsapp::Session::Inbound::ReactionStore
     removed = existing.with_lock do
       next false if stale?(existing)
 
-      existing.update!(content: '', content_attributes: existing.content_attributes.merge('deleted' => true))
+      # Stamped with the removal's own time, which is what a reaction replayed after it
+      # is compared against: see `removed_later?`.
+      existing.update!(content: '', content_attributes: existing.content_attributes.merge(
+        { 'deleted' => true, 'external_created_at' => created_at }.compact
+      ))
       true
     end
     return nil unless removed
@@ -130,6 +135,16 @@ class Whatsapp::Session::Inbound::ReactionStore
 
     Whatsapp::Session::Inbound::ChatList.refresh(existing.conversation)
     existing
+  end
+
+  # A reaction older than a removal already applied for the same sender and target. Events
+  # replayed off the ordered stream, while the message they annotate waited for its history
+  # import, can run in any order, and the removal is what the phone ended on.
+  def removed_later?
+    return false if created_at.blank?
+
+    rows = self.class.rows(inbox: inbox, target_id: reaction.target_id, sender: sender, from_me: reaction.from_me)
+    rows.any? { |row| row.content_attributes['deleted'] && row.external_created_at.to_i > created_at }
   end
 
   def stale?(existing)

@@ -186,6 +186,36 @@ describe('#mutations', () => {
       expect(emitter.emit).not.toHaveBeenCalled();
     });
 
+    it('keeps the viewport and the list order for imported history', () => {
+      const state = {
+        allConversations: [{ id: 1, messages: [], timestamp: 1602256198 }],
+        selectedChatId: 1,
+      };
+      mutations[types.ADD_MESSAGE](state, {
+        conversation_id: 1,
+        content: 'mensagem antiga',
+        created_at: 1500000000,
+        content_attributes: { imported: true },
+      });
+      expect(emitter.emit).not.toHaveBeenCalled();
+      expect(state.allConversations[0].timestamp).toBe(1602256198);
+      expect(state.allConversations[0].messages).toHaveLength(1);
+    });
+
+    it('skips SCROLL_TO_MESSAGE when the history of the thread is exhausted', () => {
+      const state = {
+        allConversations: [{ id: 1, updated_at: 1 }],
+        selectedChatId: 1,
+      };
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        additional_attributes: { history_exhausted: true },
+        event_metadata: { source: 'history_exhausted' },
+      });
+      expect(emitter.emit).not.toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
+    });
+
     it('update message if it exist in the store', () => {
       global.bus = { $emit: vi.fn() };
       const state = {

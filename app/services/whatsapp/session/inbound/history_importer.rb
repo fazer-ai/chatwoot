@@ -241,7 +241,7 @@ class Whatsapp::Session::Inbound::HistoryImporter
       # conversation, and the thread somebody is reading has to drop the button now, not
       # on the next reload. Inside `announcing`, so the dashboard hears it and nothing
       # else does: no automation or webhook fires for every old thread of the contact.
-      conversation.dispatch_conversation_updated_event(conversation.previous_changes)
+      conversation.dispatch_conversation_updated_event(conversation.previous_changes, broadcast_metadata: { source: 'history_exhausted' })
     end
     true
   end

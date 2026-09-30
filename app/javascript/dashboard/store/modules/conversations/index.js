@@ -268,14 +268,18 @@ export const mutations = {
       chat.messages[pendingMessageIndex] = message;
     } else {
       chat.messages.push(message);
-      chat.timestamp = message.created_at;
+      // History arriving in answer to "load older messages" is older than
+      // what the thread already shows: it moves neither the conversation's
+      // place in the list nor the viewport of the agent who asked for it.
+      const isImported = message.content_attributes?.imported === true;
+      if (!isImported) chat.timestamp = message.created_at;
       const { conversation: { unread_count: unreadCount = 0 } = {} } = message;
       chat.unread_count = unreadCount;
       // Reactions render as chips on their parent bubble, not as standalone
       // rows, so jumping the viewport to the bottom on every toggle would
       // yank the user away from whatever older message they reacted to.
       const isReaction = message.content_attributes?.is_reaction === true;
-      if (selectedChatId === conversationId && !isReaction) {
+      if (selectedChatId === conversationId && !isReaction && !isImported) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
     }
@@ -326,7 +330,12 @@ export const mutations = {
       // `event_metadata.source = 'reaction_toggle'` so we can skip scroll
       // unconditionally — heuristics on `last_non_activity_message` miss the
       // case where newer non-reaction messages exist after the reacted target.
-      const isReactionUpdate = eventMetadata?.source === 'reaction_toggle';
+      // `history_exhausted` only drops the "load older messages" control at the
+      // top of the thread, where the agent who asked is reading.
+      const isReactionUpdate = [
+        'reaction_toggle',
+        'history_exhausted',
+      ].includes(eventMetadata?.source);
       if (_state.selectedChatId === conversation.id && !isReactionUpdate) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
       }
