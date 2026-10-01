@@ -155,7 +155,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def toggle_status
     # FIXME: move this logic into a service object
-    return toggle_status_if_expected if params[:expected_status].present?
+    return toggle_status_if_expected if params.key?(:expected_status)
     return @conversation.bot_handoff! if bot_handoff?
 
     apply_toggle_status

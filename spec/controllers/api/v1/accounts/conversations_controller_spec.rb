@@ -942,6 +942,19 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(pending_conversation.reload.status).to eq('pending')
       end
+
+      it 'refuses a blank expected_status instead of toggling unconditionally' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        pending_conversation.update!(status: 'resolved')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: '' },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(pending_conversation.reload.status).to eq('resolved')
+      end
     end
   end
 
