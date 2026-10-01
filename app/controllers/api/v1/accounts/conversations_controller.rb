@@ -155,8 +155,35 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
 
   def toggle_status
     # FIXME: move this logic into a service object
+    return toggle_status_if_expected if params.key?(:expected_status)
     return @conversation.bot_handoff! if bot_handoff?
 
+    apply_toggle_status
+  end
+
+  # A caller that decided from a status it read earlier sends that status as `expected_status`, and the change applies
+  # only while the conversation still holds it; otherwise nothing changes and the answer is 409 with the current status.
+  # Without it a bot's `open` is a handoff on a pending conversation and a reopen on one an agent resolved meanwhile.
+  # The row lock orders the check and the write against any other write to the conversation.
+  def toggle_status_if_expected
+    unless Conversation.statuses.key?(params[:expected_status])
+      return render json: { error: 'expected_status is not a conversation status' }, status: :unprocessable_entity
+    end
+
+    handoff = false
+    current = @conversation.with_lock do
+      next @conversation.status if @conversation.status != params[:expected_status]
+
+      handoff = bot_handoff?
+      handoff ? @conversation.bot_handoff!(dispatch_event: false) : apply_toggle_status
+      nil
+    end
+    return render json: { error: 'conversation status changed', current_status: current }, status: :conflict if current
+
+    @conversation.dispatch_bot_handoff_event if handoff
+  end
+
+  def apply_toggle_status
     if params[:status].present?
       set_conversation_status
     else

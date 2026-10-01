@@ -883,6 +883,78 @@ RSpec.describe 'Conversations API', type: :request do
           .with(Events::Types::CONVERSATION_BOT_HANDOFF, kind_of(Time), conversation: pending_conversation, notifiable_assignee_change: false,
                                                                         changed_attributes: anything, performed_by: anything)
       end
+
+      it 'hands off a pending conversation when expected_status matches' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: 'pending' },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(pending_conversation.reload.status).to eq('open')
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::CONVERSATION_BOT_HANDOFF, kind_of(Time), hash_including(conversation: pending_conversation))
+      end
+
+      it 'leaves a conversation resolved meanwhile untouched and answers 409' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        pending_conversation.update!(status: 'resolved')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: 'pending' },
+             as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['current_status']).to eq('resolved')
+        expect(pending_conversation.reload.status).to eq('resolved')
+      end
+
+      it 'answers 409 when the conversation is resolved after the request loaded it' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        # An agent's resolve committing between the request loading the conversation and the bot's toggle.
+        allow_any_instance_of(Api::V1::Accounts::ConversationsController) # rubocop:disable RSpec/AnyInstance
+          .to receive(:toggle_status_if_expected).and_wrap_original do |original|
+            Conversation.find(pending_conversation.id).update!(status: :resolved)
+            original.call
+          end
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: 'pending' },
+             as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(pending_conversation.reload.status).to eq('resolved')
+      end
+
+      it 'refuses an expected_status that is not a conversation status' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: 'closed' },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(pending_conversation.reload.status).to eq('pending')
+      end
+
+      it 'refuses a blank expected_status instead of toggling unconditionally' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        pending_conversation.update!(status: 'resolved')
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{pending_conversation.display_id}/toggle_status",
+             headers: { api_access_token: agent_bot.access_token.token },
+             params: { status: 'open', expected_status: '' },
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(pending_conversation.reload.status).to eq('resolved')
+      end
     end
   end
 
