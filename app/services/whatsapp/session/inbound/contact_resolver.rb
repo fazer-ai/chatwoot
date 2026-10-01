@@ -67,12 +67,22 @@ class Whatsapp::Session::Inbound::ContactResolver
     ).perform
   end
 
+  # The other ninth-digit forms are for a contact with no contact_inbox here, which only its
+  # number can find: one created by hand or through the API (#776). The builder tries the
+  # exact number first, so a contact that matches it wins.
   def contact_attributes
     {
       name: party.name.presence || party.phone.presence || party.lid,
       phone_number: party.phone_e164,
+      phone_number_candidates: other_ninth_digit_forms,
       identifier: party.identifier
     }.compact
+  end
+
+  def other_ninth_digit_forms
+    return if party.phone.blank?
+
+    (Whatsapp::Session::PhoneMatch.variants(party.phone) - [party.phone]).map { |variant| "+#{variant}" }.presence
   end
 
   def update_contact(contact)
