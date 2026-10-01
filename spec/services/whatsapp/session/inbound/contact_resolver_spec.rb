@@ -102,6 +102,14 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
     end
   end
 
+  # A message can arrive keyed only by LID, with no number to look the contact up by.
+  it 'files a party that has only a LID' do
+    contact_inbox = described_class.new(inbox: inbox, party: model::Party.new(lid: '182736451928374', push_name: 'Ana')).perform
+
+    expect(contact_inbox.source_id).to eq('182736451928374')
+    expect(contact_inbox.contact.phone_number).to be_nil
+  end
+
   it 'answers nil for a party with nothing to key on' do
     expect(described_class.new(inbox: inbox, party: model::Party.new(push_name: 'Ana')).perform).to be_nil
   end
