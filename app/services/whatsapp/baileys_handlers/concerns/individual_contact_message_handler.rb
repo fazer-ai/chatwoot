@@ -96,11 +96,10 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
 
   # A contact created by hand or through the API has no contact_inbox, so nothing but its
   # number finds it, and WhatsApp may report that number in the other ninth-digit form
-  # (#776). The exact form is still tried first, so a contact that matches it wins.
+  # (#776). The builder tries the exact number first and drops it from the candidates, so a
+  # contact that matches it wins.
   def other_ninth_digit_forms(phone)
-    return if phone.blank?
-
-    (Whatsapp::Session::PhoneMatch.variants(phone) - [phone]).map { |variant| "+#{variant}" }.presence
+    Whatsapp::Session::PhoneMatch.variants(phone).map { |variant| "+#{variant}" }
   end
 
   def update_contact_info(phone, identifier)
