@@ -123,4 +123,28 @@ describe Whatsapp::PhoneNumberNormalizationService do
       end
     end
   end
+
+  describe '#alternate_contact_phone_numbers' do
+    subject(:service) { described_class.new(whatsapp_inbox) }
+
+    it 'returns the other Brazilian form in e164, without the number itself' do
+      expect(service.alternate_contact_phone_numbers('5541988887777')).to eq(['+554188887777'])
+      expect(service.alternate_contact_phone_numbers('554188887777')).to eq(['+5541988887777'])
+    end
+
+    it 'accepts the number already in e164' do
+      expect(service.alternate_contact_phone_numbers('+5541988887777')).to eq(['+554188887777'])
+    end
+
+    # The source-id variant of an Argentine mobile drops the 9, which is a landline that can
+    # belong to somebody else.
+    it 'does not offer the landline for an Argentine mobile' do
+      expect(service.alternate_contact_phone_numbers('5491112345678')).not_to include('+541112345678')
+    end
+
+    it 'returns nothing for a country with no normalizer or a missing number' do
+      expect(service.alternate_contact_phone_numbers('447700900123')).to eq([])
+      expect(service.alternate_contact_phone_numbers(nil)).to eq([])
+    end
+  end
 end

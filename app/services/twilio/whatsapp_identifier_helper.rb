@@ -44,8 +44,7 @@ module Twilio::WhatsappIdentifierHelper
   def twilio_whatsapp_phone_number_candidates
     return unless twilio_channel.whatsapp? && phone_number.present?
 
-    candidates = Whatsapp::PhoneNumberNormalizationService.new(inbox).phone_number_candidates(phone_number.delete_prefix('+')).drop(1)
-    candidates.map { |candidate| "+#{candidate}" }.presence
+    Whatsapp::PhoneNumberNormalizationService.new(inbox).alternate_contact_phone_numbers(phone_number).presence
   end
 
   def twilio_whatsapp_source_id(identifier)
