@@ -480,6 +480,15 @@ describe Whatsapp::IncomingMessageBaileysService do
           end
         end
 
+        it 'does not take an Argentine landline for the mobile that reported' do
+          landline = create(:contact, account: inbox.account, name: 'Fixo', phone_number: '+541123456789')
+          raw_message[:key][:remoteJidAlt] = '5491123456789@s.whatsapp.net'
+
+          expect { described_class.new(inbox: inbox, params: params).perform }
+            .to change(inbox.account.contacts, :count).by(1)
+          expect(landline.reload.phone_number).to eq('+541123456789')
+        end
+
         it 'does not reach a contact of another account' do
           create(:contact, phone_number: '+551198765432')
 

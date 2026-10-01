@@ -84,6 +84,16 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
       end
     end
 
+    # Argentina's source-id variant drops the mobile 9, which is a landline number that can
+    # belong to somebody else.
+    it 'does not take an Argentine landline for the mobile that reported' do
+      landline = create(:contact, account: channel.account, name: 'Fixo', phone_number: '+541123456789')
+
+      expect { described_class.new(inbox: inbox, party: model::Party.new(phone: '5491123456789', push_name: 'Movil')).perform }
+        .to change(channel.account.contacts, :count).by(1)
+      expect(landline.reload.phone_number).to eq('+541123456789')
+    end
+
     it 'does not reach a contact of another account' do
       create(:contact, phone_number: '+554188887777')
 

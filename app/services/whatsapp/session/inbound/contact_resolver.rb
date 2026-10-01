@@ -68,8 +68,10 @@ class Whatsapp::Session::Inbound::ContactResolver
   end
 
   # The other ninth-digit forms are for a contact with no contact_inbox here, which only its
-  # number can find: one created by hand or through the API (#776). The builder tries the
-  # exact number first and drops it from the candidates, so a contact that matches it wins.
+  # number can find: one created by hand or through the API (#776). Only the contact-safe
+  # forms, the ones the Cloud path uses: an Argentine mobile's source-id variant is a
+  # landline that can be somebody else's. The builder tries the exact number first, so a
+  # contact that matches it wins.
   def contact_attributes
     {
       name: party.name.presence || party.phone.presence || party.lid,
@@ -80,7 +82,9 @@ class Whatsapp::Session::Inbound::ContactResolver
   end
 
   def other_ninth_digit_forms
-    Whatsapp::Session::PhoneMatch.variants(party.phone).map { |variant| "+#{variant}" }
+    return if party.phone.blank?
+
+    Whatsapp::PhoneNumberNormalizationService.new(inbox).phone_number_candidates(party.phone).map { |candidate| "+#{candidate}" }
   end
 
   def update_contact(contact)
