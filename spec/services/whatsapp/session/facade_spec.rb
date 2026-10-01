@@ -79,6 +79,27 @@ RSpec.describe Whatsapp::Session::Facade do
         end
       end
 
+      context 'when the answer carries a code of its own' do
+        let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', pairing_code: 'NEW1-2345') }
+
+        it 'shows the code the answer brought' do
+          channel.request_pairing_code
+
+          expect(channel.reload.provider_connection).to include('pairing_code' => 'NEW1-2345')
+        end
+      end
+
+      context 'when the answer is already paired' do
+        let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'open') }
+
+        it 'leaves no code on a session that is open' do
+          channel.request_pairing_code
+
+          expect(channel.reload.provider_connection).to include('connection' => 'open')
+          expect(channel.provider_connection).not_to have_key('pairing_code')
+        end
+      end
+
       context 'when the answer is a refusal' do
         let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: 'connect_failure') }
 
