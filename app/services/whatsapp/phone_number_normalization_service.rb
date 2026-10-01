@@ -38,6 +38,16 @@ class Whatsapp::PhoneNumberNormalizationService
     normalizer.contact_candidates(clean_number)
   end
 
+  # The other contact phone numbers, in e164, under which the person behind this number
+  # may already be filed, for ContactInboxWithContactBuilder's phone_number_candidates.
+  # The exact number is left out: the caller passes it as phone_number, which the builder
+  # tries first.
+  def alternate_contact_phone_numbers(number)
+    return [] if number.blank?
+
+    phone_number_candidates(number.delete_prefix('+')).drop(1).map { |candidate| "+#{candidate}" }
+  end
+
   private
 
   attr_reader :inbox

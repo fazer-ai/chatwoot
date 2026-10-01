@@ -99,7 +99,7 @@ module Whatsapp::IncomingMessageIdentifierHelper
     return { name: name } if phone_number.blank?
 
     formatted_phone_number = "+#{phone_number}"
-    candidates = phone_number_candidates(phone_number).drop(1).map { |candidate| "+#{candidate}" }
+    candidates = Whatsapp::PhoneNumberNormalizationService.new(inbox).alternate_contact_phone_numbers(phone_number)
     display_name = name == phone_identifier ? formatted_phone_number : name
     { name: display_name, phone_number: formatted_phone_number, phone_number_candidates: candidates.presence }.compact
   end
