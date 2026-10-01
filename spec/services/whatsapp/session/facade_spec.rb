@@ -40,6 +40,89 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(channel.reload.provider_connection['pairing_attempt']).to be_present
     end
 
+    # The connector answers the connect only after it has published the code, and the
+    # event carrying it can be filed while this request is still waiting on that answer.
+    # The answer itself carries no code, and written as a whole state it used to clear the
+    # one the operator had just been shown (#774).
+    context 'when the code arrives as an event before the connect answers' do
+      let(:writes) { [] }
+      let(:arriving) { Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', pairing_code: 'XRW6-1299') }
+      let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting') }
+
+      before do
+        allow(channel).to receive(:update_provider_connection!).and_wrap_original do |original, payload|
+          writes << payload.deep_stringify_keys
+          original.call(payload)
+        end
+        allow(backend).to receive(:connect) do
+          Whatsapp::Session::ConnectionStateWriter.new(channel).apply(arriving)
+          answer
+        end
+      end
+
+      it 'keeps the code on the record and on every state written after it' do
+        channel.request_pairing_code
+
+        expect(channel.reload.provider_connection).to include('connection' => 'connecting', 'pairing_code' => 'XRW6-1299')
+        after_code = writes.drop_while { |payload| payload['pairing_code'].blank? }
+        expect(after_code).not_to be_empty
+        expect(after_code).to all(include('pairing_code' => 'XRW6-1299'))
+      end
+
+      context 'when the event carries a QR instead' do
+        let(:arriving) { Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', qr_data_url: 'data:image/png;base64,QR1') }
+
+        it 'keeps the QR' do
+          channel.setup_channel_provider
+
+          expect(channel.reload.provider_connection).to include('qr_data_url' => 'data:image/png;base64,QR1')
+        end
+      end
+
+      context 'when the answer carries a code of its own' do
+        let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting', pairing_code: 'NEW1-2345') }
+
+        it 'shows the code the answer brought' do
+          channel.request_pairing_code
+
+          expect(channel.reload.provider_connection).to include('pairing_code' => 'NEW1-2345')
+        end
+      end
+
+      context 'when the answer is already paired' do
+        let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'open') }
+
+        it 'leaves no code on a session that is open' do
+          channel.request_pairing_code
+
+          expect(channel.reload.provider_connection).to include('connection' => 'open')
+          expect(channel.provider_connection).not_to have_key('pairing_code')
+        end
+      end
+
+      context 'when the answer is a refusal' do
+        let(:answer) { Whatsapp::Session::Model::ConnectionState.new(connection: 'close', error: 'connect_failure') }
+
+        it 'leaves the code behind with the attempt it belonged to' do
+          channel.request_pairing_code
+
+          expect(channel.reload.provider_connection).to include('connection' => 'close', 'error_code' => 'connect_failure')
+          expect(channel.provider_connection).not_to have_key('pairing_code')
+        end
+      end
+    end
+
+    # What the answer keeps is only what this attempt was given: the claim clears the
+    # previous attempt's code before the provider is asked.
+    it 'does not carry a code from an earlier attempt into a new one' do
+      channel.update_provider_connection!('connection' => 'connecting', 'pairing_code' => 'OLD0-0000', 'pairing_attempt' => 'earlier')
+      allow(backend).to receive(:connect).and_return(Whatsapp::Session::Model::ConnectionState.new(connection: 'connecting'))
+
+      channel.request_pairing_code
+
+      expect(channel.reload.provider_connection).not_to have_key('pairing_code')
+    end
+
     it 'refuses a provider that does not declare the capability' do
       allow(channel).to receive(:session_capabilities).and_return(%w[qr_pairing])
 

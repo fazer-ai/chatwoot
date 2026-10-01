@@ -224,7 +224,7 @@ class Whatsapp::Session::Facade
     # resume that answers `open` has nothing left to poll, and a chain started over one
     # would write `connect_failure` over a healthy connection the first time a request
     # failed.
-    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider, instance: instance)
+    writer.apply(state.with_attempt(attempt), reset: true, attempt: attempt, provider: provider, instance: instance, answering: true)
     start_pairing_poll(mode, attempt) if state.connecting? && backend.class.state_polling?
     state
   end
