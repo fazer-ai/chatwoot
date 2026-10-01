@@ -459,6 +459,44 @@ describe Whatsapp::IncomingMessageBaileysService do
         expect(message.content_attributes[:external_created_at]).to eq(timestamp)
       end
 
+      # A contact created by hand or through the API has no contact_inbox, so nothing but
+      # its number can find it, and the builder matched that exactly: WhatsApp reporting
+      # the other ninth-digit form filed a second, unblocked contact that the bot answered
+      # (#776).
+      context 'when a contact with no contact_inbox holds the other ninth-digit form' do
+        [
+          ['5511998765432', '+551198765432', 'the message has the ninth digit'],
+          ['551198765432', '+5511998765432', 'the message has no ninth digit']
+        ].each do |reported, stored, label|
+          it "files the message under that contact when #{label}" do
+            existing = create(:contact, account: inbox.account, name: 'John Doe', phone_number: stored, blocked: true)
+            raw_message[:key][:remoteJidAlt] = "#{reported}@s.whatsapp.net"
+
+            expect { described_class.new(inbox: inbox, params: params).perform }
+              .not_to change(inbox.account.contacts, :count)
+
+            expect(inbox.conversations.sole.contact_id).to eq(existing.id)
+            expect(existing.reload.blocked).to be(true)
+          end
+        end
+
+        it 'does not take an Argentine landline for the mobile that reported' do
+          landline = create(:contact, account: inbox.account, name: 'Fixo', phone_number: '+541123456789')
+          raw_message[:key][:remoteJidAlt] = '5491123456789@s.whatsapp.net'
+
+          expect { described_class.new(inbox: inbox, params: params).perform }
+            .to change(inbox.account.contacts, :count).by(1)
+          expect(landline.reload.phone_number).to eq('+541123456789')
+        end
+
+        it 'does not reach a contact of another account' do
+          create(:contact, phone_number: '+551198765432')
+
+          expect { described_class.new(inbox: inbox, params: params).perform }
+            .to change(inbox.account.contacts, :count).by(1)
+        end
+      end
+
       context 'when updating contact avatar' do
         it 'enqueues the contact avatar update job for new contacts' do
           described_class.new(inbox: inbox, params: params).perform

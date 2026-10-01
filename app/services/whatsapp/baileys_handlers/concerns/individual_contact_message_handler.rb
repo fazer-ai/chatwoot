@@ -84,13 +84,25 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: source_id,
       inbox: inbox,
-      contact_attributes: { name: contact_name, phone_number: ("+#{phone}" if phone), identifier: identifier }
+      contact_attributes: { name: contact_name, phone_number: ("+#{phone}" if phone), identifier: identifier,
+                            phone_number_candidates: other_ninth_digit_forms(phone) }
     ).perform
 
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
 
     update_contact_info(phone, identifier)
+  end
+
+  # A contact created by hand or through the API has no contact_inbox, so nothing but its
+  # number finds it, and WhatsApp may report that number in the other ninth-digit form
+  # (#776). The contact-safe forms, the ones the Cloud path uses: an Argentine mobile's
+  # source-id variant is a landline that can be somebody else's. The builder tries the exact
+  # number first, so a contact that matches it wins. A message keyed only by LID has none.
+  def other_ninth_digit_forms(phone)
+    return if phone.blank?
+
+    Whatsapp::PhoneNumberNormalizationService.new(inbox).phone_number_candidates(phone).map { |candidate| "+#{candidate}" }
   end
 
   def update_contact_info(phone, identifier)
