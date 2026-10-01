@@ -55,6 +55,43 @@ RSpec.describe Whatsapp::Session::Inbound::ContactResolver do
     end
   end
 
+  # A contact created by hand or through the API has no contact_inbox yet, so the
+  # variant lookup above, which reads this inbox's contact_inboxes, cannot see it. The
+  # builder then matched the number exactly and filed a second, unblocked contact that
+  # an agent bot answered (#776).
+  context 'when a contact with no contact_inbox holds the other ninth-digit form' do
+    lids = [nil, '182736451928374']
+
+    [
+      ['5541988887777', '+554188887777', 'the message has the ninth digit'],
+      ['554188887777', '+5541988887777', 'the message has no ninth digit']
+    ].each do |reported, stored, label|
+      context "when #{label}" do
+        let!(:existing) { create(:contact, account: channel.account, name: 'Bruno', phone_number: stored, blocked: true) }
+
+        lids.each do |lid|
+          it "files it under that contact#{' with a LID' if lid}" do
+            party = model::Party.new(phone: reported, lid: lid, push_name: 'Bruno')
+
+            expect { described_class.new(inbox: inbox, party: party, overwrite: true).perform }
+              .not_to change(channel.account.contacts, :count)
+
+            contact_inbox = inbox.contact_inboxes.sole
+            expect(contact_inbox.contact_id).to eq(existing.id)
+            expect(existing.reload.blocked).to be(true)
+          end
+        end
+      end
+    end
+
+    it 'does not reach a contact of another account' do
+      create(:contact, phone_number: '+554188887777')
+
+      expect { described_class.new(inbox: inbox, party: model::Party.new(phone: '5541988887777', push_name: 'Bruno')).perform }
+        .to change(channel.account.contacts, :count).by(1)
+    end
+  end
+
   it 'answers nil for a party with nothing to key on' do
     expect(described_class.new(inbox: inbox, party: model::Party.new(push_name: 'Ana')).perform).to be_nil
   end
