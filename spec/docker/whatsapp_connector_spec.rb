@@ -183,6 +183,14 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       expect(url).to eq('postgres://u:p%40ss%3Aw@db.internal:5432/app_whatsapp_connector?sslmode=prefer')
     end
 
+    it 'reads connection fields from the query as Rails does, over the URL parts' do
+      db = described_class.chatwoot_database(
+        base.merge('DATABASE_URL' => 'postgres://cw@pg:5432/chatwoot?password=s%40cret&username=other&database=cw2')
+      )
+
+      expect(db.values_at(:user, :password, :database)).to eq(%w[other s@cret cw2])
+    end
+
     it 'keeps the TLS options of the URL and drops the ones only Rails understands' do
       url = env_for('DATABASE_URL' => 'postgres://u:s@db/app?pool=5&sslmode=verify-full&sslrootcert=/ca.pem&checkout_timeout=5')
             .fetch('WAC_DATABASE_URL')

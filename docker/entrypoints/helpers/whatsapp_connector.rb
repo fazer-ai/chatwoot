@@ -32,7 +32,7 @@ require 'securerandom'
 require 'tmpdir'
 require 'uri'
 
-module WhatsappConnectorEmbedded
+module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one self-contained file run before bundler; the length is the Rails-compatible URL handling
   DATABASE_SUFFIX = '_whatsapp_connector'
   MAX_BACKOFF = 30
   # A connector that stayed up this long is treated as healthy, and its next crash starts
@@ -82,18 +82,33 @@ module WhatsappConnectorEmbedded
     url.empty? ? config : config.merge(database_from_url(url))
   end
 
-  # Only the fields the URL actually carries, so the rest fall through to the defaults.
+  # Only the fields the URL actually carries, so the rest fall through to the defaults. A
+  # field may also come as a query parameter, which wins over the URL's own parts, as it
+  # does in Rails' resolver (under Rails' name or libpq's).
   def database_from_url(url)
     uri = URI(url)
-    path = uri.path.to_s.delete_prefix('/')
     query = URI.decode_www_form(uri.query.to_s).to_h
+    url_fields(uri).merge(query_fields(query)).merge(options: query.slice(*CONNECTION_OPTIONS.keys))
+  end
+
+  def url_fields(uri)
+    path = uri.path.to_s.delete_prefix('/')
     {
       host: present(uri.hostname),
       port: uri.port&.to_s,
       user: uri.user && URI.decode_uri_component(uri.user),
       password: uri.password && URI.decode_uri_component(uri.password),
-      database: path.empty? ? nil : URI.decode_uri_component(path),
-      options: query.slice(*CONNECTION_OPTIONS.keys)
+      database: path.empty? ? nil : URI.decode_uri_component(path)
+    }.compact
+  end
+
+  def query_fields(query)
+    {
+      host: present(query['host']),
+      port: present(query['port']),
+      user: query['username'] || query['user'],
+      password: query['password'],
+      database: present(query['database']) || present(query['dbname'])
     }.compact
   end
 
