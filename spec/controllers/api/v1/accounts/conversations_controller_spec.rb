@@ -35,6 +35,26 @@ RSpec.describe 'Conversations API', type: :request do
         expect(body[:data][:payload].first[:messages].first[:id]).to eq(message.id)
       end
 
+      # Regression (#781): there is no foreign key on assignee_id, so a user removed
+      # without its callbacks leaves the id behind. One such row took the whole list
+      # down with a 500; it renders as unassigned and the rest of the page with it.
+      it 'lists a conversation whose assignee no longer exists as unassigned' do
+        assigned = create(:conversation, account: account, inbox: conversation.inbox, assignee: agent)
+        conversation.update_column(:assignee_id, User.maximum(:id) + 1000) # rubocop:disable Rails/SkipsModelValidations
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            params: { assignee_type: 'all' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        payload = JSON.parse(response.body, symbolize_names: true)[:data][:payload].index_by { |item| item[:id] }
+        expect(payload.keys).to contain_exactly(conversation.display_id, assigned.display_id)
+        expect(payload[conversation.display_id][:meta]).not_to include(:assignee, :assignee_type)
+        expect(payload[assigned.display_id][:meta][:assignee][:id]).to eq(agent.id)
+        expect(payload[assigned.display_id][:meta][:assignee_type]).to eq('User')
+      end
+
       # Regression: when the latest message is a private note, the seed is the
       # cursor for setActiveChat → fetchPreviousMessages(before: id). Filtering
       # private notes here would leave the trailing note out of the store on
