@@ -3,6 +3,7 @@ import { defineComponent, h, nextTick, reactive, ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import Whatsapp from '../Whatsapp.vue';
 import WhatsappChannel from 'dashboard/api/channel/whatsappChannel';
+import WhatsappLegacyProviderBanner from '../../components/WhatsappLegacyProviderBanner.vue';
 
 // The picker fetches the session catalog on mount. Without this the real module reaches
 // for axios and the composable's own catch swallows it, so every session provider would
@@ -73,10 +74,14 @@ const stubComponent = name =>
 
 const ChannelSelectorStub = defineComponent({
   name: 'ChannelSelector',
-  // Declared so the assertion can read it back with `props()`. eslint cannot see into a
-  // string template, so it reads the prop as unused.
-  // eslint-disable-next-line vue/no-unused-properties
-  props: { isBeta: { type: Boolean, default: false } },
+  // Declared so the assertions can read them back with `props()`. eslint cannot see into
+  // a string template, so it reads the props as unused.
+  /* eslint-disable vue/no-unused-properties */
+  props: {
+    isBeta: { type: Boolean, default: false },
+    isLegacy: { type: Boolean, default: false },
+  },
+  /* eslint-enable vue/no-unused-properties */
   template: '<div class="ChannelSelector-stub" />',
 });
 
@@ -122,6 +127,7 @@ const mountWhatsapp = (
         ChannelSelector: ChannelSelectorStub,
         BaileysWhatsapp: stubComponent('BaileysWhatsapp'),
         ZapiWhatsapp: stubComponent('ZapiWhatsapp'),
+        SessionWhatsapp: stubComponent('SessionWhatsapp'),
       },
     },
   });
@@ -230,6 +236,84 @@ describe('Whatsapp.vue (convert mode)', () => {
       'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI',
       'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS',
     ]);
+  });
+
+  describe('legacy providers', () => {
+    const catalog = keys => ({
+      data: {
+        payload: [
+          { key: 'native', creatable: keys.includes('native'), beta: true },
+          { key: 'uazapi', creatable: true, beta: true },
+          { key: 'zapi', creatable: true, legacy: true },
+          { key: 'baileys', creatable: true, legacy: true },
+        ].map(p => ({ fields: [], ...p })),
+      },
+    });
+    const createMode = { mode: 'create', inbox: null };
+
+    it('badges the providers the catalog reports as legacy, and only those', async () => {
+      WhatsappChannel.getSessionProviders.mockResolvedValue(
+        catalog(['native'])
+      );
+      const wrapper = mountWhatsapp(createMode);
+      await flushPromises();
+
+      const legacy = wrapper
+        .findAllComponents(ChannelSelectorStub)
+        .filter(selector => selector.props('isLegacy'))
+        .map(selector => selector.attributes('title'));
+
+      expect(legacy).toEqual([
+        'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI',
+        'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS',
+      ]);
+    });
+
+    it.each(['baileys', 'zapi'])(
+      'warns on %s and recommends the native provider the account can pick',
+      async provider => {
+        WhatsappChannel.getSessionProviders.mockResolvedValue(
+          catalog(['native'])
+        );
+        setRouteProvider(provider);
+        const wrapper = mountWhatsapp(createMode);
+        await flushPromises();
+
+        const banner = wrapper.findComponent(WhatsappLegacyProviderBanner);
+        expect(banner.exists()).toBe(true);
+        expect(banner.props('nativeAvailable')).toBe(true);
+        expect(banner.props('canConvert')).toBe(false);
+      }
+    );
+
+    it('does not recommend the native provider when the account cannot pick it', async () => {
+      WhatsappChannel.getSessionProviders.mockResolvedValue(catalog([]));
+      setRouteProvider('baileys');
+      const wrapper = mountWhatsapp(createMode);
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findComponent(WhatsappLegacyProviderBanner)
+          .props('nativeAvailable')
+      ).toBe(false);
+    });
+
+    it.each(['native', 'uazapi'])(
+      'says nothing on %s, which is not legacy',
+      async provider => {
+        WhatsappChannel.getSessionProviders.mockResolvedValue(
+          catalog(['native'])
+        );
+        setRouteProvider(provider);
+        const wrapper = mountWhatsapp(createMode);
+        await flushPromises();
+
+        expect(
+          wrapper.findComponent(WhatsappLegacyProviderBanner).exists()
+        ).toBe(false);
+      }
+    );
   });
 
   // Reproduces the "flash" bug: a successful embedded signup runs

@@ -12,6 +12,7 @@ import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
 import BaileysWhatsapp from './BaileysWhatsapp.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
 import SessionWhatsapp from './session/SessionWhatsapp.vue';
+import WhatsappLegacyProviderBanner from '../components/WhatsappLegacyProviderBanner.vue';
 import Banner from 'dashboard/components-next/banner/Banner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -212,6 +213,11 @@ const selectedDescriptor = computed(() =>
 // rather than a literal in the label: ending the beta is one field on the descriptor.
 // The cloud providers have no descriptor here and answer false, which is what they are.
 const isBetaProvider = key => Boolean(descriptorFor(key)?.beta);
+// Legacy the same way: the catalog says so, and a provider's withdrawal is a server change.
+const isLegacyProvider = key => Boolean(descriptorFor(key)?.legacy);
+const isNativeAvailable = computed(() =>
+  creatableSessionKeys.value.includes(PROVIDER_TYPES.NATIVE)
+);
 
 const availableProviders = computed(() => {
   const allowed = [
@@ -397,12 +403,18 @@ const requestEmbeddedSignupAccess = () => {
           :description="provider.description"
           :icon="provider.icon"
           :is-beta="isBetaProvider(provider.key)"
+          :is-legacy="isLegacyProvider(provider.key)"
           @click="selectProvider(provider.key)"
         />
       </div>
     </div>
 
     <div v-else-if="showConfiguration">
+      <WhatsappLegacyProviderBanner
+        v-if="isLegacyProvider(selectedProvider)"
+        :native-available="isNativeAvailable"
+        class="mb-4"
+      />
       <div class="px-6 py-5 rounded-2xl border border-n-weak">
         <!-- Show embedded signup if app ID is configured -->
         <div v-if="shouldShowWhatsappEmbeddedSignup">

@@ -32,6 +32,8 @@ import AccountHealth from './components/AccountHealth.vue';
 import TwilioHealth from './components/TwilioHealth.vue';
 import WhatsappManualMigrationDialog from './components/WhatsappManualMigrationDialog.vue';
 import WhatsappManualMigrationBanner from './components/WhatsappManualMigrationBanner.vue';
+import WhatsappLegacyProviderBanner from './components/WhatsappLegacyProviderBanner.vue';
+import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
@@ -89,13 +91,21 @@ export default {
     TwilioHealth,
     WhatsappManualMigrationDialog,
     WhatsappManualMigrationBanner,
+    WhatsappLegacyProviderBanner,
     Widget,
     AccessToken,
     Icon,
   },
   mixins: [inboxMixin],
   setup() {
-    return { v$: useVuelidate() };
+    const { descriptorFor, creatableProviders, fetchProviders } =
+      useWhatsappSessionProviders();
+    return {
+      v$: useVuelidate(),
+      descriptorFor,
+      creatableProviders,
+      fetchWhatsappSessionProviders: fetchProviders,
+    };
   },
   data() {
     return {
@@ -197,6 +207,17 @@ export default {
         );
       }
       return '';
+    },
+    // The catalog says which providers are legacy, and whether this account can pick the
+    // native one; Baileys and Z-API are the legacy ones today.
+    isLegacyWhatsAppProvider() {
+      return (
+        this.isAWhatsAppChannel &&
+        Boolean(this.descriptorFor(this.whatsAppAPIProvider)?.legacy)
+      );
+    },
+    isNativeWhatsAppAvailable() {
+      return this.creatableProviders.some(({ key }) => key === 'native');
     },
     isConvertibleWhatsAppChannel() {
       return (
@@ -493,6 +514,7 @@ export default {
   },
   mounted() {
     this.fetchSharedData();
+    if (this.isAWhatsAppChannel) this.fetchWhatsappSessionProviders();
     this.openWhatsAppManualMigrationIfRequested();
   },
   methods: {
@@ -817,6 +839,18 @@ export default {
     closeConvertGate() {
       this.showConvertGate = false;
     },
+    // The banner names its target, so it opens the conversion with the native provider
+    // picked; the conversion screen is still where the change is confirmed.
+    goToConvertToNative() {
+      this.$router.push({
+        name: 'settings_inbox_convert',
+        params: {
+          accountId: this.$route.params.accountId,
+          inboxId: this.inbox.id,
+        },
+        query: { provider: 'native' },
+      });
+    },
     goToConvert() {
       this.showConvertGate = false;
       this.$router.push({
@@ -937,6 +971,14 @@ export default {
             </span>
           </div>
         </Banner>
+        <WhatsappLegacyProviderBanner
+          v-if="isLegacyWhatsAppProvider"
+          :native-available="isNativeWhatsAppAvailable"
+          can-convert
+          class="mx-6 mb-4"
+          :class="bannerMaxWidth"
+          @convert="goToConvertToNative"
+        />
         <WhatsappManualMigrationBanner
           v-if="showWhatsAppManualMigration"
           class="mx-6 mb-6"

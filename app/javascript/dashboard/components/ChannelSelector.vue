@@ -24,6 +24,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  isLegacy: {
+    type: Boolean,
+    default: false,
+  },
   hasVoiceBadge: {
     type: Boolean,
     default: false,
@@ -66,6 +70,15 @@ const { t } = useI18n();
           v-tooltip.top="t('GENERAL.BETA_DESCRIPTION')"
           :label="t('GENERAL.BETA')"
           color="blue"
+          compact
+        />
+        <Label
+          v-if="isLegacy && !isComingSoon"
+          v-tooltip.top="
+            t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.BADGE_DESCRIPTION')
+          "
+          :label="t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.BADGE')"
+          color="amber"
           compact
         />
       </div>
