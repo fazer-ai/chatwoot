@@ -15,6 +15,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
   let(:dir) { Dir.mktmpdir }
   let(:bin_dir) { File.join(dir, 'bin') }
   let(:script) { File.expand_path('../../docker/entrypoints/helpers/whatsapp_connector.rb', __dir__) }
+  let(:supervisors) { [] }
 
   before do
     FileUtils.mkdir_p(bin_dir)
@@ -38,7 +39,16 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     stub('psql', "echo 1\n")
   end
 
-  after { FileUtils.remove_entry(dir) }
+  # A failing example can leave the supervisor and its children running; they share one
+  # process group, so a single kill ends them all.
+  after do
+    supervisors.select(&:alive?).each do |wait|
+      Process.kill('KILL', -wait.pid)
+    rescue Errno::ESRCH
+      nil
+    end
+    FileUtils.remove_entry(dir)
+  end
 
   def stub(name, body)
     path = File.join(bin_dir, name)
@@ -52,9 +62,10 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       'POSTGRES_HOST' => 'pg', 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'pw',
       'POSTGRES_DATABASE' => 'chatwoot_production', 'WAC_MEDIA_ROOT' => File.join(dir, 'media')
     }.merge(extra)
-    stdin, out, wait = Open3.popen2e(env, 'ruby', script, 'worker')
+    stdin, out, wait = Open3.popen2e(env, 'ruby', script, 'worker', pgroup: true)
     stdin.close
     @output = out
+    supervisors << wait
     wait
   end
 
@@ -158,6 +169,25 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     expect(lines('connector').grep(/\Aterm /).size).to eq(1)
   end
 
+  it 'exits with the worker even while the database bootstrap hangs' do
+    # a server that took the connection and stopped answering: psql waits for as long as it
+    # is let, and only a signal ends it
+    stub('psql', <<~SH)
+      echo "start $$" >> "#{dir}/psql"
+      trap 'echo "term $$" >> "#{dir}/psql"; exit 1' TERM
+      while :; do sleep 0.05; done
+    SH
+    wait = start
+    eventually { lines('worker').any? && lines('psql').any? }
+
+    File.write(File.join(dir, 'worker_exit'), '7')
+    status = Timeout.timeout(10) { wait.value }
+
+    expect(status.exitstatus).to eq(7)
+    expect(lines('psql').grep(/\Aterm /).size).to eq(1)
+    expect(lines('connector')).to be_empty
+  end
+
   describe WhatsappConnectorEmbedded do
     let(:base) { { 'POSTGRES_HOST' => 'pg', 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'p@ss:w', 'POSTGRES_DATABASE' => 'cw_db' } }
 
@@ -201,6 +231,12 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     it 'escapes a space as %20 and reads a plus in the URL as a plus' do
       expect(env_for('POSTGRES_PASSWORD' => 'with space')['WAC_DATABASE_URL']).to start_with('postgres://cw:with%20space@')
       expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:a+b@db/app')[:password]).to eq('a+b')
+    end
+
+    it 'reads a plus in a query value as a plus, as Rails does' do
+      db = described_class.chatwoot_database('DATABASE_URL' => 'postgres://db/app?user=u%2Bv&password=a+b%20c')
+
+      expect(db).to include(user: 'u+v', password: 'a+b c')
     end
 
     it 'brackets an IPv6 host once' do

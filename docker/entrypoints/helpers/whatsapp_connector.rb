@@ -87,8 +87,14 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # does in Rails' resolver (under Rails' name or libpq's).
   def database_from_url(url)
     uri = URI(url)
-    query = URI.decode_www_form(uri.query.to_s).to_h
+    query = query_params(uri.query.to_s)
     url_fields(uri).merge(query_fields(query)).merge(options: query.slice(*CONNECTION_OPTIONS.keys))
+  end
+
+  # Percent-decoded and nothing more, as Rails' resolver reads it: a form decoder would turn
+  # a literal plus into a space, and a password with one would connect Rails and not this.
+  def query_params(query)
+    query.split('&').to_h { |pair| pair.split('=', 2) }.transform_values { |value| URI::RFC2396_PARSER.unescape(value.to_s) }
   end
 
   def url_fields(uri)
@@ -150,10 +156,17 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     out.strip == '1'
   end
 
-  def psql(env, sql)
+  # `on_spawn` gets psql's pid, so whoever runs it can end it: psql has no timeout of its own,
+  # and a server that stopped answering would otherwise hold it, and its caller, forever.
+  def psql(env, sql, on_spawn: nil)
     db = chatwoot_database(env)
-    Open3.capture3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
-                   '-h', db[:host], '-p', db[:port], '-U', db[:user].to_s, '-d', db[:database], '-c', sql)
+    Open3.popen3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
+                 '-h', db[:host], '-p', db[:port], '-U', db[:user].to_s, '-d', db[:database], '-c', sql) do |stdin, out, err, wait|
+      stdin.close
+      on_spawn&.call(wait.pid)
+      error = Thread.new { err.read }
+      [out.read, error.value, wait.value]
+    end
   end
 
   # The URL's connection options reach psql the way libpq reads them from the environment;
@@ -203,6 +216,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
       @media_token = present_or(env['WAC_MEDIA_TOKEN'], SecureRandom.hex(32))
       @stopping = false
       @connector_pid = nil
+      @bootstrap_pid = nil
       @wake_r, @wake_w = IO.pipe
     end
 
@@ -226,6 +240,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
           @stopping = true
           kill(signal, @sidekiq_pid)
           kill(signal, @connector_pid)
+          kill(signal, @bootstrap_pid)
           wake
         end
       end
@@ -239,6 +254,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     def stop_connector
       @stopping = true
       kill('TERM', @connector_pid)
+      kill('TERM', @bootstrap_pid)
       wake
     end
 
@@ -257,7 +273,9 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     end
 
     def run_connector_once
-      WhatsappConnectorEmbedded.ensure_database(@env) unless WhatsappConnectorEmbedded.present(@env['WAC_DATABASE_URL'])
+      unless WhatsappConnectorEmbedded.present(@env['WAC_DATABASE_URL'])
+        WhatsappConnectorEmbedded.ensure_database(@env, runner: method(:bootstrap_psql))
+      end
       FileUtils.mkdir_p(@media_root)
       env = WhatsappConnectorEmbedded.connector_env(@env, media_token: @media_token, media_root: @media_root)
       @connector_pid = Process.spawn(env, @binary, 'serve')
@@ -269,6 +287,18 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     rescue StandardError => e
       log e.message
       nil
+    end
+
+    # Tracked like the connector, so a worker that exits while the database is not answering
+    # still takes the container down instead of waiting on psql.
+    def bootstrap_psql(env, sql)
+      WhatsappConnectorEmbedded.psql(env, sql, on_spawn: lambda { |pid|
+        @bootstrap_pid = pid
+        # a stop that landed before the pid was known found nothing to signal
+        kill('TERM', pid) if @stopping
+      })
+    ensure
+      @bootstrap_pid = nil
     end
 
     def pause(seconds)
