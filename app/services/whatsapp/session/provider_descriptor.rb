@@ -9,17 +9,24 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
   # family (`default` = 360dialog, `whatsapp_cloud`), which this layer does not serve.
   FAMILIES = %w[session cloud].freeze
 
-  class Field < Data.define(:name, :type, :required, :default, :secret)
+  # `advanced` puts the field behind the form's advanced options: optional, with a default
+  # most inboxes keep. It is said here rather than inferred from the type, so an optional
+  # text field can go there without a new rule in the dashboard.
+  class Field < Data.define(:name, :type, :required, :default, :secret, :advanced)
     TYPES = %w[string url password boolean].freeze
 
-    def initialize(name:, type: 'string', required: false, default: nil, secret: false)
+    # One keyword per attribute of the Data, which is what the parameter count measures.
+    def initialize(name:, type: 'string', required: false, default: nil, secret: false, advanced: false) # rubocop:disable Metrics/ParameterLists
       raise ArgumentError, "unknown field type: #{type}" unless TYPES.include?(type.to_s)
 
-      super(name: name.to_s, type: type.to_s, required: required, default: default, secret: secret)
+      super(name: name.to_s, type: type.to_s, required: required, default: default, secret: secret, advanced: advanced)
     end
 
     def to_h
-      { 'name' => name, 'type' => type, 'required' => required, 'default' => default, 'secret' => secret }
+      {
+        'name' => name, 'type' => type, 'required' => required, 'default' => default, 'secret' => secret,
+        'advanced' => advanced
+      }
     end
   end
 

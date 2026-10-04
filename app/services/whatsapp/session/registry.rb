@@ -10,17 +10,18 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
   Descriptor = Whatsapp::Session::ProviderDescriptor
   Field = Whatsapp::Session::ProviderDescriptor::Field
 
-  MARK_AS_READ = Field.new(name: 'mark_as_read', type: 'boolean', default: true).freeze
-  PRESENCE_SUBSCRIBE = Field.new(name: 'presence_subscribe', type: 'boolean', default: false).freeze
+  MARK_AS_READ = Field.new(name: 'mark_as_read', type: 'boolean', default: true, advanced: true).freeze
+  PRESENCE_SUBSCRIBE = Field.new(name: 'presence_subscribe', type: 'boolean', default: false, advanced: true).freeze
   # Off by default, and behind the advanced toggle: the phone answers a history request
   # with everything it has (947 messages for one chat, measured), so an inbox opts into
   # that rather than discovering it on the first connect.
-  HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false).freeze
+  HISTORY_SYNC = Field.new(name: 'history_sync', type: 'boolean', default: false, advanced: true).freeze
   # The way out to WhatsApp for this inbox's session. A password field because the URL
   # carries the proxy's credentials, but not a secret: a secret input starts empty and an
   # empty one is never saved, so the settings page could neither show that a proxy is set
   # nor take it away, and provider_config reaches only administrators anyway (#743).
-  PROXY_URL = Field.new(name: 'proxy_url', type: 'password').freeze
+  # Advanced: optional, and most inboxes go out without one.
+  PROXY_URL = Field.new(name: 'proxy_url', type: 'password', advanced: true).freeze
 
   DESCRIPTORS = [
     Descriptor.new(

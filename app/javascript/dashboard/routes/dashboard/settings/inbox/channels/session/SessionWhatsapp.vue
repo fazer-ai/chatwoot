@@ -10,7 +10,7 @@ import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 import { isHttpUrl } from 'dashboard/helper/whatsappSession';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
-import Switch from 'dashboard/components-next/switch/Switch.vue';
+import SessionWhatsappField from './SessionWhatsappField.vue';
 
 const props = defineProps({
   // The provider's entry in the catalog: its key, the fields its form asks for and what
@@ -31,14 +31,14 @@ const store = useStore();
 const { t } = useI18n();
 
 const descriptor = computed(() => props.descriptor);
-// Everything the provider asks for, in the order the server declared it. Booleans are
-// preferences with a sane default, so they sit behind the advanced toggle; the rest is
-// what the inbox cannot connect without.
-const credentialFields = computed(
-  () => descriptor.value?.fields?.filter(f => f.type !== 'boolean') ?? []
-);
-const preferenceFields = computed(
-  () => descriptor.value?.fields?.filter(f => f.type === 'boolean') ?? []
+// Everything the provider asks for, in the order the server declared it. The catalog says
+// which fields are advanced (optional, with a sane default, unused by most inboxes), and
+// those sit behind the toggle whatever their type.
+const fields = computed(() => descriptor.value?.fields ?? []);
+const basicFields = computed(() => fields.value.filter(f => !f.advanced));
+const advancedFields = computed(() => fields.value.filter(f => f.advanced));
+const textFields = computed(() =>
+  fields.value.filter(f => f.type !== 'boolean')
 );
 
 const inboxName = ref(isConvertMode.value ? props.inbox?.name || '' : '');
@@ -47,6 +47,17 @@ const phoneNumber = ref(
 );
 const showAdvancedOptions = ref(false);
 const fieldValues = ref({});
+
+const emptyValue = field =>
+  field.default ?? (field.type === 'boolean' ? false : '');
+
+// An advanced field holding anything but its default is never left out of sight: a
+// proxy set on the inbox, or one the server just refused, stays where it can be read.
+const advancedFieldSet = computed(() =>
+  advancedFields.value.some(
+    field => (fieldValues.value[field.name] ?? '') !== emptyValue(field)
+  )
+);
 
 // The form is rendered from a catalog that arrives over the network, so the values are
 // seeded once it lands rather than at setup.
@@ -58,11 +69,17 @@ watch(
     fieldValues.value = Object.fromEntries(
       value.fields.map(field => [
         field.name,
-        existing?.[field.name] ??
-          field.default ??
-          (field.type === 'boolean' ? false : ''),
+        existing?.[field.name] ?? emptyValue(field),
       ])
     );
+  },
+  { immediate: true }
+);
+
+watch(
+  advancedFieldSet,
+  isSet => {
+    if (isSet) showAdvancedOptions.value = true;
   },
   { immediate: true }
 );
@@ -81,15 +98,16 @@ const rules = computed(() => ({
   inboxName: { required },
   phoneNumber: { required, isPhoneE164OrEmpty },
   fieldValues: Object.fromEntries(
-    credentialFields.value.map(field => [field.name, fieldRules(field)])
+    textFields.value.map(field => [field.name, fieldRules(field)])
   ),
 }));
 
 const v$ = useVuelidate(rules, { inboxName, phoneNumber, fieldValues });
 
-const fieldKey = field =>
-  `INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.${field.name.toUpperCase()}`;
-const inputType = field => (field.type === 'password' ? 'password' : 'text');
+// Booleans carry no rules, so they have no entry under v$.fieldValues.
+const fieldError = field =>
+  Boolean(v$.value.fieldValues[field.name]?.$error);
+const touchField = field => v$.value.fieldValues[field.name]?.$touch();
 
 const submit = async () => {
   v$.value.$touch();
@@ -177,27 +195,17 @@ const submit = async () => {
       </label>
     </div>
 
-    <div
-      v-for="field in credentialFields"
+    <SessionWhatsappField
+      v-for="field in basicFields"
       :key="field.name"
-      class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]"
-    >
-      <label :class="{ error: v$.fieldValues[field.name].$error }">
-        {{ $t(`${fieldKey(field)}.LABEL`) }}
-        <input
-          v-model="fieldValues[field.name]"
-          :type="inputType(field)"
-          :placeholder="$t(`${fieldKey(field)}.PLACEHOLDER`)"
-          @blur="v$.fieldValues[field.name].$touch"
-        />
-        <span v-if="v$.fieldValues[field.name].$error" class="message">
-          {{ $t(`${fieldKey(field)}.ERROR`) }}
-        </span>
-      </label>
-    </div>
+      v-model="fieldValues[field.name]"
+      :field="field"
+      :error="fieldError(field)"
+      @blur="touchField(field)"
+    />
 
     <div
-      v-if="!showAdvancedOptions && preferenceFields.length"
+      v-if="!showAdvancedOptions && advancedFields.length"
       class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%] mb-4"
     >
       <NextButton
@@ -210,26 +218,20 @@ const submit = async () => {
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
       </NextButton>
     </div>
-    <template v-else-if="preferenceFields.length">
+    <template v-else-if="advancedFields.length">
       <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
         <span class="text-sm text-gray-600">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.ADVANCED_OPTIONS') }}
         </span>
       </div>
-      <div
-        v-for="field in preferenceFields"
+      <SessionWhatsappField
+        v-for="field in advancedFields"
         :key="field.name"
-        class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]"
-      >
-        <label>
-          <div class="flex mb-2 items-center">
-            <span class="mr-2 text-sm">
-              {{ $t(`${fieldKey(field)}.LABEL`) }}
-            </span>
-            <Switch :id="field.name" v-model="fieldValues[field.name]" />
-          </div>
-        </label>
-      </div>
+        v-model="fieldValues[field.name]"
+        :field="field"
+        :error="fieldError(field)"
+        @blur="touchField(field)"
+      />
     </template>
 
     <div class="w-full">
