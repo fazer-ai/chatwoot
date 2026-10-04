@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Only the WhatsApp connector the image embeds. The base images follow upstream Chatwoot
+  # and are moved with it, not by this file.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: ghcr.io/fazer-ai/whatsapp-connector
+    commit-message:
+      prefix: chore(deps)

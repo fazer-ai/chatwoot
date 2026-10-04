@@ -1,5 +1,8 @@
 # pre-build stage
 FROM node:24-alpine as node
+# The WhatsApp connector Sidekiq runs when WHATSAPP_CONNECTOR_ENABLED=true (see
+# docker/entrypoints/helpers/whatsapp_connector.rb). Pinned, and moved by Dependabot.
+FROM ghcr.io/fazer-ai/whatsapp-connector:0.6.0 AS whatsapp-connector
 FROM ruby:3.4.4-alpine3.21 AS pre-builder
 
 ARG NODE_VERSION="24.13.0"
@@ -150,6 +153,9 @@ COPY --from=pre-builder /app /app
 
 # Copy .git_sha file from pre-builder stage
 COPY --from=pre-builder /app/.git_sha /app/.git_sha
+
+# A static binary, built for the platform this stage resolves to
+COPY --from=whatsapp-connector /connector /usr/local/bin/whatsapp-connector
 
 WORKDIR /app
 

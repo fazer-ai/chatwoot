@@ -35,6 +35,11 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
     File.write(helper, "#!/usr/bin/env ruby\n")
     FileUtils.chmod(0o755, helper)
 
+    # the embedded connector's supervisor, which takes the worker command over when it runs
+    supervisor = File.join(app_dir, 'docker/entrypoints/helpers/whatsapp_connector.rb')
+    File.write(supervisor, "#!/bin/sh\necho \"supervise $*\" >> \"#{calls_file}\"\n")
+    FileUtils.chmod(0o755, supervisor)
+
     stub('pg_isready', "exit 0\n")
     stub('sleep', "exit 0\n")
     stub('bundle', <<~SH)
@@ -63,8 +68,9 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
     FileUtils.chmod(0o755, path)
   end
 
-  def run
-    Open3.capture3({ 'PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}" },
+  def run(env = {})
+    Open3.capture3({ 'PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}", 'WHATSAPP_CONNECTOR_ENABLED' => nil,
+                     'WHATSAPP_CONNECTOR_EMBEDDED' => nil }.merge(env),
                    'docker/entrypoints/sidekiq.sh', 'bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml',
                    chdir: app_dir)
   end
@@ -97,6 +103,24 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
 
     expect(status).to be_success
     expect(out).to include('Schema is current. Starting the worker.')
+    expect(calls.last).to eq('exec sidekiq -C config/sidekiq.yml')
+  end
+
+  it 'hands the worker to the connector supervisor when the connector is enabled' do
+    run('WHATSAPP_CONNECTOR_ENABLED' => 'true')
+
+    expect(calls.last).to eq('supervise bundle exec sidekiq -C config/sidekiq.yml')
+  end
+
+  it 'runs the worker alone when the connector is a separate service' do
+    run('WHATSAPP_CONNECTOR_ENABLED' => 'true', 'WHATSAPP_CONNECTOR_EMBEDDED' => 'false')
+
+    expect(calls.last).to eq('exec sidekiq -C config/sidekiq.yml')
+  end
+
+  it 'runs the worker alone when the connector is not enabled' do
+    run('WHATSAPP_CONNECTOR_ENABLED' => 'false', 'WHATSAPP_CONNECTOR_EMBEDDED' => 'true')
+
     expect(calls.last).to eq('exec sidekiq -C config/sidekiq.yml')
   end
 end

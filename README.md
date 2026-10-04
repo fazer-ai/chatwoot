@@ -29,6 +29,7 @@ O fork acompanha as versões do Chatwoot oficial e acrescenta recursos para quem
 ### WhatsApp
 
 - Conexão pelo QR code do celular, sem API paga de terceiros, ou pela API oficial, inclusive em coexistência com o app WhatsApp Business.
+- Provedor próprio para QR code, “WhatsApp (nativo)”, em beta. Roda no servidor da instalação, sem serviço de terceiros, com um [conector de código aberto em Go](https://github.com/fazer-ai/whatsapp-connector) mantido pela fazer.ai.
 - Troca do modo de conexão da caixa de entrada sem perder o histórico.
 - Importação do histórico do celular ao conectar.
 - Grupos do WhatsApp.
@@ -105,6 +106,19 @@ Use a imagem pública `ghcr.io/fazer-ai/chatwoot:latest`. Se você já tem uma i
 O repositório inclui o [docker-compose.coolify.yaml](docker-compose.coolify.yaml) e um [guia de deploy no Coolify](docker/README-coolify-deploy.md), em português.
 
 As variáveis próprias do fork estão comentadas no [.env.example](.env.example). A imagem pública oferece a tag `latest` e uma tag para cada release.
+
+### WhatsApp (nativo)
+
+O conector vem na imagem do Chatwoot fazer.ai e roda no container do Sidekiq. Usa o mesmo Redis e cria um banco próprio no mesmo PostgreSQL no primeiro start. Para ligar, configure:
+
+```bash
+WHATSAPP_CONNECTOR_ENABLED=true
+```
+
+Para rodar o conector como serviço separado na stack, configure também `WHATSAPP_CONNECTOR_EMBEDDED=false`. Durante o beta, quem administra a instalação libera o canal conta a conta. O [README do conector](https://github.com/fazer-ai/whatsapp-connector#instalar-com-o-chatwoot-fazerai) traz o passo a passo dos dois modos, com exemplos de docker-compose, liberação da conta e migração de caixa.
+
+> [!WARNING]
+> Se você já roda o conector separado, configure `WHATSAPP_CONNECTOR_EMBEDDED=false` antes de atualizar a imagem. Sem isso, sobe um segundo conector disputando as mesmas sessões.
 
 ## Atualizar e migrar do Chatwoot oficial
 

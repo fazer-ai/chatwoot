@@ -29,6 +29,7 @@ The fork follows official Chatwoot releases and adds features for teams that set
 ### WhatsApp
 
 - Connect by scanning a QR code with your phone, without a paid third-party API, or through the official API with WhatsApp Business app coexistence.
+- fazer.ai's own QR code provider, “WhatsApp (native)”, in beta. Runs on your installation's server without a third-party service, using an [open-source Go connector](https://github.com/fazer-ai/whatsapp-connector) maintained by fazer.ai.
 - Change an inbox's connection method without losing its history.
 - Import your phone's message history when connecting.
 - WhatsApp groups.
@@ -105,6 +106,19 @@ Use the public `ghcr.io/fazer-ai/chatwoot:latest` image. If you have an existing
 The repository includes [docker-compose.coolify.yaml](docker-compose.coolify.yaml) and a [Coolify deployment guide](docker/README-coolify-deploy.md), written in Portuguese.
 
 Fork-specific environment variables are documented in [.env.example](.env.example). The public image provides the `latest` tag and a tag for each release.
+
+### WhatsApp (native)
+
+The connector comes with the Chatwoot fazer.ai image and runs in the Sidekiq container. It uses the same Redis and creates its own database on the same PostgreSQL server on first start. To enable it, set:
+
+```bash
+WHATSAPP_CONNECTOR_ENABLED=true
+```
+
+To run the connector as a separate service in your stack, also set `WHATSAPP_CONNECTOR_EMBEDDED=false`. During beta, the installation administrator enables the channel for each account. The [connector README](https://github.com/fazer-ai/whatsapp-connector/blob/main/README-en.md#install-with-chatwoot-fazerai) covers both modes step by step, with docker-compose examples, account enablement, and inbox migration.
+
+> [!WARNING]
+> If you already run the connector separately, set `WHATSAPP_CONNECTOR_EMBEDDED=false` before updating the image. Otherwise, a second connector starts and competes for the same sessions.
 
 ## Update and migrate from official Chatwoot
 
