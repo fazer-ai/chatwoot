@@ -4,58 +4,56 @@ RSpec.describe AccountWhatsappProviders do
   let(:account) { create(:account) }
 
   it 'stores the toggles in settings, keyed by name' do
-    account.update!(whatsapp_native_enabled: true)
+    account.update!(whatsapp_native_disabled: true)
 
-    expect(account.reload.settings['whatsapp_native_enabled']).to be(true)
+    expect(account.reload.settings['whatsapp_native_disabled']).to be(true)
   end
 
-  it 'casts the superadmin form values, which arrive as strings' do
-    account.update!(whatsapp_uazapi_disabled: '1')
-    account.update!(whatsapp_native_enabled: '1')
+  it 'casts console values, which can arrive as strings' do
+    account.update!(whatsapp_uazapi_disabled: '1', whatsapp_native_disabled: '1')
 
     expect(account.reload.whatsapp_uazapi_disabled).to be(true)
-    expect(account.whatsapp_native_enabled).to be(true)
+    expect(account.whatsapp_native_disabled).to be(true)
   end
 
-  # The two switches point opposite ways, and this is the example that says so. `uazapi`
-  # is on offer and the switch withdraws it; `native` is being rolled out to named
-  # accounts, so an account nobody has named cannot create one.
-  it 'offers uazapi to an account nobody has touched, and not native' do
-    expect(account.settings).not_to have_key('whatsapp_native_enabled')
-
+  it 'offers both session providers to an account nobody has touched' do
     expect(account.whatsapp_session_provider_enabled?('uazapi')).to be(true)
-    expect(account.whatsapp_session_provider_enabled?('native')).to be(false)
-  end
-
-  # The half that makes it a rollout rather than a wall: an account created after the
-  # provider was turned on for somebody else does not join by existing.
-  it 'does not offer native to an account created later' do
-    account.update!(whatsapp_native_enabled: true)
-
-    expect(create(:account).whatsapp_session_provider_enabled?('native')).to be(false)
-  end
-
-  it 'offers native to the account it was turned on for, and only that one' do
-    account.update!(whatsapp_native_enabled: true)
-
     expect(account.whatsapp_session_provider_enabled?('native')).to be(true)
-    expect(create(:account).whatsapp_session_provider_enabled?('native')).to be(false)
+  end
+
+  it 'takes native away from the account it was turned off for, and only that one' do
+    account.update!(whatsapp_native_disabled: true)
+
+    expect(account.whatsapp_session_provider_enabled?('native')).to be(false)
+    expect(account.whatsapp_session_provider_enabled?('uazapi')).to be(true)
+    expect(create(:account).whatsapp_session_provider_enabled?('native')).to be(true)
   end
 
   it 'takes uazapi away from the account it was turned off for, and leaves native alone' do
-    account.update!(whatsapp_uazapi_disabled: true, whatsapp_native_enabled: true)
+    account.update!(whatsapp_uazapi_disabled: true)
 
     expect(account.whatsapp_session_provider_enabled?('uazapi')).to be(false)
     expect(account.whatsapp_session_provider_enabled?('native')).to be(true)
   end
 
-  # Turning it off again is what makes it reversible without a console: `false` reads the
-  # same way an absent key does.
-  it 'withdraws native again when the switch is turned back off' do
-    account.update!(whatsapp_native_enabled: true)
-    account.update!(whatsapp_native_enabled: false)
+  it 'offers native again when the switch is turned back off' do
+    account.update!(whatsapp_native_disabled: true)
+    account.update!(whatsapp_native_disabled: false)
 
-    expect(account.reload.whatsapp_session_provider_enabled?('native')).to be(false)
+    expect(account.reload.whatsapp_session_provider_enabled?('native')).to be(true)
+  end
+
+  # The opt-in that came before this switch is left in the settings of the accounts it was
+  # set on, either way. It no longer decides anything, and it must not stop them saving.
+  [true, false].each do |old_value|
+    it "ignores the old opt-in left at #{old_value} and still saves the account" do
+      # written the way the old setter left it, past the accessor that no longer exists
+      account.update_column(:settings, account.settings.merge('whatsapp_native_enabled' => old_value)) # rubocop:disable Rails/SkipsModelValidations
+
+      account.reload.update!(name: 'renamed')
+
+      expect(account.whatsapp_session_provider_enabled?('native')).to be(true)
+    end
   end
 
   it 'never enables a provider this layer does not serve' do

@@ -13,7 +13,7 @@ default: &default
   # depends on WHATSAPP_CONNECTOR_CONSUMER, nothing here can tell, and an AR pool opens
   # connections only as they are asked for, so the headroom costs an unrelated process
   # nothing.
-  if ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true' &&
+  if ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'true') != 'false' &&
      ENV.fetch('WHATSAPP_CONNECTOR_CONSUMER', 'sidekiq') != 'off'
     pool_size += ENV.fetch('WHATSAPP_CONNECTOR_EVENT_SHARDS', 16).to_i
   end

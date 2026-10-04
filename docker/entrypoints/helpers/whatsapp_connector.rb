@@ -5,8 +5,7 @@
 #
 # The image carries the connector's binary (docker/Dockerfile copies it from the published
 # image at a pinned version), and sidekiq.sh hands the worker's command to this file instead
-# of exec'ing it whenever WHATSAPP_CONNECTOR_ENABLED=true and WHATSAPP_CONNECTOR_EMBEDDED is
-# not false. From here on this process is PID 1 and the parent of both:
+# of exec'ing it unless WHATSAPP_CONNECTOR_ENABLED or WHATSAPP_CONNECTOR_EMBEDDED is false. From here on this process is PID 1 and the parent of both:
 #
 # - Sidekiq is the container. When it exits, for whatever reason, the connector is stopped
 #   and this process exits with Sidekiq's status, so the restart policy and the healthcheck

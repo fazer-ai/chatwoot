@@ -109,13 +109,13 @@ Fork-specific environment variables are documented in [.env.example](.env.exampl
 
 ### WhatsApp (native)
 
-The connector comes with the Chatwoot fazer.ai image and runs in the Sidekiq container. It uses the same Redis and creates its own database on the same PostgreSQL server on first start. To enable it, set:
+The connector comes with the Chatwoot fazer.ai image and runs in the Sidekiq container, on by default for every account. It uses the same Redis and creates its own database on the same PostgreSQL server on first start. To turn it off, set:
 
 ```bash
-WHATSAPP_CONNECTOR_ENABLED=true
+WHATSAPP_CONNECTOR_ENABLED=false
 ```
 
-To run the connector as a separate service in your stack, also set `WHATSAPP_CONNECTOR_EMBEDDED=false`. During beta, the installation administrator enables the channel for each account. The [connector README](https://github.com/fazer-ai/whatsapp-connector/blob/main/README-en.md#install-with-chatwoot-fazerai) covers both modes step by step, with docker-compose examples, account enablement, and inbox migration.
+To run the connector as a separate service in your stack, set `WHATSAPP_CONNECTOR_EMBEDDED=false`. The [connector README](https://github.com/fazer-ai/whatsapp-connector/blob/main/README-en.md#install-with-chatwoot-fazerai) covers both modes step by step, with docker-compose examples and inbox migration.
 
 > [!WARNING]
 > If you already run the connector separately, set `WHATSAPP_CONNECTOR_EMBEDDED=false` before updating the image. Otherwise, a second connector starts and competes for the same sessions.

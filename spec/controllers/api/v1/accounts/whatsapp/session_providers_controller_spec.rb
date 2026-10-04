@@ -64,32 +64,28 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         expect(payload.find { |p| p['key'] == 'uazapi' }['creatable']).to be(false)
       end
 
-      # `native` answers to two gates that point the same way and are set by different
-      # people: the deployment has to serve it, and the account has to have been named.
+      # `native` answers to two gates set by different people: the deployment serves it
+      # unless it turned the connector off, and an account has it unless it was withdrawn.
       describe 'the two gates on native' do
         let(:native) { payload.find { |p| p['key'] == 'native' } }
 
-        # The connector is what serves it, so an installation without one must not offer it
-        # however the account is configured.
-        it 'keeps it uncreatable while no connector is deployed, account opted in or not' do
-          account.update!(whatsapp_native_enabled: true)
-
-          expect(native).to include('available' => false, 'creatable' => false)
-        end
-
-        # And the half that makes a restricted first release possible: turning the connector
-        # on for the deployment does not hand the provider to every account on it.
-        it 'keeps it uncreatable for an account nobody named, even with a connector' do
-          with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
-            expect(native).to include('available' => true, 'creatable' => false)
+        it 'offers it to every account of an installation that did not turn it off' do
+          with_modified_env WHATSAPP_CONNECTOR_ENABLED: nil do
+            expect(native).to include('available' => true, 'creatable' => true)
           end
         end
 
-        it 'offers it once both are true' do
-          account.update!(whatsapp_native_enabled: true)
+        it 'keeps it uncreatable while the connector is turned off, whatever the account says' do
+          with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'false' do
+            expect(native).to include('available' => false, 'creatable' => false)
+          end
+        end
 
-          with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'true' do
-            expect(native).to include('available' => true, 'creatable' => true)
+        it 'keeps it uncreatable for the account it was withdrawn from' do
+          account.update!(whatsapp_native_disabled: true)
+
+          with_modified_env WHATSAPP_CONNECTOR_ENABLED: nil do
+            expect(native).to include('available' => true, 'creatable' => false)
           end
         end
       end

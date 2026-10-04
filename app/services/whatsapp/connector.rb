@@ -16,7 +16,7 @@ module Whatsapp::Connector
   end
 
   def self.enabled?
-    ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true'
+    ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'true') != 'false'
   end
 
   # How many event streams the connector fans sessions across, as this installation is
