@@ -93,23 +93,15 @@ FactoryBot.define do
       session_provider_enabled { true }
     end
 
-    # The two session providers gate opposite ways, so the factory has to say which it is
-    # doing rather than write one key for both. `uazapi` is on offer, so a channel on it
-    # needs no setup to be valid; `native` is opt-in, so the factory opts the account in.
-    #
-    # Opting in here rather than in each spec is deliberate: the gate is what the concern's
-    # and the controller's own examples are about, and a spec exercising the media job or
-    # the echo matcher should not have to know it exists. Both directions still answer to
-    # `session_provider_enabled: false`, which is what those examples pass.
+    # Both session providers are on offer to an account nobody has touched, so a channel on
+    # either needs no setup to be valid; `session_provider_enabled: false` withdraws the
+    # provider from the account, which is what the examples about that gate pass.
     after(:build) do |channel_whatsapp, options|
       account = channel_whatsapp.account
+      next if options.session_provider_enabled
       next unless account && channel_whatsapp.provider.in?(Whatsapp::Session::PROVIDERS)
 
-      if channel_whatsapp.provider == 'native'
-        account.update!(whatsapp_native_enabled: options.session_provider_enabled)
-      elsif !options.session_provider_enabled
-        account.update!(whatsapp_uazapi_disabled: true)
-      end
+      account.update!("whatsapp_#{channel_whatsapp.provider}_disabled" => true)
     end
 
     before(:create) do |channel_whatsapp, options|

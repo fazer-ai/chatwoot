@@ -109,13 +109,13 @@ As variáveis próprias do fork estão comentadas no [.env.example](.env.example
 
 ### WhatsApp (nativo)
 
-O conector vem na imagem do Chatwoot fazer.ai e roda no container do Sidekiq. Usa o mesmo Redis e cria um banco próprio no mesmo PostgreSQL no primeiro start. Para ligar, configure:
+O conector vem na imagem do Chatwoot fazer.ai e roda no container do Sidekiq, ligado por padrão para toda conta. Usa o mesmo Redis e cria um banco próprio no mesmo PostgreSQL no primeiro start. Para desligar, configure:
 
 ```bash
-WHATSAPP_CONNECTOR_ENABLED=true
+WHATSAPP_CONNECTOR_ENABLED=false
 ```
 
-Para rodar o conector como serviço separado na stack, configure também `WHATSAPP_CONNECTOR_EMBEDDED=false`. Durante o beta, quem administra a instalação libera o canal conta a conta. O [README do conector](https://github.com/fazer-ai/whatsapp-connector#instalar-com-o-chatwoot-fazerai) traz o passo a passo dos dois modos, com exemplos de docker-compose, liberação da conta e migração de caixa.
+Para rodar o conector como serviço separado na stack, configure `WHATSAPP_CONNECTOR_EMBEDDED=false`. O [README do conector](https://github.com/fazer-ai/whatsapp-connector#instalar-com-o-chatwoot-fazerai) traz o passo a passo dos dois modos, com exemplos de docker-compose e migração de caixa.
 
 > [!WARNING]
 > Se você já roda o conector separado, configure `WHATSAPP_CONNECTOR_EMBEDDED=false` antes de atualizar a imagem. Sem isso, sobe um segundo conector disputando as mesmas sessões.

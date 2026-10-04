@@ -1,17 +1,13 @@
-# Per-account switches for the WhatsApp session providers, and the two are named for
-# what they do, which is not the same thing for both.
-#
-# `uazapi` is on offer: an account that nobody has touched can create one, and the switch
-# takes it away from one account. `native` is the other way round, and deliberately: it
-# is being rolled out to named accounts rather than announced, so nothing is on offer
-# until somebody says so. A flag whose absence means "yes" cannot do a restricted
-# rollout, because every account created after the switch is flipped joins the rollout
-# without anyone deciding that.
+# Per-account switches for the WhatsApp session providers. Both are on offer to an account
+# nobody has touched, and each switch takes its provider away from one account.
 #
 # What decides whether a provider is served **at all** is still its descriptor, not
-# these: `native` needs a connector reachable on this deployment's Redis and answers
-# `available?` on that. These narrow what the descriptor already allows, in both
-# directions, and neither can offer a provider this deployment does not serve.
+# these: `native` needs the connector, which an installation turns off with
+# WHATSAPP_CONNECTOR_ENABLED=false, and answers `available?` on that. These narrow what the
+# descriptor already allows, and neither can offer a provider this deployment does not serve.
+#
+# `native` was opt-in while it was rolled out to named accounts (`whatsapp_native_enabled`).
+# That key stays in the settings of the accounts it was set on and decides nothing now.
 #
 # They live in the `settings` jsonb (see the "Account-level toggles" section in
 # AGENTS.md), keyed by name, so bit positions never drift between CE and Pro.
@@ -22,19 +18,16 @@ module AccountWhatsappProviders
   extend ActiveSupport::Concern
 
   included do
-    store_accessor :settings, :whatsapp_native_enabled, :whatsapp_uazapi_disabled
+    store_accessor :settings, :whatsapp_native_disabled, :whatsapp_uazapi_disabled
   end
 
-  # Deliberately not on the super admin form, either of them: these are console switches by
-  # decision, so that offering the native channel to an account is a step somebody takes on
-  # purpose rather than a checkbox next to the ordinary account settings. No API writes them
-  # either: the account endpoint permits only its own list of settings, and the Platform API
-  # does not take `settings` at all, so an installation that creates accounts through it
-  # still enables the native channel from a console.
+  # Deliberately not on the super admin form: withdrawing a provider from an account is a
+  # console step. No API writes them either: the account endpoint permits only its own list
+  # of settings, and the Platform API does not take `settings` at all.
   #
   # The cast stays because a console line can type "1", and the settings JSON schema only
   # accepts booleans.
-  def whatsapp_native_enabled=(value)
+  def whatsapp_native_disabled=(value)
     super(ActiveModel::Type::Boolean.new.cast(value))
   end
 
@@ -44,7 +37,7 @@ module AccountWhatsappProviders
 
   def whatsapp_session_provider_enabled?(provider)
     case provider.to_s
-    when 'native' then whatsapp_native_enabled.present?
+    when 'native' then !whatsapp_native_disabled
     when 'uazapi' then !whatsapp_uazapi_disabled
     else false
     end

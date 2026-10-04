@@ -100,6 +100,6 @@ class Whatsapp::Session::ProviderDescriptor < Data.define(
   private
 
   def connector_enabled?
-    ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true'
+    ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'true') != 'false'
   end
 end

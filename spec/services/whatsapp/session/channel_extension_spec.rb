@@ -46,11 +46,13 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
   end
 
   describe 'validation' do
-    it 'refuses a session provider whose backend is not deployed yet' do
+    it 'refuses a session provider the installation turned off' do
       channel = build(:channel_whatsapp, account: account, provider: 'native', provider_config: {})
 
-      expect(channel).not_to be_valid
-      expect(channel.errors[:provider]).to include(I18n.t('errors.inboxes.channel.provider_unavailable'))
+      with_modified_env WHATSAPP_CONNECTOR_ENABLED: 'false' do
+        expect(channel).not_to be_valid
+        expect(channel.errors[:provider]).to include(I18n.t('errors.inboxes.channel.provider_unavailable'))
+      end
     end
 
     it 'reports the invalid config keys the backend rejected' do

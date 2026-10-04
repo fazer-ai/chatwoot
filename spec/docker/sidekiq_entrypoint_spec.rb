@@ -99,7 +99,7 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
   end
 
   it 'execs the worker once the schema is current' do
-    out, _err, status = run
+    out, _err, status = run('WHATSAPP_CONNECTOR_ENABLED' => 'false')
 
     expect(status).to be_success
     expect(out).to include('Schema is current. Starting the worker.')
@@ -118,7 +118,13 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
     expect(calls.last).to eq('exec sidekiq -C config/sidekiq.yml')
   end
 
-  it 'runs the worker alone when the connector is not enabled' do
+  it 'hands the worker to the supervisor when nothing says whether the connector is enabled' do
+    run
+
+    expect(calls.last).to eq('supervise bundle exec sidekiq -C config/sidekiq.yml')
+  end
+
+  it 'runs the worker alone when the connector is turned off' do
     run('WHATSAPP_CONNECTOR_ENABLED' => 'false', 'WHATSAPP_CONNECTOR_EMBEDDED' => 'true')
 
     expect(calls.last).to eq('exec sidekiq -C config/sidekiq.yml')

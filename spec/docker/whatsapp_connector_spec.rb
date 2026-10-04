@@ -59,7 +59,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
   def start(extra = {})
     env = {
       'PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}",
-      'POSTGRES_HOST' => 'pg', 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'pw',
+      'POSTGRES_HOST' => 'pg', 'POSTGRES_PORT' => nil, 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'pw',
       'POSTGRES_DATABASE' => 'chatwoot_production', 'WAC_MEDIA_ROOT' => File.join(dir, 'media')
     }.merge(extra)
     stdin, out, wait = Open3.popen2e(env, 'ruby', script, 'worker', pgroup: true)

@@ -6,7 +6,7 @@
 # The flags are read straight from the environment here: application constants are not
 # autoloadable yet while initializers run. The supervisor itself is built inside the
 # startup hook, which fires long after boot.
-if ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'false') == 'true' &&
+if ENV.fetch('WHATSAPP_CONNECTOR_ENABLED', 'true') != 'false' &&
    ENV.fetch('WHATSAPP_CONNECTOR_CONSUMER', 'sidekiq') == 'sidekiq'
   Sidekiq.configure_server do |config|
     supervisor = nil
