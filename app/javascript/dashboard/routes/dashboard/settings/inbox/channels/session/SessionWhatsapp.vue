@@ -105,8 +105,7 @@ const rules = computed(() => ({
 const v$ = useVuelidate(rules, { inboxName, phoneNumber, fieldValues });
 
 // Booleans carry no rules, so they have no entry under v$.fieldValues.
-const fieldError = field =>
-  Boolean(v$.value.fieldValues[field.name]?.$error);
+const fieldError = field => Boolean(v$.value.fieldValues[field.name]?.$error);
 const touchField = field => v$.value.fieldValues[field.name]?.$touch();
 
 const submit = async () => {
