@@ -138,6 +138,8 @@ export default {
       widgetBubbleType: 'standard',
       widgetBubbleLauncherTitle: '',
       showConvertGate: false,
+      // Set when the conversion was asked for from the legacy banner, which names its target.
+      convertTarget: null,
     };
   },
   computed: {
@@ -486,6 +488,14 @@ export default {
     },
   },
   watch: {
+    // On a direct visit the inbox arrives after mount, so the catalog is fetched once the
+    // page knows it is a WhatsApp inbox rather than at mount.
+    isAWhatsAppChannel: {
+      handler(isWhatsApp) {
+        if (isWhatsApp) this.fetchWhatsappSessionProviders();
+      },
+      immediate: true,
+    },
     $route(to, from) {
       if (to.name === 'settings_inbox_show') {
         const inboxChanged = to.params.inboxId !== from.params.inboxId;
@@ -514,7 +524,6 @@ export default {
   },
   mounted() {
     this.fetchSharedData();
-    if (this.isAWhatsAppChannel) this.fetchWhatsappSessionProviders();
     this.openWhatsAppManualMigrationIfRequested();
   },
   methods: {
@@ -833,32 +842,30 @@ export default {
     toggleLockToSingleConversation(value) {
       this.locktoSingleConversation = value;
     },
-    openConvertGate() {
+    openConvertGate(target = null) {
+      this.convertTarget = target;
       this.showConvertGate = true;
     },
     closeConvertGate() {
       this.showConvertGate = false;
     },
-    // The banner names its target, so it opens the conversion with the native provider
-    // picked; the conversion screen is still where the change is confirmed.
-    goToConvertToNative() {
-      this.$router.push({
-        name: 'settings_inbox_convert',
-        params: {
-          accountId: this.$route.params.accountId,
-          inboxId: this.inbox.id,
-        },
-        query: { provider: 'native' },
-      });
+    // The legacy banner goes through the same gate as the provider field's button: the
+    // conversion is the same act whichever button asked for it. It only arrives with the
+    // native provider already picked.
+    openConvertGateToNative() {
+      this.openConvertGate('native');
     },
     goToConvert() {
+      const provider = this.convertTarget;
       this.showConvertGate = false;
+      this.convertTarget = null;
       this.$router.push({
         name: 'settings_inbox_convert',
         params: {
           accountId: this.$route.params.accountId,
           inboxId: this.inbox.id,
         },
+        ...(provider ? { query: { provider } } : {}),
       });
     },
   },
@@ -977,7 +984,7 @@ export default {
           can-convert
           class="mx-6 mb-4"
           :class="bannerMaxWidth"
-          @convert="goToConvertToNative"
+          @convert="openConvertGateToNative"
         />
         <WhatsappManualMigrationBanner
           v-if="showWhatsAppManualMigration"
@@ -1098,7 +1105,7 @@ export default {
                   slate
                   sm
                   :label="$t('INBOX_MGMT.CONVERT.BUTTON')"
-                  @click="openConvertGate"
+                  @click="openConvertGate()"
                 />
               </div>
             </SettingsFieldSection>

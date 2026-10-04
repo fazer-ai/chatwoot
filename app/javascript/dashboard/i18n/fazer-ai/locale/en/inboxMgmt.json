@@ -101,7 +101,8 @@
           "BADGE_DESCRIPTION": "This provider still works, and receives no new features.",
           "NOTICE": "This provider is legacy. It still works.",
           "NOTICE_WITH_NATIVE": "This provider is legacy. It still works, but we recommend WhatsApp (native) instead.",
-          "CONVERT_TO_NATIVE": "Convert to WhatsApp (native)"
+          "CONVERT_TO_NATIVE": "Convert to WhatsApp (native)",
+          "USE_NATIVE": "Use WhatsApp (native)"
         }
       }
     },

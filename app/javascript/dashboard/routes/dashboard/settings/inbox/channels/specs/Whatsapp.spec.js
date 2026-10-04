@@ -286,6 +286,24 @@ describe('Whatsapp.vue (convert mode)', () => {
       }
     );
 
+    it('switches to the native provider from the banner', async () => {
+      WhatsappChannel.getSessionProviders.mockResolvedValue(
+        catalog(['native'])
+      );
+      setRouteProvider('baileys');
+      const wrapper = mountWhatsapp(createMode);
+      await flushPromises();
+
+      await wrapper
+        .findComponent(WhatsappLegacyProviderBanner)
+        .find('button')
+        .trigger('click');
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ query: { provider: 'native' } })
+      );
+    });
+
     it('does not recommend the native provider when the account cannot pick it', async () => {
       WhatsappChannel.getSessionProviders.mockResolvedValue(catalog([]));
       setRouteProvider('baileys');

@@ -25,11 +25,19 @@ describe('WhatsappLegacyProviderBanner', () => {
     expect(wrapper.find('button').exists()).toBe(false);
   });
 
-  it('offers the conversion only where there is an inbox to convert', () => {
-    expect(mountBanner({ nativeAvailable: true }).find('button').exists()).toBe(
-      false
-    );
+  it('offers to set up the native provider on the setup screen', () => {
+    const wrapper = mountBanner({ nativeAvailable: true });
+    const button = wrapper.find('button');
 
+    expect(button.text()).toBe(
+      'INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.USE_NATIVE'
+    );
+    button.trigger('click');
+    expect(wrapper.emitted('useNative')).toHaveLength(1);
+    expect(wrapper.emitted('convert')).toBeUndefined();
+  });
+
+  it('offers the conversion where there is an inbox to convert', () => {
     const wrapper = mountBanner({ nativeAvailable: true, canConvert: true });
     const button = wrapper.find('button');
     expect(button.text()).toBe(
@@ -38,5 +46,6 @@ describe('WhatsappLegacyProviderBanner', () => {
 
     button.trigger('click');
     expect(wrapper.emitted('convert')).toHaveLength(1);
+    expect(wrapper.emitted('useNative')).toBeUndefined();
   });
 });

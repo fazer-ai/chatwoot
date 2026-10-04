@@ -101,7 +101,8 @@
           "BADGE_DESCRIPTION": "Este provedor continua funcionando e não recebe recursos novos.",
           "NOTICE": "Este provedor é legado. Ele continua funcionando.",
           "NOTICE_WITH_NATIVE": "Este provedor é legado. Ele continua funcionando, mas recomendamos usar o WhatsApp (nativo) no lugar.",
-          "CONVERT_TO_NATIVE": "Converter para WhatsApp (nativo)"
+          "CONVERT_TO_NATIVE": "Converter para WhatsApp (nativo)",
+          "USE_NATIVE": "Usar o WhatsApp (nativo)"
         }
       }
     },

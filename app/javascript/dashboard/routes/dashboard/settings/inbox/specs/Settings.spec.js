@@ -67,19 +67,61 @@ describe('Inbox Settings', () => {
       expect(available([{ key: 'baileys', creatable: true }])).toBe(false);
     });
 
-    it('opens the conversion with the native provider picked', () => {
-      const push = vi.fn();
-      Settings.methods.goToConvertToNative.call({
-        $router: { push },
+    const gateContext = () => {
+      const context = {
+        $router: { push: vi.fn() },
         $route: { params: { accountId: 3 } },
         inbox: { id: 7 },
-      });
+        showConvertGate: false,
+        convertTarget: null,
+      };
+      context.openConvertGate = Settings.methods.openConvertGate.bind(context);
+      return context;
+    };
 
-      expect(push).toHaveBeenCalledWith({
+    it('sends the banner through the conversion gate, not past it', () => {
+      const context = gateContext();
+      Settings.methods.openConvertGateToNative.call(context);
+
+      expect(context.showConvertGate).toBe(true);
+      expect(context.$router.push).not.toHaveBeenCalled();
+    });
+
+    it('opens the conversion with the native provider picked once the gate is confirmed', () => {
+      const context = gateContext();
+      Settings.methods.openConvertGateToNative.call(context);
+      Settings.methods.goToConvert.call(context);
+
+      expect(context.$router.push).toHaveBeenCalledWith({
         name: 'settings_inbox_convert',
         params: { accountId: 3, inboxId: 7 },
         query: { provider: 'native' },
       });
+      expect(context.convertTarget).toBeNull();
+    });
+
+    it('opens the plain conversion from the provider field, even after a cancelled banner gate', () => {
+      const context = gateContext();
+      Settings.methods.openConvertGateToNative.call(context);
+      Settings.methods.closeConvertGate.call(context);
+      context.openConvertGate();
+      Settings.methods.goToConvert.call(context);
+
+      expect(context.$router.push).toHaveBeenCalledWith({
+        name: 'settings_inbox_convert',
+        params: { accountId: 3, inboxId: 7 },
+      });
+    });
+
+    it('fetches the catalog once the inbox turns out to be WhatsApp, however late it loads', () => {
+      const fetchWhatsappSessionProviders = vi.fn();
+      const { handler } = Settings.watch.isAWhatsAppChannel;
+
+      handler.call({ fetchWhatsappSessionProviders }, false);
+      expect(fetchWhatsappSessionProviders).not.toHaveBeenCalled();
+
+      handler.call({ fetchWhatsappSessionProviders }, true);
+      expect(fetchWhatsappSessionProviders).toHaveBeenCalledTimes(1);
     });
   });
 });

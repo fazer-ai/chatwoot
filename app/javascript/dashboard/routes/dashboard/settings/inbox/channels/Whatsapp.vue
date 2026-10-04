@@ -414,6 +414,7 @@ const requestEmbeddedSignupAccess = () => {
         v-if="isLegacyProvider(selectedProvider)"
         :native-available="isNativeAvailable"
         class="mb-4"
+        @use-native="selectProvider(PROVIDER_TYPES.NATIVE)"
       />
       <div class="px-6 py-5 rounded-2xl border border-n-weak">
         <!-- Show embedded signup if app ID is configured -->

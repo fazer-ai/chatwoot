@@ -11,14 +11,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  // The inbox settings offer the conversion; the setup screen has nothing to convert yet.
+  // The inbox settings offer to convert the inbox; the setup screen, with nothing to
+  // convert yet, offers to set up the native provider instead.
   canConvert: {
     type: Boolean,
     default: false,
   },
 });
 
-const emit = defineEmits(['convert']);
+const emit = defineEmits(['convert', 'useNative']);
 
 const { t } = useI18n();
 
@@ -28,11 +29,14 @@ const message = computed(() =>
     : t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.NOTICE')
 );
 
-const actionLabel = computed(() =>
-  props.nativeAvailable && props.canConvert
+const actionLabel = computed(() => {
+  if (!props.nativeAvailable) return null;
+  return props.canConvert
     ? t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.CONVERT_TO_NATIVE')
-    : null
-);
+    : t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.USE_NATIVE');
+});
+
+const onAction = () => emit(props.canConvert ? 'convert' : 'useNative');
 </script>
 
 <template>
@@ -40,7 +44,7 @@ const actionLabel = computed(() =>
     color="amber"
     :action-label="actionLabel"
     data-testid="whatsapp-legacy-provider-banner"
-    @action="emit('convert')"
+    @action="onAction"
   >
     {{ message }}
   </Banner>
