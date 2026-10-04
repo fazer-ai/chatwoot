@@ -82,5 +82,13 @@ done
 
 echo "Schema is current. Starting the worker."
 
+# The WhatsApp connector rides in this container unless told otherwise
+# (docker/entrypoints/helpers/whatsapp_connector.rb says how). An installation that runs the
+# connector as its own service sets WHATSAPP_CONNECTOR_EMBEDDED=false, or a second connector
+# with none of the pairings would compete with the first for the same sessions.
+if [ "$WHATSAPP_CONNECTOR_ENABLED" = "true" ] && [ "${WHATSAPP_CONNECTOR_EMBEDDED:-true}" != "false" ]; then
+  exec docker/entrypoints/helpers/whatsapp_connector.rb "$@"
+fi
+
 # Execute the main process of the container
 exec "$@"

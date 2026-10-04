@@ -59,7 +59,11 @@ Web e worker carregam o mesmo conjunto, com `SIDEKIQ_CONCURRENCY` só no worker.
 
 ## O conector WhatsApp
 
-Roda como application separada, com imagem e trem de release próprios, porque o whatsmeow muda a cada duas semanas e um hotfix de protocolo não pode esperar um trem de release do Rails.
+Por padrão o conector roda **dentro do worker**: a imagem traz o binário numa versão fixa e, com `WHATSAPP_CONNECTOR_ENABLED=true`, o `sidekiq.sh` sobe o conector ao lado do Sidekiq, com banco próprio no mesmo PostgreSQL (criado no primeiro start), diretório de mídia em `storage/` e token de mídia gerado no start. Nesse modo não existe a application `whatsapp-connector`. Detalhes e um compose de exemplo de cada modo em [docs/deployment.md](https://github.com/fazer-ai/whatsapp-connector/blob/main/docs/deployment.md) do repositório do conector.
+
+**Instalação que já roda o conector como application separada põe `WHATSAPP_CONNECTOR_EMBEDDED=false` no worker antes de atualizar a imagem.** Sem isso sobe um segundo conector dentro do worker, com um banco sem os pareamentos, disputando as mesmas sessões pelo mesmo Redis.
+
+Como application separada, o conector tem imagem e trem de release próprios, o que serve para atualizá-lo sem esperar uma release do Chatwoot (o whatsmeow muda a cada duas semanas). O resto desta seção vale para esse modo.
 
 - **`REDIS_URL` e `REDIS_PASSWORD` são sem prefixo `WAC_`, de propósito:** os dois lados leem a mesma variável, então não dá para apontá-los para servidores diferentes. Redis separado produziria silêncio, não erro.
 - **`WAC_ADVERTISE_URL` fica vazia.** O conector deriva o valor do próprio hostname, o que acompanha o container a cada deploy; um valor fixo apontaria para um container que deixou de existir.
