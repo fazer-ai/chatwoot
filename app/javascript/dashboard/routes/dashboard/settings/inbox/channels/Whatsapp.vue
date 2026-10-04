@@ -133,6 +133,10 @@ const shouldShowEmbeddedSignupAccessRequest = computed(() => {
 });
 
 const PROVIDER_CATALOG = computed(() => [
+  // The order the picker shows them in: the official API first, then the connection by QR
+  // code on the installation's own server, the other official route, the paid QR APIs, and
+  // the frozen Baileys last. Providers the server does not offer drop out without moving
+  // the rest.
   {
     key: PROVIDER_TYPES.WHATSAPP,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
@@ -142,16 +146,22 @@ const PROVIDER_CATALOG = computed(() => [
     icon: 'i-woot-whatsapp',
   },
   {
+    key: PROVIDER_TYPES.NATIVE,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
+    icon: 'i-woot-whatsapp-native',
+  },
+  {
     key: PROVIDER_TYPES.TWILIO,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO_DESC'),
     icon: 'i-woot-twilio',
   },
   {
-    key: PROVIDER_TYPES.BAILEYS,
-    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
-    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS_DESC'),
-    icon: 'i-woot-baileys',
+    key: PROVIDER_TYPES.UAZAPI,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
+    icon: 'i-woot-uazapi',
   },
   {
     key: PROVIDER_TYPES.ZAPI,
@@ -160,16 +170,10 @@ const PROVIDER_CATALOG = computed(() => [
     icon: 'i-woot-zapi',
   },
   {
-    key: PROVIDER_TYPES.NATIVE,
-    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE'),
-    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE_DESC'),
-    icon: 'i-woot-whatsapp-native',
-  },
-  {
-    key: PROVIDER_TYPES.UAZAPI,
-    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI'),
-    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI_DESC'),
-    icon: 'i-woot-uazapi',
+    key: PROVIDER_TYPES.BAILEYS,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS_DESC'),
+    icon: 'i-woot-baileys',
   },
   {
     key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,

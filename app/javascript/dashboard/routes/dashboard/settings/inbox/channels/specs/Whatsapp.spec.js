@@ -205,6 +205,33 @@ describe('Whatsapp.vue (convert mode)', () => {
     expect(badged).toHaveLength(1);
   });
 
+  it('lists the providers in the agreed order', async () => {
+    WhatsappChannel.getSessionProviders.mockResolvedValue({
+      data: {
+        payload: ['baileys', 'zapi', 'uazapi', 'native'].map(key => ({
+          key,
+          creatable: true,
+          fields: [],
+        })),
+      },
+    });
+    const wrapper = mountWhatsapp({ mode: 'create', inbox: null });
+    await flushPromises();
+
+    const titles = wrapper
+      .findAllComponents(ChannelSelectorStub)
+      .map(selector => selector.attributes('title'));
+
+    expect(titles).toEqual([
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD',
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.NATIVE',
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO',
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.UAZAPI',
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI',
+      'INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS',
+    ]);
+  });
+
   // Reproduces the "flash" bug: a successful embedded signup runs
   // router.replace, the route's query.provider is cleared during the
   // navigation tail, and the still-mounted parent would re-render the
