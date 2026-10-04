@@ -19,8 +19,9 @@
 #
 # Everything the connector needs is derived from what Chatwoot already has: the same Redis
 # (it reads REDIS_URL and REDIS_PASSWORD itself), a database of its own on the same
-# PostgreSQL server, created on the first start, a media directory under storage/, and a
-# media token generated per container start, which Chatwoot reads from the connector's
+# PostgreSQL server, created on the first start, a media directory local to the container
+# (a cache, and one a second replica must not share: each connector sweeps the temporary
+# files it does not know of), and a media token generated per container start, which Chatwoot reads from the connector's
 # registry entry in Redis. Any WAC_* variable set explicitly wins over the derived value.
 #
 # Plain Ruby and the standard library only: this runs before, and outside of, bundler.
@@ -28,6 +29,7 @@
 require 'fileutils'
 require 'open3'
 require 'securerandom'
+require 'tmpdir'
 require 'uri'
 
 module WhatsappConnectorEmbedded
@@ -51,33 +53,48 @@ module WhatsappConnectorEmbedded
     warn "[whatsapp-connector] #{message}"
   end
 
-  # Chatwoot's own connection, as Rails resolves it: DATABASE_URL wins over the POSTGRES_*
-  # parameters, which fall back to database.yml's defaults.
-  def chatwoot_database(env)
-    url = env['DATABASE_URL'].to_s
-    return database_from_url(url) unless url.empty?
+  # The connection options that mean the same to libpq (Rails, psql) and to lib/pq (the
+  # connector), each with the variable psql reads it from. Anything else a DATABASE_URL may
+  # carry is Rails' own (pool, checkout_timeout, ...), and lib/pq would send it to the server
+  # as a startup parameter, which the server refuses.
+  CONNECTION_OPTIONS = {
+    'sslmode' => 'PGSSLMODE',
+    'sslcert' => 'PGSSLCERT',
+    'sslkey' => 'PGSSLKEY',
+    'sslrootcert' => 'PGSSLROOTCERT',
+    'connect_timeout' => 'PGCONNECT_TIMEOUT'
+  }.freeze
 
+  # Chatwoot's own connection, as Rails resolves it: what DATABASE_URL says, over the
+  # POSTGRES_* parameters, over database.yml's defaults. Rails merges the URL into the
+  # config field by field, so a URL without a password still takes POSTGRES_PASSWORD.
+  def chatwoot_database(env)
     defaults = DATABASE_DEFAULTS.fetch(env.fetch('RAILS_ENV', 'production'), DATABASE_DEFAULTS['production'])
-    {
+    config = {
       host: present(env['POSTGRES_HOST']) || 'localhost',
       port: present(env['POSTGRES_PORT']) || '5432',
       user: env.fetch('POSTGRES_USERNAME', defaults['username']),
       password: env.fetch('POSTGRES_PASSWORD', defaults['password']),
       database: env.fetch('POSTGRES_DATABASE', defaults['database']),
-      query: nil
+      options: {}
     }
+    url = env['DATABASE_URL'].to_s
+    url.empty? ? config : config.merge(database_from_url(url))
   end
 
+  # Only the fields the URL actually carries, so the rest fall through to the defaults.
   def database_from_url(url)
     uri = URI(url)
+    path = uri.path.to_s.delete_prefix('/')
+    query = URI.decode_www_form(uri.query.to_s).to_h
     {
-      host: uri.host || 'localhost',
-      port: (uri.port || 5432).to_s,
-      user: uri.user && URI.decode_www_form_component(uri.user),
-      password: uri.password && URI.decode_www_form_component(uri.password),
-      database: URI.decode_www_form_component(uri.path.delete_prefix('/')),
-      query: uri.query
-    }
+      host: present(uri.hostname),
+      port: uri.port&.to_s,
+      user: uri.user && URI.decode_uri_component(uri.user),
+      password: uri.password && URI.decode_uri_component(uri.password),
+      database: path.empty? ? nil : URI.decode_uri_component(path),
+      options: query.slice(*CONNECTION_OPTIONS.keys)
+    }.compact
   end
 
   def connector_database_name(env)
@@ -89,13 +106,12 @@ module WhatsappConnectorEmbedded
   # would refuse the connector, so the URL says prefer unless the operator said otherwise.
   def connector_database_url(env)
     db = chatwoot_database(env)
-    params = URI.decode_www_form(db[:query].to_s)
-    params << ['sslmode', present(env['PGSSLMODE']) || 'prefer'] unless params.any? { |k, _| k == 'sslmode' }
+    options = { 'sslmode' => present(env['PGSSLMODE']) || 'prefer' }.merge(db[:options])
 
-    userinfo = [db[:user], db[:password]].compact.map { |part| URI.encode_www_form_component(part) }.join(':')
+    userinfo = [db[:user], db[:password]].compact.map { |part| URI.encode_uri_component(part) }.join(':')
     host = db[:host].include?(':') ? "[#{db[:host]}]" : db[:host]
     "postgres://#{userinfo}#{'@' unless userinfo.empty?}#{host}:#{db[:port]}/" \
-      "#{URI.encode_www_form_component(connector_database_name(env))}?#{URI.encode_www_form(params)}"
+      "#{URI.encode_uri_component(connector_database_name(env))}?#{URI.encode_www_form(options)}"
   end
 
   # Creates the connector's database when it does not exist yet. Two replicas starting
@@ -121,10 +137,16 @@ module WhatsappConnectorEmbedded
 
   def psql(env, sql)
     db = chatwoot_database(env)
-    pg_env = { 'PGPASSWORD' => db[:password].to_s }
-    pg_env['PGSSLMODE'] = env['PGSSLMODE'] if present(env['PGSSLMODE'])
-    Open3.capture3(pg_env, 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
+    Open3.capture3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
                    '-h', db[:host], '-p', db[:port], '-U', db[:user].to_s, '-d', db[:database], '-c', sql)
+  end
+
+  # The URL's connection options reach psql the way libpq reads them from the environment;
+  # the ones set as PG* variables on the container are inherited as they are.
+  def psql_env(db)
+    db[:options].each_with_object({ 'PGPASSWORD' => db[:password].to_s }) do |(option, value), pg_env|
+      pg_env[CONNECTION_OPTIONS.fetch(option)] = value
+    end
   end
 
   def quote_ident(name)
@@ -156,7 +178,7 @@ module WhatsappConnectorEmbedded
 
   class Supervisor
     def initialize(command, env: ENV.to_h, binary: ENV.fetch('WHATSAPP_CONNECTOR_BIN', 'whatsapp-connector'),
-                   media_root: File.expand_path('../../../storage/whatsapp-connector', __dir__))
+                   media_root: File.join(Dir.tmpdir, 'whatsapp-connector'))
       @command = command
       @env = env
       @binary = binary
@@ -191,6 +213,11 @@ module WhatsappConnectorEmbedded
           kill(signal, @connector_pid)
           wake
         end
+      end
+      # Sidekiq's own operational signals (TSTP quiets it, TTIN dumps its threads) reach this
+      # process now, since it is PID 1. They are the worker's alone.
+      %w[TSTP TTIN].each do |signal|
+        Signal.trap(signal) { kill(signal, @sidekiq_pid) }
       end
     end
 

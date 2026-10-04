@@ -31,6 +31,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       echo "start $$" >> "#{dir}/worker"
       # like Sidekiq, it takes its time to finish once told to stop
       trap 'echo "term $$" >> "#{dir}/worker"; echo 0 > "#{dir}/worker_exit.later"' TERM
+      trap 'echo "tstp $$" >> "#{dir}/worker"' TSTP
       while [ ! -f "#{dir}/worker_exit" ]; do sleep 0.05; done
       exit "$(cat "#{dir}/worker_exit")"
     SH
@@ -45,12 +46,12 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     FileUtils.chmod(0o755, path)
   end
 
-  def start
+  def start(extra = {})
     env = {
       'PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}",
       'POSTGRES_HOST' => 'pg', 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'pw',
       'POSTGRES_DATABASE' => 'chatwoot_production', 'WAC_MEDIA_ROOT' => File.join(dir, 'media')
-    }
+    }.merge(extra)
     stdin, out, wait = Open3.popen2e(env, 'ruby', script, 'worker')
     stdin.close
     @output = out
@@ -107,6 +108,28 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     expect(status.exitstatus).to eq(0)
   end
 
+  it 'passes TSTP to the worker alone, so Sidekiq can be quieted without stopping anything' do
+    wait = start
+    eventually { lines('worker').any? && lines('connector').any? }
+
+    Process.kill('TSTP', wait.pid)
+    eventually { lines('worker').grep(/\Atstp /).size == 1 }
+
+    expect(lines('connector').grep(/\Aterm /)).to be_empty
+    expect(wait).to be_alive
+  ensure
+    stop(wait)
+  end
+
+  it 'keeps media in a directory of the container, not on a volume replicas share' do
+    wait = start('WAC_MEDIA_ROOT' => nil)
+    eventually { lines('connector').any? }
+
+    expect(lines('connector').first.split[4]).to eq(File.join(Dir.tmpdir, 'whatsapp-connector'))
+  ensure
+    stop(wait)
+  end
+
   it 'starts a crashed connector again with the same token, without touching the worker' do
     wait = start
     eventually { lines('connector').any? }
@@ -152,6 +175,37 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       url = env_for('PGSSLMODE' => 'disable')['WAC_DATABASE_URL']
 
       expect(url).to eq('postgres://cw:p%40ss%3Aw@pg:5432/cw_db_whatsapp_connector?sslmode=disable')
+    end
+
+    it 'takes from POSTGRES_* what the URL leaves out, as Rails merges them' do
+      url = env_for('DATABASE_URL' => 'postgresql://u@db.internal/app')['WAC_DATABASE_URL']
+
+      expect(url).to eq('postgres://u:p%40ss%3Aw@db.internal:5432/app_whatsapp_connector?sslmode=prefer')
+    end
+
+    it 'keeps the TLS options of the URL and drops the ones only Rails understands' do
+      url = env_for('DATABASE_URL' => 'postgres://u:s@db/app?pool=5&sslmode=verify-full&sslrootcert=/ca.pem&checkout_timeout=5')
+            .fetch('WAC_DATABASE_URL')
+
+      expect(url).to eq('postgres://u:s@db:5432/app_whatsapp_connector?sslmode=verify-full&sslrootcert=%2Fca.pem')
+    end
+
+    it 'escapes a space as %20 and reads a plus in the URL as a plus' do
+      expect(env_for('POSTGRES_PASSWORD' => 'with space')['WAC_DATABASE_URL']).to start_with('postgres://cw:with%20space@')
+      expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:a+b@db/app')[:password]).to eq('a+b')
+    end
+
+    it 'brackets an IPv6 host once' do
+      url = env_for('DATABASE_URL' => 'postgres://u:s@[::1]:5432/app')['WAC_DATABASE_URL']
+
+      expect(url).to start_with('postgres://u:s@[::1]:5432/')
+      expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:s@[::1]:5432/app')[:host]).to eq('::1')
+    end
+
+    it 'hands the URL TLS options to psql through the variables libpq reads' do
+      db = described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:s@db/app?sslmode=verify-full&sslcert=/c&pool=5')
+
+      expect(described_class.psql_env(db)).to eq('PGPASSWORD' => 's', 'PGSSLMODE' => 'verify-full', 'PGSSLCERT' => '/c')
     end
 
     it 'maps the Chatwoot names the connector knows by another name' do

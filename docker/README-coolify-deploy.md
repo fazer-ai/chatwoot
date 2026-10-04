@@ -59,7 +59,7 @@ Web e worker carregam o mesmo conjunto, com `SIDEKIQ_CONCURRENCY` só no worker.
 
 ## O conector WhatsApp
 
-Por padrão o conector roda **dentro do worker**: a imagem traz o binário numa versão fixa e, com `WHATSAPP_CONNECTOR_ENABLED=true`, o `sidekiq.sh` sobe o conector ao lado do Sidekiq, com banco próprio no mesmo PostgreSQL (criado no primeiro start), diretório de mídia em `storage/` e token de mídia gerado no start. Nesse modo não existe a application `whatsapp-connector`. Detalhes e um compose de exemplo de cada modo em [docs/deployment.md](https://github.com/fazer-ai/whatsapp-connector/blob/main/docs/deployment.md) do repositório do conector.
+Por padrão o conector roda **dentro do worker**: a imagem traz o binário numa versão fixa e, com `WHATSAPP_CONNECTOR_ENABLED=true`, o `sidekiq.sh` sobe o conector ao lado do Sidekiq, com banco próprio no mesmo PostgreSQL (criado no primeiro start), diretório de mídia local do container e token de mídia gerado no start. Nesse modo não existe a application `whatsapp-connector`. Detalhes e um compose de exemplo de cada modo em [docs/deployment.md](https://github.com/fazer-ai/whatsapp-connector/blob/main/docs/deployment.md) do repositório do conector.
 
 **Instalação que já roda o conector como application separada põe `WHATSAPP_CONNECTOR_EMBEDDED=false` no worker antes de atualizar a imagem.** Sem isso sobe um segundo conector dentro do worker, com um banco sem os pareamentos, disputando as mesmas sessões pelo mesmo Redis.
 
