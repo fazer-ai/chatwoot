@@ -215,9 +215,6 @@ const selectedDescriptor = computed(() =>
 const isBetaProvider = key => Boolean(descriptorFor(key)?.beta);
 // Legacy the same way: the catalog says so, and a provider's withdrawal is a server change.
 const isLegacyProvider = key => Boolean(descriptorFor(key)?.legacy);
-const isNativeAvailable = computed(() =>
-  creatableSessionKeys.value.includes(PROVIDER_TYPES.NATIVE)
-);
 
 const availableProviders = computed(() => {
   const allowed = [
@@ -228,6 +225,13 @@ const availableProviders = computed(() => {
     .filter(p => allowed.includes(p.key))
     .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
 });
+
+// What this screen could actually open, not only what the catalog offers the account: a
+// conversion leaves out the inbox's own provider, so a native inbox being converted to a
+// legacy one has no native target to recommend.
+const isNativeAvailable = computed(() =>
+  availableProviders.value.some(({ key }) => key === PROVIDER_TYPES.NATIVE)
+);
 
 const currentProviderLabel = computed(() => {
   if (!isConvertMode.value || !currentProviderKey.value) return '';

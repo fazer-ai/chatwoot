@@ -317,6 +317,21 @@ describe('Whatsapp.vue (convert mode)', () => {
       ).toBe(false);
     });
 
+    it('does not recommend the native provider to a native inbox being converted', async () => {
+      WhatsappChannel.getSessionProviders.mockResolvedValue(
+        catalog(['native'])
+      );
+      setRouteProvider('baileys');
+      const wrapper = mountWhatsapp({
+        inbox: { id: 31, provider: 'native', name: 'Inbox 31' },
+      });
+      await flushPromises();
+
+      const banner = wrapper.findComponent(WhatsappLegacyProviderBanner);
+      expect(banner.props('nativeAvailable')).toBe(false);
+      expect(banner.find('button').exists()).toBe(false);
+    });
+
     it.each(['native', 'uazapi'])(
       'says nothing on %s, which is not legacy',
       async provider => {
