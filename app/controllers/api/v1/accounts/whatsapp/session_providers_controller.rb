@@ -30,7 +30,20 @@ class Api::V1::Accounts::Whatsapp::SessionProvidersController < Api::V1::Account
   def creatable?(descriptor)
     return Whatsapp::Session::Registry.legacy_creatable? if descriptor.legacy?
     return false unless descriptor.available?
+    return false unless connector_running?(descriptor)
 
     Current.account.whatsapp_session_provider_enabled?(descriptor.key)
+  end
+
+  # On by default is not the same as started: the Docker image runs the connector next to
+  # Sidekiq, and an installation from source has nothing that does. A native inbox created
+  # with nobody to pair it would never connect, so the picker asks the connector registry.
+  # Saving an inbox does not: a connector restarting must not stop an inbox being edited.
+  def connector_running?(descriptor)
+    return true unless descriptor.key == 'native'
+
+    Whatsapp::Connector::Client.new(nil).available?
+  rescue Whatsapp::Session::Errors::ProviderUnavailable
+    false
   end
 end
