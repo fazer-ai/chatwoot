@@ -44,6 +44,14 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
         expect(uazapi['pairing_modes']).to contain_exactly('qr', 'code')
       end
 
+      it 'tells the form which fields go behind the advanced options' do
+        advanced = payload.to_h { |p| [p['key'], p['fields'].select { |f| f['advanced'] }.pluck('name')] }
+
+        expect(advanced['native']).to contain_exactly('proxy_url', 'mark_as_read', 'presence_subscribe', 'history_sync')
+        expect(advanced['uazapi']).to contain_exactly('mark_as_read', 'presence_subscribe', 'history_sync')
+        expect(payload.flat_map { |p| p['fields'] }).to all(include('advanced' => be(true).or(be(false))))
+      end
+
       it 'tells the picker which providers are still in beta' do
         expect(payload.select { |p| p['beta'] }.pluck('key')).to contain_exactly('native', 'uazapi')
       end
