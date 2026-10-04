@@ -32,6 +32,8 @@ import AccountHealth from './components/AccountHealth.vue';
 import TwilioHealth from './components/TwilioHealth.vue';
 import WhatsappManualMigrationDialog from './components/WhatsappManualMigrationDialog.vue';
 import WhatsappManualMigrationBanner from './components/WhatsappManualMigrationBanner.vue';
+import WhatsappLegacyProviderBanner from './components/WhatsappLegacyProviderBanner.vue';
+import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
@@ -89,13 +91,21 @@ export default {
     TwilioHealth,
     WhatsappManualMigrationDialog,
     WhatsappManualMigrationBanner,
+    WhatsappLegacyProviderBanner,
     Widget,
     AccessToken,
     Icon,
   },
   mixins: [inboxMixin],
   setup() {
-    return { v$: useVuelidate() };
+    const { descriptorFor, creatableProviders, fetchProviders } =
+      useWhatsappSessionProviders();
+    return {
+      v$: useVuelidate(),
+      descriptorFor,
+      creatableProviders,
+      fetchWhatsappSessionProviders: fetchProviders,
+    };
   },
   data() {
     return {
@@ -128,6 +138,8 @@ export default {
       widgetBubbleType: 'standard',
       widgetBubbleLauncherTitle: '',
       showConvertGate: false,
+      // Set when the conversion was asked for from the legacy banner, which names its target.
+      convertTarget: null,
     };
   },
   computed: {
@@ -197,6 +209,17 @@ export default {
         );
       }
       return '';
+    },
+    // The catalog says which providers are legacy, and whether this account can pick the
+    // native one; Baileys and Z-API are the legacy ones today.
+    isLegacyWhatsAppProvider() {
+      return (
+        this.isAWhatsAppChannel &&
+        Boolean(this.descriptorFor(this.whatsAppAPIProvider)?.legacy)
+      );
+    },
+    isNativeWhatsAppAvailable() {
+      return this.creatableProviders.some(({ key }) => key === 'native');
     },
     isConvertibleWhatsAppChannel() {
       return (
@@ -465,6 +488,14 @@ export default {
     },
   },
   watch: {
+    // On a direct visit the inbox arrives after mount, so the catalog is fetched once the
+    // page knows it is a WhatsApp inbox rather than at mount.
+    isAWhatsAppChannel: {
+      handler(isWhatsApp) {
+        if (isWhatsApp) this.fetchWhatsappSessionProviders();
+      },
+      immediate: true,
+    },
     $route(to, from) {
       if (to.name === 'settings_inbox_show') {
         const inboxChanged = to.params.inboxId !== from.params.inboxId;
@@ -811,20 +842,30 @@ export default {
     toggleLockToSingleConversation(value) {
       this.locktoSingleConversation = value;
     },
-    openConvertGate() {
+    openConvertGate(target = null) {
+      this.convertTarget = target;
       this.showConvertGate = true;
     },
     closeConvertGate() {
       this.showConvertGate = false;
     },
+    // The legacy banner goes through the same gate as the provider field's button: the
+    // conversion is the same act whichever button asked for it. It only arrives with the
+    // native provider already picked.
+    openConvertGateToNative() {
+      this.openConvertGate('native');
+    },
     goToConvert() {
+      const provider = this.convertTarget;
       this.showConvertGate = false;
+      this.convertTarget = null;
       this.$router.push({
         name: 'settings_inbox_convert',
         params: {
           accountId: this.$route.params.accountId,
           inboxId: this.inbox.id,
         },
+        ...(provider ? { query: { provider } } : {}),
       });
     },
   },
@@ -937,6 +978,14 @@ export default {
             </span>
           </div>
         </Banner>
+        <WhatsappLegacyProviderBanner
+          v-if="isLegacyWhatsAppProvider"
+          :native-available="isNativeWhatsAppAvailable"
+          can-convert
+          class="mx-6 mb-4"
+          :class="bannerMaxWidth"
+          @convert="openConvertGateToNative"
+        />
         <WhatsappManualMigrationBanner
           v-if="showWhatsAppManualMigration"
           class="mx-6 mb-6"
@@ -1056,7 +1105,7 @@ export default {
                   slate
                   sm
                   :label="$t('INBOX_MGMT.CONVERT.BUTTON')"
-                  @click="openConvertGate"
+                  @click="openConvertGate()"
                 />
               </div>
             </SettingsFieldSection>
