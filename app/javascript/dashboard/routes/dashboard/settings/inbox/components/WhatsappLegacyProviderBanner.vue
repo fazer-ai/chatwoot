@@ -36,7 +36,12 @@ const actionLabel = computed(() => {
     : t('INBOX_MGMT.ADD.WHATSAPP.LEGACY_PROVIDER.USE_NATIVE');
 });
 
-const onAction = () => emit(props.canConvert ? 'convert' : 'useNative');
+// Each event named where it is emitted: vue/no-unused-emit-declarations cannot follow a
+// name picked at runtime.
+const onAction = () => {
+  if (props.canConvert) emit('convert');
+  else emit('useNative');
+};
 </script>
 
 <template>
