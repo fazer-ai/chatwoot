@@ -67,18 +67,9 @@ class ReportsAPI extends ApiClient {
     return axios.get(`${this.url}/drilldown`, requestConfig);
   }
 
-  getSummary(
-    since,
-    until,
-    // eslint-disable-next-line default-param-last
-    type = 'account',
-    id,
-    groupBy,
-    businessHours,
-    { signal } = {}
-  ) {
+  // eslint-disable-next-line default-param-last
+  getSummary(since, until, type = 'account', id, groupBy, businessHours) {
     return axios.get(`${this.url}/summary`, {
-      signal,
       params: {
         since,
         until,

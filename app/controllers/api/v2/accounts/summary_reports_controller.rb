@@ -18,6 +18,19 @@ class Api::V2::Accounts::SummaryReportsController < Api::V1::Accounts::BaseContr
     render_report_with(V2::Reports::LabelSummaryBuilder)
   end
 
+  # Distinct handled conversations over the whole range, for the account or the inbox
+  # the agents report is narrowed to. Agents overlap on a conversation, so their rows
+  # add up past it, and the distribution card needs the real total.
+  def handled_conversations
+    inbox_id = permitted_params[:inbox_id].presence
+    builder = V2::Reports::Conversations::ReportBuilder.new(
+      Current.account,
+      { metric: Reports::HandledConversations::METRIC, type: inbox_id ? :inbox : :account, id: inbox_id,
+        since: permitted_params[:since], until: permitted_params[:until] }
+    )
+    render json: { count: builder.aggregate_value }
+  end
+
   def channel
     return render_could_not_create_error(I18n.t('errors.reports.date_range_too_long')) if date_range_too_long?
 

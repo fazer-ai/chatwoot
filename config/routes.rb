@@ -614,6 +614,7 @@ Rails.application.routes.draw do
               get :inbox
               get :label
               get :channel
+              get :handled_conversations
             end
           end
           resources :reports, only: [:index] do

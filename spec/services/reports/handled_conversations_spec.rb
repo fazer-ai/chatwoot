@@ -123,4 +123,34 @@ RSpec.describe Reports::HandledConversations do
       expect(drilldown(diego)[:payload]).to be_empty
     end
   end
+
+  # The partial index is what keeps a month of a busy account inside the statement
+  # timeout, and it only serves queries whose WHERE implies its predicate. Sequential
+  # and bitmap scans are switched off so the planner has no other way out: if the
+  # query and the index predicate drift apart, it falls back to another index.
+  describe 'query plan' do
+    def plan_for(relation)
+      ActiveRecord::Base.transaction do
+        ActiveRecord::Base.connection.execute('SET LOCAL enable_seqscan = off')
+        ActiveRecord::Base.connection.execute('SET LOCAL enable_bitmapscan = off')
+        ActiveRecord::Base.connection.select_values("EXPLAIN #{relation.to_sql}").join("\n")
+      end
+    end
+
+    it 'answers every shape the reports read from the partial index alone' do
+      range = since..until_time
+      shapes = [
+        described_class.messages(account.messages.where(created_at: range)).group('messages.sender_id').select('messages.sender_id'),
+        described_class.distinct_conversations(account.messages.where(created_at: range)),
+        described_class.distinct_conversations(ana.messages.where(account_id: account.id, created_at: range)),
+        described_class.distinct_conversations(inbox.messages.where(account_id: account.id, created_at: range)),
+        described_class.messages(account.messages.where(created_at: range)).joins(:conversation).group('conversations.team_id')
+                       .select('conversations.team_id')
+      ]
+
+      shapes.each do |relation|
+        expect(plan_for(relation)).to include('Index Only Scan using index_messages_on_handled_conversations')
+      end
+    end
+  end
 end
