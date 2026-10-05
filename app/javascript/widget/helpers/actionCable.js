@@ -5,6 +5,7 @@ import { IFrameHelper } from 'widget/helpers/utils';
 import { shouldTriggerMessageUpdateEvent } from './IframeEventHelper';
 import { CHATWOOT_ON_MESSAGE } from '../constants/sdkEvents';
 import { emitter } from '../../shared/helpers/mitt';
+import { AGENT_TYPING_TIMEOUT } from 'widget/helpers/constants';
 
 const isMessageInActiveConversation = (getters, message) => {
   const { conversation_id: conversationId } = message;
@@ -105,14 +106,18 @@ class ActionCableConnector extends BaseActionCableConnector {
     ActionCableConnector.refreshConnector(pubsubToken);
   };
 
-  onTypingOn = data => {
+  isTypingElsewhere = data => {
     const activeConversationId =
       this.app.$store.getters['conversationAttributes/getConversationParams']
         .id;
     const isUserTypingOnAnotherConversation =
       data.conversation && data.conversation.id !== activeConversationId;
 
-    if (isUserTypingOnAnotherConversation || data.is_private) {
+    return isUserTypingOnAnotherConversation || data.is_private;
+  };
+
+  onTypingOn = data => {
+    if (this.isTypingElsewhere(data)) {
       return;
     }
     this.clearTimer();
@@ -122,7 +127,15 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.initTimer();
   };
 
-  onTypingOff = () => {
+  // A typing_off from the agent side also ends the bubble a pending conversation shows on its own.
+  onTypingOff = data => {
+    this.stopTyping();
+    if (!this.isTypingElsewhere(data)) {
+      this.app.$store.dispatch('conversation/clearPendingTyping');
+    }
+  };
+
+  stopTyping = () => {
     this.clearTimer();
     this.app.$store.dispatch('conversation/toggleAgentTyping', {
       status: 'off',
@@ -137,10 +150,11 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   initTimer = () => {
-    // Turn off typing automatically after 30 seconds
+    // Turn off typing automatically after 30 seconds. Only the real signal: a visitor message that
+    // arrived meanwhile keeps its own window.
     this.CancelTyping = setTimeout(() => {
-      this.onTypingOff();
-    }, 30000);
+      this.stopTyping();
+    }, AGENT_TYPING_TIMEOUT);
   };
 }
 

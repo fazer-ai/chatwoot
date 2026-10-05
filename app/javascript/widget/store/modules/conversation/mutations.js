@@ -1,4 +1,4 @@
-import { MESSAGE_TYPE } from 'widget/helpers/constants';
+import { AGENT_TYPING_TIMEOUT, MESSAGE_TYPE } from 'widget/helpers/constants';
 import { findUndeliveredMessage } from './helpers';
 
 export const mutations = {
@@ -13,6 +13,13 @@ export const mutations = {
     const messagesInbox = $state.conversations;
     const isMessageIncoming = type === MESSAGE_TYPE.INCOMING;
     const isTemporaryMessage = status === 'in_progress';
+
+    if (isMessageIncoming && !messagesInbox[id]) {
+      $state.pendingTyping = {
+        messageId: id,
+        until: Date.now() + AGENT_TYPING_TIMEOUT,
+      };
+    }
 
     if (!isMessageIncoming || isTemporaryMessage) {
       messagesInbox[id] = message;
@@ -98,6 +105,13 @@ export const mutations = {
     // [VITE] In Vue 3 proxy objects, we can't delete properties by setting them to undefined
     // Instead, we have to use the delete operator
     // $state.conversations[id] = undefined;
+  },
+
+  endPendingTyping($state) {
+    const lastMessage = Object.values($state.conversations).at(-1);
+    $state.pendingTyping = lastMessage
+      ? { messageId: lastMessage.id, until: 0 }
+      : null;
   },
 
   toggleAgentTypingStatus($state, { status }) {
