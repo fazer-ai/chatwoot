@@ -17,6 +17,7 @@ import ContactDeleteModal from 'dashboard/modules/contact/ContactDeleteModal.vue
 import ComposeConversation from 'dashboard/components-next/NewConversation/ComposeConversation.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import VoiceCallButton from 'dashboard/components-next/Contacts/VoiceCallButton.vue';
+import AgentsConversationButton from './AgentsConversationButton.vue';
 import InlineInput from 'dashboard/components-next/inline-input/InlineInput.vue';
 
 export default {
@@ -32,6 +33,7 @@ export default {
     ContactDeleteModal,
     VoiceCallButton,
     InlineInput,
+    AgentsConversationButton,
   },
   props: {
     contact: {
@@ -349,6 +351,7 @@ export default {
           slate
           :tooltip-label="$t('CONTACT_PANEL.CALL')"
         />
+        <AgentsConversationButton :conversation="currentChat" />
         <NextButton
           v-tooltip.top-end="$t('EDIT_CONTACT.BUTTON_LABEL')"
           icon="i-ph-pencil-simple"

@@ -32,5 +32,8 @@
   "COMPOSE_NEW_CONVERSATION": {
     "TAB_CONVERSATION": "Conversación",
     "TAB_GROUP": "Grupo"
+  },
+  "CONTACT_PANEL": {
+    "OPEN_IN_AGENTS": "Abrir en fazer.ai agents"
   }
 }
