@@ -17,11 +17,11 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
   phone = '5541999990000'
   lid = '182736451928374'
 
-  # How each entry point that files a contact's messages is driven. `echo: false` is an
-  # event that only ever comes from the contact.
+  # How each entry point that files a contact's messages is driven, and what it files.
+  # `echo: false` is an event that only ever comes from the contact.
   entry_points = {
     'service:Whatsapp::IncomingMessageWhatsappCloudService' => {
-      channel: { provider: 'whatsapp_cloud' }, source_id: phone,
+      why: 'Cloud API messages and smb echoes', channel: { provider: 'whatsapp_cloud' }, source_id: phone,
       deliver: lambda do |id, from_me:|
         message = { id: id, text: { body: 'oi' }, timestamp: Time.current.to_i.to_s, type: 'text' }
         value = if from_me
@@ -35,7 +35,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'service:Whatsapp::IncomingMessageService' => {
-      channel: { provider: 'default' }, source_id: phone, echo: false,
+      why: '360dialog messages', channel: { provider: 'default' }, source_id: phone, echo: false,
       deliver: lambda do |id, from_me:| # rubocop:disable Lint/UnusedBlockArgument
         params = { contacts: [{ profile: { name: 'Ana' }, wa_id: phone }],
                    messages: [{ from: phone, id: id, text: { body: 'oi' }, timestamp: Time.current.to_i.to_s, type: 'text' }] }
@@ -43,7 +43,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'baileys:MessagesUpsert' => {
-      channel: { provider: 'baileys', provider_config: { webhook_verify_token: 'token' } }, source_id: lid,
+      why: 'live messages and echoes', channel: { provider: 'baileys', provider_config: { webhook_verify_token: 'token' } }, source_id: lid,
       deliver: lambda do |id, from_me:|
         raw = { key: { id: id, remoteJid: "#{lid}@lid", remoteJidAlt: "#{phone}@s.whatsapp.net", fromMe: from_me, addressingMode: 'lid' },
                 pushName: 'Ana', messageTimestamp: Time.current.to_i, message: { conversation: 'oi' } }
@@ -52,6 +52,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'baileys:MessagingHistorySet' => {
+      why: "the phone's history, filed by Baileys::HistoryImporter",
       channel: { provider: 'baileys', provider_config: { webhook_verify_token: 'token' } }, source_id: lid,
       deliver: lambda do |id, from_me:|
         raw = { key: { id: id, remoteJid: "#{lid}@lid", remoteJidAlt: "#{phone}@s.whatsapp.net", fromMe: from_me, addressingMode: 'lid' },
@@ -63,7 +64,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'zapi:ReceivedCallback' => {
-      channel: { provider: 'zapi' }, source_id: lid,
+      why: 'live messages and echoes', channel: { provider: 'zapi' }, source_id: lid,
       deliver: lambda do |id, from_me:|
         params = { type: 'ReceivedCallback', messageId: id, momment: Time.current.to_i * 1000, phone: phone,
                    chatLid: "#{lid}@lid", fromMe: from_me, chatName: 'Ana', text: { message: 'oi' } }
@@ -71,7 +72,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'session:MessageReceived' => {
-      channel: { provider: 'native' }, source_id: lid,
+      why: 'live messages and echoes', channel: { provider: 'native' }, source_id: lid,
       deliver: lambda do |id, from_me:|
         model = Whatsapp::Session::Model
         message = model::InboundMessage.new(
@@ -82,7 +83,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'session:MessageReaction' => {
-      channel: { provider: 'native' }, source_id: lid, needs_target: true,
+      why: 'a reaction is filed as a message', channel: { provider: 'native' }, source_id: lid, needs_target: true,
       deliver: lambda do |id, from_me:|
         model = Whatsapp::Session::Model
         reaction = model::Events::MessageReaction.new(
@@ -93,7 +94,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'session:CallOffer' => {
-      channel: { provider: 'native' }, source_id: lid, echo: false,
+      why: 'a call is filed as a line in the thread', channel: { provider: 'native' }, source_id: lid, echo: false,
       deliver: lambda do |id, from_me:| # rubocop:disable Lint/UnusedBlockArgument
         model = Whatsapp::Session::Model
         offer = model::Events::CallOffer.new(call_id: id, from: model::Party.new(phone: phone, lid: lid, push_name: 'Ana'),
@@ -102,7 +103,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
       end
     },
     'session:HistorySync' => {
-      channel: { provider: 'native' }, source_id: lid,
+      why: 'the phone\'s history, filed by Session::Inbound::HistoryImporter', channel: { provider: 'native' }, source_id: lid,
       deliver: lambda do |id, from_me:|
         model = Whatsapp::Session::Model
         message = model::InboundMessage.new(
@@ -160,6 +161,7 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
             Whatsapp::Session::Inbound::Dispatcher::HANDLERS.values.uniq.map { |name| "session:#{name}" }
 
     expect(entry_points.keys + files_nothing_from_a_contact.keys).to match_array(found)
+    expect(entry_points.values.pluck(:why) + files_nothing_from_a_contact.values).to all(be_present)
   end
 
   entry_points.each do |entry_point, spec|

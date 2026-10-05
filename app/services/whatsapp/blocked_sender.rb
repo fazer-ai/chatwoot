@@ -1,9 +1,9 @@
-# The one rule every WhatsApp inbound path applies to a blocked contact, the same one
-# upstream's Cloud path applies in `IncomingMessageBaseService#contact_processable?`: what
-# the contact sends is not filed, so it opens no conversation and reaches no bot, while the
-# echo of a reply the owner typed on the phone is still filed, or the agent's own answer
-# would go missing from the thread. Taking a reaction back is not a new message: the paths
-# reconcile it before asking this, as upstream does.
+# The one rule every WhatsApp inbound path applies to a blocked contact, Cloud included
+# (`IncomingMessageBaseService#contact_processable?`), and the same one upstream writes
+# inline there: what the contact sends is not filed, so it opens no conversation and
+# reaches no bot, while the echo of a reply the owner typed on the phone is still filed, or
+# the agent's own answer would go missing from the thread. Taking a reaction back is not a
+# new message: the paths reconcile it before asking this, as upstream does.
 #
 # Asked as the first thing after the sender's contact is resolved. Not before: the
 # read-only lookup (`Session::Inbound::ContactLookup`) only finds a contact that already

@@ -100,7 +100,7 @@ class Whatsapp::IncomingMessageBaseService # rubocop:disable Metrics/ClassLength
   # Blocked contacts should not generate new incoming messages, but we still
   # accept echoes so outgoing messages tracked from native apps are preserved.
   def contact_processable?
-    @contact.present? && !(@contact.blocked? && !outgoing_echo)
+    @contact.present? && !Whatsapp::BlockedSender.silenced?(@contact, from_me: outgoing_echo.present?)
   end
 
   def process_statuses
