@@ -146,6 +146,25 @@ describe('ConversationWrap typing bubble', () => {
     expect(bubbleShown()).toBe(true);
   });
 
+  it('counts the window of a message seen arriving from the visitor clock, not from its stored time', async () => {
+    mountWith('pending');
+    connector.onMessageCreated(
+      message(1, MESSAGE_TYPE.INCOMING, (NOW - 60_000) / 1000)
+    );
+    await wrapper.vm.$nextTick();
+    expect(bubbleShown()).toBe(true);
+  });
+
+  it('does not reopen the window when a visitor message already shown is updated', async () => {
+    mountWith('pending');
+    await visitorSends(1);
+    await advance(20_000);
+    connector.onMessageUpdated(message(1, MESSAGE_TYPE.INCOMING, NOW / 1000));
+
+    await advance(11_000);
+    expect(bubbleShown()).toBe(false);
+  });
+
   it('after a reload, shows the bubble only until 30 seconds past the stored message time', async () => {
     mountWith('pending');
     store.commit('conversation/setMessagesInConversation', [
