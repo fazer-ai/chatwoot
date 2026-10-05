@@ -229,13 +229,12 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     run.find { |raw| !raw.dig(:key, :fromMe) } || run.first
   end
 
-  # What of a 1:1 run is filed: nothing without a contact, and only the echoes for a blocked
-  # one, which is the live rule (`IndividualContactMessageHandler#process_individual_contact_message`).
+  # What of a 1:1 run is filed: nothing without a contact, and what Whatsapp::BlockedSender
+  # lets through for a blocked one.
   def fileable(run)
     return [] if @contact.blank?
-    return run unless @contact.blocked?
 
-    run.select { |raw| raw.dig(:key, :fromMe) }
+    run.reject { |raw| Whatsapp::BlockedSender.silenced?(@contact, from_me: raw.dig(:key, :fromMe) == true) }
   end
 
   # A group is the one chat whose author changes from message to message, so its sender is

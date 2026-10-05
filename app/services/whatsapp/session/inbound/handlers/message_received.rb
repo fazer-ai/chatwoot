@@ -210,7 +210,7 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
     return :ignored if contact_inbox.nil?
 
     contact = contact_inbox.contact
-    return :ignored if silenced?(contact)
+    return :ignored if Whatsapp::BlockedSender.silenced?(contact, from_me: !message.incoming?)
 
     conversation = inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, attribution: attribution
@@ -247,14 +247,6 @@ class Whatsapp::Session::Inbound::Handlers::MessageReceived < Whatsapp::Session:
   # serialize it, or the two file the same person twice.
   def chat_lock_ids = inbound::ChatIdentity.lock_ids(message)
   def peer_party = inbound::ChatIdentity.peer_party(message)
-
-  # The same rule the Cloud path applies (`IncomingMessageBaseService#contact_processable?`):
-  # a blocked contact stops generating messages and notifications, but the echo of a
-  # reply typed on the connected phone is still stored, or the agent's own answer would
-  # go missing from the thread.
-  def silenced?(contact)
-    contact.blocked? && message.incoming?
-  end
 
   def attribution
     { 'referral' => message.referral, 'entry_point' => message.entry_point }.compact
