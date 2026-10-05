@@ -30,6 +30,8 @@ RSpec.describe Reports::HandledConversations do
     reply(shared, bruno, day + 1.day)
     reply(ana_only, ana, day + 2.hours)
     reply(ana_only, diego, day, private: true)
+    campaign_only = create(:conversation, account: account, inbox: inbox, created_at: day)
+    reply(campaign_only, bruno, day, additional_attributes: { campaign_id: 1 }) # a live chat campaign posting as Bruno
     bot_only = create(:conversation, account: account, inbox: other_inbox, created_at: day)
     create(:message, :bot_message, account: account, inbox: other_inbox, conversation: bot_only, created_at: day)
     create(:message, account: account, inbox: inbox, conversation: shared, message_type: :incoming, created_at: day)

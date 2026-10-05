@@ -19,9 +19,13 @@ module Reports::HandledConversations
   end
 
   # Private notes, bot and automation replies and campaigns are left out: only a
-  # message a person wrote to the customer makes a conversation handled.
+  # message a person wrote to the customer makes a conversation handled. A live
+  # chat campaign posts as its configured sender, a User, so it is told apart by
+  # the campaign it carries.
   def messages(scope)
-    scope.where(message_type: :outgoing, private: false, sender_type: 'User').unscope(:order)
+    scope.where(message_type: :outgoing, private: false, sender_type: 'User')
+         .where("(messages.additional_attributes->'campaign_id') IS NULL")
+         .unscope(:order)
   end
 
   # One row per conversation, ready for `count` (and groupdate's grouped count).

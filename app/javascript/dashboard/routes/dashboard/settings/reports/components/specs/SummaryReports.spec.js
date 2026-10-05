@@ -1,5 +1,6 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
+import ReportsAPI from 'dashboard/api/reports';
 import SummaryReports from '../SummaryReports.vue';
 
 const agents = [
@@ -123,5 +124,34 @@ describe('SummaryReports.vue', () => {
     expect(header.find('[title]').attributes('title')).toBe(
       'REPORT.METRIC_HINTS.ASSIGNED_AGENT'
     );
+  });
+
+  it('never lets a superseded period overwrite the handled total', async () => {
+    // Each request settles only when the spec says so, and rejects the way axios
+    // does once its signal is aborted.
+    const pending = [];
+    ReportsAPI.getSummary.mockImplementation(
+      (...args) =>
+        new Promise((resolve, reject) => {
+          const { signal } = args.at(-1);
+          signal?.addEventListener('abort', () =>
+            reject(
+              Object.assign(new Error('canceled'), { name: 'CanceledError' })
+            )
+          );
+          pending.push(resolve);
+        })
+    );
+    const wrapper = mountReports();
+    const filters = wrapper.findComponent({ name: 'OverviewReportFilters' });
+
+    filters.vm.$emit('filterChange', { from: 1, to: 2, businessHours: false });
+    filters.vm.$emit('filterChange', { from: 3, to: 4, businessHours: false });
+    pending.at(-1)({ data: { handled_conversations_count: 7 } });
+    pending.at(-2)({ data: { handled_conversations_count: 99 } });
+    await flushPromises();
+
+    const distribution = wrapper.findComponent({ name: 'SummaryDistribution' });
+    expect(distribution.props('handledTotal')).toBe(7);
   });
 });
