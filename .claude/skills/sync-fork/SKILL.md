@@ -402,7 +402,7 @@ gh run list --workflow=run_foss_spec.yml --branch chore/merge-upstream-X.Y.Z --l
 gh run watch <run-id>                                                                    # or poll with `gh run view <run-id>`
 ```
 
-For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered by pushing the merge to a branch on the `chatwoot-pro` remote first (e.g. `sync/ce-<tag>`), and only after it is green to `HEAD:main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
+For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and runs on a staging branch before `main` moves: push the merge to the `chatwoot-pro` remote as `sync/ce-<tag>`, then dispatch both suites on it, since a branch push alone triggers neither (`gh workflow run run_foss_spec.yml --repo fazer-ai/chatwoot-pro --ref sync/ce-<tag> -f full=true` and `gh workflow run run_ee_spec.yml --repo fazer-ai/chatwoot-pro --ref sync/ce-<tag>`; the second is the only CI that runs `spec/enterprise`). Only after both are green, `git push chatwoot-pro HEAD:main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
 
 ## Merging the sync PR: merge commit, NEVER squash
 
