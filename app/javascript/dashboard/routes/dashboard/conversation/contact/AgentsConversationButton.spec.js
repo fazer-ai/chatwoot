@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { flushPromises, mount } from '@vue/test-utils';
 import AgentsConversationButton from './AgentsConversationButton.vue';
 
@@ -8,6 +9,7 @@ vi.mock('dashboard/api/inboxes', () => ({
 }));
 
 const AGENTS = 'https://agents.example.com/api/v1/chatwoot/webhook/tok';
+const tokSha256 = createHash('sha256').update('tok').digest('hex');
 const botReply = outgoingUrl => ({
   data: { agent_bot: outgoingUrl ? { outgoing_url: outgoingUrl } : {} },
 });
@@ -27,12 +29,12 @@ describe('AgentsConversationButton', () => {
     mocks.getAgentBot.mockResolvedValue(botReply(AGENTS));
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const wrapper = mountWith({ id: 42, account_id: 3, inbox_id: 9 });
-    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.find('button').exists()).toBe(true));
 
     expect(mocks.getAgentBot).toHaveBeenCalledWith(9);
     await wrapper.find('button').trigger('click');
     expect(open).toHaveBeenCalledWith(
-      'https://agents.example.com/chatwoot/accounts/3/conversations/42?inbox=9',
+      `https://agents.example.com/chatwoot/accounts/3/conversations/42?inbox=9&bot=${tokSha256}`,
       '_blank',
       'noopener'
     );
@@ -68,6 +70,10 @@ describe('AgentsConversationButton', () => {
     });
     await flushPromises();
     answerOld(botReply(AGENTS));
+    // NOTE: the old reply still has to be hashed, which settles outside the microtask queue.
+    await new Promise(resolve => {
+      setTimeout(resolve, 50);
+    });
     await flushPromises();
 
     expect(mocks.getAgentBot).toHaveBeenLastCalledWith(10);
@@ -79,8 +85,7 @@ describe('AgentsConversationButton', () => {
       .mockResolvedValueOnce(botReply(AGENTS))
       .mockReturnValueOnce(new Promise(() => {}));
     const wrapper = mountWith({ id: 1, account_id: 3, inbox_id: 9 });
-    await flushPromises();
-    expect(wrapper.find('button').exists()).toBe(true);
+    await vi.waitFor(() => expect(wrapper.find('button').exists()).toBe(true));
 
     await wrapper.setProps({
       conversation: { id: 2, account_id: 3, inbox_id: 10 },
