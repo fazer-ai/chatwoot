@@ -3,7 +3,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
+  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
