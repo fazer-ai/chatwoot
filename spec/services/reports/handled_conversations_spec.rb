@@ -11,7 +11,9 @@ RSpec.describe Reports::HandledConversations do
   let(:bruno) { create(:user, account: account, role: :agent) }
   # Holds conversations and never replies to any of them.
   let(:diego) { create(:user, account: account, role: :agent) }
-  let(:day) { Time.zone.parse('2026-09-05 12:00') }
+  # In UTC, like the series it is read through. Built from Time.zone, it shifts by
+  # whatever zone an earlier spec left behind and the series grows a leading day.
+  let(:day) { Time.utc(2026, 9, 5, 12) }
   let(:since) { day.beginning_of_day }
   let(:until_time) { (day + 1.day).end_of_day }
 
