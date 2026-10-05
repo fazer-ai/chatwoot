@@ -33,9 +33,7 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     return :ignored if contact_inbox.nil?
 
     contact = contact_inbox.contact
-    # The same rule every inbound path applies: a blocked contact stops generating
-    # messages and notifications.
-    return :ignored if contact.blocked?
+    return :ignored if Whatsapp::BlockedSender.silenced?(contact, from_me: false)
 
     conversation = inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, occurred_at: occurred_at

@@ -68,13 +68,20 @@ class Whatsapp::Session::Inbound::Handlers::MessageReaction < Whatsapp::Session:
     return :deferred if target.nil?
 
     contact_inbox = resolve_contact_inbox
-    return :ignored if contact_inbox.nil?
+    return :ignored if contact_inbox.nil? || silenced?(contact_inbox.contact)
 
-    written = store(payload.chat.group? ? sender_contact : contact_inbox.contact).write(target.conversation)
+    written = store(reactor(contact_inbox)).write(target.conversation)
     # nil when a newer reaction from the same sender is already on the bubble, which is
     # what an emoji swap looks like when its two halves arrive the wrong way round.
     written.nil? ? :ignored : :handled
   end
+
+  # Who the reaction is filed under: the contact of a 1:1 chat, the author in a group.
+  def reactor(contact_inbox) = payload.chat.group? ? sender_contact : contact_inbox.contact
+
+  # Whatsapp::BlockedSender, in a 1:1 chat only: in a group the contact resolved here is the
+  # group itself.
+  def silenced?(contact) = !payload.chat.group? && Whatsapp::BlockedSender.silenced?(contact, from_me: payload.from_me)
 
   def store(sender)
     inbound::ReactionStore.new(inbox: inbox, reaction: payload, sender: sender)

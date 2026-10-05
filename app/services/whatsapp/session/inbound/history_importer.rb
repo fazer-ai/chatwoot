@@ -154,13 +154,12 @@ class Whatsapp::Session::Inbound::HistoryImporter
     run.find(&:incoming?) || run.first
   end
 
-  # What of a 1:1 run is filed: nothing without a contact, and only the echoes for a blocked
-  # one, which is the live rule (`Handlers::MessageReceived#silenced?`).
+  # What of a 1:1 run is filed: nothing without a contact, and what Whatsapp::BlockedSender
+  # lets through for a blocked one.
   def fileable(run, contact_inbox)
     return [] if contact_inbox.nil?
-    return run unless contact_inbox.contact.blocked?
 
-    run.reject(&:incoming?)
+    run.reject { |message| Whatsapp::BlockedSender.silenced?(contact_inbox.contact, from_me: !message.incoming?) }
   end
 
   def conversation_for(contact_inbox, message, archived)
