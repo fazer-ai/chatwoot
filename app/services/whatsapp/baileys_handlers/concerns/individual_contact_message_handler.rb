@@ -42,6 +42,11 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
     # set_conversation so a blank webhook can't open/create a stray thread.
     return mark_existing_reaction_as_removed(sender: @contact) if reaction_removal?
 
+    # The rule every WhatsApp inbound path applies (`IncomingMessageBaseService#contact_processable?`):
+    # a blocked contact stops opening threads and reaching bots, but the echo of a reply typed
+    # on the phone is still stored, or the agent's own answer would go missing.
+    return if @contact.blocked? && incoming?
+
     set_first_touch_attribution
     set_conversation
     handle_create_message

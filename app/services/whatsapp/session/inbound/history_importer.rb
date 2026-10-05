@@ -142,6 +142,11 @@ class Whatsapp::Session::Inbound::HistoryImporter
     contact_inbox = resolve_contact(identifying(run))
     return [] if contact_inbox.nil?
 
+    # The live rule for a blocked contact: only the echoes are filed. See
+    # `Handlers::MessageReceived#silenced?`.
+    run = run.reject(&:incoming?) if contact_inbox.contact.blocked?
+    return [] if run.empty?
+
     conversation = track(conversation_for(contact_inbox, run.first, archived))
     run.filter_map { |message| write(conversation, contact_inbox.contact, message) }
   end

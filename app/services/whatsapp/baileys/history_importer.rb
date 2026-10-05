@@ -218,6 +218,11 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     set_contact
     return [] if @contact.blank?
 
+    # The live rule for a blocked contact: only the echoes are filed. See
+    # `IndividualContactMessageHandler#process_individual_contact_message`.
+    run = run.select { |raw| raw.dig(:key, :fromMe) } if @contact.blocked?
+    return [] if run.empty?
+
     conversation = track(conversation_for(@contact_inbox, run.first, archived))
     run.filter_map { |raw| write(conversation, @contact, raw) }
   end
