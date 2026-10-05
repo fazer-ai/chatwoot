@@ -130,6 +130,26 @@ describe Whatsapp::Baileys::HistoryImporter do
     expect(a_request(:get, %r{/media/})).not_to have_been_made
   end
 
+  # The live rule (#793): what a blocked contact sends is not filed, and the echo of a reply
+  # typed on the phone is, so the agent's own answer does not go missing.
+  describe 'a blocked contact' do
+    let!(:contact) { create(:contact, account: inbox.account, name: 'June', phone_number: "+#{phone}", blocked: true) }
+
+    before { create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid) }
+
+    it 'files only the echoes' do
+      import([raw_message('IN', sent_at: 2.days.ago), raw_message('OUT', sent_at: 1.day.ago, from_me: true)])
+
+      expect(inbox.messages.pluck(:source_id)).to eq(['OUT'])
+    end
+
+    it 'leaves no thread behind when the contact is all the dump has' do
+      import([raw_message('IN', sent_at: 2.days.ago)])
+
+      expect(inbox.conversations).to be_empty
+    end
+  end
+
   describe 'what an import may set off' do
     it 'never tells WhatsApp the messages were received' do
       channel = create(:channel_whatsapp, provider: 'baileys',

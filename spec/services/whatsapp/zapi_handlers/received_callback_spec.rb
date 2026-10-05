@@ -1063,6 +1063,29 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
       end
     end
 
+    # The rule every WhatsApp inbound path applies (#793): a blocked contact stops opening
+    # threads and reaching bots, while the echo of a reply typed on the phone is kept.
+    context 'when the contact is blocked' do
+      before do
+        create(:account_user, account: inbox.account)
+        contact.update!(blocked: true)
+        create(:contact_inbox, inbox: inbox, contact: contact, source_id: '5511987654321')
+      end
+
+      it 'files neither the message nor a conversation' do
+        expect { service.perform }.not_to change(Message, :count)
+        expect(inbox.conversations).to be_empty
+      end
+
+      it 'still files the echo of a reply typed on the phone' do
+        params[:fromMe] = true
+
+        service.perform
+
+        expect(inbox.messages.find_by(source_id: message_id)).to be_outgoing
+      end
+    end
+
     context 'when handling duplicated events' do
       let(:params) do
         {
