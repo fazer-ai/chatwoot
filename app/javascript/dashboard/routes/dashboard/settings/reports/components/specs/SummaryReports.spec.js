@@ -28,6 +28,10 @@ vi.mock('dashboard/composables/store', () => ({
   },
 }));
 
+vi.mock('dashboard/api/reports', () => ({
+  default: { getSummary: vi.fn().mockResolvedValue({ data: {} }) },
+}));
+
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: key => key }),
 }));
@@ -55,6 +59,10 @@ const mountReports = () =>
     },
   });
 
+// Resolved, handled and assigned come first, the durations after them.
+const ASSIGNED = 3;
+const FIRST_RESPONSE = 4;
+
 const columnOf = (wrapper, index) =>
   wrapper.findAll('tbody tr').map(row => row.findAll('td')[index].text());
 
@@ -64,15 +72,15 @@ const sortBy = (wrapper, headerIndex) =>
 describe('SummaryReports.vue', () => {
   it('sorts a count column by its number, not by the formatted string', async () => {
     const wrapper = mountReports();
-    await sortBy(wrapper, 1);
+    await sortBy(wrapper, ASSIGNED);
 
     // 10 above 9 is the whole point: as strings they sort the other way round.
-    expect(columnOf(wrapper, 1)).toEqual(['10', '9', '2', '--']);
+    expect(columnOf(wrapper, ASSIGNED)).toEqual(['10', '9', '2', '--']);
   });
 
   it('sorts a duration column by its seconds, even when they arrive as strings', async () => {
     const wrapper = mountReports();
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
 
     expect(columnOf(wrapper, 0)).toEqual(['Carol', 'alice', 'Bob', 'Dave']);
   });
@@ -101,10 +109,19 @@ describe('SummaryReports.vue', () => {
   it('keeps rows with no measurement at the bottom in both directions', async () => {
     const wrapper = mountReports();
 
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
     expect(columnOf(wrapper, 0).at(-1)).toBe('Dave');
 
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
     expect(columnOf(wrapper, 0)).toEqual(['Bob', 'alice', 'Carol', 'Dave']);
+  });
+
+  it('names the conversations column after the assignment and explains it', () => {
+    const header = mountReports().findAll('th')[ASSIGNED];
+
+    expect(header.text()).toContain('SUMMARY_REPORTS.ASSIGNED');
+    expect(header.find('[title]').attributes('title')).toBe(
+      'REPORT.METRIC_HINTS.ASSIGNED_AGENT'
+    );
   });
 });

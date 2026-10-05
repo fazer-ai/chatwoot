@@ -8,7 +8,7 @@ class V2::Reports::AgentSummaryBuilder < V2::Reports::BaseSummaryBuilder
 
   private
 
-  attr_reader :conversations_count, :resolved_count,
+  attr_reader :conversations_count, :resolved_count, :handled_count,
               :avg_resolution_time, :avg_first_response_time, :avg_reply_time
 
   def prepare_report
@@ -23,6 +23,7 @@ class V2::Reports::AgentSummaryBuilder < V2::Reports::BaseSummaryBuilder
       id: user_id,
       conversations_count: conversations_count[user_id] || 0,
       resolved_conversations_count: resolved_count[user_id] || 0,
+      handled_conversations_count: handled_count[user_id] || 0,
       avg_resolution_time: avg_resolution_time[user_id],
       avg_first_response_time: avg_first_response_time[user_id],
       avg_reply_time: avg_reply_time[user_id]

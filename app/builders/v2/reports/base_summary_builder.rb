@@ -13,6 +13,7 @@ class V2::Reports::BaseSummaryBuilder
 
     @conversations_count = results.transform_values { |data| data[:conversations_count] }
     @resolved_count = results.transform_values { |data| data[:resolved_conversations_count] }
+    @handled_count = results.transform_values { |data| data[:handled_conversations_count] }
     @avg_resolution_time = results.transform_values { |data| data[:avg_resolution_time] }
     @avg_first_response_time = results.transform_values { |data| data[:avg_first_response_time] }
     @avg_reply_time = results.transform_values { |data| data[:avg_reply_time] }
@@ -65,6 +66,7 @@ class V2::Reports::BaseSummaryBuilder
   def untouched_row?(report)
     report[:conversations_count].to_i.zero? &&
       report[:resolved_conversations_count].to_i.zero? &&
+      report[:handled_conversations_count].to_i.zero? &&
       [report[:avg_resolution_time], report[:avg_first_response_time], report[:avg_reply_time]].all?(&:nil?)
   end
 

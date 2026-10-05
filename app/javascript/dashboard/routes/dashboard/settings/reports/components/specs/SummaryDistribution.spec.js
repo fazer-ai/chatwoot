@@ -20,10 +20,24 @@ const buildI18n = () =>
               AGENT: 'Distribution by agent',
               INBOX: 'Distribution by inbox',
             },
-            METRIC: { CONVERSATIONS: 'Conversations', RESOLUTIONS: 'Resolved' },
+            METRIC: {
+              RESOLUTIONS: 'Resolved',
+              HANDLED: 'Handled',
+              ASSIGNED: 'Assigned',
+              OPENED: 'Opened',
+            },
             OTHERS: 'Others ({count})',
             EMPTY_METRIC: 'Not enough data to compare on this metric.',
-            ASSIGNED_ONLY: 'Counts only conversations that have an assignee.',
+            HANDLED_SHARE: 'Shares can add up to more than 100%.',
+          },
+          METRIC_HINTS: {
+            RESOLVED_AGENT: 'Credited to the assignee.',
+            RESOLVED: 'Resolutions in the period.',
+            HANDLED_AGENT: 'The agent sent a public message.',
+            HANDLED: 'An agent sent a public message.',
+            ASSIGNED_AGENT: 'Assigned to the agent today.',
+            ASSIGNED_TEAM: 'Assigned to the team today.',
+            OPENED: 'Opened in the period.',
           },
         },
       },
@@ -34,8 +48,8 @@ const buildRows = (count, value) =>
   Array.from({ length: count }, (_, index) => ({
     id: index + 1,
     name: `Agent ${index + 1}`,
-    conversationsCount: value ?? count - index,
-    resolvedConversationsCount: 1,
+    resolvedConversationsCount: value ?? count - index,
+    conversationsCount: 1,
   }));
 
 const mountComponent = (props = {}) =>
@@ -65,9 +79,9 @@ describe('SummaryDistribution.vue', () => {
   it('ranks rows by the active metric and shows each share of the total', () => {
     const wrapper = mountComponent({
       rows: [
-        { id: 1, name: 'Alice', conversationsCount: 20 },
-        { id: 2, name: 'Bob', conversationsCount: 60 },
-        { id: 3, name: 'Carol', conversationsCount: 20 },
+        { id: 1, name: 'Alice', resolvedConversationsCount: 20 },
+        { id: 2, name: 'Bob', resolvedConversationsCount: 60 },
+        { id: 3, name: 'Carol', resolvedConversationsCount: 20 },
       ],
     });
 
@@ -81,10 +95,10 @@ describe('SummaryDistribution.vue', () => {
   it('leaves out rows the period has nothing for', () => {
     const wrapper = mountComponent({
       rows: [
-        { id: 1, name: 'Alice', conversationsCount: 5 },
-        { id: 2, name: 'Bob', conversationsCount: 0 },
-        { id: 3, name: 'Carol', conversationsCount: undefined },
-        { id: 4, name: 'Dave', conversationsCount: 5 },
+        { id: 1, name: 'Alice', resolvedConversationsCount: 5 },
+        { id: 2, name: 'Bob', resolvedConversationsCount: 0 },
+        { id: 3, name: 'Carol', resolvedConversationsCount: undefined },
+        { id: 4, name: 'Dave', resolvedConversationsCount: 5 },
       ],
     });
 
@@ -110,27 +124,27 @@ describe('SummaryDistribution.vue', () => {
 
   it('renders nothing until there are two rows to compare', () => {
     const wrapper = mountComponent({
-      rows: [{ id: 1, name: 'Alice', conversationsCount: 9 }],
+      rows: [{ id: 1, name: 'Alice', resolvedConversationsCount: 9 }],
     });
 
     expect(wrapper.find('h3').exists()).toBe(false);
   });
 
   it('keeps the card up for a metric with no activity, so the tabs survive', () => {
-    // Two agents took conversations, neither resolved one.
+    // Two agents resolved conversations, neither replied to one.
     const wrapper = mountComponent({
       rows: [
         {
           id: 1,
           name: 'Alice',
-          conversationsCount: 5,
-          resolvedConversationsCount: 0,
+          resolvedConversationsCount: 5,
+          handledConversationsCount: 0,
         },
         {
           id: 2,
           name: 'Bob',
-          conversationsCount: 3,
-          resolvedConversationsCount: 0,
+          resolvedConversationsCount: 3,
+          handledConversationsCount: 0,
         },
       ],
     });
@@ -162,12 +176,55 @@ describe('SummaryDistribution.vue', () => {
     expect(wrapper.findAll('li button')).toHaveLength(10);
   });
 
-  it('warns that the total leaves unassigned conversations out, except on inboxes', () => {
-    const assignedOnly = 'Counts only conversations that have an assignee.';
+  it('explains the active metric for the dimension being read', async () => {
+    const wrapper = mountComponent();
+    expect(wrapper.text()).toContain('Credited to the assignee.');
 
-    expect(mountComponent().text()).toContain(assignedOnly);
-    expect(mountComponent({ type: 'inbox' }).text()).not.toContain(
-      assignedOnly
-    );
+    const tabBar = wrapper.findComponent({ name: 'TabBar' });
+    tabBar.vm.$emit('tabChanged', { index: 2 });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('Assigned to the agent today.');
+
+    const inbox = mountComponent({ type: 'inbox' });
+    inbox
+      .findComponent({ name: 'TabBar' })
+      .vm.$emit('tabChanged', { index: 2 });
+    await inbox.vm.$nextTick();
+    expect(inbox.text()).toContain('Opened in the period.');
+  });
+
+  it('shares handled conversations out of the distinct total, not the sum of the rows', async () => {
+    // Alice and Bob both replied to 2 of the 8 handled conversations.
+    const wrapper = mountComponent({
+      handledTotal: 8,
+      rows: [
+        { id: 1, name: 'Alice', handledConversationsCount: 6 },
+        { id: 2, name: 'Bob', handledConversationsCount: 4 },
+      ],
+    });
+    wrapper
+      .findComponent({ name: 'TabBar' })
+      .vm.$emit('tabChanged', { index: 1 });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Shares can add up to more than 100%.');
+    expect(rowsOf(wrapper)).toEqual(['Alice 6 75%', 'Bob 4 50%']);
+  });
+
+  it('keeps sharing out of the sum where rows cannot overlap', async () => {
+    const wrapper = mountComponent({
+      type: 'inbox',
+      handledTotal: 8,
+      rows: [
+        { id: 1, name: 'Sales', handledConversationsCount: 6 },
+        { id: 2, name: 'Support', handledConversationsCount: 4 },
+      ],
+    });
+    wrapper
+      .findComponent({ name: 'TabBar' })
+      .vm.$emit('tabChanged', { index: 1 });
+    await wrapper.vm.$nextTick();
+
+    expect(rowsOf(wrapper)).toEqual(['Sales 6 60%', 'Support 4 40%']);
   });
 });

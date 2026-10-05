@@ -13,7 +13,7 @@ class Reports::RawDataSource < Reports::DataSource
                      .group(summary_group_by_key)
                      .index_by { |record| record.public_send(summary_index_key) }
 
-    merge_summary_results(metric_results, summary_conversation_counts)
+    merge_summary_results(metric_results, summary_conversation_counts, summary_handled_counts)
   end
 
   private
@@ -63,7 +63,7 @@ class Reports::RawDataSource < Reports::DataSource
     scope.reporting_events.where(name: raw_event_name, created_at: range, account_id: account.id)
   end
 
-  def count_scope
+  def count_scope # rubocop:disable Metrics/AbcSize
     case metric.to_s
     when 'conversations_count'
       scope.conversations.where(account_id: account.id, created_at: range)
@@ -71,9 +71,15 @@ class Reports::RawDataSource < Reports::DataSource
       scope.messages.where(account_id: account.id, created_at: range).incoming.unscope(:order)
     when 'outgoing_messages_count'
       scope.messages.where(account_id: account.id, created_at: range).outgoing.unscope(:order)
+    when Reports::HandledConversations::METRIC
+      handled_count_scope
     else
       reporting_event_count_scope
     end
+  end
+
+  def handled_count_scope
+    Reports::HandledConversations.distinct_conversations(scope.messages.where(account_id: account.id, created_at: range))
   end
 
   def reporting_event_count_scope
@@ -110,6 +116,10 @@ class Reports::RawDataSource < Reports::DataSource
       .count
   end
 
+  def summary_handled_counts
+    Reports::HandledConversations.summary_counts(account: account, dimension_type: dimension_type, range: range, filters: filters)
+  end
+
   # Narrows a summary to a second dimension, so a report grouped by agent can be
   # read for a single inbox and the other way around.
   def apply_event_filters(events)
@@ -124,10 +134,11 @@ class Reports::RawDataSource < Reports::DataSource
     conversations
   end
 
-  def merge_summary_results(metric_results, conversation_counts)
-    (metric_results.keys | conversation_counts.keys).each_with_object({}) do |dimension_id, results|
+  def merge_summary_results(metric_results, conversation_counts, handled_counts)
+    (metric_results.keys | conversation_counts.keys | handled_counts.keys).each_with_object({}) do |dimension_id, results|
       record = metric_results[dimension_id]
       results[dimension_id] = summary_attributes_for(record, conversation_counts[dimension_id])
+                              .merge(handled_conversations_count: handled_counts[dimension_id].to_i)
     end
   end
 

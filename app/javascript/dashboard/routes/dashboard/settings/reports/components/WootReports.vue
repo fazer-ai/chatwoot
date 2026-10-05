@@ -73,8 +73,12 @@ export default {
       return this.selectedFilter?.id || null;
     },
     reportKeys() {
+      const conversationsKey = ['agent', 'team'].includes(this.type)
+        ? 'ASSIGNED_CONVERSATIONS'
+        : 'CONVERSATIONS';
       return {
-        CONVERSATIONS: 'conversations_count',
+        [conversationsKey]: 'conversations_count',
+        HANDLED_CONVERSATIONS: 'handled_conversations_count',
         ...(!this.isAgentType && {
           INCOMING_MESSAGES: 'incoming_messages_count',
         }),

@@ -9,6 +9,14 @@ import { useAlert } from 'dashboard/composables';
 import ChartStats from './components/ChartElements/ChartStats.vue';
 import BarChart from 'shared/components/charts/BarChart.vue';
 import ReportDrilldownDrawer from './components/ReportDrilldownDrawer.vue';
+import { metricHintKey } from './helpers/conversationMetrics';
+
+const METRIC_HINTS = {
+  CONVERSATIONS: 'conversations',
+  ASSIGNED_CONVERSATIONS: 'conversations',
+  HANDLED_CONVERSATIONS: 'handled',
+  RESOLUTION_COUNT: 'resolved',
+};
 
 const DURATION_UNITS_IN_SECONDS = [
   1,
@@ -116,6 +124,9 @@ export default {
         KEY: this.reportKeys[key],
         DESC: this.$t(`REPORT.METRICS.${key}.DESC`),
         INFO_TEXT: infoText[key],
+        HINT:
+          METRIC_HINTS[key] &&
+          this.$t(metricHintKey(METRIC_HINTS[key], this.reportType)),
         trend: this.calculateTrend(this.reportKeys[key]),
       }));
     },
