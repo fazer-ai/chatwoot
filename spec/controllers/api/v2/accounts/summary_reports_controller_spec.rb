@@ -203,6 +203,44 @@ RSpec.describe 'Summary Reports API', type: :request do
     end
   end
 
+  describe 'GET /api/v2/accounts/:account_id/summary_reports/handled_conversations' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:params) { { since: 30.days.ago.to_i.to_s, until: end_of_today.to_s } }
+
+    before do
+      conversation = create(:conversation, account: account, inbox: inbox, created_at: 2.days.ago)
+      # Two agents on one conversation: the total counts it once.
+      [admin, agent].each do |sender|
+        create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :outgoing, sender: sender)
+      end
+    end
+
+    it 'counts each handled conversation once' do
+      get "/api/v2/accounts/#{account.id}/summary_reports/handled_conversations",
+          params: params,
+          headers: admin.create_new_auth_token
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body).to eq('count' => 1)
+    end
+
+    it 'narrows to the inbox the report is filtered by' do
+      get "/api/v2/accounts/#{account.id}/summary_reports/handled_conversations",
+          params: params.merge(inbox_id: create(:inbox, account: account).id),
+          headers: admin.create_new_auth_token
+
+      expect(response.parsed_body).to eq('count' => 0)
+    end
+
+    it 'returns unauthorized for agents' do
+      get "/api/v2/accounts/#{account.id}/summary_reports/handled_conversations",
+          params: params,
+          headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
   describe 'GET /api/v2/accounts/:account_id/summary_reports/channel' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do

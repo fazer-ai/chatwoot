@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
-import ReportsAPI from 'dashboard/api/reports';
+import SummaryReportsAPI from 'dashboard/api/summaryReports';
 import SummaryReports from '../SummaryReports.vue';
 
 const agents = [
@@ -29,8 +29,8 @@ vi.mock('dashboard/composables/store', () => ({
   },
 }));
 
-vi.mock('dashboard/api/reports', () => ({
-  default: { getSummary: vi.fn().mockResolvedValue({ data: {} }) },
+vi.mock('dashboard/api/summaryReports', () => ({
+  default: { getHandledConversations: vi.fn().mockResolvedValue({ data: {} }) },
 }));
 
 vi.mock('vue-i18n', () => ({
@@ -130,10 +130,9 @@ describe('SummaryReports.vue', () => {
     // Each request settles only when the spec says so, and rejects the way axios
     // does once its signal is aborted.
     const pending = [];
-    ReportsAPI.getSummary.mockImplementation(
-      (...args) =>
+    SummaryReportsAPI.getHandledConversations.mockImplementation(
+      ({ signal }) =>
         new Promise((resolve, reject) => {
-          const { signal } = args.at(-1);
           signal?.addEventListener('abort', () =>
             reject(
               Object.assign(new Error('canceled'), { name: 'CanceledError' })
@@ -147,8 +146,8 @@ describe('SummaryReports.vue', () => {
 
     filters.vm.$emit('filterChange', { from: 1, to: 2, businessHours: false });
     filters.vm.$emit('filterChange', { from: 3, to: 4, businessHours: false });
-    pending.at(-1)({ data: { handled_conversations_count: 7 } });
-    pending.at(-2)({ data: { handled_conversations_count: 99 } });
+    pending.at(-1)({ data: { count: 7 } });
+    pending.at(-2)({ data: { count: 99 } });
     await flushPromises();
 
     const distribution = wrapper.findComponent({ name: 'SummaryDistribution' });

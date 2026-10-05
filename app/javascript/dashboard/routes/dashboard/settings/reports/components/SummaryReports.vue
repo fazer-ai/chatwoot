@@ -7,7 +7,7 @@ import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import Table from 'dashboard/components/table/Table.vue';
 import { generateFileName } from 'dashboard/helper/downloadHelper';
-import ReportsAPI from 'dashboard/api/reports';
+import SummaryReportsAPI from 'dashboard/api/summaryReports';
 import { useAbortableRequest } from 'dashboard/composables/useAbortableRequest';
 import {
   conversationsLabel,
@@ -270,33 +270,30 @@ const fetchReportsWithRetry = async () => {
 };
 
 // Agents overlap on handled conversations, so the distribution needs the distinct
-// count, read from the account (or the inbox the report is narrowed to).
-// A filter change supersedes the request in flight, so an older period's total
-// can never land on the current rows.
+// count, for the account or the inbox the report is narrowed to. It has an endpoint
+// of its own: the account summary would compute every metric twice over to hand
+// back this one number. A filter change supersedes the request in flight, so an
+// older period's total can never land on the current rows.
 const handledTotal = ref(null);
 const { run: runHandledTotal } = useAbortableRequest();
 const fetchHandledTotal = async () => {
   handledTotal.value = null;
   if (props.type !== 'agent') return;
 
-  const inboxId = crossFilterParams.value.inboxId;
   const ABORTED = Symbol('aborted');
   try {
     const response = await runHandledTotal(
       signal =>
-        ReportsAPI.getSummary(
-          from.value,
-          to.value,
-          inboxId ? 'inbox' : 'account',
-          inboxId,
-          undefined,
-          businessHours.value,
-          { signal }
-        ),
+        SummaryReportsAPI.getHandledConversations({
+          since: from.value,
+          until: to.value,
+          inboxId: crossFilterParams.value.inboxId,
+          signal,
+        }),
       { onAbort: ABORTED }
     );
     if (response === ABORTED) return;
-    handledTotal.value = response.data.handled_conversations_count ?? null;
+    handledTotal.value = response.data.count ?? null;
   } catch {
     // Without it the card falls back to the sum of the rows.
   }

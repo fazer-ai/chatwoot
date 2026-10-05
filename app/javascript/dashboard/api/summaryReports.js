@@ -27,6 +27,13 @@ class SummaryReportsAPI extends ApiClient {
     });
   }
 
+  getHandledConversations({ since, until, inboxId, signal } = {}) {
+    return axios.get(`${this.url}/handled_conversations`, {
+      signal,
+      params: { since, until, inbox_id: inboxId },
+    });
+  }
+
   getInboxReports({ since, until, businessHours, userId } = {}) {
     return axios.get(`${this.url}/inbox`, {
       params: {
