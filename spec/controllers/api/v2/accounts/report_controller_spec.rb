@@ -380,6 +380,20 @@ RSpec.describe 'Reports API', type: :request do
         expect(response.body).to include(user.name)
         expect(response.body).not_to include(other_agent.name)
       end
+
+      it 'ends each row with the conversations the agent handled' do
+        conversation = create(:conversation, account: account, inbox: inbox, created_at: 2.days.ago)
+        create(:message, account: account, inbox: inbox, conversation: conversation, message_type: :outgoing, sender: user)
+
+        get "/api/v2/accounts/#{account.id}/reports/agents.csv",
+            params: params,
+            headers: admin.create_new_auth_token
+
+        rows = CSV.parse(response.body)
+        header = rows.find { |row| row.first == I18n.t('reports.agent_csv.agent_name') }
+        expect(header.last).to eq(I18n.t('reports.agent_csv.handled_count'))
+        expect(rows.find { |row| row.first == user.name }.last).to eq('1')
+      end
     end
 
     context 'when an agent has access to multiple accounts' do

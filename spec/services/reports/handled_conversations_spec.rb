@@ -32,6 +32,14 @@ RSpec.describe Reports::HandledConversations do
     reply(ana_only, diego, day, private: true)
     campaign_only = create(:conversation, account: account, inbox: inbox, created_at: day)
     reply(campaign_only, bruno, day, additional_attributes: { campaign_id: 1 }) # a live chat campaign posting as Bruno
+    reaction_only = create(:conversation, account: account, inbox: inbox, created_at: day)
+    reply(reaction_only, bruno, day, content: '👍', content_attributes: { is_reaction: true, in_reply_to: 1 })
+    automation_only = create(:conversation, account: account, inbox: inbox, created_at: day)
+    reply(automation_only, bruno, day, content_attributes: { automation_rule_id: 1 })
+    # Answered from the WhatsApp Business app: a human reply with no agent behind it.
+    echoed = create(:conversation, account: account, inbox: other_inbox, team: team, created_at: day)
+    create(:message, :bot_message, account: account, inbox: other_inbox, conversation: echoed,
+                                   content_attributes: { external_echo: true }, created_at: day)
     bot_only = create(:conversation, account: account, inbox: other_inbox, created_at: day)
     create(:message, :bot_message, account: account, inbox: other_inbox, conversation: bot_only, created_at: day)
     create(:message, account: account, inbox: inbox, conversation: shared, message_type: :incoming, created_at: day)
@@ -63,8 +71,8 @@ RSpec.describe Reports::HandledConversations do
   end
 
   it 'counts distinct conversations per inbox and per team' do
-    expect(handled_by(summary(V2::Reports::InboxSummaryBuilder))).to include(inbox.id => 1, other_inbox.id => 1)
-    expect(handled_by(summary(V2::Reports::TeamSummaryBuilder))).to eq(team.id => 1)
+    expect(handled_by(summary(V2::Reports::InboxSummaryBuilder))).to include(inbox.id => 1, other_inbox.id => 2)
+    expect(handled_by(summary(V2::Reports::TeamSummaryBuilder))).to eq(team.id => 2)
   end
 
   describe 'timeseries' do
@@ -75,11 +83,11 @@ RSpec.describe Reports::HandledConversations do
     it 'counts a conversation on every day it was handled' do
       values = V2::Reports::Conversations::ReportBuilder.new(account, params).timeseries.pluck(:value)
 
-      expect(values).to eq([2, 1])
+      expect(values).to eq([3, 1])
     end
 
     it 'counts it once over the whole period' do
-      expect(V2::Reports::Conversations::ReportBuilder.new(account, params).aggregate_value).to eq(2)
+      expect(V2::Reports::Conversations::ReportBuilder.new(account, params).aggregate_value).to eq(3)
     end
 
     it 'reads a single agent by what they sent' do

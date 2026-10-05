@@ -18,13 +18,20 @@ module Reports::HandledConversations
     name.to_s == METRIC
   end
 
-  # Private notes, bot and automation replies and campaigns are left out: only a
-  # message a person wrote to the customer makes a conversation handled. A live
-  # chat campaign posts as its configured sender, a User, so it is told apart by
-  # the campaign it carries.
+  # `#>>'{}'` unwraps the double-encoded json column, see Message.hide_removed_reactions.
+  CONTENT_ATTRIBUTES = "(messages.content_attributes#>>'{}')::jsonb".freeze
+
+  # The SQL side of Message#human_response?, minus private notes: a reply a
+  # person wrote to the customer, from the dashboard or echoed from the native
+  # app. Reactions, automations and campaigns are left out even when they carry
+  # a User as sender, which a live chat campaign does. An echo has no sender, so
+  # it counts for its inbox and team but for no agent.
   def messages(scope)
-    scope.where(message_type: :outgoing, private: false, sender_type: 'User')
-         .where("(messages.additional_attributes->'campaign_id') IS NULL")
+    scope.where(message_type: :outgoing, private: false)
+         .where("(#{CONTENT_ATTRIBUTES}->>'is_reaction' = 'true') IS NOT TRUE")
+         .where("COALESCE(#{CONTENT_ATTRIBUTES}->>'automation_rule_id', '') = ''")
+         .where("COALESCE(messages.additional_attributes->>'campaign_id', '') = ''")
+         .where("messages.sender_type = 'User' OR COALESCE(#{CONTENT_ATTRIBUTES}->>'external_echo', '') NOT IN ('', 'false')")
          .unscope(:order)
   end
 
