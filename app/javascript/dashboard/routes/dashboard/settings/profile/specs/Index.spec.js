@@ -109,4 +109,32 @@ describe('profile settings: changing the email', () => {
     expect(clearCookiesOnLogout).not.toHaveBeenCalled();
     expect(useAlert).toHaveBeenCalledWith('PROFILE_SETTINGS.UPDATE_SUCCESS');
   });
+
+  // Devise stores the email downcased and stripped, so this saves nothing new and no
+  // confirmation link goes out.
+  it('treats a change of case alone as no change', async () => {
+    const wrapper = mountWith('a@example.com');
+
+    await wrapper.vm.updateProfile({ name: 'John', email: ' A@Example.com ' });
+
+    expect(clearCookiesOnLogout).not.toHaveBeenCalled();
+    expect(useAlert).toHaveBeenCalledWith('PROFILE_SETTINGS.UPDATE_SUCCESS');
+    expect(wrapper.vm.email).toBe('a@example.com');
+  });
+
+  // The first answer puts the field back on the current address while the second save
+  // is still in flight; that save must not read the field to decide.
+  it('keeps the session when the same change is saved twice before the first answer', async () => {
+    const wrapper = mountWith('a@example.com');
+
+    await Promise.all([
+      wrapper.vm.updateProfile({ name: 'John', email: 'b@example.com' }),
+      wrapper.vm.updateProfile({ name: 'John', email: 'b@example.com' }),
+    ]);
+
+    expect(clearCookiesOnLogout).not.toHaveBeenCalled();
+    expect(useAlert).not.toHaveBeenCalledWith(
+      'PROFILE_SETTINGS.AFTER_EMAIL_CHANGED'
+    );
+  });
 });
