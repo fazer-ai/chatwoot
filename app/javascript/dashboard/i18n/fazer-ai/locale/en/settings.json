@@ -36,7 +36,8 @@
           "INTERNAL_CHAT_NEW_MESSAGE": "A new direct message in internal chat"
         }
       }
-    }
+    },
+    "EMAIL_CONFIRMATION_PENDING": "We sent a confirmation link to {email}. Your current email keeps working until you click it."
   },
   "COMPONENTS": {
     "REFERRAL_CARD": {

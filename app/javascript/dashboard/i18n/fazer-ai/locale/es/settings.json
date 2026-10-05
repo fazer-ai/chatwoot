@@ -36,7 +36,8 @@
           "INTERNAL_CHAT_NEW_MESSAGE": "Un nuevo mensaje directo en el chat interno"
         }
       }
-    }
+    },
+    "EMAIL_CONFIRMATION_PENDING": "Enviamos un enlace de confirmación a {email}. Tu correo actual sigue funcionando hasta que hagas clic en él."
   },
   "COMPONENTS": {
     "REFERRAL_CARD": {
