@@ -12,8 +12,18 @@ class AddHandledConversationsIndexToMessages < ActiveRecord::Migration[7.1]
   INDEX = 'index_messages_on_handled_conversations'.freeze
 
   def up
-    return if index_state == :valid
+    build_index unless index_state == :valid
+    vacuum_messages_as_they_arrive
+  end
 
+  def down
+    execute('ALTER TABLE messages RESET (autovacuum_vacuum_insert_scale_factor)') if insert_vacuum_supported?
+    remove_index :messages, name: INDEX, algorithm: :concurrently, if_exists: true
+  end
+
+  private
+
+  def build_index
     # A concurrent build that was interrupted leaves an invalid index behind, which
     # Postgres keeps updating and never reads. Skipping it would mark the migration done
     # with no usable index, so it is dropped and built again.
@@ -34,11 +44,19 @@ class AddHandledConversationsIndexToMessages < ActiveRecord::Migration[7.1]
     end
   end
 
-  def down
-    remove_index :messages, name: INDEX, algorithm: :concurrently, if_exists: true
+  # The index is answered from alone only for pages the visibility map marks all-visible,
+  # and only a vacuum marks them. By default an insert-mostly table is vacuumed every 20%
+  # of growth: on fifteen million messages that is three million new ones, about two
+  # months on a busy account, so the month the reports read is exactly the one left
+  # unmarked and every row goes back to the heap. 1% keeps the recent pages marked.
+  # The setting exists from Postgres 13 on.
+  def vacuum_messages_as_they_arrive
+    execute('ALTER TABLE messages SET (autovacuum_vacuum_insert_scale_factor = 0.01)') if insert_vacuum_supported?
   end
 
-  private
+  def insert_vacuum_supported?
+    connection.database_version >= 130_000
+  end
 
   def index_state
     valid = select_value(<<~SQL.squish)
