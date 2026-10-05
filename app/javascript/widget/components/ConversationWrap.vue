@@ -42,7 +42,7 @@ export default {
       isFetchingList: 'conversation/getIsFetchingList',
       conversationSize: 'conversation/getConversationSize',
       isAgentTyping: 'conversation/getIsAgentTyping',
-      pendingTypingUntil: 'conversation/getPendingTypingUntil',
+      pendingTyping: 'conversation/getPendingTyping',
       conversationAttributes: 'conversationAttributes/getConversationParams',
     }),
     colorSchemeClass() {
@@ -50,13 +50,16 @@ export default {
     },
     // A pending conversation shows the bubble on the visitor's last message as if the agent side had
     // sent typing_on then: for the same timeout, renewed by a real typing_on and ended by a typing_off.
-    // After a reload the window is counted from the stored time of that message.
+    // A message not seen arriving (a reload, a sync after reconnecting) counts from its stored time.
     pendingTypingDeadline() {
-      if (this.lastMessage.message_type !== MESSAGE_TYPE.INCOMING) return 0;
-      return (
-        this.pendingTypingUntil ??
-        this.lastMessage.created_at * 1000 + AGENT_TYPING_TIMEOUT
-      );
+      const {
+        id,
+        message_type: type,
+        created_at: createdAt,
+      } = this.lastMessage;
+      if (type !== MESSAGE_TYPE.INCOMING) return 0;
+      if (this.pendingTyping?.messageId === id) return this.pendingTyping.until;
+      return createdAt * 1000 + AGENT_TYPING_TIMEOUT;
     },
     showStatusIndicator() {
       const { status } = this.conversationAttributes;

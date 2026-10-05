@@ -119,9 +119,54 @@ describe('ConversationWrap typing bubble', () => {
     await visitorSends(1);
 
     await advance(5_000);
-    connector.onTypingOff();
+    connector.onTypingOff({ conversation: { id: CONVERSATION_ID } });
     await wrapper.vm.$nextTick();
     expect(bubbleShown()).toBe(false);
+  });
+
+  it.each([
+    [
+      'a private note',
+      { conversation: { id: CONVERSATION_ID }, is_private: true },
+    ],
+    ['another conversation', { conversation: { id: CONVERSATION_ID + 1 } }],
+  ])('keeps the bubble on a typing_off from %s', async (_, data) => {
+    mountWith('pending');
+    await visitorSends(1);
+
+    await advance(5_000);
+    connector.onTypingOff(data);
+    await wrapper.vm.$nextTick();
+    expect(bubbleShown()).toBe(true);
+  });
+
+  it('counts a message loaded after a typing_off from its own stored time', async () => {
+    mountWith('pending');
+    await visitorSends(1);
+    connector.onTypingOff({ conversation: { id: CONVERSATION_ID } });
+    await wrapper.vm.$nextTick();
+
+    store.commit('conversation/clearConversations');
+    store.commit('conversation/setMessagesInConversation', [
+      message(2, MESSAGE_TYPE.INCOMING, (NOW - 5_000) / 1000),
+    ]);
+    await wrapper.vm.$nextTick();
+    expect(bubbleShown()).toBe(true);
+  });
+
+  it('counts a message recovered after reconnecting from its own stored time', async () => {
+    mountWith('pending');
+    await visitorSends(1);
+    await advance(31_000);
+
+    // syncLatestMessages writes the recovered messages into the map directly.
+    store.state.conversation.conversations[2] = message(
+      2,
+      MESSAGE_TYPE.INCOMING,
+      (Date.now() - 5_000) / 1000
+    );
+    await wrapper.vm.$nextTick();
+    expect(bubbleShown()).toBe(true);
   });
 
   it('does not let an earlier typing_on expiring cut the window of a newer visitor message', async () => {

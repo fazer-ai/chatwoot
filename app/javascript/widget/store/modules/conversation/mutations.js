@@ -15,7 +15,10 @@ export const mutations = {
     const isTemporaryMessage = status === 'in_progress';
 
     if (isMessageIncoming && !messagesInbox[id]) {
-      $state.pendingTypingUntil = Date.now() + AGENT_TYPING_TIMEOUT;
+      $state.pendingTyping = {
+        messageId: id,
+        until: Date.now() + AGENT_TYPING_TIMEOUT,
+      };
     }
 
     if (!isMessageIncoming || isTemporaryMessage) {
@@ -104,8 +107,11 @@ export const mutations = {
     // $state.conversations[id] = undefined;
   },
 
-  setPendingTypingUntil($state, until) {
-    $state.pendingTypingUntil = until;
+  endPendingTyping($state) {
+    const lastMessage = Object.values($state.conversations).at(-1);
+    $state.pendingTyping = lastMessage
+      ? { messageId: lastMessage.id, until: 0 }
+      : null;
   },
 
   toggleAgentTypingStatus($state, { status }) {

@@ -187,7 +187,7 @@ export const actions = {
   },
 
   clearPendingTyping({ commit }) {
-    commit('setPendingTypingUntil', 0);
+    commit('endPendingTyping');
   },
 
   toggleUserTyping: async (_, data) => {

@@ -106,14 +106,18 @@ class ActionCableConnector extends BaseActionCableConnector {
     ActionCableConnector.refreshConnector(pubsubToken);
   };
 
-  onTypingOn = data => {
+  isTypingElsewhere = data => {
     const activeConversationId =
       this.app.$store.getters['conversationAttributes/getConversationParams']
         .id;
     const isUserTypingOnAnotherConversation =
       data.conversation && data.conversation.id !== activeConversationId;
 
-    if (isUserTypingOnAnotherConversation || data.is_private) {
+    return isUserTypingOnAnotherConversation || data.is_private;
+  };
+
+  onTypingOn = data => {
+    if (this.isTypingElsewhere(data)) {
       return;
     }
     this.clearTimer();
@@ -124,9 +128,11 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   // A typing_off from the agent side also ends the bubble a pending conversation shows on its own.
-  onTypingOff = () => {
+  onTypingOff = data => {
     this.stopTyping();
-    this.app.$store.dispatch('conversation/clearPendingTyping');
+    if (!this.isTypingElsewhere(data)) {
+      this.app.$store.dispatch('conversation/clearPendingTyping');
+    }
   };
 
   stopTyping = () => {
