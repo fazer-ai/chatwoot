@@ -8,7 +8,7 @@ import { MESSAGE_TYPE } from 'shared/constants/messages';
 
 vi.mock('@rails/actioncable', () => ({
   createConsumer: () => ({
-    subscriptions: { create: () => ({}) },
+    subscriptions: { create: () => ({ updatePresence: vi.fn() }) },
     disconnect: vi.fn(),
   }),
 }));
@@ -96,7 +96,9 @@ describe('ConversationWrap typing bubble', () => {
 
     await advance(1_500);
     expect(bubbleShown()).toBe(false);
-    expect(store.getters['conversationAttributes/getConversationParams'].status).toBe('pending');
+    expect(
+      store.getters['conversationAttributes/getConversationParams'].status
+    ).toBe('pending');
   });
 
   it('keeps the bubble while the agent side renews it with typing_on', async () => {
