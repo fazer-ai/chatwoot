@@ -1,6 +1,6 @@
 ---
 name: sync-fork
-description: Use this skill when syncing one of our forks with its upstream — either pulling chatwoot/chatwoot into fazer-ai/chatwoot, OR pulling fazer-ai/chatwoot `main` into fazer-ai/chatwoot-pro (`chatwoot-pro-main`). Covers per-file decision framework (KC/AI/CO/delete), recurring patterns (SaveBang, signature architecture, schema.rb regen, WhatsApp service, installation_config, Pro-only overrides), validation flow, and pre-commit/CI pitfalls specific to this repo. Trigger when the user asks to merge develop/main from chatwoot upstream, resolve merge conflicts on a merge branch, bump the fork to a new chatwoot version, or merge CE `main` into `chatwoot-pro-main`. **Never assume the sync direction — always confirm with the user which side is upstream and which is the receiving fork before doing anything.**
+description: Use this skill when syncing one of our forks with its upstream — either pulling chatwoot/chatwoot into fazer-ai/chatwoot, OR pulling fazer-ai/chatwoot `main` into fazer-ai/chatwoot-pro (its `main`, checked out locally as `chatwoot-pro-main`). Covers per-file decision framework (KC/AI/CO/delete), recurring patterns (SaveBang, signature architecture, schema.rb regen, WhatsApp service, installation_config, Pro-only overrides), validation flow, and pre-commit/CI pitfalls specific to this repo. Trigger when the user asks to merge develop/main from chatwoot upstream, resolve merge conflicts on a merge branch, bump the fork to a new chatwoot version, or merge CE `main` into Pro. **Never assume the sync direction — always confirm with the user which side is upstream and which is the receiving fork before doing anything.**
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 
@@ -23,9 +23,9 @@ Branch from our fork's `main`, merge `upstream/develop` (or a release tag like `
 
 ### B) fazer-ai/chatwoot → fazer-ai/chatwoot-pro (Pro merge)
 
-Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/chatwoot-pro-main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/chatwoot-pro-main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+Switch to the local `chatwoot-pro-main` branch, pull it even with `chatwoot-pro/main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. This is done directly on the Pro trunk (no PR), then pushed with `git push chatwoot-pro HEAD:main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
 
-⚠️ The remote branch is `chatwoot-pro-main`, so the tracking ref is `chatwoot-pro/chatwoot-pro-main`. **`chatwoot-pro/main` is a different, long-dead branch** that the Pro repo keeps only as its nominal GitHub default. Resetting onto it or pushing to it puts the merge on a stale ancestor.
+⚠️ Pro's trunk is `main` on the `chatwoot-pro` remote; `chatwoot-pro-main` is only the local branch name, so it does not collide with CE's `main` (see **Pro repo gotchas** in `AGENTS.md`). **Never push the local branch by name**: `git push chatwoot-pro chatwoot-pro-main` recreates a stray remote `chatwoot-pro-main`, which is what collected every push for a month in 2026-08 while `main` went stale. Always `HEAD:main`.
 
 - HEAD = Pro (`chatwoot-pro-main`), MERGE_HEAD = CE (`main`).
 - Pro is a strict superset of CE: every conflict is either "CE changed something we overrode" (usually KC/CO to preserve Pro behavior) or "CE added new code next to our additions" (usually CO).
@@ -42,7 +42,7 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
 6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
 7. Merge the CE sync PR with a **merge commit, never squash** (**Merging the sync PR** section), then verify the upstream tag is an ancestor of `main`.
-8. For Pro merges, recall that pushing to `chatwoot-pro/chatwoot-pro-main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+8. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
 
@@ -82,7 +82,7 @@ git log --oneline HEAD -3
 git log --oneline MERGE_HEAD -3
 
 # for Pro merges, confirm the branch and remote before doing anything destructive
-git branch --show-current   # should be chatwoot-pro-main
+git branch --show-current   # should be chatwoot-pro-main (the local name of chatwoot-pro/main)
 git remote -v               # should show `chatwoot-pro` remote pointing at fazer-ai/chatwoot-pro
 ```
 
@@ -402,11 +402,11 @@ gh run list --workflow=run_foss_spec.yml --branch chore/merge-upstream-X.Y.Z --l
 gh run watch <run-id>                                                                    # or poll with `gh run view <run-id>`
 ```
 
-For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered the same way against `chatwoot-pro-main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
+For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered by pushing the merge to a branch on the `chatwoot-pro` remote first (e.g. `sync/ce-<tag>`), and only after it is green to `HEAD:main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
 
 ## Merging the sync PR: merge commit, NEVER squash
 
-This fork's default PR strategy is `--squash`. **Sync PRs are one of the two exceptions** (the other is a PR already merged into `chatwoot-pro-main` — see **Merge strategy** in `AGENTS.md`), and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
+This fork's default PR strategy is `--squash`. **Sync PRs are one of the two exceptions** (the other is a PR already merged into Pro's `main` — see **Merge strategy** in `AGENTS.md`), and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
 
 - GitHub shows `main` as "N commits behind chatwoot:develop" forever, and the count only grows with each squashed sync (after the squashed 4.16.2 sync it read 197).
 - The NEXT sync's merge base falls back to the last non-squashed tag, so git replays an entire version's diff and manufactures conflicts on every file the fork changed in between.
