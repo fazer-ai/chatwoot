@@ -508,4 +508,29 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.reorder(nil).group(:source_id).having('count(*) > 1').count).to be_empty
     end
   end
+
+  # The live rule (#793): what a blocked contact sends is not filed, and the echo of a reply
+  # typed on the phone is, so the agent's own answer does not go missing.
+  describe 'a blocked contact' do
+    let(:echo) do
+      model::InboundMessage.new(
+        id: '3EB0OUT', chat: chat, sender: sender, from_me: true, timestamp: (1.day.ago.to_f * 1000).to_i,
+        content: model::Content::Text.new(body: 'resposta')
+      )
+    end
+
+    before { threads_of(a_contact(blocked: true), phone, []) }
+
+    it 'files only the echoes' do
+      deliver(slice([historical('3EB0IN', 2.days.ago), echo]))
+
+      expect(inbox.messages.pluck(:source_id)).to eq(['3EB0OUT'])
+    end
+
+    it 'leaves no thread behind when the contact is all the slice has' do
+      deliver(slice([historical('3EB0IN', 2.days.ago)]))
+
+      expect(inbox.conversations).to be_empty
+    end
+  end
 end

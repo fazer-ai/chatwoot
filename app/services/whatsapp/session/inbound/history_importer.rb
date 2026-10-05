@@ -140,7 +140,8 @@ class Whatsapp::Session::Inbound::HistoryImporter
     return run.filter_map { |message| import_group(message, archived) } if run.first.group?
 
     contact_inbox = resolve_contact(identifying(run))
-    return [] if contact_inbox.nil?
+    run = fileable(run, contact_inbox)
+    return [] if run.empty?
 
     conversation = track(conversation_for(contact_inbox, run.first, archived))
     run.filter_map { |message| write(conversation, contact_inbox.contact, message) }
@@ -151,6 +152,15 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # addressed by, which can be a LID with no number behind it.
   def identifying(run)
     run.find(&:incoming?) || run.first
+  end
+
+  # What of a 1:1 run is filed: nothing without a contact, and only the echoes for a blocked
+  # one, which is the live rule (`Handlers::MessageReceived#silenced?`).
+  def fileable(run, contact_inbox)
+    return [] if contact_inbox.nil?
+    return run unless contact_inbox.contact.blocked?
+
+    run.reject(&:incoming?)
   end
 
   def conversation_for(contact_inbox, message, archived)

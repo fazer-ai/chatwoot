@@ -3,7 +3,7 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
 
   private
 
-  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity
+  def process_received_callback # rubocop:disable Metrics/MethodLength,Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity
     @raw_message = processed_params
     @message = nil
     @contact_inbox = nil
@@ -30,6 +30,11 @@ module Whatsapp::ZapiHandlers::ReceivedCallback # rubocop:disable Metrics/Module
       # Reaction removals don't produce a new Message row — handle them before
       # set_conversation so a blank webhook can't open/create a stray thread.
       next mark_existing_reaction_as_removed if reaction_removal?
+
+      # The rule every WhatsApp inbound path applies (`IncomingMessageBaseService#contact_processable?`):
+      # a blocked contact stops opening threads and reaching bots, but the echo of a reply typed
+      # on the phone is still stored, or the agent's own answer would go missing.
+      next if @contact.blocked? && incoming_message?
 
       set_conversation
       handle_create_message

@@ -216,7 +216,8 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     return [] if extract_from_jid(type: 'lid').blank?
 
     set_contact
-    return [] if @contact.blank?
+    run = fileable(run)
+    return [] if run.empty?
 
     conversation = track(conversation_for(@contact_inbox, run.first, archived))
     run.filter_map { |raw| write(conversation, @contact, raw) }
@@ -226,6 +227,15 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   # phone and LID together, while an echo only carries whatever the chat is addressed by.
   def identifying(run)
     run.find { |raw| !raw.dig(:key, :fromMe) } || run.first
+  end
+
+  # What of a 1:1 run is filed: nothing without a contact, and only the echoes for a blocked
+  # one, which is the live rule (`IndividualContactMessageHandler#process_individual_contact_message`).
+  def fileable(run)
+    return [] if @contact.blank?
+    return run unless @contact.blocked?
+
+    run.select { |raw| raw.dig(:key, :fromMe) }
   end
 
   # A group is the one chat whose author changes from message to message, so its sender is

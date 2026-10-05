@@ -475,8 +475,10 @@ describe Whatsapp::IncomingMessageBaileysService do
             expect { described_class.new(inbox: inbox, params: params).perform }
               .not_to change(inbox.account.contacts, :count)
 
-            expect(inbox.conversations.sole.contact_id).to eq(existing.id)
+            expect(inbox.contact_inboxes.sole.contact_id).to eq(existing.id)
             expect(existing.reload.blocked).to be(true)
+            # Found, the block holds: nothing reaches the bot (#793).
+            expect(inbox.conversations).to be_empty
           end
         end
 
@@ -494,6 +496,29 @@ describe Whatsapp::IncomingMessageBaileysService do
 
           expect { described_class.new(inbox: inbox, params: params).perform }
             .to change(inbox.account.contacts, :count).by(1)
+        end
+      end
+
+      # The rule the Cloud and native paths apply (#793): a blocked contact stops opening
+      # threads and reaching bots, while the echo of a reply typed on the phone is kept so
+      # the agent's own answer does not go missing.
+      context 'when the contact is blocked' do
+        let!(:contact) { create(:contact, account: inbox.account, name: 'John Doe', phone_number: '+5511998765432', blocked: true) }
+
+        before { create(:contact_inbox, inbox: inbox, contact: contact, source_id: '12345678') }
+
+        it 'files neither the message nor a conversation' do
+          expect { described_class.new(inbox: inbox, params: params).perform }
+            .not_to change(Message, :count)
+          expect(inbox.conversations).to be_empty
+        end
+
+        it 'still files the echo of a reply typed on the phone' do
+          raw_message[:key][:fromMe] = true
+
+          described_class.new(inbox: inbox, params: params).perform
+
+          expect(inbox.messages.find_by(source_id: 'msg_123')).to be_outgoing
         end
       end
 
