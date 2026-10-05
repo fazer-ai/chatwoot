@@ -69,10 +69,14 @@ class V2::Reports::DrilldownBuilder
   end
 
   def conversation_scope
-    scope.conversations
-         .where(account_id: account.id, created_at: bucket_range)
-         .includes(:assignee, :contact, :inbox)
-         .order(created_at: :desc)
+    conversations = if Reports::HandledConversations.metric?(metric)
+                      handled = Reports::HandledConversations.messages(scope.messages.where(account_id: account.id, created_at: bucket_range))
+                      account.conversations.where(id: handled.select(:conversation_id))
+                    else
+                      scope.conversations.where(account_id: account.id, created_at: bucket_range)
+                    end
+
+    conversations.includes(:assignee, :contact, :inbox).order(created_at: :desc)
   end
 
   def reporting_event_scope
@@ -181,7 +185,7 @@ class V2::Reports::DrilldownBuilder
   end
 
   def conversation_metric?
-    metric == 'conversations_count'
+    metric == 'conversations_count' || Reports::HandledConversations.metric?(metric)
   end
 
   def dimension_type

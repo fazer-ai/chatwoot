@@ -166,3 +166,12 @@ pt_BR:
         fourth: quarto(a)
         fifth: quinto(a)
         last: último(a)
+  reports:
+    agent_csv:
+      handled_count: Conversas atendidas
+    team_csv:
+      handled_count: Conversas atendidas
+    inbox_csv:
+      handled_count: Conversas atendidas
+      avg_customer_waiting_time: Tempo médio de espera do cliente
+      resolution_count: Contagem de Resolução

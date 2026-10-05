@@ -38,6 +38,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
                                             id: i1.id,
                                             conversations_count: 1,
                                             resolved_conversations_count: 0,
+                                            handled_conversations_count: 0,
                                             avg_resolution_time: nil,
                                             avg_first_response_time: 50.0,
                                             avg_reply_time: 35.0
@@ -45,6 +46,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
                                             id: i2.id,
                                             conversations_count: 1,
                                             resolved_conversations_count: 1,
+                                            handled_conversations_count: 0,
                                             avg_resolution_time: 100.0,
                                             avg_first_response_time: nil,
                                             avg_reply_time: nil
@@ -60,6 +62,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
                                             id: i1.id,
                                             conversations_count: 1,
                                             resolved_conversations_count: 0,
+                                            handled_conversations_count: 0,
                                             avg_resolution_time: nil,
                                             avg_first_response_time: 30.0,
                                             avg_reply_time: 15.0
@@ -67,6 +70,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
                                             id: i2.id,
                                             conversations_count: 1,
                                             resolved_conversations_count: 1,
+                                            handled_conversations_count: 0,
                                             avg_resolution_time: 60.0,
                                             avg_first_response_time: nil,
                                             avg_reply_time: nil
@@ -97,6 +101,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
           id: i1.id,
           conversations_count: 1,
           resolved_conversations_count: 1,
+          handled_conversations_count: 0,
           avg_resolution_time: 20.0,
           avg_first_response_time: nil,
           avg_reply_time: nil
@@ -113,6 +118,7 @@ RSpec.describe V2::Reports::InboxSummaryBuilder do
           id: empty_inbox.id,
           conversations_count: 0,
           resolved_conversations_count: 0,
+          handled_conversations_count: 0,
           avg_resolution_time: nil,
           avg_first_response_time: nil,
           avg_reply_time: nil

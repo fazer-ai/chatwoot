@@ -7,6 +7,13 @@ import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import Table from 'dashboard/components/table/Table.vue';
 import { generateFileName } from 'dashboard/helper/downloadHelper';
+import ReportsAPI from 'dashboard/api/reports';
+import { useAbortableRequest } from 'dashboard/composables/useAbortableRequest';
+import {
+  conversationsLabel,
+  metricHintKey,
+  supportsHandled,
+} from '../helpers/conversationMetrics';
 import {
   useVueTable,
   createColumnHelper,
@@ -91,9 +98,19 @@ const byNumber = (rowA, rowB, columnId) =>
 
 // A row with nothing to show stays at the bottom either way round: it is the
 // absence of a measurement, not a measurement of zero.
-const metricColumn = (key, headerKey, format) =>
+const metricColumn = (key, headerKey, format, hintKey) =>
   columnHelper.accessor(key, {
-    header: t(headerKey),
+    header: hintKey
+      ? () =>
+          h(
+            'span',
+            { class: 'inline-flex items-center gap-1', title: t(hintKey) },
+            [
+              t(headerKey),
+              h('span', { class: 'i-lucide-info size-3.5 text-n-slate-10' }),
+            ]
+          )
+      : t(headerKey),
     width: 200,
     cell: spanRender(format),
     sortDescFirst: true,
@@ -114,10 +131,33 @@ const columns = computed(() => [
     sortingFn: 'alphanumeric',
   }),
   metricColumn(
-    'conversationsCount',
-    'SUMMARY_REPORTS.CONVERSATIONS',
-    renderCount
+    'resolutionsCount',
+    'SUMMARY_REPORTS.RESOLUTION_COUNT',
+    renderCount,
+    metricHintKey('resolved', props.type)
   ),
+  ...(supportsHandled(props.type)
+    ? [
+        metricColumn(
+          'handledConversationsCount',
+          'SUMMARY_REPORTS.HANDLED',
+          renderCount,
+          metricHintKey('handled', props.type)
+        ),
+      ]
+    : []),
+  props.type === 'label'
+    ? metricColumn(
+        'conversationsCount',
+        'SUMMARY_REPORTS.CONVERSATIONS',
+        renderCount
+      )
+    : metricColumn(
+        'conversationsCount',
+        `SUMMARY_REPORTS.${conversationsLabel(props.type)}`,
+        renderCount,
+        metricHintKey('conversations', props.type)
+      ),
   metricColumn(
     'avgFirstResponseTime',
     'SUMMARY_REPORTS.AVG_FIRST_RESPONSE_TIME',
@@ -129,11 +169,6 @@ const columns = computed(() => [
     renderAvgTime
   ),
   metricColumn('avgReplyTime', 'SUMMARY_REPORTS.AVG_REPLY_TIME', renderAvgTime),
-  metricColumn(
-    'resolutionsCount',
-    'SUMMARY_REPORTS.RESOLUTION_COUNT',
-    renderCount
-  ),
 ]);
 
 // Once the report is narrowed to a single inbox (or agent), the backend only
@@ -154,6 +189,7 @@ const tableData = computed(() =>
       avgResolutionTime,
       avgReplyTime,
       resolvedConversationsCount,
+      handledConversationsCount,
     } = rowMetrics;
     return {
       id: row.id,
@@ -165,6 +201,7 @@ const tableData = computed(() =>
       avgReplyTime: avgReplyTime || undefined,
       avgResolutionTime: avgResolutionTime || undefined,
       resolutionsCount: resolvedConversationsCount || undefined,
+      handledConversationsCount: handledConversationsCount || undefined,
     };
   })
 );
@@ -178,14 +215,17 @@ const distributionType = computed(() =>
 
 const distributionRows = computed(() =>
   visibleRowItems.value.map(row => {
-    const { conversationsCount, resolvedConversationsCount } = getMetrics(
-      row.id
-    );
+    const {
+      conversationsCount,
+      resolvedConversationsCount,
+      handledConversationsCount,
+    } = getMetrics(row.id);
     return {
       id: row.id,
       name: row.name ?? row.title,
       conversationsCount: conversationsCount ?? 0,
       resolvedConversationsCount: resolvedConversationsCount ?? 0,
+      handledConversationsCount: handledConversationsCount ?? 0,
     };
   })
 );
@@ -229,9 +269,43 @@ const fetchReportsWithRetry = async () => {
   }
 };
 
+// Agents overlap on handled conversations, so the distribution needs the distinct
+// count, read from the account (or the inbox the report is narrowed to).
+// A filter change supersedes the request in flight, so an older period's total
+// can never land on the current rows.
+const handledTotal = ref(null);
+const { run: runHandledTotal } = useAbortableRequest();
+const fetchHandledTotal = async () => {
+  handledTotal.value = null;
+  if (props.type !== 'agent') return;
+
+  const inboxId = crossFilterParams.value.inboxId;
+  const ABORTED = Symbol('aborted');
+  try {
+    const response = await runHandledTotal(
+      signal =>
+        ReportsAPI.getSummary(
+          from.value,
+          to.value,
+          inboxId ? 'inbox' : 'account',
+          inboxId,
+          undefined,
+          businessHours.value,
+          { signal }
+        ),
+      { onAbort: ABORTED }
+    );
+    if (response === ABORTED) return;
+    handledTotal.value = response.data.handled_conversations_count ?? null;
+  } catch {
+    // Without it the card falls back to the sum of the rows.
+  }
+};
+
 const fetchAllData = () => {
   store.dispatch(props.fetchItemsKey);
   fetchReportsWithRetry();
+  fetchHandledTotal();
 };
 
 onMounted(() => fetchAllData());
@@ -297,6 +371,7 @@ defineExpose({ downloadReports });
     v-if="distributionType"
     :type="distributionType"
     :rows="distributionRows"
+    :handled-total="handledTotal"
     :is-loading="isLoading"
   />
   <div

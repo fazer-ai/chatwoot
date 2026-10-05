@@ -3,6 +3,10 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import TabBar from 'dashboard/components-next/tabbar/TabBar.vue';
+import {
+  conversationsLabel,
+  metricHintKey,
+} from '../helpers/conversationMetrics';
 
 const props = defineProps({
   // 'agent' | 'inbox' | 'team'. Labels are left out on purpose: a conversation
@@ -11,11 +15,18 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  // [{ id, name, conversationsCount, resolvedConversationsCount }] with the raw
-  // numbers, already narrowed by whatever filter the table is showing.
+  // [{ id, name, conversationsCount, resolvedConversationsCount,
+  // handledConversationsCount }] with the raw numbers, already narrowed by
+  // whatever filter the table is showing.
   rows: {
     type: Array,
     default: () => [],
+  },
+  // Distinct handled conversations in the period. Two agents replying to the same
+  // conversation both count it, so on agents the rows add up past this number.
+  handledTotal: {
+    type: Number,
+    default: null,
   },
   isLoading: {
     type: Boolean,
@@ -30,22 +41,30 @@ const { t, locale } = useI18n();
 // below it, so the rest is aggregated into a single row.
 const MAX_ROWS = 10;
 
-const METRICS = [
-  {
-    key: 'conversationsCount',
-    labelKey: 'REPORT.DISTRIBUTION.METRIC.CONVERSATIONS',
-  },
+const METRICS = computed(() => [
   {
     key: 'resolvedConversationsCount',
     labelKey: 'REPORT.DISTRIBUTION.METRIC.RESOLUTIONS',
+    hintKey: metricHintKey('resolved', props.type),
   },
-];
+  {
+    key: 'handledConversationsCount',
+    labelKey: 'REPORT.DISTRIBUTION.METRIC.HANDLED',
+    hintKey: metricHintKey('handled', props.type),
+    overlaps: props.type === 'agent',
+  },
+  {
+    key: 'conversationsCount',
+    labelKey: `REPORT.DISTRIBUTION.METRIC.${conversationsLabel(props.type)}`,
+    hintKey: metricHintKey('conversations', props.type),
+  },
+]);
 
 const activeMetricIndex = ref(0);
-const activeMetric = computed(() => METRICS[activeMetricIndex.value]);
+const activeMetric = computed(() => METRICS.value[activeMetricIndex.value]);
 
 const tabs = computed(() =>
-  METRICS.map((metric, index) => ({ index, label: t(metric.labelKey) }))
+  METRICS.value.map((metric, index) => ({ index, label: t(metric.labelKey) }))
 );
 
 const onTabChange = tab => {
@@ -64,8 +83,16 @@ const rankBy = metricKey =>
 
 const rankedRows = computed(() => rankBy(activeMetric.value.key));
 
-const total = computed(() =>
+const rowsTotal = computed(() =>
   rankedRows.value.reduce((sum, row) => sum + row.value, 0)
+);
+
+// Where rows overlap, the share is of the distinct conversations: "took part in
+// 40% of the handled conversations", which is why the shares can pass 100%.
+const total = computed(() =>
+  activeMetric.value.overlaps && props.handledTotal !== null
+    ? props.handledTotal
+    : rowsTotal.value
 );
 
 const segments = computed(() => {
@@ -127,12 +154,8 @@ const hasMetricData = computed(() => rankedRows.value.length > 1);
 // selection means picking a metric with no activity takes the tabs down with the
 // card, and nothing is left to switch back with.
 const hasData = computed(() =>
-  METRICS.some(metric => rankBy(metric.key).length > 1)
+  METRICS.value.some(metric => rankBy(metric.key).length > 1)
 );
-
-// Agents and teams only account for conversations that carry an assignee, so the
-// total here is not the account's conversation count and should not claim to be.
-const showsAssignedOnly = computed(() => props.type !== 'inbox');
 
 const openRow = segment => {
   if (!segment.linked) return;
@@ -153,8 +176,11 @@ const openRow = segment => {
         <h3 class="mb-0 text-sm font-medium text-n-slate-12">
           {{ $t(`REPORT.DISTRIBUTION.TITLE.${type.toUpperCase()}`) }}
         </h3>
-        <p v-if="showsAssignedOnly" class="mt-1 mb-0 text-xs text-n-slate-10">
-          {{ $t('REPORT.DISTRIBUTION.ASSIGNED_ONLY') }}
+        <p class="max-w-xl mt-1 mb-0 text-xs text-n-slate-10">
+          {{ $t(activeMetric.hintKey) }}
+          <template v-if="activeMetric.overlaps">
+            {{ $t('REPORT.DISTRIBUTION.HANDLED_SHARE') }}
+          </template>
         </p>
       </div>
       <TabBar

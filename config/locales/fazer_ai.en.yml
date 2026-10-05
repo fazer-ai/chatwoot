@@ -166,3 +166,12 @@ en:
         fourth: fourth
         fifth: fifth
         last: last
+  reports:
+    agent_csv:
+      handled_count: Handled conversations
+    team_csv:
+      handled_count: Handled conversations
+    inbox_csv:
+      handled_count: Handled conversations
+      avg_customer_waiting_time: Avg customer waiting time
+      resolution_count: Resolution Count

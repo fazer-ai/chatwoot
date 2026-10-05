@@ -1,5 +1,6 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
+import ReportsAPI from 'dashboard/api/reports';
 import SummaryReports from '../SummaryReports.vue';
 
 const agents = [
@@ -26,6 +27,10 @@ vi.mock('dashboard/composables/store', () => ({
     if (key[0] === 'summaryReports/getAgentSummaryReports') return ref(metrics);
     return ref({});
   },
+}));
+
+vi.mock('dashboard/api/reports', () => ({
+  default: { getSummary: vi.fn().mockResolvedValue({ data: {} }) },
 }));
 
 vi.mock('vue-i18n', () => ({
@@ -55,6 +60,10 @@ const mountReports = () =>
     },
   });
 
+// Resolved, handled and assigned come first, the durations after them.
+const ASSIGNED = 3;
+const FIRST_RESPONSE = 4;
+
 const columnOf = (wrapper, index) =>
   wrapper.findAll('tbody tr').map(row => row.findAll('td')[index].text());
 
@@ -64,15 +73,15 @@ const sortBy = (wrapper, headerIndex) =>
 describe('SummaryReports.vue', () => {
   it('sorts a count column by its number, not by the formatted string', async () => {
     const wrapper = mountReports();
-    await sortBy(wrapper, 1);
+    await sortBy(wrapper, ASSIGNED);
 
     // 10 above 9 is the whole point: as strings they sort the other way round.
-    expect(columnOf(wrapper, 1)).toEqual(['10', '9', '2', '--']);
+    expect(columnOf(wrapper, ASSIGNED)).toEqual(['10', '9', '2', '--']);
   });
 
   it('sorts a duration column by its seconds, even when they arrive as strings', async () => {
     const wrapper = mountReports();
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
 
     expect(columnOf(wrapper, 0)).toEqual(['Carol', 'alice', 'Bob', 'Dave']);
   });
@@ -101,10 +110,48 @@ describe('SummaryReports.vue', () => {
   it('keeps rows with no measurement at the bottom in both directions', async () => {
     const wrapper = mountReports();
 
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
     expect(columnOf(wrapper, 0).at(-1)).toBe('Dave');
 
-    await sortBy(wrapper, 2);
+    await sortBy(wrapper, FIRST_RESPONSE);
     expect(columnOf(wrapper, 0)).toEqual(['Bob', 'alice', 'Carol', 'Dave']);
+  });
+
+  it('names the conversations column after the assignment and explains it', () => {
+    const header = mountReports().findAll('th')[ASSIGNED];
+
+    expect(header.text()).toContain('SUMMARY_REPORTS.ASSIGNED');
+    expect(header.find('[title]').attributes('title')).toBe(
+      'REPORT.METRIC_HINTS.ASSIGNED_AGENT'
+    );
+  });
+
+  it('never lets a superseded period overwrite the handled total', async () => {
+    // Each request settles only when the spec says so, and rejects the way axios
+    // does once its signal is aborted.
+    const pending = [];
+    ReportsAPI.getSummary.mockImplementation(
+      (...args) =>
+        new Promise((resolve, reject) => {
+          const { signal } = args.at(-1);
+          signal?.addEventListener('abort', () =>
+            reject(
+              Object.assign(new Error('canceled'), { name: 'CanceledError' })
+            )
+          );
+          pending.push(resolve);
+        })
+    );
+    const wrapper = mountReports();
+    const filters = wrapper.findComponent({ name: 'OverviewReportFilters' });
+
+    filters.vm.$emit('filterChange', { from: 1, to: 2, businessHours: false });
+    filters.vm.$emit('filterChange', { from: 3, to: 4, businessHours: false });
+    pending.at(-1)({ data: { handled_conversations_count: 7 } });
+    pending.at(-2)({ data: { handled_conversations_count: 99 } });
+    await flushPromises();
+
+    const distribution = wrapper.findComponent({ name: 'SummaryDistribution' });
+    expect(distribution.props('handledTotal')).toBe(7);
   });
 });

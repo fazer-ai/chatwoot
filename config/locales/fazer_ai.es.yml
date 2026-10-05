@@ -166,3 +166,12 @@ es:
         fourth: cuarto
         fifth: quinto
         last: último
+  reports:
+    agent_csv:
+      handled_count: Conversaciones atendidas
+    team_csv:
+      handled_count: Conversaciones atendidas
+    inbox_csv:
+      handled_count: Conversaciones atendidas
+      avg_customer_waiting_time: Tiempo promedio de espera del cliente
+      resolution_count: Recuento de resoluciones
