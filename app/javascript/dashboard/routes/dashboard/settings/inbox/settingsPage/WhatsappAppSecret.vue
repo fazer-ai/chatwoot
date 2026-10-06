@@ -20,9 +20,6 @@ const props = defineProps({
 const { t } = useI18n();
 const store = useStore();
 const appSecret = ref('');
-// Only when the inbox moves to another Meta app: the secret is checked against the token,
-// so the two have to change in the same save.
-const accessToken = ref('');
 const isUpdating = ref(false);
 
 const isConfigured = computed(() =>
@@ -34,7 +31,6 @@ watch(
   () => props.inbox.id,
   () => {
     appSecret.value = '';
-    accessToken.value = '';
     isUpdating.value = false;
   }
 );
@@ -49,14 +45,10 @@ const updateAppSecret = async () => {
         provider_config: {
           ...props.inbox.provider_config,
           app_secret: appSecret.value.trim(),
-          ...(accessToken.value.trim() && {
-            api_key: accessToken.value.trim(),
-          }),
         },
       },
     });
     appSecret.value = '';
-    accessToken.value = '';
     useAlert(t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.SUCCESS'));
   } catch {
     // The server only says the credentials were refused; the likely cause is a secret
@@ -109,14 +101,6 @@ const updateAppSecret = async () => {
           }}
         </NextButton>
       </div>
-      <woot-input
-        v-model="accessToken"
-        type="password"
-        class="[&>input]:!mb-0"
-        :placeholder="
-          t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.TOKEN_PLACEHOLDER')
-        "
-      />
     </div>
   </SettingsFieldSection>
 </template>

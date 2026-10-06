@@ -168,7 +168,6 @@
         "MISSING": "This inbox has no App Secret, so its webhooks are accepted without checking that they come from Meta. A future version will refuse them: add the App Secret to keep receiving messages.",
         "CONFIGURED": "App Secret configured",
         "PLACEHOLDER": "Paste the App Secret",
-        "TOKEN_PLACEHOLDER": "New access token, only when moving to another Meta app (optional)",
         "ADD": "Add",
         "REPLACE": "Replace",
         "SUCCESS": "App Secret saved",

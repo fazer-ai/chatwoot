@@ -18,8 +18,6 @@ vi.mock('dashboard/composables', () => ({
 
 const SECRET_INPUT =
   'input[placeholder="INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.PLACEHOLDER"]';
-const TOKEN_INPUT =
-  'input[placeholder="INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.TOKEN_PLACEHOLDER"]';
 
 const INBOX = {
   id: 7,
@@ -120,29 +118,6 @@ describe('WhatsappAppSecret', () => {
     });
     expect(mockAlert).toHaveBeenCalledWith(
       'INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.SUCCESS'
-    );
-  });
-
-  // Checked against each other, a token and a secret from another Meta app only pass together.
-  it('sends a new token in the same save when one is given', async () => {
-    const wrapper = await mountSection();
-
-    await wrapper.find(TOKEN_INPUT).setValue('other-app-token');
-    await wrapper.find(SECRET_INPUT).setValue('other-app-secret');
-    await wrapper.find('button.save').trigger('click');
-    await flushPromises();
-
-    expect(mockDispatch).toHaveBeenCalledWith(
-      'inboxes/updateInbox',
-      expect.objectContaining({
-        channel: {
-          provider_config: {
-            api_key: 'other-app-token',
-            source: 'manual_setup_v2',
-            app_secret: 'other-app-secret',
-          },
-        },
-      })
     );
   });
 

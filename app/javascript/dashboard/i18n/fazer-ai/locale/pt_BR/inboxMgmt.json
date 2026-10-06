@@ -168,7 +168,6 @@
         "MISSING": "Esta caixa não tem a chave secreta do aplicativo, então os webhooks dela são aceitos sem conferir se vieram da Meta. Uma versão futura vai recusá-los: adicione a chave para continuar recebendo mensagens.",
         "CONFIGURED": "Chave secreta configurada",
         "PLACEHOLDER": "Cole a chave secreta",
-        "TOKEN_PLACEHOLDER": "Novo token de acesso, só ao trocar de aplicativo da Meta (opcional)",
         "ADD": "Adicionar",
         "REPLACE": "Substituir",
         "SUCCESS": "Chave secreta salva",
