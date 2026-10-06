@@ -51,7 +51,7 @@ describe Whatsapp::ZapiRequestOptions do
 
   it 'reads every call in the file, so an empty result cannot pass as a clean one' do
     # The canary. Every check above answers "none", and answers it for zero calls too.
-    expect(calls.size).to eq(8)
+    expect(calls.size).to eq(9)
   end
 
   # The split is the substance: the send ceiling is the one that waits out a forward to WhatsApp,

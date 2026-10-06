@@ -14,7 +14,7 @@ RSpec.describe 'WhatsApp credential check', type: :request do
   let(:graph) { %r{graph\.facebook\.com/v14\.0/123456789/} }
   let(:secret) { 'EAAsegredo598xyz' }
 
-  let(:cloud_config) { { api_key: secret, phone_number_id: '123456789', business_account_id: '123456789' } }
+  let(:cloud_config) { { api_key: secret, phone_number_id: '123456789', business_account_id: '123456789', app_secret: 'meta-app-secret' } }
 
   def create_inbox(channel)
     post "/api/v1/accounts/#{account.id}/inboxes",
@@ -235,7 +235,7 @@ RSpec.describe 'WhatsApp credential check', type: :request do
         expect(channel.reload.provider_config['source']).to eq('embedded_signup')
         stub_request(:get, %r{graph\.facebook\.com/v14\.0/.+/message_templates}).to_return(status: 401, **unreadable)
 
-        update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key'))
+        update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key', 'app_secret' => 'manual-app-secret'))
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(message).to eq('Provider config Invalid Credentials')
@@ -250,7 +250,7 @@ RSpec.describe 'WhatsApp credential check', type: :request do
         original.call(**kwargs).tap { |provider| allow(provider).to receive(:credential_check_body).and_raise(NoMethodError, 'planted 598') }
       end
 
-      update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key'))
+      update_config(channel.provider_config.except('source').merge('api_key' => 'rotated-key', 'app_secret' => 'manual-app-secret'))
 
       expect(response).to have_http_status(:internal_server_error)
       expect(response.body).to include('planted 598')
