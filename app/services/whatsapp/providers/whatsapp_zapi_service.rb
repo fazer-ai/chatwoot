@@ -7,6 +7,8 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
 
   API_BASE_PATH = 'https://api.z-api.io'.freeze
+  CALLBACK_URL_FIELDS = %w[receivedCallbackUrl deliveryCallbackUrl messageStatusCallbackUrl connectedCallbackUrl
+                           disconnectedCallbackUrl presenceChatCallbackUrl initialDataCallbackUrl].freeze
 
   def send_template(phone_number, template_info); end
 
@@ -74,6 +76,19 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
     raise ProviderUnavailableError unless process_response(response)
 
     confirm_webhook_url(instance_id)
+  end
+
+  # Z-API keeps one URL per event, and update-every-webhooks overwrites all of them. Before the
+  # migration does that on its own, it checks they all still point at the URL this app registered
+  # (the phone-number one): an instance that sends an event somewhere else, or that another
+  # installation set up, is not this app's to take over.
+  def webhooks_on_legacy_url?
+    response = HTTParty.get("#{api_instance_path_with_token}/me", headers: api_headers, **ZAPI_REQUEST_OPTIONS)
+    raise ProviderUnavailableError unless process_response(response)
+
+    # In case Z-API keeps the number's `+` as `%2B`.
+    urls = response.parsed_response.to_h.slice(*CALLBACK_URL_FIELDS).values.compact_blank.map { |url| url.gsub(/%2B/i, '+') }
+    urls.present? && urls.all?(legacy_webhook_url)
   end
 
   def webhook_url_confirmed?
@@ -180,6 +195,10 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   private
+
+  def legacy_webhook_url
+    "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/#{whatsapp_channel.phone_number}"
+  end
 
   def webhook_url(token)
     "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}"
