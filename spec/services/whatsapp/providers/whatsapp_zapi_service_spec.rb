@@ -213,12 +213,34 @@ describe Whatsapp::Providers::WhatsappZapiService do
       expect(whatsapp_channel.reload.provider_config).to include('previous_webhook_verify_token' => 'old_token')
     end
 
-    it 'keeps the token Z-API may still use when a rotation was never confirmed' do
+    # Z-API may have taken the new URL with its answer lost, so a retry registers that same URL
+    # again rather than a third one, and both stay open.
+    it 'retries an unconfirmed rotation with the token it already made' do
       stub_request(:put, update_webhooks_url).to_return(status: 400, body: 'error message')
       allow(Rails.logger).to receive(:error)
-      2.times { expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError) }
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+      pending_token = whatsapp_channel.reload.provider_config['webhook_verify_token']
 
-      expect(whatsapp_channel.reload.provider_config['previous_webhook_verify_token']).to eq('old_token')
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+
+      expect(whatsapp_channel.reload.provider_config).to include('webhook_verify_token' => pending_token,
+                                                                 'previous_webhook_verify_token' => 'old_token')
+    end
+
+    # A setup or migration that read the token before a rotation must not reach Z-API after it.
+    it 'registers while holding the inbox registration lock' do
+      held = nil
+      stub_request(:put, update_webhooks_url).to_return do
+        held = ActiveRecord::Base.connection.select_value(<<~SQL.squish)
+          SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND granted
+            AND classid = hashtext('zapi_webhook_registration')::oid AND objid = #{whatsapp_channel.id} AND pid = pg_backend_pid()
+        SQL
+        { status: 200 }
+      end
+
+      service.register_webhooks
+
+      expect(held).to be_positive
     end
   end
 

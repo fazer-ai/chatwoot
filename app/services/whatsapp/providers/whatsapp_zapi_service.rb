@@ -65,24 +65,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   # confirmed: credentials changed in between must not split the two. `expected_instance` is for
   # the migration, which checked one instance's webhooks and must not overwrite another's.
   def register_webhooks(expected_instance: nil)
-    token = reserve_webhook_verify_token
-    instance = whatsapp_channel.provider_config.slice('instance_id', 'token')
-    raise InstanceChangedError if expected_instance && instance != expected_instance
-
-    response = HTTParty.put(
-      "#{API_BASE_PATH}/instances/#{instance['instance_id']}/token/#{instance['token']}/update-every-webhooks",
-      headers: api_headers,
-      body: {
-        value: webhook_url(token),
-        notifySentByMe: true
-      }.to_json,
-      **ZAPI_REQUEST_OPTIONS
-    )
-
-    raise ProviderUnavailableError unless process_response(response)
-
-    retire_previous_webhook_token(token)
-    confirm_webhook_url(instance['instance_id'])
+    with_registration_lock { register_current_webhook_url(expected_instance) }
   end
 
   # A token that leaked (a proxy log, a support ticket) is replaced by a new URL. The one being
@@ -90,14 +73,18 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   # registration, or a delivery carrying the new token (Webhooks::Whatsapp::ZapiController). A
   # registration that fails therefore leaves the inbox receiving on the old URL, not silent.
   #
-  # A previous token that is already set is kept instead of the current one: it means the last
-  # rotation was never confirmed, so it is the one Z-API may still be posting to.
+  # A rotation that was never confirmed is retried with the token it already made, not a new
+  # one: Z-API may have taken that URL with its answer lost on the way, and both of the URLs it
+  # may be posting to stay open until it is known which.
   def rotate_webhook_url
-    update_provider_config do |config|
-      replaced = config['previous_webhook_verify_token'].presence || config['webhook_verify_token'].presence
-      config.merge('previous_webhook_verify_token' => replaced, 'webhook_verify_token' => SecureRandom.hex(16)).compact
+    with_registration_lock do
+      update_provider_config do |config|
+        next config if config['previous_webhook_verify_token'].present?
+
+        config.merge('previous_webhook_verify_token' => config['webhook_verify_token'], 'webhook_verify_token' => SecureRandom.hex(16)).compact
+      end
+      register_webhooks
     end
-    register_webhooks
   end
 
   # Only once the token that proved Z-API moved is still the current one: a rotation in between
@@ -234,6 +221,44 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
   def webhook_url(token)
     "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}"
+  end
+
+  def register_current_webhook_url(expected_instance)
+    token = reserve_webhook_verify_token
+    instance = whatsapp_channel.provider_config.slice('instance_id', 'token')
+    raise InstanceChangedError if expected_instance && instance != expected_instance
+
+    response = HTTParty.put(
+      "#{API_BASE_PATH}/instances/#{instance['instance_id']}/token/#{instance['token']}/update-every-webhooks",
+      headers: api_headers,
+      body: {
+        value: webhook_url(token),
+        notifySentByMe: true
+      }.to_json,
+      **ZAPI_REQUEST_OPTIONS
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    retire_previous_webhook_token(token)
+    confirm_webhook_url(instance['instance_id'])
+  end
+
+  # One registration at a time per inbox, from the token it reads to Z-API's answer: the row lock
+  # covers the writes, not the order in which PUTs reach Z-API, and a setup that read a token
+  # before a rotation would otherwise register it after the rotation retired it, leaving Z-API on
+  # a URL this app refuses. A session lock rather than a transaction, so the token a registration
+  # stores is visible to the deliveries that may arrive before Z-API answers. Reentrant, which
+  # is what lets a rotation hold it around its own registration.
+  def with_registration_lock
+    lock_args = ['zapi_webhook_registration', whatsapp_channel.id]
+    connection = ActiveRecord::Base.connection
+    connection.execute(ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_lock(hashtext(?), ?)', *lock_args]))
+    begin
+      yield
+    ensure
+      connection.execute(ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_unlock(hashtext(?), ?)', *lock_args]))
+    end
   end
 
   # Under the row lock, so a migration and a setup racing on the same inbox settle on one token.
