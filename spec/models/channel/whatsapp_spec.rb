@@ -471,7 +471,7 @@ RSpec.describe Channel::Whatsapp do
                                           validate_provider_config: false, sync_templates: false)
       channel.update_column(:provider_config, channel.provider_config.except('app_secret')) # rubocop:disable Rails/SkipsModelValidations
       stub_request(:get, /graph\.facebook\.com/).to_return(status: 200, body: { data: [{ id: '123456789' }] }.to_json,
-                                                          headers: { 'Content-Type' => 'application/json' })
+                                                           headers: { 'Content-Type' => 'application/json' })
 
       channel.reload.provider_config = channel.provider_config.merge('api_key' => 'rotated')
 

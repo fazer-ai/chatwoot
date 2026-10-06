@@ -13,7 +13,7 @@ describe Whatsapp::ManualSetupService do
     )
     allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup)
     stub_request(:get, /graph\.facebook\.com/).to_return(status: 200, body: { data: [{ id: 'phone-id' }] }.to_json,
-                                                        headers: { 'Content-Type' => 'application/json' })
+                                                         headers: { 'Content-Type' => 'application/json' })
   end
 
   # The secret is what verifies the inbox's webhooks; an inbox saved without it takes none.

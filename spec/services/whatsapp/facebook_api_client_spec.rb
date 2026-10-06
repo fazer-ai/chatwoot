@@ -25,7 +25,8 @@ describe Whatsapp::FacebookApiClient do
 
     it 'takes a refused proof as a mismatch' do
       stub_request(:get, me_url).with(query: hash_including('appsecret_proof' => proof))
-                                .to_return(status: 400, body: { error: { message: 'Invalid appsecret_proof provided in the API argument', code: 100 } }.to_json)
+                                .to_return(status: 400, body: { error: { message: 'Invalid appsecret_proof provided in the API argument',
+                                                                         code: 100 } }.to_json)
 
       expect(api_client.app_secret_matches?('customer_secret')).to be(false)
     end
