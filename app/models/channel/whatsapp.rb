@@ -591,6 +591,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   def keep_zapi_webhook_url(token, stored)
     provider_config['webhook_verify_token'] = token if token
     provider_config['webhook_url_confirmed_for'] = stored['webhook_url_confirmed_for'] if stored['webhook_url_confirmed_for']
+    if stored['previous_webhook_verify_token']
+      provider_config['previous_webhook_verify_token'] = stored['previous_webhook_verify_token']
+    else
+      provider_config.delete('previous_webhook_verify_token')
+    end
   end
 
   # Meta signs every Cloud webhook with the secret of the app that issued the token. Embedded

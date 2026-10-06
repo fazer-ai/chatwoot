@@ -172,6 +172,13 @@
         "REPLACE": "Replace",
         "SUCCESS": "App Secret saved",
         "ERROR": "Could not save the App Secret. Check that it belongs to the same Meta app that issued this inbox's access token."
+      },
+      "ZAPI_WEBHOOK_URL": {
+        "TITLE": "Receiving address",
+        "HELP": "Z-API delivers this inbox's messages to an address with a key of its own. If that address shows up where it should not, such as a log or a support ticket, generate a new one: Z-API switches to it and the old one stops working.",
+        "BUTTON": "Generate new address",
+        "SUCCESS": "New address registered with Z-API.",
+        "ERROR": "Z-API did not accept the new address. The inbox keeps receiving on the current one; try again."
       }
     },
     "ASSIGNMENT": {

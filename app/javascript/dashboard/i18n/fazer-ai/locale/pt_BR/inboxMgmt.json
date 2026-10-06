@@ -172,6 +172,13 @@
         "REPLACE": "Substituir",
         "SUCCESS": "Chave secreta salva",
         "ERROR": "Não foi possível salvar a chave secreta. Confira se ela é do mesmo aplicativo da Meta que gerou o token de acesso desta caixa."
+      },
+      "ZAPI_WEBHOOK_URL": {
+        "TITLE": "Endereço de recebimento",
+        "HELP": "A Z-API entrega as mensagens desta caixa num endereço com uma chave própria. Se esse endereço aparecer onde não devia, como num log ou num chamado de suporte, gere um novo: a Z-API passa a usá-lo e o antigo deixa de funcionar.",
+        "BUTTON": "Gerar novo endereço",
+        "SUCCESS": "Novo endereço registrado na Z-API.",
+        "ERROR": "A Z-API não aceitou o novo endereço. A caixa continua recebendo pelo atual; tente de novo."
       }
     },
     "ASSIGNMENT": {

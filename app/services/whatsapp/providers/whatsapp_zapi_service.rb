@@ -81,7 +81,33 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
+    retire_previous_webhook_token(token)
     confirm_webhook_url(instance['instance_id'])
+  end
+
+  # A token that leaked (a proxy log, a support ticket) is replaced by a new URL. The one being
+  # replaced keeps working until Z-API is known to post to the new one: an answer to the
+  # registration, or a delivery carrying the new token (Webhooks::Whatsapp::ZapiController). A
+  # registration that fails therefore leaves the inbox receiving on the old URL, not silent.
+  #
+  # A previous token that is already set is kept instead of the current one: it means the last
+  # rotation was never confirmed, so it is the one Z-API may still be posting to.
+  def rotate_webhook_url
+    update_provider_config do |config|
+      replaced = config['previous_webhook_verify_token'].presence || config['webhook_verify_token'].presence
+      config.merge('previous_webhook_verify_token' => replaced, 'webhook_verify_token' => SecureRandom.hex(16)).compact
+    end
+    register_webhooks
+  end
+
+  # Only once the token that proved Z-API moved is still the current one: a rotation in between
+  # made a newer one, and the URL Z-API may still use is not this one.
+  def retire_previous_webhook_token(token)
+    return if whatsapp_channel.provider_config['previous_webhook_verify_token'].blank?
+
+    update_provider_config do |config|
+      config['webhook_verify_token'] == token ? config.except('previous_webhook_verify_token') : config
+    end
   end
 
   # Z-API keeps one URL per event, and update-every-webhooks overwrites all of them. Before the

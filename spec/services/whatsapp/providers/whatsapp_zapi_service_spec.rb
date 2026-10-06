@@ -184,6 +184,44 @@ describe Whatsapp::Providers::WhatsappZapiService do
     end
   end
 
+  describe '#rotate_webhook_url' do
+    let(:update_webhooks_url) { "#{api_instance_path_with_token}/update-every-webhooks" }
+
+    before do
+      whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => 'old_token')
+      whatsapp_channel.save!(validate: false)
+    end
+
+    it 'registers a new URL and stops accepting the old one once Z-API took it' do
+      stub_request(:put, update_webhooks_url).to_return(status: 200)
+
+      service.rotate_webhook_url
+
+      config = whatsapp_channel.reload.provider_config
+      expect(config['webhook_verify_token']).to be_present.and(satisfy { |token| token != 'old_token' })
+      expect(config).not_to have_key('previous_webhook_verify_token')
+      expect(a_request(:put, update_webhooks_url).with(body: hash_including('value' => %r{/#{config['webhook_verify_token']}\z}))).to have_been_made
+    end
+
+    # The inbox keeps receiving on the old URL instead of going silent.
+    it 'keeps the old token open when Z-API does not take the new URL' do
+      stub_request(:put, update_webhooks_url).to_return(status: 400, body: 'error message')
+      allow(Rails.logger).to receive(:error)
+
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+
+      expect(whatsapp_channel.reload.provider_config).to include('previous_webhook_verify_token' => 'old_token')
+    end
+
+    it 'keeps the token Z-API may still use when a rotation was never confirmed' do
+      stub_request(:put, update_webhooks_url).to_return(status: 400, body: 'error message')
+      allow(Rails.logger).to receive(:error)
+      2.times { expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError) }
+
+      expect(whatsapp_channel.reload.provider_config['previous_webhook_verify_token']).to eq('old_token')
+    end
+  end
+
   describe '#disconnect_channel_provider' do
     context 'when response is successful' do
       it 'disconnects the whatsapp connection' do
