@@ -40,12 +40,16 @@ class Webhooks::WhatsappController < ActionController::API
   # Baileys echoes the token in every body. Z-API cannot, so it posts to a URL that carries
   # the token (Webhooks::Whatsapp::ZapiController); this route only keeps taking an inbox
   # that has not been moved to that URL yet, and refuses it from the moment it has one.
+  # A session provider never posts here at all, and the job would read whatever came for
+  # one of its numbers as a 360dialog message.
   def verify_provider_token!
     case whatsapp_channel&.provider
     when 'baileys'
       head :unauthorized unless matches_webhook_verify_token?(params[:webhookVerifyToken])
     when 'zapi'
       head :unauthorized if whatsapp_channel.provider_config['webhook_verify_token'].present?
+    when *Whatsapp::Session::PROVIDERS
+      head :unauthorized
     end
   end
 

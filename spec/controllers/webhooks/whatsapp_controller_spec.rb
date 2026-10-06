@@ -340,6 +340,20 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
     end
 
+    # They post to routes of their own; here the job would read the body as a 360dialog message.
+    Whatsapp::Session::PROVIDERS.each do |provider|
+      it "refuses a #{provider} inbox" do
+        session_channel = create(:channel_whatsapp, provider: provider, sync_templates: false, validate_provider_config: false)
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
+        post "/webhooks/whatsapp/#{session_channel.phone_number}",
+             params: { messages: [{ from: '5511988887777', id: 'forged', text: { body: 'forged' }, type: 'text' }] }, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+      end
+    end
+
     context 'when awaitResponse param is present' do
       let(:baileys_channel) { create(:channel_whatsapp, provider: 'baileys', sync_templates: false, validate_provider_config: false) }
       let(:verify_token) { baileys_channel.provider_config['webhook_verify_token'] }
