@@ -168,6 +168,7 @@
         "MISSING": "Esta bandeja no tiene la clave secreta de la aplicación, así que sus webhooks se aceptan sin comprobar que vengan de Meta. Una versión futura los rechazará: agrega la clave para seguir recibiendo mensajes.",
         "CONFIGURED": "Clave secreta configurada",
         "PLACEHOLDER": "Pega la clave secreta",
+        "TOKEN_PLACEHOLDER": "Nuevo token de acceso, solo al cambiar de aplicación de Meta (opcional)",
         "ADD": "Agregar",
         "REPLACE": "Reemplazar",
         "SUCCESS": "Clave secreta guardada",

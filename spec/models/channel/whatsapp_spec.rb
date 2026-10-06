@@ -476,6 +476,17 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.reload.provider_config).to include('app_secret' => 'test_app_secret', 'api_key' => 'rotated')
     end
 
+    # Reauthorized through embedded signup, the inbox is verified with the installation's secret,
+    # and the manual app's one would be checked against a token it did not issue.
+    it 'is dropped when a manual inbox moves to embedded signup' do
+      channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', account: account, provider_config: { 'source' => 'manual_setup_v2' },
+                                          validate_provider_config: false, sync_templates: false)
+
+      channel.update!(provider_config: channel.provider_config.merge('source' => 'embedded_signup', 'api_key' => 'embedded_token'))
+
+      expect(channel.reload.provider_config).not_to have_key('app_secret')
+    end
+
     # Inboxes from before the secret was asked for keep working until their operator adds one.
     it 'is not asked of a manual inbox that already exists' do
       channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', account: account, provider_config: { 'source' => 'manual_setup_v2' },

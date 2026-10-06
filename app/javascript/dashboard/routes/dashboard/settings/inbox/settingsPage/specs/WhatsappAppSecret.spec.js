@@ -16,6 +16,11 @@ vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => mockAlert(...args),
 }));
 
+const SECRET_INPUT =
+  'input[placeholder="INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.PLACEHOLDER"]';
+const TOKEN_INPUT =
+  'input[placeholder="INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_APP_SECRET.TOKEN_PLACEHOLDER"]';
+
 const INBOX = {
   id: 7,
   provider: 'whatsapp_cloud',
@@ -33,13 +38,16 @@ const mountSection = async (inbox = INBOX) => {
         }),
         'woot-input': defineComponent({
           name: 'WootInput',
-          props: { modelValue: { type: String, default: '' } },
+          props: {
+            modelValue: { type: String, default: '' },
+            placeholder: { type: String, default: '' },
+          },
           emits: ['update:modelValue'],
           setup:
             (props, { emit }) =>
             () =>
               h('input', {
-                class: 'secret',
+                placeholder: props.placeholder,
                 value: props.modelValue,
                 onInput: event => emit('update:modelValue', event.target.value),
               }),
@@ -95,7 +103,7 @@ describe('WhatsappAppSecret', () => {
   it('saves the secret together with the rest of the provider config', async () => {
     const wrapper = await mountSection();
 
-    await wrapper.find('input.secret').setValue('  new-secret ');
+    await wrapper.find(SECRET_INPUT).setValue('  new-secret ');
     await wrapper.find('button.save').trigger('click');
     await flushPromises();
 
@@ -115,11 +123,34 @@ describe('WhatsappAppSecret', () => {
     );
   });
 
+  // Checked against each other, a token and a secret from another Meta app only pass together.
+  it('sends a new token in the same save when one is given', async () => {
+    const wrapper = await mountSection();
+
+    await wrapper.find(TOKEN_INPUT).setValue('other-app-token');
+    await wrapper.find(SECRET_INPUT).setValue('other-app-secret');
+    await wrapper.find('button.save').trigger('click');
+    await flushPromises();
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      'inboxes/updateInbox',
+      expect.objectContaining({
+        channel: {
+          provider_config: {
+            api_key: 'other-app-token',
+            source: 'manual_setup_v2',
+            app_secret: 'other-app-secret',
+          },
+        },
+      })
+    );
+  });
+
   it('says what to check when the secret is refused', async () => {
     mockDispatch.mockRejectedValueOnce(new Error('Invalid Credentials'));
     const wrapper = await mountSection();
 
-    await wrapper.find('input.secret').setValue('wrong');
+    await wrapper.find(SECRET_INPUT).setValue('wrong');
     await wrapper.find('button.save').trigger('click');
     await flushPromises();
 

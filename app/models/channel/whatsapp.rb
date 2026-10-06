@@ -562,8 +562,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   # Kept like the token, for the same wholesale replace: an update that left the secret out
   # would otherwise turn an inbox whose webhooks are verified back into one that takes them
-  # unsigned. Replacing it is fine; removing it is not something an update can do.
+  # unsigned. Replacing it is fine; removing it is not something an update can do. The one
+  # exception is embedded signup, which runs on the installation's app and is verified with
+  # WHATSAPP_APP_SECRET: a secret left from a manual setup belongs to another app.
   def keep_app_secret(stored)
+    return provider_config.delete('app_secret') if provider_config['source'] == 'embedded_signup'
     return if provider_config['app_secret'].present? || stored['app_secret'].blank?
 
     provider_config['app_secret'] = stored['app_secret']
