@@ -114,7 +114,7 @@ describe Whatsapp::GraphRequestOptions do
       # Sixteen since 4.18.0: the guided manual setup reads the WABA's numbers, templates, business
       # profile, permissions and subscriptions through this client, and each read got the ceiling
       # on the way in.
-      'app/services/whatsapp/facebook_api_client.rb' => 16,
+      'app/services/whatsapp/facebook_api_client.rb' => 17,
       'app/services/whatsapp/health_service.rb' => 1,
       # Six rather than ten: the five sends now go through `post_outgoing`, which is the single
       # HTTParty call on the outgoing path and carries the ceiling for all of them. That

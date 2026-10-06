@@ -13,6 +13,33 @@ describe Whatsapp::FacebookApiClient do
     allow(GlobalConfigService).to receive(:load).with('WHATSAPP_APP_SECRET', '').and_return(app_secret)
   end
 
+  describe '#app_secret_matches?' do
+    let(:proof) { OpenSSL::HMAC.hexdigest('SHA256', 'customer_secret', access_token) }
+    let(:me_url) { "https://graph.facebook.com/#{api_version}/me" }
+
+    it 'sends a proof made from the secret and the token, and takes a 200 as a match' do
+      stub_request(:get, me_url).with(query: { fields: 'id', appsecret_proof: proof }).to_return(status: 200, body: { id: '1' }.to_json)
+
+      expect(api_client.app_secret_matches?('customer_secret')).to be(true)
+    end
+
+    it 'takes a refused proof as a mismatch' do
+      stub_request(:get, me_url).with(query: hash_including('appsecret_proof' => proof))
+                                .to_return(status: 400, body: { error: { message: 'Invalid appsecret_proof provided in the API argument',
+                                                                         code: 100 } }.to_json)
+
+      expect(api_client.app_secret_matches?('customer_secret')).to be(false)
+    end
+
+    # Anything else says nothing about the secret, and must not be read as a wrong one.
+    it 'raises on any other failure' do
+      stub_request(:get, me_url).with(query: hash_including('appsecret_proof' => proof))
+                                .to_return(status: 401, body: { error: { message: 'Invalid OAuth access token', code: 190 } }.to_json)
+
+      expect { api_client.app_secret_matches?('customer_secret') }.to raise_error(Whatsapp::ApiError)
+    end
+  end
+
   describe '#exchange_code_for_token' do
     let(:code) { 'test_code' }
 

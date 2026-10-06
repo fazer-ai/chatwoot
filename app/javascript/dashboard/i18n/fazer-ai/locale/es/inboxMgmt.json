@@ -103,6 +103,13 @@
           "NOTICE_WITH_NATIVE": "Este proveedor es heredado. Sigue funcionando, pero recomendamos usar WhatsApp (nativo) en su lugar.",
           "CONVERT_TO_NATIVE": "Convertir a WhatsApp (nativo)",
           "USE_NATIVE": "Usar WhatsApp (nativo)"
+        },
+        "MANUAL_SETUP": {
+          "APP_SECRET": {
+            "LABEL": "Clave secreta de la aplicación",
+            "PLACEHOLDER": "Pega la clave secreta de tu aplicación de Meta",
+            "HELP": "En tu aplicación de developers.facebook.com, abre Configuración de la app > Básica y copia la Clave secreta de la app. Confirma que cada webhook viene realmente de Meta."
+          }
         }
       }
     },
@@ -154,7 +161,18 @@
       "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de seguridad",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Su Client Token de Z-API (vea la pestaña Security en el panel de Z-API).",
       "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Actualizar el token de seguridad",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Introduzca aquí el nuevo token de seguridad"
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Introduzca aquí el nuevo token de seguridad",
+      "WHATSAPP_APP_SECRET": {
+        "TITLE": "Clave secreta de la aplicación",
+        "HELP": "La clave secreta de la aplicación de Meta que generó el token de acceso de esta bandeja. Confirma que cada webhook viene realmente de Meta.",
+        "MISSING": "Esta bandeja no tiene la clave secreta de la aplicación, así que sus webhooks se aceptan sin comprobar que vengan de Meta. Una versión futura los rechazará: agrega la clave para seguir recibiendo mensajes.",
+        "CONFIGURED": "Clave secreta configurada",
+        "PLACEHOLDER": "Pega la clave secreta",
+        "ADD": "Agregar",
+        "REPLACE": "Reemplazar",
+        "SUCCESS": "Clave secreta guardada",
+        "ERROR": "No se pudo guardar la clave secreta. Verifica que sea de la misma aplicación de Meta que generó el token de acceso de esta bandeja."
+      }
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Impedir que otro agente tome la conversación",

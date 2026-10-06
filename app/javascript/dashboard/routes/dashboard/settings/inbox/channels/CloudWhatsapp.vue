@@ -37,6 +37,7 @@ export default {
       inboxName: isConvert ? this.inbox?.name || '' : '',
       phoneNumber: isConvert ? this.inbox?.phone_number || '' : '',
       apiKey: '',
+      appSecret: '',
       phoneNumberId: '',
       businessAccountId: '',
     };
@@ -58,6 +59,7 @@ export default {
     inboxName: { required },
     phoneNumber: { required, isPhoneE164OrEmpty },
     apiKey: { required },
+    appSecret: { required },
     phoneNumberId: { required, isNumber },
     businessAccountId: { required, isNumber },
   },
@@ -65,6 +67,7 @@ export default {
     buildProviderConfig() {
       return {
         api_key: this.apiKey,
+        app_secret: this.appSecret,
         phone_number_id: this.phoneNumberId,
         business_account_id: this.businessAccountId,
       };
@@ -221,6 +224,29 @@ export default {
           @blur="v$.apiKey.$touch"
         />
         <span v-if="v$.apiKey.$error" class="message">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.ERROR') }}
+        </span>
+      </label>
+    </div>
+
+    <div class="flex-shrink-0 flex-grow-0">
+      <label :class="{ error: v$.appSecret.$error }">
+        <span>
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.LABEL') }}
+        </span>
+        <input
+          v-model="appSecret"
+          type="password"
+          autocomplete="off"
+          :placeholder="
+            $t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.PLACEHOLDER')
+          "
+          @blur="v$.appSecret.$touch"
+        />
+        <span class="help-text">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.HELP') }}
+        </span>
+        <span v-if="v$.appSecret.$error" class="message">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.API_KEY.ERROR') }}
         </span>
       </label>

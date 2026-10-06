@@ -56,18 +56,35 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
   describe '#setup_channel_provider' do
     context 'when response is successful' do
-      it 'sets up the webhook and returns true' do
+      it 'registers a webhook URL that carries the token it stores' do
+        registered = nil
         stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
-          .with(
-            headers: stub_headers,
-            body: {
-              value: whatsapp_channel.inbox.callback_webhook_url,
-              notifySentByMe: true
-            }.to_json
-          )
+          .with(headers: stub_headers) { |request| registered = JSON.parse(request.body) }
           .to_return(status: 200)
 
-        expect(service.setup_channel_provider).to be(true)
+        with_modified_env FRONTEND_URL: 'https://chat.example.com' do
+          expect(service.setup_channel_provider).to be(true)
+        end
+
+        token = whatsapp_channel.reload.provider_config['webhook_verify_token']
+        expect(token).to be_present
+        expect(whatsapp_channel.provider_config['webhook_url_confirmed_for']).to eq('test_instance')
+        expect(registered).to eq(
+          'value' => "https://chat.example.com/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}",
+          'notifySentByMe' => true
+        )
+      end
+
+      it 'keeps the token the inbox already has' do
+        whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => 'kept-token')
+        whatsapp_channel.save!(validate: false)
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
+          .with(headers: stub_headers, body: hash_including('value' => %r{/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/kept-token\z}))
+          .to_return(status: 200)
+
+        service.setup_channel_provider
+
+        expect(whatsapp_channel.reload.provider_config['webhook_verify_token']).to eq('kept-token')
       end
 
       it 'schedules QR code job when connection is blank' do
@@ -118,6 +135,51 @@ describe Whatsapp::Providers::WhatsappZapiService do
         expect do
           service.setup_channel_provider
         end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
+      end
+
+      # Z-API may have taken the URL even though its answer never arrived, so the token is kept
+      # for the new URL; the old one stays open because nothing confirmed the move.
+      it 'keeps the token for a retry and leaves the move unconfirmed' do
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks").to_return(status: 400, body: 'error message')
+        allow(Rails.logger).to receive(:error)
+
+        expect { service.setup_channel_provider }.to raise_error(described_class::ProviderUnavailableError)
+        token = whatsapp_channel.reload.provider_config['webhook_verify_token']
+        expect(token).to be_present
+        expect(whatsapp_channel.provider_config).not_to have_key('webhook_url_confirmed_for')
+
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
+          .with(body: hash_including('value' => %r{/#{token}\z})).to_return(status: 200)
+        service.setup_channel_provider
+        expect(whatsapp_channel.reload.provider_config['webhook_url_confirmed_for']).to eq('test_instance')
+      end
+
+      it 'does not confirm the URL for an instance the inbox left while it registered' do
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks").to_return do
+          Channel::Whatsapp.find(whatsapp_channel.id).tap do |other|
+            other.provider_config = other.provider_config.merge('instance_id' => 'another_instance')
+            other.save!(validate: false)
+          end
+          { status: 200 }
+        end
+
+        service.setup_channel_provider
+
+        expect(whatsapp_channel.reload.provider_config).not_to have_key('webhook_url_confirmed_for')
+      end
+
+      it 'does not write over a credential saved while it registers' do
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks").to_return do
+          Channel::Whatsapp.find(whatsapp_channel.id).tap do |other|
+            other.provider_config = other.provider_config.merge('client_token' => 'edited')
+            other.save!(validate: false)
+          end
+          { status: 200 }
+        end
+
+        service.setup_channel_provider
+
+        expect(whatsapp_channel.reload.provider_config).to include('client_token' => 'edited', 'webhook_url_confirmed_for' => 'test_instance')
       end
     end
   end

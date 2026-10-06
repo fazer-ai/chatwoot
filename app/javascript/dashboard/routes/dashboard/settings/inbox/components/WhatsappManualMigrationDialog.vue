@@ -33,6 +33,7 @@ const buildForm = () => ({
   phoneNumberId: props.inbox.provider_config?.phone_number_id || '',
   displayPhoneNumber: props.inbox.phone_number || '',
   accessToken: '',
+  appSecret: '',
 });
 
 const form = ref(buildForm());
@@ -182,7 +183,9 @@ const guideUrl = WHATSAPP_MANUAL_MIGRATION_GUIDE_URL;
 const hasBusinessDetails = computed(
   () => form.value.wabaId.trim() && form.value.phoneNumberId.trim()
 );
-const hasAccessToken = computed(() => form.value.accessToken.trim());
+const hasAccessToken = computed(
+  () => form.value.accessToken.trim() && form.value.appSecret.trim()
+);
 const canContinue = computed(() => {
   if (currentStep.value === 1) return hasBusinessDetails.value;
   if (currentStep.value === 2) return hasAccessToken.value;
@@ -216,6 +219,7 @@ const reconnect = () => {
     wabaId: form.value.wabaId.trim(),
     phoneNumberId: form.value.phoneNumberId.trim(),
     accessToken: form.value.accessToken.trim(),
+    appSecret: form.value.appSecret.trim(),
   });
 };
 
@@ -411,6 +415,24 @@ defineExpose({ open, close });
               min-height="6rem"
               max-height="12rem"
             />
+            <div class="flex flex-col gap-2">
+              <Input
+                v-model="form.appSecret"
+                type="password"
+                autocomplete="off"
+                :label="
+                  t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.LABEL')
+                "
+                :placeholder="
+                  t(
+                    'INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.PLACEHOLDER'
+                  )
+                "
+              />
+              <p class="m-0 text-sm text-n-slate-11">
+                {{ t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.HELP') }}
+              </p>
+            </div>
             <div
               class="flex gap-3 p-3 border rounded-xl bg-n-blue-3 border-n-blue-4 text-n-blue-11"
             >

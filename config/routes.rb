@@ -756,6 +756,7 @@ Rails.application.routes.draw do
   # segments, so the two cannot collide, and keeping them together is what makes that
   # obvious to whoever adds the next provider.
   post 'webhooks/whatsapp/session/uazapi/:channel_id/:webhook_token', to: 'webhooks/whatsapp/uazapi#process_payload'
+  post 'webhooks/whatsapp/zapi/:channel_id/:webhook_token', to: 'webhooks/whatsapp/zapi#process_payload'
   get 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#verify'
   post 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#process_payload'
   get 'webhooks/instagram', to: 'webhooks/instagram#verify'

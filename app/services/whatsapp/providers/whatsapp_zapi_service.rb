@@ -5,8 +5,11 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
   # See the note in WhatsappBaileysService: legacy errors share the session hierarchy.
   class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
+  class InstanceChangedError < StandardError; end
 
   API_BASE_PATH = 'https://api.z-api.io'.freeze
+  CALLBACK_URL_FIELDS = %w[receivedCallbackUrl deliveryCallbackUrl messageStatusCallbackUrl connectedCallbackUrl
+                           disconnectedCallbackUrl presenceChatCallbackUrl initialDataCallbackUrl].freeze
 
   def send_template(phone_number, template_info); end
 
@@ -40,11 +43,37 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def setup_channel_provider
+    register_webhooks
+
+    if whatsapp_channel.provider_connection.blank? || whatsapp_channel.provider_connection['connection'] == 'close'
+      Channels::Whatsapp::ZapiQrCodeJob.perform_later(whatsapp_channel)
+    end
+
+    true
+  end
+
+  # Z-API signs nothing and echoes no secret back, so the URL it posts to is the credential.
+  # The token is stored before Z-API hears of it, because a registration Z-API applied but
+  # whose answer never arrived would otherwise leave Z-API posting a token this app does not
+  # know. The old URL stays open for the inbox until the instance it points at has confirmed
+  # the new one, by accepting it here or by its first delivery (Webhooks::Whatsapp::ZapiController),
+  # so a failed registration costs nothing and a new instance starts on the old URL again.
+  # An inbox from before this URL existed gets its token here too, which is how
+  # Migration::ZapiWebhookUrlJob moves it.
+  #
+  # The instance is the one the row names once locked, and that same one is written to and
+  # confirmed: credentials changed in between must not split the two. `expected_instance` is for
+  # the migration, which checked one instance's webhooks and must not overwrite another's.
+  def register_webhooks(expected_instance: nil)
+    token = reserve_webhook_verify_token
+    instance = whatsapp_channel.provider_config.slice('instance_id', 'token')
+    raise InstanceChangedError if expected_instance && instance != expected_instance
+
     response = HTTParty.put(
-      "#{api_instance_path_with_token}/update-every-webhooks",
+      "#{API_BASE_PATH}/instances/#{instance['instance_id']}/token/#{instance['token']}/update-every-webhooks",
       headers: api_headers,
       body: {
-        value: whatsapp_channel.inbox.callback_webhook_url,
+        value: webhook_url(token),
         notifySentByMe: true
       }.to_json,
       **ZAPI_REQUEST_OPTIONS
@@ -52,11 +81,35 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
-    if whatsapp_channel.provider_connection.blank? || whatsapp_channel.provider_connection['connection'] == 'close'
-      Channels::Whatsapp::ZapiQrCodeJob.perform_later(whatsapp_channel)
-    end
+    confirm_webhook_url(instance['instance_id'])
+  end
 
-    true
+  # Z-API keeps one URL per event, and update-every-webhooks overwrites all of them. Before the
+  # migration does that on its own, it checks they all still point at the URL this app registered
+  # (the phone-number one): an instance that sends an event somewhere else, or that another
+  # installation set up, is not this app's to take over.
+  def webhooks_on_legacy_url?
+    response = HTTParty.get("#{api_instance_path_with_token}/me", headers: api_headers, **ZAPI_REQUEST_OPTIONS)
+    raise ProviderUnavailableError unless process_response(response)
+
+    # In case Z-API keeps the number's `+` as `%2B`.
+    urls = response.parsed_response.to_h.slice(*CALLBACK_URL_FIELDS).values.compact_blank.map { |url| url.gsub(/%2B/i, '+') }
+    urls.present? && urls.all?(legacy_webhook_url)
+  end
+
+  def webhook_url_confirmed?
+    config = whatsapp_channel.provider_config
+    config['webhook_url_confirmed_for'].present? && config['webhook_url_confirmed_for'] == config['instance_id']
+  end
+
+  # Only for the instance the inbox points at when the row is locked: an answer or a delivery
+  # from an instance the inbox has since left proves nothing about the one it uses now.
+  def confirm_webhook_url(instance_id)
+    return if instance_id.blank? || webhook_url_confirmed?
+
+    update_provider_config do |config|
+      config['instance_id'] == instance_id ? config.merge('webhook_url_confirmed_for' => instance_id) : config
+    end
   end
 
   def disconnect_channel_provider
@@ -148,6 +201,34 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   private
+
+  def legacy_webhook_url
+    "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/#{whatsapp_channel.phone_number}"
+  end
+
+  def webhook_url(token)
+    "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}"
+  end
+
+  # Under the row lock, so a migration and a setup racing on the same inbox settle on one token.
+  def reserve_webhook_verify_token
+    update_provider_config do |config|
+      config['webhook_verify_token'].present? ? config : config.merge('webhook_verify_token' => SecureRandom.hex(16))
+    end
+    whatsapp_channel.provider_config['webhook_verify_token']
+  end
+
+  # Merged into the row as it is under the lock, not into the copy this service was handed,
+  # so a credential edit saved in between is not written over.
+  def update_provider_config
+    whatsapp_channel.with_lock do
+      updated = yield whatsapp_channel.provider_config
+      next if updated == whatsapp_channel.provider_config
+
+      whatsapp_channel.provider_config = updated
+      whatsapp_channel.save!(validate: false)
+    end
+  end
 
   def api_instance_path
     "#{API_BASE_PATH}/instances/#{whatsapp_channel.provider_config['instance_id']}"

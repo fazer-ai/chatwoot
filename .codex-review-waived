@@ -198,3 +198,4 @@ app/controllers/api/v1/accounts/conversations/messages_controller.rb: Keep pendi
 # (o stale? da troca de emoji já compara assim, e empate no mesmo segundo passa por desenho).
 # Reordenar dentro do mesmo segundo exigiria outra coluna de milissegundos só para isto.
 app/services/whatsapp/session/inbound/reaction_store.rb: Preserve subsecond ordering when comparing reaction removals  # PR#772
+app/javascript/dashboard/routes/dashboard/settings/inbox/settingsPage/WhatsappAppSecret.vue: Allow the token and app secret to be replaced together  # GHSA-xwhx PR#1

@@ -103,6 +103,13 @@
           "NOTICE_WITH_NATIVE": "Este provedor é legado. Ele continua funcionando, mas recomendamos usar o WhatsApp (nativo) no lugar.",
           "CONVERT_TO_NATIVE": "Converter para WhatsApp (nativo)",
           "USE_NATIVE": "Usar o WhatsApp (nativo)"
+        },
+        "MANUAL_SETUP": {
+          "APP_SECRET": {
+            "LABEL": "Chave secreta do aplicativo",
+            "PLACEHOLDER": "Cole a chave secreta do seu aplicativo da Meta",
+            "HELP": "No seu aplicativo em developers.facebook.com, abra Configurações do app > Básico e copie a Chave secreta do aplicativo. Ela confirma que cada webhook veio mesmo da Meta."
+          }
         }
       }
     },
@@ -154,7 +161,18 @@
       "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de Segurança",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Seu Token de Segurança Z-API (veja a aba Segurança no painel do Z-API).",
       "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Atualizar Token de Segurança",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token de Segurança aqui"
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token de Segurança aqui",
+      "WHATSAPP_APP_SECRET": {
+        "TITLE": "Chave secreta do aplicativo",
+        "HELP": "A chave secreta do aplicativo da Meta que gerou o token de acesso desta caixa. Ela confirma que cada webhook veio mesmo da Meta.",
+        "MISSING": "Esta caixa não tem a chave secreta do aplicativo, então os webhooks dela são aceitos sem conferir se vieram da Meta. Uma versão futura vai recusá-los: adicione a chave para continuar recebendo mensagens.",
+        "CONFIGURED": "Chave secreta configurada",
+        "PLACEHOLDER": "Cole a chave secreta",
+        "ADD": "Adicionar",
+        "REPLACE": "Substituir",
+        "SUCCESS": "Chave secreta salva",
+        "ERROR": "Não foi possível salvar a chave secreta. Confira se ela é do mesmo aplicativo da Meta que gerou o token de acesso desta caixa."
+      }
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Impedir tomada de conversa atribuída",
