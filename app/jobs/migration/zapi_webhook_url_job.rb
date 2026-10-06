@@ -16,12 +16,13 @@ class Migration::ZapiWebhookUrlJob < ApplicationJob
       service = Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: channel)
       next if service.webhook_url_confirmed?
 
+      checked = channel.provider_config.slice('instance_id', 'token')
       unless service.webhooks_on_legacy_url?
         stats[:skipped] += 1
         next Rails.logger.warn("[zapi-webhook-url] left alone, webhooks point elsewhere channel_id=#{channel.id}")
       end
 
-      service.register_webhooks
+      service.register_webhooks(expected_instance: checked)
       stats[:moved] += 1
     rescue StandardError => e
       stats[:failed] += 1

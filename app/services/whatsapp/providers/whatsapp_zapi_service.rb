@@ -5,6 +5,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
   # See the note in WhatsappBaileysService: legacy errors share the session hierarchy.
   class ProviderUnavailableError < Whatsapp::Session::Errors::ProviderUnavailable; end
+  class InstanceChangedError < StandardError; end
 
   API_BASE_PATH = 'https://api.z-api.io'.freeze
   CALLBACK_URL_FIELDS = %w[receivedCallbackUrl deliveryCallbackUrl messageStatusCallbackUrl connectedCallbackUrl
@@ -59,12 +60,17 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   # so a failed registration costs nothing and a new instance starts on the old URL again.
   # An inbox from before this URL existed gets its token here too, which is how
   # Migration::ZapiWebhookUrlJob moves it.
-  def register_webhooks
-    instance_id = whatsapp_channel.provider_config['instance_id']
+  #
+  # The instance is the one the row names once locked, and that same one is written to and
+  # confirmed: credentials changed in between must not split the two. `expected_instance` is for
+  # the migration, which checked one instance's webhooks and must not overwrite another's.
+  def register_webhooks(expected_instance: nil)
     token = reserve_webhook_verify_token
+    instance = whatsapp_channel.provider_config.slice('instance_id', 'token')
+    raise InstanceChangedError if expected_instance && instance != expected_instance
 
     response = HTTParty.put(
-      "#{api_instance_path_with_token}/update-every-webhooks",
+      "#{API_BASE_PATH}/instances/#{instance['instance_id']}/token/#{instance['token']}/update-every-webhooks",
       headers: api_headers,
       body: {
         value: webhook_url(token),
@@ -75,7 +81,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
-    confirm_webhook_url(instance_id)
+    confirm_webhook_url(instance['instance_id'])
   end
 
   # Z-API keeps one URL per event, and update-every-webhooks overwrites all of them. Before the

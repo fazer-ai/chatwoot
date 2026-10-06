@@ -64,6 +64,24 @@ RSpec.describe Migration::ZapiWebhookUrlJob do
     expect(described_class.perform_now).to eq(moved: 1, skipped: 0, failed: 0)
   end
 
+  # The check covered one instance; an inbox pointed at another meanwhile is not overwritten blind.
+  it 'does not register an instance it did not check' do
+    legacy
+    stub_request(:get, "#{instance_path}/me").to_return do
+      Channel::Whatsapp.find(legacy.id).tap do |other|
+        other.provider_config = other.provider_config.merge('instance_id' => 'replacement')
+        other.save!(validate: false)
+      end
+      { status: 200, body: instance_webhooks.to_json, headers: { 'Content-Type' => 'application/json' } }
+    end
+    stub_request(:put, /update-every-webhooks/).to_return(status: 200)
+    allow(Rails.logger).to receive(:warn)
+
+    expect(described_class.perform_now).to eq(moved: 0, skipped: 0, failed: 1)
+    expect(a_request(:put, /update-every-webhooks/)).not_to have_been_made
+    expect(legacy.reload.provider_config).not_to have_key('webhook_url_confirmed_for')
+  end
+
   # An inbox it cannot reach stays on the old URL, which keeps taking its events.
   it 'leaves an inbox it cannot reach on the old URL and carries on' do
     legacy
