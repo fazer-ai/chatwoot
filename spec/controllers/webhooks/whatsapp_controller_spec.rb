@@ -289,15 +289,65 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       end
     end
 
-    context 'when awaitResponse param is present' do
-      # baileys channels skip signature verification (meta_signature_verification_required? short-circuits
-      # for non whatsapp_cloud providers), so an unsigned POST is valid here.
+    context 'with a baileys channel' do
       let(:baileys_channel) { create(:channel_whatsapp, provider: 'baileys', sync_templates: false, validate_provider_config: false) }
+      let(:verify_token) { baileys_channel.provider_config['webhook_verify_token'] }
+
+      before { allow(Webhooks::WhatsappEventsJob).to receive(:perform_later) }
+
+      it 'queues a body that carries the inbox token' do
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { event: 'messages.upsert', webhookVerifyToken: verify_token }
+
+        expect(response).to have_http_status(:ok)
+        expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later)
+      end
+
+      # The same answer an unknown number gets, so the response does not tell an inbox apart.
+      it 'answers 401 and queues nothing without the token or with a wrong one' do
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { event: 'messages.upsert' }
+        expect(response).to have_http_status(:unauthorized)
+
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { event: 'messages.upsert', webhookVerifyToken: 'wrong' }
+        expect(response).to have_http_status(:unauthorized)
+
+        post '/webhooks/whatsapp/+19999999999', params: { event: 'messages.upsert' }
+        expect(response).to have_http_status(:unauthorized)
+
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+      end
+    end
+
+    context 'with a zapi channel' do
+      let(:zapi_channel) { create(:channel_whatsapp, provider: 'zapi', sync_templates: false, validate_provider_config: false) }
+
+      before { allow(Webhooks::WhatsappEventsJob).to receive(:perform_later) }
+
+      it 'keeps taking an inbox that has not been moved to the URL with a token' do
+        post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }
+
+        expect(response).to have_http_status(:ok)
+        expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later)
+      end
+
+      it 'refuses an inbox that already has a URL with a token' do
+        zapi_channel.provider_config = zapi_channel.provider_config.merge('webhook_verify_token' => 'zapi-token')
+        zapi_channel.save!(validate: false)
+
+        post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+      end
+    end
+
+    context 'when awaitResponse param is present' do
+      let(:baileys_channel) { create(:channel_whatsapp, provider: 'baileys', sync_templates: false, validate_provider_config: false) }
+      let(:verify_token) { baileys_channel.provider_config['webhook_verify_token'] }
 
       it 'calls the whatsapp events job synchronously' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_now)
 
-        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true }
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true, webhookVerifyToken: verify_token }
 
         expect(Webhooks::WhatsappEventsJob).to have_received(:perform_now)
         expect(response).to have_http_status(:ok)
@@ -306,7 +356,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       it 'returns 401 when InvalidWebhookVerifyToken is raised' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(Whatsapp::IncomingMessageBaileysService::InvalidWebhookVerifyToken)
 
-        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true }
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true, webhookVerifyToken: verify_token }
 
         expect(response).to have_http_status(:unauthorized)
       end
@@ -314,7 +364,7 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       it 'returns 404 when MessageNotFoundError is raised' do
         allow(Webhooks::WhatsappEventsJob).to receive(:perform_now).and_raise(Whatsapp::IncomingMessageBaileysService::MessageNotFoundError)
 
-        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true }
+        post "/webhooks/whatsapp/#{baileys_channel.phone_number}", params: { content: 'hello', awaitResponse: true, webhookVerifyToken: verify_token }
 
         expect(response).to have_http_status(:not_found)
       end

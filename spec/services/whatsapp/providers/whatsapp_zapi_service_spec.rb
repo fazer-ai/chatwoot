@@ -56,18 +56,34 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
   describe '#setup_channel_provider' do
     context 'when response is successful' do
-      it 'sets up the webhook and returns true' do
+      it 'registers a webhook URL that carries the token it stores' do
+        registered = nil
         stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
-          .with(
-            headers: stub_headers,
-            body: {
-              value: whatsapp_channel.inbox.callback_webhook_url,
-              notifySentByMe: true
-            }.to_json
-          )
+          .with(headers: stub_headers) { |request| registered = JSON.parse(request.body) }
           .to_return(status: 200)
 
-        expect(service.setup_channel_provider).to be(true)
+        with_modified_env FRONTEND_URL: 'https://chat.example.com' do
+          expect(service.setup_channel_provider).to be(true)
+        end
+
+        token = whatsapp_channel.reload.provider_config['webhook_verify_token']
+        expect(token).to be_present
+        expect(registered).to eq(
+          'value' => "https://chat.example.com/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}",
+          'notifySentByMe' => true
+        )
+      end
+
+      it 'keeps the token the inbox already has' do
+        whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => 'kept-token')
+        whatsapp_channel.save!(validate: false)
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
+          .with(headers: stub_headers, body: hash_including('value' => %r{/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/kept-token\z}))
+          .to_return(status: 200)
+
+        service.setup_channel_provider
+
+        expect(whatsapp_channel.reload.provider_config['webhook_verify_token']).to eq('kept-token')
       end
 
       it 'schedules QR code job when connection is blank' do
@@ -118,6 +134,15 @@ describe Whatsapp::Providers::WhatsappZapiService do
         expect do
           service.setup_channel_provider
         end.to(raise_error { |error| expect(error.class.name).to eq('Whatsapp::Providers::WhatsappZapiService::ProviderUnavailableError') })
+      end
+
+      # Stored without a registration, the token would close the old URL Z-API is still posting to.
+      it 'does not store a token Z-API was not told about' do
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks").to_return(status: 400, body: 'error message')
+        allow(Rails.logger).to receive(:error)
+
+        expect { service.setup_channel_provider }.to raise_error(described_class::ProviderUnavailableError)
+        expect(whatsapp_channel.reload.provider_config['webhook_verify_token']).to be_nil
       end
     end
   end

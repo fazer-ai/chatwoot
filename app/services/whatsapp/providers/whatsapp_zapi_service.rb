@@ -40,11 +40,29 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   def setup_channel_provider
+    register_webhooks
+
+    if whatsapp_channel.provider_connection.blank? || whatsapp_channel.provider_connection['connection'] == 'close'
+      Channels::Whatsapp::ZapiQrCodeJob.perform_later(whatsapp_channel)
+    end
+
+    true
+  end
+
+  # Z-API signs nothing and echoes no secret back, so the URL it posts to is the credential.
+  # The token reaches Z-API before it reaches the column: stored first, a failed registration
+  # would leave Z-API posting to the old URL, which refuses an inbox that has a token, and the
+  # inbox would go silent. Stored second, the worst case is a registration that has to be
+  # repeated. An inbox from before this URL existed gets its first token here, which is also
+  # how Migration::ZapiWebhookUrlJob moves it.
+  def register_webhooks
+    token = whatsapp_channel.provider_config['webhook_verify_token'].presence || SecureRandom.hex(16)
+
     response = HTTParty.put(
       "#{api_instance_path_with_token}/update-every-webhooks",
       headers: api_headers,
       body: {
-        value: whatsapp_channel.inbox.callback_webhook_url,
+        value: webhook_url(token),
         notifySentByMe: true
       }.to_json,
       **ZAPI_REQUEST_OPTIONS
@@ -52,11 +70,7 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
-    if whatsapp_channel.provider_connection.blank? || whatsapp_channel.provider_connection['connection'] == 'close'
-      Channels::Whatsapp::ZapiQrCodeJob.perform_later(whatsapp_channel)
-    end
-
-    true
+    store_webhook_verify_token(token)
   end
 
   def disconnect_channel_provider
@@ -148,6 +162,17 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   private
+
+  def webhook_url(token)
+    "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}"
+  end
+
+  def store_webhook_verify_token(token)
+    return if whatsapp_channel.provider_config['webhook_verify_token'] == token
+
+    whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => token)
+    whatsapp_channel.save!(validate: false)
+  end
 
   def api_instance_path
     "#{API_BASE_PATH}/instances/#{whatsapp_channel.provider_config['instance_id']}"

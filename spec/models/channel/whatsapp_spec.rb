@@ -364,7 +364,7 @@ RSpec.describe Channel::Whatsapp do
     end
 
     context 'when an update writes provider_config without the token' do
-      %w[baileys whatsapp_cloud].each do |provider|
+      %w[baileys whatsapp_cloud zapi].each do |provider|
         it "keeps the stored token on #{provider}" do
           channel = create(:channel_whatsapp, provider: provider,
                                               provider_config: { 'webhook_verify_token' => 'stored-token', 'api_key' => 'test_key' },
@@ -384,6 +384,16 @@ RSpec.describe Channel::Whatsapp do
       channel.update!(provider_config: { 'webhook_verify_token' => 'chosen-by-caller' })
 
       expect(channel.reload.provider_config['webhook_verify_token']).to eq 'stored-token'
+    end
+
+    # Z-API's token is born with the URL that carries it; one minted here would close the old
+    # URL before Z-API had been told about the new one.
+    it 'does not mint a token for zapi' do
+      channel = create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false)
+
+      channel.update!(provider_config: channel.provider_config.merge('instance_id' => 'other'))
+
+      expect(channel.reload.provider_config).not_to have_key('webhook_verify_token')
     end
 
     it 'does not carry the token across a provider change' do

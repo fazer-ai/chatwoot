@@ -2,6 +2,7 @@ class Webhooks::WhatsappController < ActionController::API
   include MetaTokenVerifyConcern
 
   before_action :verify_meta_signature!, only: :process_payload
+  before_action :verify_provider_token!, only: :process_payload
 
   def process_payload
     if inactive_whatsapp_number?
@@ -31,6 +32,28 @@ class Webhooks::WhatsappController < ActionController::API
     head :unauthorized
   rescue Whatsapp::IncomingMessageBaileysService::MessageNotFoundError
     head :not_found
+  end
+
+  # Providers Meta does not sign authenticate with a token of their own, and it has to be
+  # checked here, before anything is queued: a check left to the job answers 200 to anyone
+  # who guesses a number, which tells them the inbox exists and lets them fill the queue.
+  # Baileys echoes the token in every body. Z-API cannot, so it posts to a URL that carries
+  # the token (Webhooks::Whatsapp::ZapiController); this route only keeps taking an inbox
+  # that has not been moved to that URL yet, and refuses it from the moment it has one.
+  def verify_provider_token!
+    case whatsapp_channel&.provider
+    when 'baileys'
+      head :unauthorized unless matches_webhook_verify_token?(params[:webhookVerifyToken])
+    when 'zapi'
+      head :unauthorized if whatsapp_channel.provider_config['webhook_verify_token'].present?
+    end
+  end
+
+  def matches_webhook_verify_token?(given)
+    expected = whatsapp_channel.provider_config['webhook_verify_token']
+    return false if given.blank? || expected.blank?
+
+    ActiveSupport::SecurityUtils.secure_compare(given.to_s, expected.to_s)
   end
 
   def tracking_events_only?

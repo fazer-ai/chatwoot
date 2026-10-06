@@ -545,11 +545,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # by the inbox API and an update is a plain replace of the column: one that leaves the token
   # out would otherwise mint a new one while the provider keeps posting the old one. A provider
   # change (creation included) is the one write that starts over.
+  # Z-API's token is never minted here: it is born with the URL that carries it, in
+  # Whatsapp::Providers::WhatsappZapiService#register_webhooks, and one minted on its own would
+  # close the old URL before Z-API had been told about the new one.
   def ensure_webhook_verify_token
-    return unless provider.in?(%w[whatsapp_cloud baileys])
+    return unless provider.in?(%w[whatsapp_cloud baileys zapi])
 
     stored = provider_config_was.to_h['webhook_verify_token'] unless provider_changed?
-    provider_config['webhook_verify_token'] = stored.presence || provider_config['webhook_verify_token'].presence || SecureRandom.hex(16)
+    token = stored.presence || provider_config['webhook_verify_token'].presence
+    token ||= SecureRandom.hex(16) unless provider == 'zapi'
+    provider_config['webhook_verify_token'] = token if token
   end
 
   # A check that could not reach a verdict is neither a refusal nor a broken application, so it gets a
