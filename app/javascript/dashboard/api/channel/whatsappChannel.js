@@ -48,6 +48,12 @@ class WhatsappChannel extends ApiClient {
       `${this.baseUrl()}/whatsapp/manual/${inboxId}/setup_webhook`
     );
   }
+
+  rotateZapiWebhookUrl(inboxId) {
+    return axios.post(
+      `${this.baseUrl()}/whatsapp/zapi/${inboxId}/rotate_webhook_url`
+    );
+  }
 }
 
 export default new WhatsappChannel();

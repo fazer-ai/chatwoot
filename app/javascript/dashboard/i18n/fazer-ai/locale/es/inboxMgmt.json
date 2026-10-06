@@ -172,6 +172,13 @@
         "REPLACE": "Reemplazar",
         "SUCCESS": "Clave secreta guardada",
         "ERROR": "No se pudo guardar la clave secreta. Verifica que sea de la misma aplicación de Meta que generó el token de acceso de esta bandeja."
+      },
+      "ZAPI_WEBHOOK_URL": {
+        "TITLE": "Dirección de recepción",
+        "HELP": "Z-API entrega los mensajes de esta bandeja en una dirección con una clave propia. Si esa dirección aparece donde no debería, como en un log o en un ticket de soporte, genera una nueva: Z-API pasa a usarla y la anterior deja de funcionar.",
+        "BUTTON": "Generar nueva dirección",
+        "SUCCESS": "Nueva dirección registrada en Z-API.",
+        "ERROR": "Z-API no aceptó la nueva dirección. La bandeja sigue recibiendo por la actual; inténtalo de nuevo."
       }
     },
     "ASSIGNMENT": {

@@ -184,6 +184,66 @@ describe Whatsapp::Providers::WhatsappZapiService do
     end
   end
 
+  describe '#rotate_webhook_url' do
+    let(:update_webhooks_url) { "#{api_instance_path_with_token}/update-every-webhooks" }
+
+    before do
+      whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => 'old_token')
+      whatsapp_channel.save!(validate: false)
+    end
+
+    it 'registers a new URL and stops accepting the old one once Z-API took it' do
+      stub_request(:put, update_webhooks_url).to_return(status: 200)
+
+      service.rotate_webhook_url
+
+      config = whatsapp_channel.reload.provider_config
+      expect(config['webhook_verify_token']).to be_present.and(satisfy { |token| token != 'old_token' })
+      expect(config).not_to have_key('previous_webhook_verify_token')
+      expect(a_request(:put, update_webhooks_url).with(body: hash_including('value' => %r{/#{config['webhook_verify_token']}\z}))).to have_been_made
+    end
+
+    # The inbox keeps receiving on the old URL instead of going silent.
+    it 'keeps the old token open when Z-API does not take the new URL' do
+      stub_request(:put, update_webhooks_url).to_return(status: 400, body: 'error message')
+      allow(Rails.logger).to receive(:error)
+
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+
+      expect(whatsapp_channel.reload.provider_config).to include('previous_webhook_verify_token' => 'old_token')
+    end
+
+    # Z-API may have taken the new URL with its answer lost, so a retry registers that same URL
+    # again rather than a third one, and both stay open.
+    it 'retries an unconfirmed rotation with the token it already made' do
+      stub_request(:put, update_webhooks_url).to_return(status: 400, body: 'error message')
+      allow(Rails.logger).to receive(:error)
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+      pending_token = whatsapp_channel.reload.provider_config['webhook_verify_token']
+
+      expect { service.rotate_webhook_url }.to raise_error(described_class::ProviderUnavailableError)
+
+      expect(whatsapp_channel.reload.provider_config).to include('webhook_verify_token' => pending_token,
+                                                                 'previous_webhook_verify_token' => 'old_token')
+    end
+
+    # A setup or migration that read the token before a rotation must not reach Z-API after it.
+    it 'registers while holding the inbox registration lock' do
+      held = nil
+      stub_request(:put, update_webhooks_url).to_return do
+        held = ActiveRecord::Base.connection.select_value(<<~SQL.squish)
+          SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND granted
+            AND classid = hashtext('zapi_webhook_registration')::oid AND objid = #{whatsapp_channel.id} AND pid = pg_backend_pid()
+        SQL
+        { status: 200 }
+      end
+
+      service.register_webhooks
+
+      expect(held).to be_positive
+    end
+  end
+
   describe '#disconnect_channel_provider' do
     context 'when response is successful' do
       it 'disconnects the whatsapp connection' do

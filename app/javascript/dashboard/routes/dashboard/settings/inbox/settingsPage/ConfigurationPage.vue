@@ -21,6 +21,7 @@ import SessionProviderConfiguration from './SessionProviderConfiguration.vue';
 import WhatsappHistorySync from './WhatsappHistorySync.vue';
 import WhatsappBusinessManagementToken from './WhatsappBusinessManagementToken.vue';
 import WhatsappAppSecret from './WhatsappAppSecret.vue';
+import ZapiWebhookUrl from './ZapiWebhookUrl.vue';
 import InboxName from 'dashboard/components/widgets/InboxName.vue';
 import Switch from 'dashboard/components-next/switch/Switch.vue';
 import HmacSecretKey from './components/HmacSecretKey.vue';
@@ -41,6 +42,7 @@ export default {
     WhatsappHistorySync,
     WhatsappBusinessManagementToken,
     WhatsappAppSecret,
+    ZapiWebhookUrl,
     InboxName,
     // eslint-disable-next-line vue/no-reserved-component-names
     Switch,
@@ -949,6 +951,7 @@ export default {
           </NextButton>
         </div>
       </SettingsSection>
+      <ZapiWebhookUrl :inbox="inbox" />
     </div>
   </div>
 </template>

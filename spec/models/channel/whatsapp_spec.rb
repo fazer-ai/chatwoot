@@ -412,6 +412,21 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.reload.provider_config).to include('webhook_verify_token' => 't', 'webhook_url_confirmed_for' => 'i1')
     end
 
+    # The token a rotation replaced is the inbox's own: an update can neither close it early nor
+    # name one of its own choosing.
+    it 'keeps the replaced zapi token as stored, whatever an update sends' do
+      channel = create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false)
+      channel.provider_config = channel.provider_config.merge('webhook_verify_token' => 't', 'previous_webhook_verify_token' => 'old')
+      channel.save!(validate: false)
+
+      channel.update!(provider_config: { 'instance_id' => 'i1' })
+      expect(channel.reload.provider_config['previous_webhook_verify_token']).to eq('old')
+
+      channel.update_column(:provider_config, channel.provider_config.except('previous_webhook_verify_token')) # rubocop:disable Rails/SkipsModelValidations
+      channel.update!(provider_config: channel.reload.provider_config.merge('previous_webhook_verify_token' => 'chosen'))
+      expect(channel.reload.provider_config).not_to have_key('previous_webhook_verify_token')
+    end
+
     # An inbox update loaded before Z-API's token was reserved must not write the config back without it.
     it 'keeps a zapi token reserved after the record being saved was loaded' do
       channel = create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false)

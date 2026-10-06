@@ -465,6 +465,7 @@ Rails.application.routes.draw do
             post 'manual/connect', to: 'manual_setup#connect'
             get 'manual/:inbox_id/webhook_status', to: 'manual_setup#webhook_status'
             post 'manual/:inbox_id/setup_webhook', to: 'manual_setup#setup_webhook'
+            post 'zapi/:inbox_id/rotate_webhook_url', to: 'zapi_webhook#rotate'
           end
 
           resources :webhooks, only: [:index, :create, :update, :destroy]

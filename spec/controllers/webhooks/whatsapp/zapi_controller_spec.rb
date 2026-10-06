@@ -67,4 +67,27 @@ RSpec.describe 'Webhooks::Whatsapp::ZapiController', type: :request do
     expect(response).to have_http_status(:unauthorized)
     expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
   end
+
+  context 'when a rotation replaced the token' do
+    before do
+      channel.update_column(:provider_config, channel.provider_config.merge('previous_webhook_verify_token' => 'leaked-token')) # rubocop:disable Rails/SkipsModelValidations
+    end
+
+    # Until Z-API is known to use the new URL, the old one is all that keeps the inbox receiving.
+    it 'still takes the replaced token' do
+      post "/webhooks/whatsapp/zapi/#{channel.id}/leaked-token", params: { type: 'ReceivedCallback' }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(channel.reload.provider_config['previous_webhook_verify_token']).to eq('leaked-token')
+    end
+
+    it 'closes the replaced token once a delivery arrives with the new one' do
+      post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token", params: { type: 'ReceivedCallback' }, as: :json
+      post "/webhooks/whatsapp/zapi/#{channel.id}/leaked-token", params: { type: 'ReceivedCallback' }, as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(channel.reload.provider_config).not_to have_key('previous_webhook_verify_token')
+      expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later).once
+    end
+  end
 end
