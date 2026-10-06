@@ -103,6 +103,13 @@
           "NOTICE_WITH_NATIVE": "This provider is legacy. It still works, but we recommend WhatsApp (native) instead.",
           "CONVERT_TO_NATIVE": "Convert to WhatsApp (native)",
           "USE_NATIVE": "Use WhatsApp (native)"
+        },
+        "MANUAL_SETUP": {
+          "APP_SECRET": {
+            "LABEL": "App Secret",
+            "PLACEHOLDER": "Paste your Meta app's App Secret",
+            "HELP": "In your app on developers.facebook.com, open App settings > Basic and copy the App secret. It confirms that each webhook really comes from Meta."
+          }
         }
       }
     },
@@ -154,7 +161,18 @@
       "WHATSAPP_CLIENT_TOKEN_TITLE": "Security Token",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Your Z-API Client Token (see Security tab on Z-API dashboard).",
       "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Update Security Token",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Enter the new Security Token here"
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Enter the new Security Token here",
+      "WHATSAPP_APP_SECRET": {
+        "TITLE": "App Secret",
+        "HELP": "The secret of the Meta app that issued this inbox's access token. It confirms that each webhook really comes from Meta.",
+        "MISSING": "This inbox has no App Secret, so its webhooks are accepted without checking that they come from Meta. A future version will refuse them: add the App Secret to keep receiving messages.",
+        "CONFIGURED": "App Secret configured",
+        "PLACEHOLDER": "Paste the App Secret",
+        "ADD": "Add",
+        "REPLACE": "Replace",
+        "SUCCESS": "App Secret saved",
+        "ERROR": "Could not save the App Secret. Check that it belongs to the same Meta app that issued this inbox's access token."
+      }
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Prevent assignment takeover",

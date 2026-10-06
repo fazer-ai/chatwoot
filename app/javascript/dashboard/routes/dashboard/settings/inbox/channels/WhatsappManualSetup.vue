@@ -55,6 +55,7 @@ const form = reactive({
   wabaId: '',
   phoneNumberId: '',
   accessToken: '',
+  appSecret: '',
   inboxName: '',
 });
 
@@ -72,7 +73,7 @@ const idsComplete = computed(
 );
 
 const detailsComplete = computed(
-  () => idsComplete.value && form.accessToken.trim()
+  () => idsComplete.value && form.accessToken.trim() && form.appSecret.trim()
 );
 
 const connectionReady = computed(
@@ -207,6 +208,7 @@ const verifyDetails = async () => {
       waba_id: form.wabaId.trim(),
       phone_number_id: form.phoneNumberId.trim(),
       access_token: form.accessToken.trim(),
+      app_secret: form.appSecret.trim(),
     });
     preview.value = data;
     form.inboxName = data.suggested_inbox_name;
@@ -267,6 +269,7 @@ const connectNumber = async () => {
       waba_id: form.wabaId.trim(),
       phone_number_id: form.phoneNumberId.trim(),
       access_token: form.accessToken.trim(),
+      app_secret: form.appSecret.trim(),
       inbox_name: form.inboxName.trim(),
     });
     inboxId.value = data.id;
@@ -601,6 +604,23 @@ const continueToAgents = async () => {
             <Icon icon="i-lucide-triangle-alert" class="mt-0.5 shrink-0" />
             {{ t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.TOKEN.WARNING') }}
           </p>
+          <div class="mt-5 flex flex-col gap-2">
+            <Input
+              v-model="form.appSecret"
+              type="password"
+              autocomplete="off"
+              :label="
+                t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.LABEL')
+              "
+              :placeholder="
+                t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.PLACEHOLDER')
+              "
+              @update:model-value="errorMessage = ''"
+            />
+            <p class="text-sm text-n-slate-11">
+              {{ t('INBOX_MGMT.ADD.WHATSAPP.MANUAL_SETUP.APP_SECRET.HELP') }}
+            </p>
+          </div>
         </div>
 
         <div
