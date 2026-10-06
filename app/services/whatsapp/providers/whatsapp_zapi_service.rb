@@ -50,13 +50,14 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   end
 
   # Z-API signs nothing and echoes no secret back, so the URL it posts to is the credential.
-  # The token reaches Z-API before it reaches the column: stored first, a failed registration
-  # would leave Z-API posting to the old URL, which refuses an inbox that has a token, and the
-  # inbox would go silent. Stored second, the worst case is a registration that has to be
-  # repeated. An inbox from before this URL existed gets its first token here, which is also
-  # how Migration::ZapiWebhookUrlJob moves it.
+  # The token is stored before Z-API hears of it, because a registration Z-API applied but
+  # whose answer never arrived would otherwise leave Z-API posting a token this app does not
+  # know. The old URL stays open for the inbox until the new one is confirmed, by Z-API
+  # accepting it here or by its first delivery (Webhooks::Whatsapp::ZapiController), so a
+  # failed registration costs nothing. An inbox from before this URL existed gets its token
+  # here too, which is how Migration::ZapiWebhookUrlJob moves it.
   def register_webhooks
-    token = whatsapp_channel.provider_config['webhook_verify_token'].presence || SecureRandom.hex(16)
+    token = reserve_webhook_verify_token
 
     response = HTTParty.put(
       "#{api_instance_path_with_token}/update-every-webhooks",
@@ -70,7 +71,13 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
-    store_webhook_verify_token(token)
+    confirm_webhook_url
+  end
+
+  def confirm_webhook_url
+    return if whatsapp_channel.provider_config['webhook_url_confirmed']
+
+    update_provider_config { |config| config.merge('webhook_url_confirmed' => true) }
   end
 
   def disconnect_channel_provider
@@ -167,11 +174,24 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
     "#{ENV.fetch('FRONTEND_URL', nil)}/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}"
   end
 
-  def store_webhook_verify_token(token)
-    return if whatsapp_channel.provider_config['webhook_verify_token'] == token
+  # Under the row lock, so a migration and a setup racing on the same inbox settle on one token.
+  def reserve_webhook_verify_token
+    update_provider_config do |config|
+      config['webhook_verify_token'].present? ? config : config.merge('webhook_verify_token' => SecureRandom.hex(16))
+    end
+    whatsapp_channel.provider_config['webhook_verify_token']
+  end
 
-    whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('webhook_verify_token' => token)
-    whatsapp_channel.save!(validate: false)
+  # Merged into the row as it is under the lock, not into the copy this service was handed,
+  # so a credential edit saved in between is not written over.
+  def update_provider_config
+    whatsapp_channel.with_lock do
+      updated = yield whatsapp_channel.provider_config
+      next if updated == whatsapp_channel.provider_config
+
+      whatsapp_channel.provider_config = updated
+      whatsapp_channel.save!(validate: false)
+    end
   end
 
   def api_instance_path

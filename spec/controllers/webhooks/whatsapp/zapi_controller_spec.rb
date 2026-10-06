@@ -20,6 +20,24 @@ RSpec.describe 'Webhooks::Whatsapp::ZapiController', type: :request do
     end
   end
 
+  # The delivery proves Z-API is on this URL, even when its answer to the registration was lost.
+  it 'confirms the new URL on the first delivery, closing the old one' do
+    post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token", params: { type: 'ReceivedCallback' }, as: :json
+
+    expect(channel.reload.provider_config['webhook_url_confirmed']).to be(true)
+  end
+
+  # A Cloud payload makes the job pick the inbox from the body; this token speaks only for its own.
+  it 'does not let the body pick another inbox' do
+    post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token",
+         params: { object: 'whatsapp_business_account', entry: [{ changes: [{ value: { metadata: { phone_number_id: '1' } } }] }] }, as: :json
+
+    expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later) do |args|
+      expect(args).not_to have_key('object')
+      expect(args['phone_number']).to eq(channel.phone_number)
+    end
+  end
+
   it 'answers 401 to a wrong token, an unknown channel and an inbox of another provider alike' do
     baileys = create(:channel_whatsapp, provider: 'baileys', sync_templates: false, validate_provider_config: false)
 

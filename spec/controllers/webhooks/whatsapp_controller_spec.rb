@@ -322,15 +322,24 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
 
       before { allow(Webhooks::WhatsappEventsJob).to receive(:perform_later) }
 
-      it 'keeps taking an inbox that has not been moved to the URL with a token' do
+      it 'keeps taking an inbox that has not been moved to the URL with a token yet' do
         post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }
 
         expect(response).to have_http_status(:ok)
         expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later)
       end
 
-      it 'refuses an inbox that already has a URL with a token' do
+      it 'keeps taking an inbox whose new URL is not confirmed yet' do
         zapi_channel.provider_config = zapi_channel.provider_config.merge('webhook_verify_token' => 'zapi-token')
+        zapi_channel.save!(validate: false)
+
+        post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'refuses an inbox whose new URL is confirmed' do
+        zapi_channel.provider_config = zapi_channel.provider_config.merge('webhook_verify_token' => 'zapi-token', 'webhook_url_confirmed' => true)
         zapi_channel.save!(validate: false)
 
         post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }

@@ -396,6 +396,16 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.reload.provider_config).not_to have_key('webhook_verify_token')
     end
 
+    it 'keeps the confirmation of the zapi URL across an update that leaves it out' do
+      channel = create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false)
+      channel.provider_config = channel.provider_config.merge('webhook_verify_token' => 't', 'webhook_url_confirmed' => true)
+      channel.save!(validate: false)
+
+      channel.update!(provider_config: { 'instance_id' => 'other' })
+
+      expect(channel.reload.provider_config).to include('webhook_verify_token' => 't', 'webhook_url_confirmed' => true)
+    end
+
     it 'does not carry the token across a provider change' do
       channel = create(:channel_whatsapp, provider: 'baileys', provider_config: { 'webhook_verify_token' => 'stored-token' },
                                           validate_provider_config: false, sync_templates: false)
