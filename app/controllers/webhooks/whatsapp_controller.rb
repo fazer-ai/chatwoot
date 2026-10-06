@@ -47,7 +47,7 @@ class Webhooks::WhatsappController < ActionController::API
     when 'baileys'
       head :unauthorized unless matches_webhook_verify_token?(params[:webhookVerifyToken])
     when 'zapi'
-      head :unauthorized if whatsapp_channel.provider_config['webhook_url_confirmed']
+      head :unauthorized if Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: whatsapp_channel).webhook_url_confirmed?
     when *Whatsapp::Session::PROVIDERS
       head :unauthorized
     end
@@ -84,12 +84,16 @@ class Webhooks::WhatsappController < ActionController::API
     @whatsapp_channel ||= whatsapp_business_payload_channel || Channel::Whatsapp.find_by(phone_number: params[:phone_number])
   end
 
+  # A Cloud or 360dialog inbox without a secret cannot have its webhooks verified, and is taken
+  # unsigned only while WHATSAPP_ACCEPT_UNSIGNED_WEBHOOKS allows it: a grace period for the
+  # inboxes set up before a secret was asked for, closed by setting it to false.
   def meta_signature_verification_required?
     return true if whatsapp_channel.blank?
-    return false unless whatsapp_channel.provider == 'whatsapp_cloud'
+    return false unless whatsapp_channel.provider.in?(%w[whatsapp_cloud default])
     return true if channel_meta_app_secrets(whatsapp_channel).present?
+    return true if whatsapp_channel.provider_config['source'] == 'embedded_signup'
 
-    whatsapp_channel.provider_config['source'] == 'embedded_signup'
+    !ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_ACCEPT_UNSIGNED_WEBHOOKS', true))
   end
 
   def whatsapp_business_payload_channel

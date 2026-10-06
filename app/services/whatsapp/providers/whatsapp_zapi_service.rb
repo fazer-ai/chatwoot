@@ -52,11 +52,13 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
   # Z-API signs nothing and echoes no secret back, so the URL it posts to is the credential.
   # The token is stored before Z-API hears of it, because a registration Z-API applied but
   # whose answer never arrived would otherwise leave Z-API posting a token this app does not
-  # know. The old URL stays open for the inbox until the new one is confirmed, by Z-API
-  # accepting it here or by its first delivery (Webhooks::Whatsapp::ZapiController), so a
-  # failed registration costs nothing. An inbox from before this URL existed gets its token
-  # here too, which is how Migration::ZapiWebhookUrlJob moves it.
+  # know. The old URL stays open for the inbox until the instance it points at has confirmed
+  # the new one, by accepting it here or by its first delivery (Webhooks::Whatsapp::ZapiController),
+  # so a failed registration costs nothing and a new instance starts on the old URL again.
+  # An inbox from before this URL existed gets its token here too, which is how
+  # Migration::ZapiWebhookUrlJob moves it.
   def register_webhooks
+    instance_id = whatsapp_channel.provider_config['instance_id']
     token = reserve_webhook_verify_token
 
     response = HTTParty.put(
@@ -71,13 +73,22 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
 
     raise ProviderUnavailableError unless process_response(response)
 
-    confirm_webhook_url
+    confirm_webhook_url(instance_id)
   end
 
-  def confirm_webhook_url
-    return if whatsapp_channel.provider_config['webhook_url_confirmed']
+  def webhook_url_confirmed?
+    config = whatsapp_channel.provider_config
+    config['webhook_url_confirmed_for'].present? && config['webhook_url_confirmed_for'] == config['instance_id']
+  end
 
-    update_provider_config { |config| config.merge('webhook_url_confirmed' => true) }
+  # Only for the instance the inbox points at when the row is locked: an answer or a delivery
+  # from an instance the inbox has since left proves nothing about the one it uses now.
+  def confirm_webhook_url(instance_id)
+    return if instance_id.blank? || webhook_url_confirmed?
+
+    update_provider_config do |config|
+      config['instance_id'] == instance_id ? config.merge('webhook_url_confirmed_for' => instance_id) : config
+    end
   end
 
   def disconnect_channel_provider

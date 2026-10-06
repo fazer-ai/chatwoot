@@ -10,9 +10,10 @@ class Migration::ZapiWebhookUrlJob < ApplicationJob
     stats = { moved: 0, failed: 0 }
 
     Channel::Whatsapp.where(provider: 'zapi').find_each do |channel|
-      next if channel.provider_config['webhook_url_confirmed']
+      service = Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: channel)
+      next if service.webhook_url_confirmed?
 
-      Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: channel).register_webhooks
+      service.register_webhooks
       stats[:moved] += 1
     rescue StandardError => e
       stats[:failed] += 1

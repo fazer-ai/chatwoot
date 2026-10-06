@@ -729,6 +729,31 @@ describe Whatsapp::Providers::WhatsappCloudService do
         expect(subject.validate_provider_config?).to be(false)
       end
     end
+
+    # Webhooks would be verified with it, so a secret from another app would refuse every one of them.
+    context 'when the app secret changes' do
+      let(:api_client) { instance_double(Whatsapp::FacebookApiClient) }
+
+      before do
+        stub_request(:get, 'https://graph.facebook.com/v14.0/123456789/message_templates?access_token=test_key')
+        stub_request(:get, %r{/123456789/phone_numbers}).to_return(status: 200, body: { data: [{ id: '123456789' }] }.to_json,
+                                                                   headers: { 'Content-Type' => 'application/json' })
+        allow(Whatsapp::FacebookApiClient).to receive(:new).with('test_key').and_return(api_client)
+        whatsapp_channel.provider_config = whatsapp_channel.provider_config.merge('app_secret' => 'new_secret')
+      end
+
+      it 'refuses a secret that does not match the token' do
+        allow(api_client).to receive(:app_secret_matches?).with('new_secret').and_return(false)
+
+        expect(service.validate_provider_config?).to be(false)
+      end
+
+      it 'accepts the secret of the app that issued the token' do
+        allow(api_client).to receive(:app_secret_matches?).with('new_secret').and_return(true)
+
+        expect(service.validate_provider_config?).to be(true)
+      end
+    end
   end
 
   describe 'Ability to configure Base URL' do

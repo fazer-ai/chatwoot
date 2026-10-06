@@ -68,7 +68,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         token = whatsapp_channel.reload.provider_config['webhook_verify_token']
         expect(token).to be_present
-        expect(whatsapp_channel.provider_config['webhook_url_confirmed']).to be(true)
+        expect(whatsapp_channel.provider_config['webhook_url_confirmed_for']).to eq('test_instance')
         expect(registered).to eq(
           'value' => "https://chat.example.com/webhooks/whatsapp/zapi/#{whatsapp_channel.id}/#{token}",
           'notifySentByMe' => true
@@ -146,12 +146,26 @@ describe Whatsapp::Providers::WhatsappZapiService do
         expect { service.setup_channel_provider }.to raise_error(described_class::ProviderUnavailableError)
         token = whatsapp_channel.reload.provider_config['webhook_verify_token']
         expect(token).to be_present
-        expect(whatsapp_channel.provider_config).not_to have_key('webhook_url_confirmed')
+        expect(whatsapp_channel.provider_config).not_to have_key('webhook_url_confirmed_for')
 
         stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks")
           .with(body: hash_including('value' => %r{/#{token}\z})).to_return(status: 200)
         service.setup_channel_provider
-        expect(whatsapp_channel.reload.provider_config['webhook_url_confirmed']).to be(true)
+        expect(whatsapp_channel.reload.provider_config['webhook_url_confirmed_for']).to eq('test_instance')
+      end
+
+      it 'does not confirm the URL for an instance the inbox left while it registered' do
+        stub_request(:put, "#{api_instance_path_with_token}/update-every-webhooks").to_return do
+          Channel::Whatsapp.find(whatsapp_channel.id).tap do |other|
+            other.provider_config = other.provider_config.merge('instance_id' => 'another_instance')
+            other.save!(validate: false)
+          end
+          { status: 200 }
+        end
+
+        service.setup_channel_provider
+
+        expect(whatsapp_channel.reload.provider_config).not_to have_key('webhook_url_confirmed_for')
       end
 
       it 'does not write over a credential saved while it registers' do
@@ -165,7 +179,7 @@ describe Whatsapp::Providers::WhatsappZapiService do
 
         service.setup_channel_provider
 
-        expect(whatsapp_channel.reload.provider_config).to include('client_token' => 'edited', 'webhook_url_confirmed' => true)
+        expect(whatsapp_channel.reload.provider_config).to include('client_token' => 'edited', 'webhook_url_confirmed_for' => 'test_instance')
       end
     end
   end

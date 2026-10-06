@@ -130,6 +130,9 @@ FactoryBot.define do
           'business_account_id' => '123456789'
         }
         default_config['source'] = 'embedded_signup' unless channel_whatsapp.provider_config.key?('source')
+        # A manual inbox is created with its Meta app's secret (Channel::Whatsapp#app_secret_required?).
+        manual = (default_config['source'] || channel_whatsapp.provider_config['source']) != 'embedded_signup'
+        default_config['app_secret'] = 'test_app_secret' if manual && !channel_whatsapp.provider_config.key?('app_secret')
         channel_whatsapp.provider_config = channel_whatsapp.provider_config.merge(default_config)
       end
     end

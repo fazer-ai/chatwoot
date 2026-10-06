@@ -244,7 +244,7 @@ RSpec.describe 'Inboxes API', type: :request do
       it 'does not flag reauthorization_required for manual whatsapp channel even when reauth required' do
         whatsapp_channel = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', sync_templates: false,
                                                      validate_provider_config: false)
-        whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge('source' => 'manual'))
+        whatsapp_channel.update!(provider_config: whatsapp_channel.provider_config.merge('source' => 'manual', 'app_secret' => 's'))
         whatsapp_inbox = create(:inbox, channel: whatsapp_channel, account: account)
         whatsapp_channel.prompt_reauthorization!
 
@@ -2308,7 +2308,7 @@ RSpec.describe 'Inboxes API', type: :request do
     let(:channel) { create(:channel_whatsapp, account: account, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
     let(:inbox) { channel.inbox }
     let(:new_cloud_config) do
-      { api_key: 'new_cloud_key', phone_number_id: 'new_phone_id', business_account_id: 'new_waba_id' }
+      { api_key: 'new_cloud_key', phone_number_id: 'new_phone_id', business_account_id: 'new_waba_id', app_secret: 'new_secret' }
     end
 
     before do
@@ -2318,6 +2318,7 @@ RSpec.describe 'Inboxes API', type: :request do
         .to_return(status: 200, body: { data: [] }.to_json, headers: { 'Content-Type' => 'application/json' })
       stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/.*/phone_numbers.*})
         .to_return(status: 200, body: { data: [{ id: 'new_phone_id' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
+      stub_request(:get, %r{graph\.facebook\.com/v\d+\.\d+/me\?}).to_return(status: 200, body: { id: '1' }.to_json)
       webhook_setup_service = instance_double(Whatsapp::WebhookSetupService, perform: nil)
       allow(Whatsapp::WebhookSetupService).to receive(:new).and_return(webhook_setup_service)
     end

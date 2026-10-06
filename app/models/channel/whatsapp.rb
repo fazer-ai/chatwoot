@@ -51,6 +51,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
   validate :validate_provider_config
+  validate :validate_app_secret, if: :app_secret_required?
 
   has_one :inbox, as: :channel, dependent: :destroy
 
@@ -546,21 +547,44 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # out would otherwise mint a new one while the provider keeps posting the old one. A provider
   # change (creation included) is the one write that starts over.
   # Z-API's token is never minted here: it is born with the URL that carries it, in
-  # Whatsapp::Providers::WhatsappZapiService#register_webhooks. So is the mark that Z-API took
-  # that URL, which closes the old one for the inbox and is kept the same way the token is.
+  # Whatsapp::Providers::WhatsappZapiService#register_webhooks. So is the record of which Z-API
+  # instance took that URL, which closes the old one for the inbox and is kept the same way.
   def ensure_webhook_verify_token
     return unless provider.in?(%w[whatsapp_cloud baileys zapi])
 
-    stored = provider_changed? ? {} : provider_config_was.to_h
+    stored = provider_changed? ? {} : stored_provider_config
     token = stored['webhook_verify_token'].presence || provider_config['webhook_verify_token'].presence
     return keep_zapi_webhook_url(token, stored) if provider == 'zapi'
 
     provider_config['webhook_verify_token'] = token || SecureRandom.hex(16)
   end
 
+  # The row as it is now, locked until this save commits, rather than provider_config_was: a record
+  # loaded before a Z-API token was reserved would otherwise write the config back without it.
+  def stored_provider_config
+    return {} if new_record?
+
+    self.class.lock.where(id: id).pick(:provider_config).to_h
+  end
+
   def keep_zapi_webhook_url(token, stored)
     provider_config['webhook_verify_token'] = token if token
-    provider_config['webhook_url_confirmed'] = true if stored['webhook_url_confirmed']
+    provider_config['webhook_url_confirmed_for'] = stored['webhook_url_confirmed_for'] if stored['webhook_url_confirmed_for']
+  end
+
+  # Meta signs every Cloud webhook with the secret of the app that issued the token. Embedded
+  # signup runs on the installation's own app, whose secret is WHATSAPP_APP_SECRET; any other
+  # Cloud inbox brings its app's, or its webhooks cannot be told apart from a forged one. Asked
+  # for when an inbox becomes a manual Cloud inbox (created, converted or moved off embedded
+  # signup), so the inboxes that already exist keep working until their operator adds it.
+  def app_secret_required?
+    return false unless provider == 'whatsapp_cloud' && provider_config['source'] != 'embedded_signup'
+
+    new_record? || provider_changed? || provider_config_was.to_h['source'] == 'embedded_signup'
+  end
+
+  def validate_app_secret
+    errors.add(:provider_config, 'App secret is required') if provider_config['app_secret'].blank?
   end
 
   # A check that could not reach a verdict is neither a refusal nor a broken application, so it gets a

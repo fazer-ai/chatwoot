@@ -2,10 +2,11 @@ class Whatsapp::ManualSetupValidationService
   LOG_PREFIX = '[WHATSAPP MANUAL SETUP]'.freeze
   MESSAGING_PERMISSION = 'whatsapp_business_messaging'.freeze
 
-  def initialize(waba_id:, phone_number_id:, access_token:)
+  def initialize(waba_id:, phone_number_id:, access_token:, app_secret:)
     @waba_id = waba_id
     @phone_number_id = phone_number_id
     @access_token = access_token
+    @app_secret = app_secret
     @api_client = Whatsapp::FacebookApiClient.new(access_token)
   end
 
@@ -24,6 +25,7 @@ class Whatsapp::ManualSetupValidationService
     verify_uniqueness!(phone_data)
     verify_template_access!
     verify_messaging_access!
+    verify_app_secret!
 
     build_preview(phone_data)
   end
@@ -34,6 +36,7 @@ class Whatsapp::ManualSetupValidationService
     raise ArgumentError, 'WABA ID is required' if @waba_id.blank?
     raise ArgumentError, 'Phone Number ID is required' if @phone_number_id.blank?
     raise ArgumentError, 'Access token is required' if @access_token.blank?
+    raise ArgumentError, 'App secret is required' if @app_secret.blank?
   end
 
   def find_phone_data!
@@ -81,6 +84,14 @@ class Whatsapp::ManualSetupValidationService
   rescue StandardError
     raise ArgumentError,
           'The token cannot access WhatsApp messaging. Generate a token with whatsapp_business_messaging permission.'
+  end
+
+  # Webhooks are signed with the secret of the app that issued the token; any other secret
+  # would make every one of them fail verification, with nothing on screen to say why.
+  def verify_app_secret!
+    return if @api_client.app_secret_matches?(@app_secret)
+
+    raise ArgumentError, 'The App Secret does not belong to the Meta app that issued this access token.'
   end
 
   def build_preview(phone_data)

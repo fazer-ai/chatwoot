@@ -77,6 +77,22 @@ class Whatsapp::FacebookApiClient # rubocop:disable Metrics/ClassLength
     handle_response(response, 'WhatsApp business profile fetch failed')
   end
 
+  # Meta checks an appsecret_proof whenever a request carries one, so a proof made with a secret
+  # from another app (or a mistyped one) is refused even where the app does not require proofs.
+  # That is the only way to know, before the first webhook, that the secret will verify them.
+  def app_secret_matches?(app_secret)
+    response = HTTParty.get(
+      "#{BASE_URI}/#{@api_version}/me",
+      **GRAPH_REQUEST_OPTIONS, **@deadline.cut(GRAPH_REQUEST_OPTIONS),
+      headers: request_headers,
+      query: { fields: 'id', appsecret_proof: OpenSSL::HMAC.hexdigest('SHA256', app_secret.to_s, @access_token.to_s) }
+    )
+    return true if response.success?
+    return false if response.body.to_s.include?('appsecret_proof')
+
+    handle_response(response, 'App secret check failed')
+  end
+
   def fetch_permissions
     response = HTTParty.get(
       "#{BASE_URI}/#{@api_version}/me/permissions",

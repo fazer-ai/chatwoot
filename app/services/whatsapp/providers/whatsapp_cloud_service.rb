@@ -89,7 +89,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     # The templates check only proves the WABA/token pair, so verify the phone_number_id belongs to this WABA when it changes.
     return true unless whatsapp_channel.provider_config_changed?
 
-    phone_number_belongs_to_waba?(config)
+    phone_number_belongs_to_waba?(config) && app_secret_matches_token?(config)
   end
 
   def api_headers
@@ -191,6 +191,12 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     return true if ids.any? { |number| number['id'] == config['phone_number_id'].to_s }
 
     log_transfer_failure('phone_number_id_check', response)
+  end
+
+  def app_secret_matches_token?(config)
+    return true if config['app_secret'].blank? || config['app_secret'] == whatsapp_channel.provider_config_was.to_h['app_secret']
+
+    credential_check_request { Whatsapp::FacebookApiClient.new(config['api_key']).app_secret_matches?(config['app_secret']) }
   end
 
   def log_transfer_failure(check, response)

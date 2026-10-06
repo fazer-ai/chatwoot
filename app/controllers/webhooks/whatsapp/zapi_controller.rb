@@ -21,7 +21,7 @@ class Webhooks::Whatsapp::ZapiController < Webhooks::WhatsappController
     params.delete(:channel_id)
     params.delete(:object)
     params[:phone_number] = whatsapp_channel.phone_number
-    Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: whatsapp_channel).confirm_webhook_url
+    Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: whatsapp_channel).confirm_webhook_url(params[:instanceId])
   end
 
   def whatsapp_channel

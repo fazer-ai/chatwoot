@@ -200,40 +200,50 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
       expect(response).to have_http_status(:success)
     end
 
-    it 'skips signature validation for 360dialog channels' do
-      dialog_channel = create(:channel_whatsapp, provider: 'default', sync_templates: false, validate_provider_config: false)
-      allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
-      expect(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+    # Inboxes set up before a secret was asked for: taken unsigned during the grace period,
+    # refused once the installation closes it.
+    context 'with an inbox that has no app secret' do
+      let(:dialog_channel) { create(:channel_whatsapp, provider: 'default', sync_templates: false, validate_provider_config: false) }
+      let(:manual_channel) do
+        channel.tap do |legacy|
+          legacy.update_column(:provider_config, legacy.provider_config.except('app_secret', 'source')) # rubocop:disable Rails/SkipsModelValidations
+        end
+      end
 
-      post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{dialog_channel.phone_number}", body)
+      before { allow(Webhooks::WhatsappEventsJob).to receive(:perform_later) }
 
-      expect(response).to have_http_status(:success)
+      it 'takes their webhooks unsigned by default' do
+        post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{dialog_channel.phone_number}", body)
+        expect(response).to have_http_status(:success)
+
+        post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{manual_channel.phone_number}", body)
+        expect(response).to have_http_status(:success)
+
+        expect(Webhooks::WhatsappEventsJob).to have_received(:perform_later).twice
+      end
+
+      it 'refuses them unsigned when WHATSAPP_ACCEPT_UNSIGNED_WEBHOOKS is false' do
+        env = { WHATSAPP_APP_SECRET: client_secret, WHATSAPP_ACCEPT_UNSIGNED_WEBHOOKS: 'false' }
+
+        post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{dialog_channel.phone_number}", body, env: env)
+        expect(response).to have_http_status(:unauthorized)
+
+        post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{manual_channel.phone_number}", body, env: env)
+        expect(response).to have_http_status(:unauthorized)
+
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+      end
     end
 
-    it 'skips signature validation for manual whatsapp cloud channels without an app secret' do
-      channel.update!(
-        provider_config: channel.provider_config.except('app_secret', 'app_secret_key', 'api_secret', 'client_secret', 'source')
-      )
+    it 'refuses an unsigned webhook for a manual inbox that has its app secret' do
+      manual = create(:channel_whatsapp, provider: 'whatsapp_cloud', provider_config: { 'source' => 'manual_setup_v2' },
+                                         sync_templates: false, validate_provider_config: false)
       allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
-      expect(Webhooks::WhatsappEventsJob).to receive(:perform_later)
 
-      channel_body = {
-        object: 'whatsapp_business_account',
-        entry: [{
-          changes: [{
-            value: {
-              metadata: {
-                display_phone_number: channel.phone_number.delete_prefix('+'),
-                phone_number_id: channel.provider_config['phone_number_id']
-              }
-            }
-          }]
-        }]
-      }.to_json
+      post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{manual.phone_number}", body)
 
-      post_unsigned_whatsapp_webhook("/webhooks/whatsapp/#{channel.phone_number}", channel_body)
-
-      expect(response).to have_http_status(:success)
+      expect(response).to have_http_status(:unauthorized)
+      expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
     end
 
     it 'returns unauthorized when signature is missing' do
@@ -338,8 +348,20 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
         expect(response).to have_http_status(:ok)
       end
 
+      # The new instance was never told about the URL with a token.
+      it 'takes the inbox again once it points at another instance' do
+        zapi_channel.provider_config = zapi_channel.provider_config.merge('instance_id' => 'i2', 'webhook_verify_token' => 'zapi-token',
+                                                                          'webhook_url_confirmed_for' => 'i1')
+        zapi_channel.save!(validate: false)
+
+        post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }
+
+        expect(response).to have_http_status(:ok)
+      end
+
       it 'refuses an inbox whose new URL is confirmed' do
-        zapi_channel.provider_config = zapi_channel.provider_config.merge('webhook_verify_token' => 'zapi-token', 'webhook_url_confirmed' => true)
+        zapi_channel.provider_config = zapi_channel.provider_config.merge('instance_id' => 'i1', 'webhook_verify_token' => 'zapi-token',
+                                                                          'webhook_url_confirmed_for' => 'i1')
         zapi_channel.save!(validate: false)
 
         post "/webhooks/whatsapp/#{zapi_channel.phone_number}", params: { type: 'ReceivedCallback' }

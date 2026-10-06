@@ -5,7 +5,7 @@ RSpec.describe Migration::ZapiWebhookUrlJob do
   let(:legacy) { create(:channel_whatsapp, provider: 'zapi', provider_config: zapi_config, validate_provider_config: false, sync_templates: false) }
   let(:moved) do
     create(:channel_whatsapp, provider: 'zapi', validate_provider_config: false, sync_templates: false).tap do |channel|
-      channel.provider_config = zapi_config.merge('webhook_verify_token' => 'already', 'webhook_url_confirmed' => true)
+      channel.provider_config = zapi_config.merge('webhook_verify_token' => 'already', 'webhook_url_confirmed_for' => 'instance')
       channel.save!(validate: false)
     end
   end
@@ -17,7 +17,7 @@ RSpec.describe Migration::ZapiWebhookUrlJob do
     stub_request(:put, webhooks_url).to_return(status: 200)
 
     expect(described_class.perform_now).to eq(moved: 1, failed: 0)
-    expect(legacy.reload.provider_config).to include('webhook_url_confirmed' => true)
+    expect(legacy.reload.provider_config).to include('webhook_url_confirmed_for' => 'instance')
     expect(moved.reload.provider_config['webhook_verify_token']).to eq('already')
     expect(a_request(:put, webhooks_url)).to have_been_made.once
   end
@@ -29,7 +29,7 @@ RSpec.describe Migration::ZapiWebhookUrlJob do
     allow(Rails.logger).to receive(:warn)
 
     expect(described_class.perform_now).to eq(moved: 0, failed: 1)
-    expect(legacy.reload.provider_config).not_to have_key('webhook_url_confirmed')
+    expect(legacy.reload.provider_config).not_to have_key('webhook_url_confirmed_for')
     expect(Rails.logger).to have_received(:warn).with(/still on the old URL channel_id=#{legacy.id}/)
   end
 end

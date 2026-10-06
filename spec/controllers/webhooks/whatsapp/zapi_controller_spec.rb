@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe 'Webhooks::Whatsapp::ZapiController', type: :request do
   let(:channel) do
     create(:channel_whatsapp, provider: 'zapi', sync_templates: false, validate_provider_config: false).tap do |zapi|
-      zapi.provider_config = zapi.provider_config.merge('webhook_verify_token' => 'zapi-token')
+      zapi.provider_config = zapi.provider_config.merge('instance_id' => 'inst-1', 'webhook_verify_token' => 'zapi-token')
       zapi.save!(validate: false)
     end
   end
@@ -22,9 +22,15 @@ RSpec.describe 'Webhooks::Whatsapp::ZapiController', type: :request do
 
   # The delivery proves Z-API is on this URL, even when its answer to the registration was lost.
   it 'confirms the new URL on the first delivery, closing the old one' do
-    post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token", params: { type: 'ReceivedCallback' }, as: :json
+    post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token", params: { type: 'ReceivedCallback', instanceId: 'inst-1' }, as: :json
 
-    expect(channel.reload.provider_config['webhook_url_confirmed']).to be(true)
+    expect(channel.reload.provider_config['webhook_url_confirmed_for']).to eq('inst-1')
+  end
+
+  it 'does not confirm it for a delivery from an instance the inbox has left' do
+    post "/webhooks/whatsapp/zapi/#{channel.id}/zapi-token", params: { type: 'ReceivedCallback', instanceId: 'old-instance' }, as: :json
+
+    expect(channel.reload.provider_config).not_to have_key('webhook_url_confirmed_for')
   end
 
   # A Cloud payload makes the job pick the inbox from the body; this token speaks only for its own.
