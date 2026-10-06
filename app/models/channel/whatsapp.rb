@@ -557,6 +557,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     return keep_zapi_webhook_url(token, stored) if provider == 'zapi'
 
     provider_config['webhook_verify_token'] = token || SecureRandom.hex(16)
+    keep_app_secret(stored)
+  end
+
+  # Kept like the token, for the same wholesale replace: an update that left the secret out
+  # would otherwise turn an inbox whose webhooks are verified back into one that takes them
+  # unsigned. Replacing it is fine; removing it is not something an update can do.
+  def keep_app_secret(stored)
+    return if provider_config['app_secret'].present? || stored['app_secret'].blank?
+
+    provider_config['app_secret'] = stored['app_secret']
   end
 
   # The row as it is now, locked until this save commits, rather than provider_config_was: a record

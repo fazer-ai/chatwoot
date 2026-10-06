@@ -193,8 +193,12 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     log_transfer_failure('phone_number_id_check', response)
   end
 
+  # Checked when either half changes: a token from another Meta app would leave the inbox
+  # verifying webhooks with a secret that app does not sign them with.
   def app_secret_matches_token?(config)
-    return true if config['app_secret'].blank? || config['app_secret'] == whatsapp_channel.provider_config_was.to_h['app_secret']
+    stored = whatsapp_channel.provider_config_was.to_h
+    return true if config['app_secret'].blank?
+    return true if config['app_secret'] == stored['app_secret'] && config['api_key'] == stored['api_key']
 
     credential_check_request { Whatsapp::FacebookApiClient.new(config['api_key']).app_secret_matches?(config['app_secret']) }
   end

@@ -754,6 +754,26 @@ describe Whatsapp::Providers::WhatsappCloudService do
         expect(service.validate_provider_config?).to be(true)
       end
     end
+
+    # A token from another Meta app would leave the inbox checking webhooks with the wrong secret.
+    context 'when only the token changes' do
+      let(:api_client) { instance_double(Whatsapp::FacebookApiClient) }
+
+      before do
+        whatsapp_channel.update_column(:provider_config, whatsapp_channel.provider_config.merge('app_secret' => 'kept_secret')) # rubocop:disable Rails/SkipsModelValidations
+        whatsapp_channel.reload.provider_config = whatsapp_channel.provider_config.merge('api_key' => 'other_app_token')
+        stub_request(:get, %r{/123456789/message_templates}).to_return(status: 200)
+        stub_request(:get, %r{/123456789/phone_numbers}).to_return(status: 200, body: { data: [{ id: '123456789' }] }.to_json,
+                                                                   headers: { 'Content-Type' => 'application/json' })
+        allow(Whatsapp::FacebookApiClient).to receive(:new).with('other_app_token').and_return(api_client)
+      end
+
+      it 'checks the stored secret against the new token' do
+        allow(api_client).to receive(:app_secret_matches?).with('kept_secret').and_return(false)
+
+        expect(service.validate_provider_config?).to be(false)
+      end
+    end
   end
 
   describe 'Ability to configure Base URL' do

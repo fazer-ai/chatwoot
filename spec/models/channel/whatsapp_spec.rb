@@ -465,6 +465,17 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.errors[:provider_config]).to include('App secret is required')
     end
 
+    # Left out by a wholesale replace, it would turn verified webhooks back into unsigned ones.
+    it 'is kept when an update leaves it out' do
+      channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', account: account, provider_config: { 'source' => 'manual_setup_v2' },
+                                          validate_provider_config: false, sync_templates: false)
+      expect(channel.provider_config['app_secret']).to be_present
+
+      channel.update!(provider_config: channel.provider_config.except('app_secret').merge('api_key' => 'rotated'))
+
+      expect(channel.reload.provider_config).to include('app_secret' => 'test_app_secret', 'api_key' => 'rotated')
+    end
+
     # Inboxes from before the secret was asked for keep working until their operator adds one.
     it 'is not asked of a manual inbox that already exists' do
       channel = create(:channel_whatsapp, provider: 'whatsapp_cloud', account: account, provider_config: { 'source' => 'manual_setup_v2' },
