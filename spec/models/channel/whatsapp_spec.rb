@@ -476,6 +476,16 @@ RSpec.describe Channel::Whatsapp do
       expect(channel.reload.provider_config).to include('app_secret' => 'test_app_secret', 'api_key' => 'rotated')
     end
 
+    it 'is kept on a 360dialog inbox too' do
+      channel = create(:channel_whatsapp, provider: 'default', account: account, validate_provider_config: false, sync_templates: false)
+      channel.update_column(:provider_config, channel.provider_config.merge('app_secret' => 'dialog_secret')) # rubocop:disable Rails/SkipsModelValidations
+      channel.reload.define_singleton_method(:validate_provider_config) { nil }
+
+      channel.update!(provider_config: { 'api_key' => 'rotated' })
+
+      expect(channel.reload.provider_config).to include('app_secret' => 'dialog_secret', 'api_key' => 'rotated')
+    end
+
     # Reauthorized through embedded signup, the inbox is verified with the installation's secret,
     # and the manual app's one would be checked against a token it did not issue.
     it 'is dropped when a manual inbox moves to embedded signup' do

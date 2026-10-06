@@ -47,6 +47,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # snapshot, so keeping it would make the 5-min poll re-broadcast every cycle for no reason).
   NEW_CHAT_CAP_KEYS = %w[capping_status ote_status mv_status total_quota used_quota cycle_start_timestamp cycle_end_timestamp].freeze
   before_validation :ensure_webhook_verify_token
+  before_validation :keep_app_secret, if: -> { provider.in?(%w[whatsapp_cloud default]) }
 
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
@@ -557,19 +558,26 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     return keep_zapi_webhook_url(token, stored) if provider == 'zapi'
 
     provider_config['webhook_verify_token'] = token || SecureRandom.hex(16)
-    keep_app_secret(stored)
   end
 
   # Kept like the token, for the same wholesale replace: an update that left the secret out
   # would otherwise turn an inbox whose webhooks are verified back into one that takes them
   # unsigned. Replacing it is fine; removing it is not something an update can do. The one
-  # exception is embedded signup, which runs on the installation's app and is verified with
-  # WHATSAPP_APP_SECRET: a secret left from a manual setup belongs to another app.
-  def keep_app_secret(stored)
-    return provider_config.delete('app_secret') if provider_config['source'] == 'embedded_signup'
+  # exception is a move to embedded signup, which runs on the installation's app and is
+  # verified with WHATSAPP_APP_SECRET: the secret left from the manual setup belongs to
+  # another app, and would be checked against a token that app did not issue.
+  def keep_app_secret
+    return if provider_changed?
+
+    stored = stored_provider_config
+    return provider_config.delete('app_secret') if moving_to_embedded_signup?(stored)
     return if provider_config['app_secret'].present? || stored['app_secret'].blank?
 
     provider_config['app_secret'] = stored['app_secret']
+  end
+
+  def moving_to_embedded_signup?(stored)
+    provider_config['source'] == 'embedded_signup' && stored['source'] != 'embedded_signup'
   end
 
   # The row as it is now, locked until this save commits, rather than provider_config_was: a record
