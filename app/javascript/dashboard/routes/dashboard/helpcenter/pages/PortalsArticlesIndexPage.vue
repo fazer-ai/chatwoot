@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useMapGetter, useStore } from 'dashboard/composables/store.js';
 import allLocales from 'shared/constants/locales.js';
 import { getArticleStatus } from 'dashboard/helper/portalHelper.js';
+import { useArticleListSort } from 'dashboard/composables/useArticleListSort';
+import { useAbortableRequest } from 'dashboard/composables/useAbortableRequest';
 import ArticlesPage from 'dashboard/components-next/HelpCenter/Pages/ArticlePage/ArticlesPage.vue';
 
 const route = useRoute();
@@ -22,6 +24,10 @@ const meta = useMapGetter('articles/getMeta');
 const portalMeta = useMapGetter('portals/getMeta');
 const currentUserId = useMapGetter('getCurrentUserID');
 const getPortalBySlug = useMapGetter('portals/portalBySlug');
+const { appliesHere: sortApplies, sort } = useArticleListSort();
+// Changing the order, the tab or the search in quick succession must not let an older response
+// land last and replace the list the controls describe.
+const { run: runLatest } = useAbortableRequest();
 
 const selectedPortalSlug = computed(() => route.params.portalSlug);
 const selectedCategorySlug = computed(() => route.params.categorySlug);
@@ -69,15 +75,19 @@ const articles = computed(() =>
 );
 
 const fetchArticles = ({ pageNumber: pageNumberParam } = {}) => {
-  store.dispatch('articles/index', {
-    pageNumber: pageNumberParam || pageNumber.value,
-    portalSlug: selectedPortalSlug.value,
-    locale: activeLocale.value,
-    status: status.value,
-    authorId: author.value,
-    categorySlug: selectedCategorySlug.value,
-    query: searchQuery.value || undefined,
-  });
+  runLatest(signal =>
+    store.dispatch('articles/index', {
+      pageNumber: pageNumberParam || pageNumber.value,
+      portalSlug: selectedPortalSlug.value,
+      locale: activeLocale.value,
+      status: status.value,
+      authorId: author.value,
+      categorySlug: selectedCategorySlug.value,
+      sort: sortApplies.value ? sort.value : undefined,
+      query: searchQuery.value || undefined,
+      signal,
+    })
+  );
 };
 
 const onPageChange = pageNumberParam => {
@@ -106,6 +116,12 @@ const fetchPortalAndItsCategories = async locale => {
 
 onMounted(() => {
   fetchArticles();
+});
+
+watch(sort, () => {
+  if (!sortApplies.value) return;
+  pageNumber.value = 1;
+  fetchArticles({ pageNumber: 1 });
 });
 
 watch(

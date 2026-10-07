@@ -19,6 +19,30 @@
           "ERROR": "Custom body HTML must be less than 15,000 characters"
         }
       }
+    },
+    "ARTICLES_PAGE": {
+      "ARTICLES_HEADER": {
+        "SORT": {
+          "BUTTON": "Sort articles",
+          "SORT_BY": "Sort by",
+          "ORDER": "Order",
+          "FIELDS": {
+            "UPDATED_AT": "Last updated",
+            "CREATED_AT": "Created",
+            "TITLE": "Title",
+            "VIEWS": "Views"
+          },
+          "ORDERS": {
+            "ASCENDING": "Ascending",
+            "DESCENDING": "Descending"
+          }
+        }
+      },
+      "ARTICLE_CARD": {
+        "CARD": {
+          "CREATED": "Created {time}"
+        }
+      }
     }
   }
 }

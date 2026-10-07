@@ -12,6 +12,8 @@ pt_BR:
     messages:
       deleted: Esta mensagem foi excluída
   errors:
+    articles:
+      invalid_sort: Ordenação de artigos desconhecida. Use updated_at, created_at, title ou views, com - na frente para ordem decrescente.
     request:
       unexpected: Não foi possível completar a requisição.
     account:

@@ -7,7 +7,17 @@ import types from '../../mutation-types';
 export const actions = {
   index: async (
     { commit },
-    { pageNumber, portalSlug, locale, status, authorId, categorySlug, query }
+    {
+      pageNumber,
+      portalSlug,
+      locale,
+      status,
+      authorId,
+      categorySlug,
+      sort,
+      query,
+      signal,
+    }
   ) => {
     try {
       commit(types.SET_UI_FLAG, { isFetching: true });
@@ -18,7 +28,9 @@ export const actions = {
         status,
         authorId,
         categorySlug,
+        sort,
         query,
+        signal,
       });
       const payload = camelcaseKeys(data.payload);
       const meta = camelcaseKeys(data.meta);
@@ -31,7 +43,8 @@ export const actions = {
     } catch (error) {
       return throwErrorMessage(error);
     } finally {
-      commit(types.SET_UI_FLAG, { isFetching: false });
+      // A superseded request leaves the flag to the one that replaced it.
+      if (!signal?.aborted) commit(types.SET_UI_FLAG, { isFetching: false });
     }
   },
 

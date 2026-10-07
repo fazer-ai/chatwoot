@@ -11,6 +11,7 @@ import {
 } from 'dashboard/helper/portalHelper.js';
 import wootConstants from 'dashboard/constants/globals';
 import { hasPendingChanges } from 'dashboard/helper/articleDiffHelper';
+import { useArticleListSort } from 'dashboard/composables/useArticleListSort';
 
 import ArticleCard from 'dashboard/components-next/HelpCenter/ArticleCard/ArticleCard.vue';
 import DraggableReorderList from 'dashboard/components-next/DraggableReorderList/DraggableReorderList.vue';
@@ -57,6 +58,11 @@ const store = useStore();
 const { t } = useI18n();
 
 const hoveredArticleId = ref(null);
+
+const { appliesHere: sortApplies, sortField } = useArticleListSort();
+const showCreatedAt = computed(
+  () => sortApplies.value && sortField.value === 'created_at'
+);
 
 const dragEnabled = computed(() => {
   const canReorder = props.articles?.length > 1 || props.totalPages > 1;
@@ -240,6 +246,7 @@ const updateArticle = ({ action, value, id }) => {
         :category="getCategory(item.category.id)"
         :views="item.views || 0"
         :updated-at="item.updatedAt"
+        :created-at="showCreatedAt ? item.createdAt : null"
         :is-selected="selectedArticleIds.has(item.id)"
         :has-pending-changes="
           item.status === ARTICLE_STATUSES.PUBLISHED && hasPendingChanges(item)
@@ -263,6 +270,7 @@ const updateArticle = ({ action, value, id }) => {
         :category="getCategory(item.category.id)"
         :views="item.views || 0"
         :updated-at="item.updatedAt"
+        :created-at="showCreatedAt ? item.createdAt : null"
       />
     </template>
   </DraggableReorderList>

@@ -12,6 +12,8 @@ es:
     messages:
       deleted: Este mensaje fue eliminado
   errors:
+    articles:
+      invalid_sort: Orden de artículos desconocido. Usa updated_at, created_at, title o views, con - delante para orden descendente.
     request:
       unexpected: No se pudo completar la solicitud.
     account:

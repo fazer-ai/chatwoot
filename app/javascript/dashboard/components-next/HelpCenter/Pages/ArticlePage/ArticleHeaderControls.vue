@@ -14,6 +14,7 @@ import TabBar from 'dashboard/components-next/tabbar/TabBar.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
 import EmojiIcon from 'dashboard/components-next/emoji-icon-picker/EmojiIcon.vue';
+import ArticleSortMenu from 'dashboard/components-next/HelpCenter/Pages/ArticlePage/ArticleSortMenu.vue';
 
 const props = defineProps({
   categories: {
@@ -194,6 +195,7 @@ const handleTabChange = value => {
           </OnClickOutside>
         </div>
       </div>
+      <ArticleSortMenu />
       <Button
         :label="t('HELP_CENTER.ARTICLES_PAGE.ARTICLES_HEADER.NEW_ARTICLE')"
         icon="i-lucide-plus"

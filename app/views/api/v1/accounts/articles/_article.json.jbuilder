@@ -8,6 +8,7 @@ json.draft_title article.draft_title
 json.draft_content article.draft_content
 json.position article.position
 json.account_id article.account_id
+json.created_at article.created_at.to_i
 json.updated_at article.updated_at.to_i
 json.meta article.meta
 

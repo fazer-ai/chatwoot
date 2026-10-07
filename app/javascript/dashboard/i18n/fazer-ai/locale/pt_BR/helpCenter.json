@@ -19,6 +19,30 @@
           "ERROR": "O HTML personalizado do body deve ter menos de 15.000 caracteres"
         }
       }
+    },
+    "ARTICLES_PAGE": {
+      "ARTICLES_HEADER": {
+        "SORT": {
+          "BUTTON": "Ordenar artigos",
+          "SORT_BY": "Ordenar por",
+          "ORDER": "Ordem",
+          "FIELDS": {
+            "UPDATED_AT": "Atualização",
+            "CREATED_AT": "Criação",
+            "TITLE": "Título",
+            "VIEWS": "Visualizações"
+          },
+          "ORDERS": {
+            "ASCENDING": "Crescente",
+            "DESCENDING": "Decrescente"
+          }
+        }
+      },
+      "ARTICLE_CARD": {
+        "CARD": {
+          "CREATED": "Criado {time}"
+        }
+      }
     }
   }
 }
