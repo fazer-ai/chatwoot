@@ -5,12 +5,11 @@
 let pendingInboxId = null;
 
 export const requestPairing = inboxId => {
-  pendingInboxId = Number(inboxId);
+  pendingInboxId = inboxId;
 };
 
 export const consumePairingRequest = inboxId => {
-  if (pendingInboxId === null || pendingInboxId !== Number(inboxId))
-    return false;
+  if (pendingInboxId === null || pendingInboxId !== inboxId) return false;
   pendingInboxId = null;
   return true;
 };
