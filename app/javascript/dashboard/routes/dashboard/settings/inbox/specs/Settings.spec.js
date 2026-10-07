@@ -124,4 +124,60 @@ describe('Inbox Settings', () => {
       expect(fetchWhatsappSessionProviders).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('disconnected session inbox', () => {
+    const banner = (isASessionWhatsAppChannel, providerConnection) =>
+      Settings.computed.showSessionDisconnectedBanner.call({
+        isASessionWhatsAppChannel,
+        inbox: { provider_connection: providerConnection },
+      });
+
+    it('warns on a session inbox that is not connected, including one never paired', () => {
+      expect(banner(true, { connection: 'close' })).toBe(true);
+      expect(banner(true, {})).toBe(true);
+      expect(banner(true, { connection: 'connecting' })).toBe(true);
+    });
+
+    it('stays quiet while connected or redialling on purpose, and off session inboxes', () => {
+      expect(banner(true, { connection: 'open' })).toBe(false);
+      expect(
+        banner(true, { connection: 'reconnecting', rerouting: true })
+      ).toBe(false);
+      expect(banner(false, { connection: 'close' })).toBe(false);
+    });
+
+    const connectContext = (query, isASessionWhatsAppChannel = true) => ({
+      $route: {
+        name: 'settings_inbox_show',
+        params: { accountId: 3, inboxId: 7 },
+        query,
+      },
+      $router: { replace: vi.fn() },
+      isASessionWhatsAppChannel,
+      showLinkDeviceModal: false,
+    });
+
+    it('opens the pairing a conversion asked for, and drops the request so a reload does not repeat it', () => {
+      const context = connectContext({ connect: '1', other: 'x' });
+      Settings.methods.openLinkDeviceModalIfRequested.call(context);
+
+      expect(context.showLinkDeviceModal).toBe(true);
+      expect(context.$router.replace).toHaveBeenCalledWith({
+        name: 'settings_inbox_show',
+        params: { accountId: 3, inboxId: 7 },
+        query: { other: 'x' },
+      });
+    });
+
+    it('leaves the modal closed without the request, or on an inbox with no session', () => {
+      [connectContext({}), connectContext({ connect: '1' }, false)].forEach(
+        context => {
+          Settings.methods.openLinkDeviceModalIfRequested.call(context);
+
+          expect(context.showLinkDeviceModal).toBe(false);
+          expect(context.$router.replace).not.toHaveBeenCalled();
+        }
+      );
+    });
+  });
 });
