@@ -1,3 +1,4 @@
+import { requestPairing } from 'dashboard/helper/whatsappPairingRequest';
 import Settings from '../Settings.vue';
 
 const computeWhatsappUnauthorized = context =>
@@ -146,39 +147,46 @@ describe('Inbox Settings', () => {
       expect(banner(false, { connection: 'close' })).toBe(false);
     });
 
-    const connectContext = (query, isASessionWhatsAppChannel = true) => ({
-      $route: { query },
-      $router: { replace: vi.fn(), push: vi.fn() },
+    const pairingContext = (isASessionWhatsAppChannel = true) => ({
+      inbox: { id: 7 },
       isASessionWhatsAppChannel,
       showLinkDeviceModal: false,
     });
 
-    beforeEach(() => {
-      window.history.replaceState(
-        null,
-        '',
-        '/app/accounts/3/settings/inboxes/7/collaborators?connect=1&other=x'
-      );
-    });
-
-    it('opens the pairing a conversion asked for, and drops the request so a reload does not repeat it', () => {
-      const context = connectContext({ connect: '1', other: 'x' });
+    it('opens the pairing a conversion asked for, once', () => {
+      requestPairing(7);
+      const context = pairingContext();
       Settings.methods.openLinkDeviceModalIfRequested.call(context);
-
       expect(context.showLinkDeviceModal).toBe(true);
-      expect(window.location.pathname + window.location.search).toBe(
-        '/app/accounts/3/settings/inboxes/7/collaborators?other=x'
-      );
+
+      const again = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(again);
+      expect(again.showLinkDeviceModal).toBe(false);
     });
 
-    // The settings wrapper keys this page by $route.fullPath: a router navigation here
-    // remounts the page, and the modal that was just opened goes down with it.
-    it('drops the request without a router navigation, which would remount the page', () => {
-      const context = connectContext({ connect: '1' });
-      Settings.methods.openLinkDeviceModalIfRequested.call(context);
+    // Kept alive per full path: a conversion can land on a cached instance, which is
+    // reactivated and sees no watcher fire.
+    it('reads the request when a cached page is reactivated', () => {
+      const context = { openLinkDeviceModalIfRequested: vi.fn() };
+      Settings.activated.call(context);
 
-      expect(context.$router.replace).not.toHaveBeenCalled();
-      expect(context.$router.push).not.toHaveBeenCalled();
+      expect(context.openLinkDeviceModalIfRequested).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the request for the inbox it names, and for a page that knows the inbox has a session', () => {
+      requestPairing(8);
+      const other = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(other);
+      expect(other.showLinkDeviceModal).toBe(false);
+
+      requestPairing(7);
+      const loading = pairingContext(false);
+      Settings.methods.openLinkDeviceModalIfRequested.call(loading);
+      expect(loading.showLinkDeviceModal).toBe(false);
+
+      const loaded = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(loaded);
+      expect(loaded.showLinkDeviceModal).toBe(true);
     });
 
     it('reads the request once the inbox arrives, which on a direct visit is after mount', () => {
@@ -193,17 +201,6 @@ describe('Inbox Settings', () => {
       Settings.watch.inbox.handler.call(context, { id: 7 }, undefined);
 
       expect(context.openLinkDeviceModalIfRequested).toHaveBeenCalledTimes(1);
-    });
-
-    it('leaves the modal closed without the request, or on an inbox with no session', () => {
-      [connectContext({}), connectContext({ connect: '1' }, false)].forEach(
-        context => {
-          Settings.methods.openLinkDeviceModalIfRequested.call(context);
-
-          expect(context.showLinkDeviceModal).toBe(false);
-          expect(window.location.search).toBe('?connect=1&other=x');
-        }
-      );
     });
   });
 });

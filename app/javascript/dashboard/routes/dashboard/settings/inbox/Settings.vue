@@ -35,6 +35,7 @@ import WhatsappManualMigrationBanner from './components/WhatsappManualMigrationB
 import WhatsappLegacyProviderBanner from './components/WhatsappLegacyProviderBanner.vue';
 import WhatsappLinkDeviceModal from './components/WhatsappLinkDeviceModal.vue';
 import { isProviderOffline } from 'dashboard/helper/whatsapp';
+import { consumePairingRequest } from 'dashboard/helper/whatsappPairingRequest';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
@@ -539,19 +540,18 @@ export default {
     this.fetchSharedData();
     this.openWhatsAppManualMigrationIfRequested();
   },
+  // The settings wrapper keeps this page alive per full path, so a conversion can land on
+  // an instance that is reactivated rather than mounted, and no watcher fires for it.
+  activated() {
+    this.openLinkDeviceModalIfRequested();
+  },
   methods: {
-    // A conversion to a provider paired by QR lands here with `?connect=1`: the inbox has no
-    // session yet, and the pairing is the one thing left to do. The query is dropped once
-    // read, so a reload after closing the modal does not put it back up. Dropped from the
-    // address bar only, like the tab: the settings wrapper keys this page by the full path,
-    // so a router navigation would remount it and take the modal down as it opens.
+    // A conversion to a provider paired by QR leaves the inbox with no session, and the
+    // pairing is the one thing left to do. Read wherever the page can first see that the
+    // inbox has a session: on activation, or once a late inbox arrives.
     openLinkDeviceModalIfRequested() {
-      if (this.$route.query.connect !== '1' || !this.isASessionWhatsAppChannel)
-        return;
-      this.showLinkDeviceModal = true;
-      const url = new URL(window.location.href);
-      url.searchParams.delete('connect');
-      window.history.replaceState(window.history.state, '', url);
+      if (!this.isASessionWhatsAppChannel) return;
+      if (consumePairingRequest(this.inbox.id)) this.showLinkDeviceModal = true;
     },
     openWhatsAppManualMigrationDialog() {
       this.$refs.whatsappManualMigrationDialog?.open();

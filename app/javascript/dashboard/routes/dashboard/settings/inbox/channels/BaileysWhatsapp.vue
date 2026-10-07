@@ -5,6 +5,7 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
+import { requestPairing } from 'dashboard/helper/whatsappPairingRequest';
 import { required, requiredIf } from '@vuelidate/validators';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 import { isValidURL } from '../../../../../helper/URLHelper';
@@ -88,14 +89,14 @@ const createChannel = async () => {
       });
 
       useAlert(t('INBOX_MGMT.CONVERT.API.SUCCESS_MESSAGE'));
+      // The inbox comes out of the conversion unpaired: the settings open the pairing.
+      requestPairing(props.inbox.id);
       router.replace({
         name: 'settings_inbox_show',
         params: {
           accountId: router.currentRoute.value.params.accountId,
           inboxId: props.inbox.id,
         },
-        // The inbox comes out of the conversion unpaired: the settings open the pairing.
-        query: { connect: '1' },
       });
       return;
     }

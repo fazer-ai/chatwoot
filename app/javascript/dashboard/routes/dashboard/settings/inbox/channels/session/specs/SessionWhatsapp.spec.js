@@ -1,3 +1,4 @@
+import { consumePairingRequest } from 'dashboard/helper/whatsappPairingRequest';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import SessionWhatsapp from '../SessionWhatsapp.vue';
@@ -99,9 +100,11 @@ describe('SessionWhatsapp.vue', () => {
       expect.objectContaining({
         name: 'settings_inbox_show',
         params: { accountId: 1, inboxId: 7 },
-        query: { connect: '1' },
       })
     );
+    // In memory, not in the URL: a reload or a Back must not bring it back.
+    expect(mockReplace.mock.calls[0][0]).not.toHaveProperty('query');
+    expect(consumePairingRequest(7)).toBe(true);
   });
 
   it('keeps every field the catalog marks advanced behind the toggle', async () => {
