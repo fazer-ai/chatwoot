@@ -179,6 +179,10 @@
         "BUTTON": "Generate new address",
         "SUCCESS": "New address registered with Z-API.",
         "ERROR": "Z-API did not accept the new address. The inbox keeps receiving on the current one; try again."
+      },
+      "WHATSAPP_DISCONNECTED": {
+        "MESSAGE": "This WhatsApp is not connected, so the inbox cannot send or receive messages. Connect the phone to pair it again.",
+        "CONNECT": "Connect"
       }
     },
     "ASSIGNMENT": {

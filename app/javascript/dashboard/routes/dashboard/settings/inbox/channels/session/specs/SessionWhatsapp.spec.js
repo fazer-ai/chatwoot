@@ -1,8 +1,10 @@
+import { consumePairingRequest } from 'dashboard/helper/whatsappPairingRequest';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import SessionWhatsapp from '../SessionWhatsapp.vue';
 
 const mockDispatch = vi.fn();
+const mockReplace = vi.fn();
 vi.mock('vuex', () => ({
   useStore: () => ({
     dispatch: mockDispatch,
@@ -12,7 +14,7 @@ vi.mock('vuex', () => ({
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
-    replace: vi.fn(),
+    replace: mockReplace,
     currentRoute: { value: { params: { accountId: 1 } } },
   }),
 }));
@@ -71,6 +73,38 @@ describe('SessionWhatsapp.vue', () => {
   beforeEach(() => {
     mockDispatch.mockReset();
     mockAlert.mockReset();
+    mockReplace.mockReset();
+  });
+
+  it('lands a converted inbox on its settings with the pairing open', async () => {
+    mockDispatch.mockResolvedValue({ id: 7 });
+    const wrapper = mountForm({
+      mode: 'convert',
+      inbox: {
+        id: 7,
+        name: 'Vendas',
+        phone_number: '+5511999999999',
+        provider_config: {},
+      },
+    });
+    await wrapper.find('input[data-field="base_url"]').setValue('https://x.y');
+
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      'inboxes/convertProvider',
+      expect.objectContaining({ inboxId: 7, provider: 'native' })
+    );
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'settings_inbox_show',
+        params: { accountId: 1, inboxId: 7 },
+      })
+    );
+    // In memory, not in the URL: a reload or a Back must not bring it back.
+    expect(mockReplace.mock.calls[0][0]).not.toHaveProperty('query');
+    expect(consumePairingRequest(7)).toBe(true);
   });
 
   it('keeps every field the catalog marks advanced behind the toggle', async () => {

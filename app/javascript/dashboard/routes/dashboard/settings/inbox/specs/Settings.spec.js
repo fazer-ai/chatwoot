@@ -1,3 +1,4 @@
+import { requestPairing } from 'dashboard/helper/whatsappPairingRequest';
 import Settings from '../Settings.vue';
 
 const computeWhatsappUnauthorized = context =>
@@ -122,6 +123,84 @@ describe('Inbox Settings', () => {
 
       handler.call({ fetchWhatsappSessionProviders }, true);
       expect(fetchWhatsappSessionProviders).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('disconnected session inbox', () => {
+    const banner = (isASessionWhatsAppChannel, providerConnection) =>
+      Settings.computed.showSessionDisconnectedBanner.call({
+        isASessionWhatsAppChannel,
+        inbox: { provider_connection: providerConnection },
+      });
+
+    it('warns on a session inbox that is not connected, including one never paired', () => {
+      expect(banner(true, { connection: 'close' })).toBe(true);
+      expect(banner(true, {})).toBe(true);
+      expect(banner(true, { connection: 'connecting' })).toBe(true);
+    });
+
+    it('stays quiet while connected or redialling on purpose, and off session inboxes', () => {
+      expect(banner(true, { connection: 'open' })).toBe(false);
+      expect(
+        banner(true, { connection: 'reconnecting', rerouting: true })
+      ).toBe(false);
+      expect(banner(false, { connection: 'close' })).toBe(false);
+    });
+
+    const pairingContext = (isASessionWhatsAppChannel = true) => ({
+      inbox: { id: 7 },
+      isASessionWhatsAppChannel,
+      showLinkDeviceModal: false,
+    });
+
+    it('opens the pairing a conversion asked for, once', () => {
+      requestPairing(7);
+      const context = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(context);
+      expect(context.showLinkDeviceModal).toBe(true);
+
+      const again = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(again);
+      expect(again.showLinkDeviceModal).toBe(false);
+    });
+
+    // Kept alive per full path: a conversion can land on a cached instance, which is
+    // reactivated and sees no watcher fire.
+    it('reads the request when a cached page is reactivated', () => {
+      const context = { openLinkDeviceModalIfRequested: vi.fn() };
+      Settings.activated.call(context);
+
+      expect(context.openLinkDeviceModalIfRequested).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the request for the inbox it names, and for a page that knows the inbox has a session', () => {
+      requestPairing(8);
+      const other = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(other);
+      expect(other.showLinkDeviceModal).toBe(false);
+
+      requestPairing(7);
+      const loading = pairingContext(false);
+      Settings.methods.openLinkDeviceModalIfRequested.call(loading);
+      expect(loading.showLinkDeviceModal).toBe(false);
+
+      const loaded = pairingContext();
+      Settings.methods.openLinkDeviceModalIfRequested.call(loaded);
+      expect(loaded.showLinkDeviceModal).toBe(true);
+    });
+
+    it('reads the request once the inbox arrives, which on a direct visit is after mount', () => {
+      const context = {
+        syncInboxData: vi.fn(),
+        fetchHealthData: vi.fn(),
+        setTabFromRouteParam: vi.fn(),
+        openWhatsAppManualMigrationIfRequested: vi.fn(),
+        openLinkDeviceModalIfRequested: vi.fn(),
+        $nextTick: callback => callback(),
+      };
+      Settings.watch.inbox.handler.call(context, { id: 7 }, undefined);
+
+      expect(context.openLinkDeviceModalIfRequested).toHaveBeenCalledTimes(1);
     });
   });
 });
