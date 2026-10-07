@@ -52,7 +52,7 @@ const labelOf = (options, value) =>
 </script>
 
 <template>
-  <div v-if="appliesHere" class="relative">
+  <div v-if="appliesHere" class="relative ms-auto">
     <Button
       v-tooltip.top="t('HELP_CENTER.ARTICLES_PAGE.ARTICLES_HEADER.SORT.BUTTON')"
       icon="i-lucide-arrow-down-up"
@@ -66,7 +66,7 @@ const labelOf = (options, value) =>
     <div
       v-if="isMenuOpen"
       v-on-clickaway="() => (isMenuOpen = false)"
-      class="absolute top-full mt-1 ltr:right-0 rtl:left-0 flex flex-col gap-4 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 z-50"
+      class="absolute top-full mt-1 ltr:right-0 rtl:left-0 flex flex-col gap-4 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 max-w-[calc(100vw-5rem)] rounded-xl p-4 z-50"
     >
       <div class="flex items-center justify-between gap-2">
         <span class="text-sm text-n-slate-12">

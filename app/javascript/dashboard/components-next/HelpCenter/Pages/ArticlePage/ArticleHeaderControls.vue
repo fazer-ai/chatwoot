@@ -194,8 +194,8 @@ const handleTabChange = value => {
             />
           </OnClickOutside>
         </div>
-        <ArticleSortMenu />
       </div>
+      <ArticleSortMenu />
       <Button
         :label="t('HELP_CENTER.ARTICLES_PAGE.ARTICLES_HEADER.NEW_ARTICLE')"
         icon="i-lucide-plus"

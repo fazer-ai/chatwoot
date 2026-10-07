@@ -16,6 +16,7 @@ export const actions = {
       categorySlug,
       sort,
       query,
+      signal,
     }
   ) => {
     try {
@@ -29,6 +30,7 @@ export const actions = {
         categorySlug,
         sort,
         query,
+        signal,
       });
       const payload = camelcaseKeys(data.payload);
       const meta = camelcaseKeys(data.meta);
@@ -41,7 +43,8 @@ export const actions = {
     } catch (error) {
       return throwErrorMessage(error);
     } finally {
-      commit(types.SET_UI_FLAG, { isFetching: false });
+      // A superseded request leaves the flag to the one that replaced it.
+      if (!signal?.aborted) commit(types.SET_UI_FLAG, { isFetching: false });
     }
   },
 
