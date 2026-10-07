@@ -33,6 +33,8 @@ import TwilioHealth from './components/TwilioHealth.vue';
 import WhatsappManualMigrationDialog from './components/WhatsappManualMigrationDialog.vue';
 import WhatsappManualMigrationBanner from './components/WhatsappManualMigrationBanner.vue';
 import WhatsappLegacyProviderBanner from './components/WhatsappLegacyProviderBanner.vue';
+import WhatsappLinkDeviceModal from './components/WhatsappLinkDeviceModal.vue';
+import { isProviderOffline } from 'dashboard/helper/whatsapp';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
@@ -92,6 +94,7 @@ export default {
     WhatsappManualMigrationDialog,
     WhatsappManualMigrationBanner,
     WhatsappLegacyProviderBanner,
+    WhatsappLinkDeviceModal,
     Widget,
     AccessToken,
     Icon,
@@ -140,6 +143,7 @@ export default {
       showConvertGate: false,
       // Set when the conversion was asked for from the legacy banner, which names its target.
       convertTarget: null,
+      showLinkDeviceModal: false,
     };
   },
   computed: {
@@ -412,6 +416,14 @@ export default {
     instagramUnauthorized() {
       return this.isAnInstagramChannel && this.inbox.reauthorization_required;
     },
+    // Every tab, not just Configuration: a session inbox that dropped, or one just converted
+    // and never paired, has nothing else on this page saying it cannot send or receive.
+    showSessionDisconnectedBanner() {
+      return (
+        this.isASessionWhatsAppChannel &&
+        isProviderOffline(this.inbox.provider_connection)
+      );
+    },
     showInstagramRestrictionSettingsBanner() {
       return this.isMetaMessageSendingDisabled && this.isAnInstagramChannel;
     },
@@ -514,6 +526,7 @@ export default {
           this.$nextTick(() => {
             this.setTabFromRouteParam();
             this.openWhatsAppManualMigrationIfRequested();
+            this.openLinkDeviceModalIfRequested();
           });
         } else {
           this.selectedFeatureFlags = newInbox?.selected_feature_flags || [];
@@ -527,6 +540,16 @@ export default {
     this.openWhatsAppManualMigrationIfRequested();
   },
   methods: {
+    // A conversion to a provider paired by QR lands here with `?connect=1`: the inbox has no
+    // session yet, and the pairing is the one thing left to do. The query is dropped once
+    // read, so a reload after closing the modal does not put it back up.
+    openLinkDeviceModalIfRequested() {
+      if (this.$route.query.connect !== '1' || !this.isASessionWhatsAppChannel)
+        return;
+      this.showLinkDeviceModal = true;
+      const { connect, ...query } = this.$route.query;
+      this.$router.replace({ ...this.$route, query });
+    },
     openWhatsAppManualMigrationDialog() {
       this.$refs.whatsappManualMigrationDialog?.open();
     },
@@ -978,6 +1001,19 @@ export default {
               </a>
             </span>
           </div>
+        </Banner>
+        <Banner
+          v-if="showSessionDisconnectedBanner"
+          color="ruby"
+          :action-label="
+            $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_DISCONNECTED.CONNECT')
+          "
+          class="mx-6 mb-4"
+          :class="bannerMaxWidth"
+          data-testid="whatsapp-session-disconnected-banner"
+          @action="showLinkDeviceModal = true"
+        >
+          {{ $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_DISCONNECTED.MESSAGE') }}
         </Banner>
         <WhatsappLegacyProviderBanner
           v-if="isLegacyWhatsAppProvider"
@@ -1598,6 +1634,12 @@ export default {
       :current-provider="whatsAppAPIProviderName"
       @on-confirm="goToConvert"
       @on-close="closeConvertGate"
+    />
+    <WhatsappLinkDeviceModal
+      v-if="showLinkDeviceModal"
+      :show="showLinkDeviceModal"
+      :on-close="() => (showLinkDeviceModal = false)"
+      :inbox="inbox"
     />
   </div>
 </template>

@@ -179,6 +179,10 @@
         "BUTTON": "Generar nueva dirección",
         "SUCCESS": "Nueva dirección registrada en Z-API.",
         "ERROR": "Z-API no aceptó la nueva dirección. La bandeja sigue recibiendo por la actual; inténtalo de nuevo."
+      },
+      "WHATSAPP_DISCONNECTED": {
+        "MESSAGE": "Este WhatsApp está desconectado, y la bandeja no envía ni recibe mensajes. Conecta el teléfono para vincularlo de nuevo.",
+        "CONNECT": "Conectar"
       }
     },
     "ASSIGNMENT": {

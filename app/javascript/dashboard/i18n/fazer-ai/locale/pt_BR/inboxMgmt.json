@@ -179,6 +179,10 @@
         "BUTTON": "Gerar novo endereço",
         "SUCCESS": "Novo endereço registrado na Z-API.",
         "ERROR": "A Z-API não aceitou o novo endereço. A caixa continua recebendo pelo atual; tente de novo."
+      },
+      "WHATSAPP_DISCONNECTED": {
+        "MESSAGE": "Este WhatsApp está desconectado, e a caixa não envia nem recebe mensagens. Conecte o celular para parear de novo.",
+        "CONNECT": "Conectar"
       }
     },
     "ASSIGNMENT": {

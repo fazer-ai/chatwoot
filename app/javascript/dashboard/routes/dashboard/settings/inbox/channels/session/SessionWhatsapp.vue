@@ -129,6 +129,8 @@ const submit = async () => {
           accountId: router.currentRoute.value.params.accountId,
           inboxId: props.inbox.id,
         },
+        // The inbox comes out of the conversion unpaired: the settings open the pairing.
+        query: { connect: '1' },
       });
       return;
     }
