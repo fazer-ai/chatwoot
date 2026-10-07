@@ -542,13 +542,16 @@ export default {
   methods: {
     // A conversion to a provider paired by QR lands here with `?connect=1`: the inbox has no
     // session yet, and the pairing is the one thing left to do. The query is dropped once
-    // read, so a reload after closing the modal does not put it back up.
+    // read, so a reload after closing the modal does not put it back up. Dropped from the
+    // address bar only, like the tab: the settings wrapper keys this page by the full path,
+    // so a router navigation would remount it and take the modal down as it opens.
     openLinkDeviceModalIfRequested() {
       if (this.$route.query.connect !== '1' || !this.isASessionWhatsAppChannel)
         return;
       this.showLinkDeviceModal = true;
-      const { connect, ...query } = this.$route.query;
-      this.$router.replace({ ...this.$route, query });
+      const url = new URL(window.location.href);
+      url.searchParams.delete('connect');
+      window.history.replaceState(window.history.state, '', url);
     },
     openWhatsAppManualMigrationDialog() {
       this.$refs.whatsappManualMigrationDialog?.open();

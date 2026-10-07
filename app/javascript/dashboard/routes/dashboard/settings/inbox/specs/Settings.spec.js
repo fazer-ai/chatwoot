@@ -147,14 +147,18 @@ describe('Inbox Settings', () => {
     });
 
     const connectContext = (query, isASessionWhatsAppChannel = true) => ({
-      $route: {
-        name: 'settings_inbox_show',
-        params: { accountId: 3, inboxId: 7 },
-        query,
-      },
-      $router: { replace: vi.fn() },
+      $route: { query },
+      $router: { replace: vi.fn(), push: vi.fn() },
       isASessionWhatsAppChannel,
       showLinkDeviceModal: false,
+    });
+
+    beforeEach(() => {
+      window.history.replaceState(
+        null,
+        '',
+        '/app/accounts/3/settings/inboxes/7/collaborators?connect=1&other=x'
+      );
     });
 
     it('opens the pairing a conversion asked for, and drops the request so a reload does not repeat it', () => {
@@ -162,11 +166,19 @@ describe('Inbox Settings', () => {
       Settings.methods.openLinkDeviceModalIfRequested.call(context);
 
       expect(context.showLinkDeviceModal).toBe(true);
-      expect(context.$router.replace).toHaveBeenCalledWith({
-        name: 'settings_inbox_show',
-        params: { accountId: 3, inboxId: 7 },
-        query: { other: 'x' },
-      });
+      expect(window.location.pathname + window.location.search).toBe(
+        '/app/accounts/3/settings/inboxes/7/collaborators?other=x'
+      );
+    });
+
+    // The settings wrapper keys this page by $route.fullPath: a router navigation here
+    // remounts the page, and the modal that was just opened goes down with it.
+    it('drops the request without a router navigation, which would remount the page', () => {
+      const context = connectContext({ connect: '1' });
+      Settings.methods.openLinkDeviceModalIfRequested.call(context);
+
+      expect(context.$router.replace).not.toHaveBeenCalled();
+      expect(context.$router.push).not.toHaveBeenCalled();
     });
 
     it('reads the request once the inbox arrives, which on a direct visit is after mount', () => {
@@ -189,7 +201,7 @@ describe('Inbox Settings', () => {
           Settings.methods.openLinkDeviceModalIfRequested.call(context);
 
           expect(context.showLinkDeviceModal).toBe(false);
-          expect(context.$router.replace).not.toHaveBeenCalled();
+          expect(window.location.search).toBe('?connect=1&other=x');
         }
       );
     });
