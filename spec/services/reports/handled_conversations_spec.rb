@@ -126,15 +126,45 @@ RSpec.describe Reports::HandledConversations do
 
   # The partial index is what keeps a month of a busy account inside the statement
   # timeout, and it only serves queries whose WHERE implies its predicate. Sequential
-  # and bitmap scans are switched off so the planner has no other way out: if the
-  # query and the index predicate drift apart, it falls back to another index.
+  # and bitmap scans are switched off and every other index of `messages` is dropped
+  # for the duration of the EXPLAIN, so the planner has no other way out: if the query
+  # and the index predicate drift apart, the plan falls back to a disabled sequential
+  # scan, and if the index stops covering the columns read, to a plain index scan.
+  #
+  # Leaving the other indexes in place made the result depend on the table statistics
+  # (#813): once autovacuum has visited an empty `messages`, the planner expects one row,
+  # and `index_messages_on_conversation_id` won on cost for the DISTINCT shapes, so the
+  # spec failed or passed depending on which CI shard it landed in.
   describe 'query plan' do
+    # The state CI hits: autovacuum visits `messages` while it holds only this example's rows,
+    # which are not committed, so the statistics say the table is empty. Reproduced here on
+    # purpose, through a connection of its own because VACUUM cannot run inside the example's
+    # transaction, so the spec measures the plan in that state on every run instead of whenever
+    # autovacuum happens to get there first.
+    before do
+      config = ActiveRecord::Base.connection_db_config.configuration_hash
+      connection = PG.connect(host: config[:host], port: config[:port], dbname: config[:database],
+                              user: config[:username], password: config[:password])
+      connection.exec('VACUUM messages')
+    ensure
+      connection&.close
+    end
+
     def plan_for(relation)
-      ActiveRecord::Base.transaction do
-        ActiveRecord::Base.connection.execute('SET LOCAL enable_seqscan = off')
-        ActiveRecord::Base.connection.execute('SET LOCAL enable_bitmapscan = off')
-        ActiveRecord::Base.connection.select_values("EXPLAIN #{relation.to_sql}").join("\n")
+      plan = nil
+      ActiveRecord::Base.transaction(requires_new: true) do
+        connection = ActiveRecord::Base.connection
+        connection.execute('SET LOCAL enable_seqscan = off')
+        connection.execute('SET LOCAL enable_bitmapscan = off')
+        connection.select_values(<<~SQL.squish).each { |index| connection.execute("DROP INDEX #{index}") }
+          SELECT indexrelid::regclass::text FROM pg_index
+          WHERE indrelid = 'messages'::regclass AND NOT indisprimary
+            AND indexrelid <> 'index_messages_on_handled_conversations'::regclass
+        SQL
+        plan = connection.select_values("EXPLAIN #{relation.to_sql}").join("\n")
+        raise ActiveRecord::Rollback
       end
+      plan
     end
 
     it 'answers every shape the reports read from the partial index alone' do
