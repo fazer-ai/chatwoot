@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useMapGetter, useStore } from 'dashboard/composables/store.js';
 import allLocales from 'shared/constants/locales.js';
 import { getArticleStatus } from 'dashboard/helper/portalHelper.js';
+import { useArticleListSort } from 'dashboard/composables/useArticleListSort';
 import ArticlesPage from 'dashboard/components-next/HelpCenter/Pages/ArticlePage/ArticlesPage.vue';
 
 const route = useRoute();
@@ -22,6 +23,7 @@ const meta = useMapGetter('articles/getMeta');
 const portalMeta = useMapGetter('portals/getMeta');
 const currentUserId = useMapGetter('getCurrentUserID');
 const getPortalBySlug = useMapGetter('portals/portalBySlug');
+const { sort } = useArticleListSort();
 
 const selectedPortalSlug = computed(() => route.params.portalSlug);
 const selectedCategorySlug = computed(() => route.params.categorySlug);
@@ -76,6 +78,7 @@ const fetchArticles = ({ pageNumber: pageNumberParam } = {}) => {
     status: status.value,
     authorId: author.value,
     categorySlug: selectedCategorySlug.value,
+    sort: isCategoryArticles.value ? undefined : sort.value,
     query: searchQuery.value || undefined,
   });
 };
@@ -106,6 +109,12 @@ const fetchPortalAndItsCategories = async locale => {
 
 onMounted(() => {
   fetchArticles();
+});
+
+watch(sort, () => {
+  if (isCategoryArticles.value) return;
+  pageNumber.value = 1;
+  fetchArticles({ pageNumber: 1 });
 });
 
 watch(

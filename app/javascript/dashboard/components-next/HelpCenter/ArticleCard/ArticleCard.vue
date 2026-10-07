@@ -52,6 +52,11 @@ const props = defineProps({
     type: Number,
     required: true,
   },
+  // Given when the list is ordered by creation, so the card shows the date the list is sorted by.
+  createdAt: {
+    type: Number,
+    default: null,
+  },
   isSelected: {
     type: Boolean,
     default: false,
@@ -172,6 +177,11 @@ const authorThumbnailSrc = computed(() => {
 });
 
 const lastUpdatedAt = computed(() => {
+  if (props.createdAt) {
+    return t('HELP_CENTER.ARTICLES_PAGE.ARTICLE_CARD.CARD.CREATED', {
+      time: dynamicTime(props.createdAt),
+    });
+  }
   return dynamicTime(props.updatedAt);
 });
 
@@ -295,7 +305,7 @@ const handleClick = id => {
       </div>
       <span
         v-tooltip.top="{
-          content: exactTimestamp(updatedAt),
+          content: exactTimestamp(createdAt || updatedAt),
           delay: { show: 500, hide: 0 },
         }"
         class="text-sm text-n-slate-11 line-clamp-1 shrink-0"
