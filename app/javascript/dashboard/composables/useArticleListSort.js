@@ -1,9 +1,11 @@
 import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 
 // The order of the help center's Articles tab (#811), kept in the user's UI settings in the format
 // the API takes: a field, prefixed with `-` for descending. A category ignores it and keeps the
-// manual order, which is the one the public portal shows.
+// manual order, which is the one the public portal shows: the API orders a category by position
+// whatever it is asked, so with a category on screen the order is neither sent nor offered.
 const ARTICLE_SORT_FIELDS = Object.freeze([
   'updated_at',
   'created_at',
@@ -16,7 +18,10 @@ const DEFAULT_SORT = '-updated_at';
 const SORT_PATTERN = new RegExp(`^-?(${ARTICLE_SORT_FIELDS.join('|')})$`);
 
 export function useArticleListSort() {
+  const route = useRoute();
   const { uiSettings, updateUISettings } = useUISettings();
+
+  const appliesHere = computed(() => !route.params.categorySlug);
 
   // A value the API would turn down (an older client, a hand-edited setting) falls back to the
   // default here, so the list still loads.
@@ -31,5 +36,5 @@ export function useArticleListSort() {
     updateUISettings({ [SETTING_KEY]: `${order}${field}` });
   };
 
-  return { sort, sortField, sortOrder, setSort };
+  return { appliesHere, sort, sortField, sortOrder, setSort };
 }

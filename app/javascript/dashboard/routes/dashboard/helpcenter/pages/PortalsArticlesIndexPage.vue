@@ -23,7 +23,7 @@ const meta = useMapGetter('articles/getMeta');
 const portalMeta = useMapGetter('portals/getMeta');
 const currentUserId = useMapGetter('getCurrentUserID');
 const getPortalBySlug = useMapGetter('portals/portalBySlug');
-const { sort } = useArticleListSort();
+const { appliesHere: sortApplies, sort } = useArticleListSort();
 
 const selectedPortalSlug = computed(() => route.params.portalSlug);
 const selectedCategorySlug = computed(() => route.params.categorySlug);
@@ -78,7 +78,7 @@ const fetchArticles = ({ pageNumber: pageNumberParam } = {}) => {
     status: status.value,
     authorId: author.value,
     categorySlug: selectedCategorySlug.value,
-    sort: isCategoryArticles.value ? undefined : sort.value,
+    sort: sortApplies.value ? sort.value : undefined,
     query: searchQuery.value || undefined,
   });
 };
@@ -112,7 +112,7 @@ onMounted(() => {
 });
 
 watch(sort, () => {
-  if (isCategoryArticles.value) return;
+  if (!sortApplies.value) return;
   pageNumber.value = 1;
   fetchArticles({ pageNumber: 1 });
 });

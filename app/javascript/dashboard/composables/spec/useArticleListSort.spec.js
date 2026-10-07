@@ -3,6 +3,9 @@ import { useArticleListSort } from 'dashboard/composables/useArticleListSort';
 
 const mockDispatch = vi.fn();
 const uiSettings = ref({});
+const route = { params: {} };
+
+vi.mock('vue-router', () => ({ useRoute: () => route }));
 
 vi.mock('dashboard/composables/store', () => ({
   useStoreGetters: () => ({ getUISettings: uiSettings }),
@@ -13,6 +16,7 @@ describe('useArticleListSort', () => {
   beforeEach(() => {
     mockDispatch.mockClear();
     uiSettings.value = { editor_message_key: 'enter' };
+    route.params = { portalSlug: 'docs', locale: 'en' };
   });
 
   it('starts from the last updated first when nothing was chosen', () => {
@@ -41,6 +45,17 @@ describe('useArticleListSort', () => {
       expect(useArticleListSort().sort.value).toBe('-updated_at');
     }
   );
+
+  it('applies to the Articles tab', () => {
+    expect(useArticleListSort().appliesHere.value).toBe(true);
+  });
+
+  // The API orders a category by position whatever it is asked, so a menu there would do nothing.
+  it('does not apply once a category is on screen', () => {
+    route.params.categorySlug = 'billing';
+
+    expect(useArticleListSort().appliesHere.value).toBe(false);
+  });
 
   it('saves the choice next to the other UI settings', () => {
     useArticleListSort().setSort({ field: 'created_at', order: '-' });

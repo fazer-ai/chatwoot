@@ -7,7 +7,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import SelectMenu from 'dashboard/components-next/selectmenu/SelectMenu.vue';
 
 const { t } = useI18n();
-const { sortField, sortOrder, setSort } = useArticleListSort();
+const { appliesHere, sortField, sortOrder, setSort } = useArticleListSort();
 
 const isMenuOpen = ref(false);
 
@@ -52,7 +52,7 @@ const labelOf = (options, value) =>
 </script>
 
 <template>
-  <div class="relative">
+  <div v-if="appliesHere" class="relative">
     <Button
       v-tooltip.top="t('HELP_CENTER.ARTICLES_PAGE.ARTICLES_HEADER.SORT.BUTTON')"
       icon="i-lucide-arrow-down-up"

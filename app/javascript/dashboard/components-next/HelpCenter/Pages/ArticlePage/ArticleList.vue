@@ -59,9 +59,9 @@ const { t } = useI18n();
 
 const hoveredArticleId = ref(null);
 
-const { sortField } = useArticleListSort();
+const { appliesHere: sortApplies, sortField } = useArticleListSort();
 const showCreatedAt = computed(
-  () => !props.isCategoryArticles && sortField.value === 'created_at'
+  () => sortApplies.value && sortField.value === 'created_at'
 );
 
 const dragEnabled = computed(() => {
