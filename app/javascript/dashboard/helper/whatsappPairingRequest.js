@@ -9,7 +9,7 @@ export const requestPairing = inboxId => {
 };
 
 export const consumePairingRequest = inboxId => {
-  if (pendingInboxId === null || pendingInboxId !== inboxId) return false;
+  if (pendingInboxId !== inboxId) return false;
   pendingInboxId = null;
   return true;
 };
