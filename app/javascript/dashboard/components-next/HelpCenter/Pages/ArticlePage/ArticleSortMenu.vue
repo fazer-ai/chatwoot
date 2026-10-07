@@ -66,7 +66,7 @@ const labelOf = (options, value) =>
     <div
       v-if="isMenuOpen"
       v-on-clickaway="() => (isMenuOpen = false)"
-      class="absolute top-full mt-1 ltr:left-0 rtl:right-0 flex flex-col gap-4 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 z-50"
+      class="absolute top-full mt-1 ltr:right-0 rtl:left-0 flex flex-col gap-4 bg-n-alpha-3 backdrop-blur-[100px] border border-n-weak w-72 rounded-xl p-4 z-50"
     >
       <div class="flex items-center justify-between gap-2">
         <span class="text-sm text-n-slate-12">
@@ -75,6 +75,7 @@ const labelOf = (options, value) =>
         <SelectMenu
           :model-value="sortField"
           :options="fieldOptions"
+          sub-menu-position="bottom"
           :label="labelOf(fieldOptions, sortField)"
           @update:model-value="field => setSort({ field, order: sortOrder })"
         />
@@ -86,6 +87,7 @@ const labelOf = (options, value) =>
         <SelectMenu
           :model-value="sortOrder"
           :options="orderOptions"
+          sub-menu-position="bottom"
           :label="labelOf(orderOptions, sortOrder)"
           @update:model-value="order => setSort({ field: sortField, order })"
         />

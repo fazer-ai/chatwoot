@@ -40,8 +40,11 @@ module ArticleListSort
 
     private
 
+    # `sort[]=title` arrives as an Array and `sort[field]=title` as a Hash; matching either would
+    # raise instead of turning the request down.
     def article_sort_match
-      @article_sort_match ||= PATTERN.match(params[:sort].presence || DEFAULT)
+      sort = params[:sort].presence || DEFAULT
+      @article_sort_match ||= PATTERN.match(sort) if sort.is_a?(String)
     end
   end
 end

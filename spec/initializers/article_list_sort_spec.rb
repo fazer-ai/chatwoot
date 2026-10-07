@@ -68,6 +68,14 @@ describe 'ArticleListSort', type: :request do
       end
     end
 
+    it 'turns down an order sent as a list or a hash' do
+      ['sort[]=title', 'sort[field]=title'].each do |query|
+        get "/api/v1/accounts/#{account.id}/portals/#{portal.slug}/articles?#{query}", headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:unprocessable_entity), query
+      end
+    end
+
     it 'reads an empty order as no order asked for' do
       expect(ids(sort: '')).to eq([oldest.id, newest.id, middle.id])
     end
