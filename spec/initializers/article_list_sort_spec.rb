@@ -92,6 +92,16 @@ describe 'ArticleListSort', type: :request do
         expect(seen).to match_array(articles.map(&:id)), "sort=#{sort}"
       end
     end
+
+    # On a table this small Postgres hands back the same physical order to both pages, so the test
+    # above passes with or without a tie-breaker; this one pins the tie-breaker itself.
+    it 'breaks a tie by id, in the direction asked for' do
+      tied_at = 1.day.ago
+      articles = Array.new(3) { create_article(views: 7, created_at: tied_at, updated_at: tied_at) }
+
+      expect(ids(sort: 'views')).to eq(articles.map(&:id).sort)
+      expect(ids(sort: '-updated_at')).to eq(articles.map(&:id).sort.reverse)
+    end
   end
 
   describe 'a category' do
