@@ -169,6 +169,20 @@ describe('Inbox Settings', () => {
       });
     });
 
+    it('reads the request once the inbox arrives, which on a direct visit is after mount', () => {
+      const context = {
+        syncInboxData: vi.fn(),
+        fetchHealthData: vi.fn(),
+        setTabFromRouteParam: vi.fn(),
+        openWhatsAppManualMigrationIfRequested: vi.fn(),
+        openLinkDeviceModalIfRequested: vi.fn(),
+        $nextTick: callback => callback(),
+      };
+      Settings.watch.inbox.handler.call(context, { id: 7 }, undefined);
+
+      expect(context.openLinkDeviceModalIfRequested).toHaveBeenCalledTimes(1);
+    });
+
     it('leaves the modal closed without the request, or on an inbox with no session', () => {
       [connectContext({}), connectContext({ connect: '1' }, false)].forEach(
         context => {
