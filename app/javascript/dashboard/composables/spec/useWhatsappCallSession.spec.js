@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import WhatsappCallsAPI from 'dashboard/api/channel/whatsapp/whatsappCallsAPI';
 import { useCallsStore } from 'dashboard/stores/calls';
+import { markCallDismissed } from 'dashboard/helper/voice';
 import {
   applyOutboundAnswer,
   cleanupWhatsappSession,
@@ -11,6 +12,10 @@ import {
   useWhatsappCallSession,
 } from 'dashboard/composables/useWhatsappCallSession';
 
+vi.mock('dashboard/helper/voice', async importOriginal => ({
+  ...(await importOriginal()),
+  markCallDismissed: vi.fn(),
+}));
 vi.mock('dashboard/api/channel/whatsapp/whatsappCallsAPI', () => ({
   default: {
     initiate: vi.fn(),
@@ -98,6 +103,8 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
 
     await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
     await vi.waitFor(() => expect(useCallsStore().calls).toHaveLength(0));
+    // So a ringing message still queued for it does not bring it back.
+    expect(markCallDismissed).toHaveBeenCalledWith('CALLOUT1');
   });
 
   // The end went through, but its broadcast is not replayed to a tab whose cable was down.

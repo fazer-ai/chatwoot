@@ -4,6 +4,7 @@ import WhatsappCallsAPI from 'dashboard/api/channel/whatsapp/whatsappCallsAPI';
 import { remuxWebmToOgg } from 'dashboard/components/widgets/WootWriter/utils/webmOpusToOgg';
 import { VOICE_CALL_OUTBOUND_INIT_STATUS } from 'dashboard/components-next/message/constants';
 import { useCallsStore } from 'dashboard/stores/calls';
+import { markCallDismissed } from 'dashboard/helper/voice';
 
 // Module-level state lets the cable handlers and unload listeners reach the
 // live PeerConnection without prop-drilling refs through every composable.
@@ -15,6 +16,8 @@ let mediaRecorder = null;
 let recorderChunks = [];
 let audioContext = null;
 let activeCallId = null;
+// The provider's id of the call this tab placed, which is what a late ringing message names.
+let activeCallSid = null;
 // voice_call.outbound_connected (the sole source of the outbound SDP answer) is
 // broadcast account-wide and can arrive before the /initiate response sets
 // activeCallId in this tab. Until we know our own call id we can't tell our
@@ -159,6 +162,7 @@ const cleanup = () => {
   recorderChunks = [];
   audioContext = null;
   activeCallId = null;
+  activeCallSid = null;
   pendingOutboundAnswers.clear();
   recorderArmed = false;
 };
@@ -195,6 +199,7 @@ const buildPeerConnection = iceServers => {
   own.onconnectionstatechange = () => {
     if (own !== pc || own.connectionState !== 'failed' || !activeCallId) return;
     const callId = activeCallId;
+    const placedSid = activeCallSid;
     WhatsappCallsAPI.terminate(callId)
       .catch(() => {})
       .then(() => {
@@ -205,6 +210,9 @@ const buildPeerConnection = iceServers => {
       .then(() => {
         const store = useCallsStore();
         const card = store.calls.find(c => c.callId === callId);
+        // Dismissed as an end broadcast would, so a ringing message still queued for the
+        // call does not add it back.
+        markCallDismissed(card?.callSid || placedSid);
         if (card) store.removeCall(card.callSid);
       });
   };
@@ -392,6 +400,7 @@ export function useWhatsappCallSession() {
       const response = await WhatsappCallsAPI.initiate(target, sdpOffer);
       if (response?.id) {
         activeCallId = response.id;
+        activeCallSid = response.call_id || null;
         callRecordingEnabled = response.recording_enabled !== false;
         // A connect webhook that raced ahead of this response was buffered;
         // apply our own by id now that we know it, then drop every buffered
