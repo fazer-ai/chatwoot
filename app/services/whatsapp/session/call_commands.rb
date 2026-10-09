@@ -21,15 +21,18 @@ module Whatsapp::Session::CallCommands
   end
 
   # The failure side. Answers the call the command was about when that was written down
-  # first, once; nil when the failure is the first word of this command.
+  # first; nil when the failure is the first word of this command. Answered again for the
+  # same failure delivered again, until `settled` says it was carried out.
   def self.failed(command_id)
     return if command_id.blank? || claim(command_id, FAILED)
 
     call_id = Redis::Alfred.get(key(command_id))
-    return if call_id.nil? || call_id == FAILED
+    call_id unless call_id.nil? || call_id == FAILED
+  end
 
+  # The failure was applied to its call, so a redelivery of it has nothing left to do.
+  def self.settled(command_id)
     Redis::Alfred.delete(key(command_id))
-    call_id
   end
 
   def self.claim(command_id, value)

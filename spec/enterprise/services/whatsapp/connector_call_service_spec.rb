@@ -218,6 +218,10 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
       described_class.new(inbox: inbox).reconcile(late)
       expect(events_named('voice_call.outbound_connected').size).to eq(1)
+      %w[answered terminate].each do |kind|
+        key = format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_PENDING, inbox_id: inbox.id, call_id: 'CALLOUT9', kind: kind)
+        expect(Redis::Alfred.get(key)).to be_nil
+      end
     end
   end
 
@@ -250,6 +254,28 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
       expect(late.reload.status).to eq('completed')
       expect(late.meta['sdp_answer']).to eq('SDP-EARLY')
+    end
+
+    # The job is retried when the database fails it, and the retry still has what to apply.
+    it 'keeps what it applies until the call is written' do
+      call_id = "CALLOUT5#{command_suffix}"
+      dispatch(model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY'))
+      dispatch(model::Events::CallTerminate.new(call_id: call_id, from: caller_party, reason: nil))
+      late = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                          direction: :outgoing, status: 'ringing', provider_call_id: call_id, meta: {})
+      database_down = true
+      allow_any_instance_of(Call).to receive(:update!).and_wrap_original do |original, *args, **kwargs| # rubocop:disable RSpec/AnyInstance
+        raise ActiveRecord::StatementInvalid, 'connection lost' if database_down
+
+        original.call(*args, **kwargs)
+      end
+
+      expect { described_class.new(inbox: inbox).reconcile(late) }.to raise_error(ActiveRecord::StatementInvalid)
+
+      database_down = false
+      described_class.new(inbox: inbox).reconcile(Call.find(late.id))
+      expect(late.reload.meta['sdp_answer']).to eq('SDP-EARLY')
+      expect(late.status).to eq('completed')
     end
 
     # Applied later, from a queue, and timed by when the pickup and the end arrived.
@@ -300,6 +326,21 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call.reload.status).to eq('failed')
       expect(events_named('voice_call.ended').map { |p| p[:data][:call_id] }).to eq(['CALLX3'])
       expect(backend.commands.map(&:to_h)).to eq([{ 'call_id' => 'CALLX3', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' } }])
+    end
+
+    # The stream delivers again a failure whose handling the database failed.
+    it 'closes the call on the failure delivered again after closing it failed' do
+      Whatsapp::Session::CallCommands.remember("cmd-accept-3-#{command_suffix}", 'CALLX3')
+      service = instance_double(described_class)
+      allow(described_class).to receive(:new).and_call_original
+      allow(described_class).to receive(:new).with(inbox: inbox).and_return(service)
+      allow(service).to receive(:accept_failed).and_raise(ActiveRecord::StatementInvalid, 'connection lost')
+
+      expect { failed("cmd-accept-3-#{command_suffix}") }.to raise_error(ActiveRecord::StatementInvalid)
+
+      allow(described_class).to receive(:new).and_call_original
+      expect(failed("cmd-accept-3-#{command_suffix}")).to eq(:handled)
+      expect(call.reload.status).to eq('failed')
     end
 
     it 'leaves the call alone for a failure it cannot place' do

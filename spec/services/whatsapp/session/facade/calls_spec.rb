@@ -66,6 +66,9 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(facade.accept_call('CALLX3', 'SDP')).to be(true)
 
       expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to eq('CALLX3')
+      # Delivered again before it was applied, it is the same failure of the same call.
+      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to eq('CALLX3')
+      Whatsapp::Session::CallCommands.settled("cmd-accept-1-#{command_suffix}")
       expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to be_nil
     end
 

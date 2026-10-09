@@ -118,11 +118,16 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     Redis::Alfred.setex(pending_key(call_id, kind), data.merge('at' => Time.current.to_i).to_json, PENDING_TTL)
   end
 
+  # Taken inside the call's lock, and let go only once what it was applied to commits: a
+  # transaction rolled back leaves it for the job's retry, which would otherwise find the
+  # only record of the pickup or the end gone. Read again before then, it is applied again
+  # to a call that already has it, which changes nothing.
   def take_pending(call_id, kind)
-    raw = Redis::Alfred.get(pending_key(call_id, kind))
+    key = pending_key(call_id, kind)
+    raw = Redis::Alfred.get(key)
     return if raw.blank?
 
-    Redis::Alfred.delete(pending_key(call_id, kind))
+    ActiveRecord.after_all_transactions_commit { Redis::Alfred.delete(key) }
     JSON.parse(raw)
   end
 
