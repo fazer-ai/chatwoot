@@ -186,9 +186,17 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     conversation = Whatsapp::Session::Inbound::ConversationFinder.new(
       inbox: inbox, contact: @contact_inbox.contact, contact_inbox: @contact_inbox
     ).perform
-    Voice::InboundCallBuilder.perform!(
-      inbox: inbox, call_sid: payload[:id], provider: :whatsapp, extra_meta: extra_meta,
-      caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }, conversation: conversation
-    )
+    # An end the connector published before the offer, kept by `terminate`, is applied in
+    # the same transaction, as the Cloud path applies its tombstone: the call's message is
+    # then written already ended, and nobody is rung for a call that is over.
+    ActiveRecord::Base.transaction do
+      call = Voice::InboundCallBuilder.perform!(
+        inbox: inbox, call_sid: payload[:id], provider: :whatsapp, extra_meta: extra_meta,
+        caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }, conversation: conversation
+      )
+      ended = take_pending(call.provider_call_id, 'terminate')
+      finalize_terminate(call, nil, ended['reason']) if ended
+      call
+    end
   end
 end

@@ -138,6 +138,18 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(events_named('voice_call.incoming')).to be_empty
     end
 
+    # The connector publishes the end and the offer from separate callbacks, and a caller
+    # who hung up at once can have the end arrive first.
+    it 'rings nobody for an offer whose end arrived before it' do
+      call_id = "CALLX8#{command_suffix}"
+      dispatch(model::Events::CallTerminate.new(call_id: call_id, from: caller_party, reason: 'timeout'))
+
+      offer(call_id)
+
+      expect(Call.find_by!(provider_call_id: call_id)).to be_terminal
+      expect(events_named('voice_call.incoming')).to be_empty
+    end
+
     it 'does not ring again for an offer still ringing that it already rang' do
       offer('CALLX1')
       offer('CALLX1')
