@@ -61,6 +61,18 @@ describe('calls store, a call this tab placed', () => {
     expect(store.calls[0].isActive).toBe(false);
   });
 
+  // The message can add the call this tab placed before the tab itself does.
+  it('applies the pickup when the tab adds a call the message added first', () => {
+    const store = useCallsStore();
+    store.addCall(placed);
+    takeEarlyOutboundOutcome.mockReturnValue('accepted');
+    store.addCall(placed);
+
+    expect(store.calls).toHaveLength(1);
+    expect(store.activeCall?.callSid).toBe('CALLOUT1');
+    expect(armOutboundRecorder).toHaveBeenCalled();
+  });
+
   it('is not added when it ended first, and its session is released', () => {
     takeEarlyOutboundOutcome.mockReturnValue('ended');
     const store = useCallsStore();

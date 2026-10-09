@@ -24,6 +24,10 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
   # line is written instead.
   def take_up_call(_contact_inbox) = nil
 
+  # Refuses the call when the calling flow says the inbox takes no incoming calls. The
+  # connector refuses every call itself when calling is off, so here there is none.
+  def refuse_call = nil
+
   # Prefixed, and not the raw call id: this shares a column with WhatsApp's message ids,
   # and the prefix is what keeps a call from ever being the target of an edit, a revoke
   # or a reaction that names the same string.
@@ -34,6 +38,10 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     # connector publishes one offer per call, but a redelivery crosses instances and the
     # dedupe there is per session.
     return :duplicate if payload.call_id.present? && find_message(source_id).present?
+
+    # Before anything about who is calling: a call refused on the inbox's instruction is
+    # refused for a blocked contact too, who is otherwise filed nowhere.
+    refuse_call
 
     contact_inbox = inbound::ContactResolver.new(inbox: inbox, party: payload.from, overwrite: true).perform
     return :ignored if contact_inbox.nil?

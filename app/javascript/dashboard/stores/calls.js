@@ -56,19 +56,9 @@ export const useCallsStore = defineStore('calls', {
         const next = { ...callData };
         if (existing.caller && !next.caller) delete next.caller;
         Object.assign(existing, next, { isActive: existing.isActive });
-        return;
-      }
-
-      // A call this tab placed that was picked up, or ended, before it got here. Only this
-      // tab's own call: a sibling tab's, arriving here as a message, is not this tab's to
-      // start or to release.
-      const early =
-        callData.provider === VOICE_CALL_PROVIDERS.WHATSAPP &&
-        isLocalWhatsappCall(callData.callId)
-          ? takeEarlyOutboundOutcome(callData.callId)
-          : undefined;
-      if (early === 'ended') {
-        cleanupWhatsappSession();
+        // The message can add this tab's placed call before the tab does; an outcome kept
+        // for it is applied when the tab adds it all the same.
+        this.applyEarlyOutcome(callData);
         return;
       }
 
@@ -78,7 +68,23 @@ export const useCallsStore = defineStore('calls', {
         ...callData,
         isActive: false,
       });
-      if (early === 'accepted') {
+      this.applyEarlyOutcome(callData);
+    },
+
+    // A call this tab placed that was picked up, or ended, before the tab had it. Only this
+    // tab's own call: a sibling tab's, arriving here as a message, is not this tab's to
+    // start or to release.
+    applyEarlyOutcome(callData) {
+      if (
+        callData.provider !== VOICE_CALL_PROVIDERS.WHATSAPP ||
+        !isLocalWhatsappCall(callData.callId)
+      )
+        return;
+      const early = takeEarlyOutboundOutcome(callData.callId);
+      if (early === 'ended') {
+        this.calls = this.calls.filter(c => c.callSid !== callData.callSid);
+        cleanupWhatsappSession();
+      } else if (early === 'accepted') {
         this.setCallActive(callData.callSid);
         armOutboundRecorder();
       }

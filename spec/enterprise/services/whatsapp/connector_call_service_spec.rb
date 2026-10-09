@@ -139,6 +139,19 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call_lines.count).to eq(1)
     end
 
+    # A blocked contact is filed nowhere, and the inbox takes no calls: the call is refused
+    # all the same, or it would go on ringing on the paired phone.
+    it 'refuses a blocked contact\'s call too, filing nothing' do
+      channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
+      offer('CALLB0')
+      inbox.contacts.find_by(identifier: '182736451928374@lid').update!(blocked: true)
+
+      offer('CALLB1')
+
+      expect(backend.commands_of('call.reject').map(&:call_id)).to eq(%w[CALLB0 CALLB1])
+      expect(call_lines.count).to eq(1)
+    end
+
     it 'is refused by name, with the line, when incoming calls are off' do
       channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
 

@@ -57,12 +57,14 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     return keep_pending(payload.call_id, 'terminate', 'reason' => payload.reason) if call.nil?
 
     # A pickup kept for a call recorded since, and not applied yet, happened before this
-    # end: applied first, so the call is ended as the answered call it was.
-    early = take_pending(call.provider_call_id, 'answered')
-    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: early['sdp'])) if early
-    call.reload if early
-    duration = (Time.current - call.started_at).to_i if call.in_progress? && call.started_at
-    finalize_terminate(call, duration, payload.reason)
+    # end: applied first, so the call is ended as the answered call it was. Under the call's
+    # lock, which the reconciliation also takes, so a pickup it took is applied before this
+    # end reads the call.
+    call.with_lock do
+      apply_kept_pickup(call)
+      duration = (Time.current - call.started_at).to_i if call.in_progress? && call.started_at
+      finalize_terminate(call, duration, payload.reason)
+    end
   end
 
   # Applies what arrived for a placed call before it was recorded, in the order it happened.
@@ -70,10 +72,11 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # the tab that placed the call learns of it from that request's answer, and a pickup or
   # an end broadcast before then reaches a tab that does not know the call yet.
   def reconcile(call)
-    answer = take_pending(call.provider_call_id, 'answered')
-    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp'])) if answer
-    ended = take_pending(call.provider_call_id, 'terminate')
-    terminate(model::Events::CallTerminate.new(call_id: call.provider_call_id, from: nil, reason: ended['reason'])) if ended
+    call.with_lock do
+      apply_kept_pickup(call)
+      ended = take_pending(call.provider_call_id, 'terminate')
+      terminate(model::Events::CallTerminate.new(call_id: call.provider_call_id, from: nil, reason: ended['reason'])) if ended
+    end
   end
 
   # The connector could not use the agent's answer, and the call it was for goes on ringing
@@ -95,6 +98,14 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   private
 
   def model = Whatsapp::Session::Model
+
+  def apply_kept_pickup(call)
+    answer = take_pending(call.provider_call_id, 'answered')
+    return if answer.nil?
+
+    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp']))
+    call.reload
+  end
 
   def find_call(call_id)
     Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: call_id)
