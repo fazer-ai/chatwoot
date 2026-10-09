@@ -3,6 +3,7 @@ import {
   armOutboundRecorder,
   cleanupWhatsappSession,
   isLocalWhatsappCall,
+  takeEarlyOutboundEnd,
   takeEarlyOutboundOutcome,
 } from 'dashboard/composables/useWhatsappCallSession';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
@@ -74,16 +75,18 @@ export const useCallsStore = defineStore('calls', {
     // A call this tab placed that was picked up, or ended, before the tab had it. Only this
     // tab's own call: a sibling tab's, arriving here as a message, is not this tab's to
     // start or to release.
+    //
+    // An end is applied to a call the tab no longer owns too: the end that tore down the
+    // session placing it can arrive before the dial's answer adds the call.
     applyEarlyOutcome(callData) {
-      if (
-        callData.provider !== VOICE_CALL_PROVIDERS.WHATSAPP ||
-        !isLocalWhatsappCall(callData.callId)
-      )
-        return;
-      const early = takeEarlyOutboundOutcome(callData.callId);
+      if (callData.provider !== VOICE_CALL_PROVIDERS.WHATSAPP) return;
+      const local = isLocalWhatsappCall(callData.callId);
+      const early = local
+        ? takeEarlyOutboundOutcome(callData.callId)
+        : takeEarlyOutboundEnd(callData.callId);
       if (early === 'ended') {
         this.calls = this.calls.filter(c => c.callSid !== callData.callSid);
-        cleanupWhatsappSession();
+        if (local) cleanupWhatsappSession();
       } else if (early === 'accepted') {
         this.setCallActive(callData.callSid);
         armOutboundRecorder();

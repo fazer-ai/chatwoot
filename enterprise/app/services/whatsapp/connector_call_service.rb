@@ -17,9 +17,11 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # it came from is kept on the call, since that is what refusing it names, and the
   # contact's own fields can be edited or merged away while it rings.
   # A redelivered offer is the call already ringing, or already answered: ringing the
-  # agents again for it would put back the card an accept took away.
+  # agents again for it would put back the card an accept took away. One whose call was
+  # recorded and that failed before the agents were rung is redelivered to ring them.
   def offer(payload)
-    return if find_call(payload.call_id)
+    call = find_call(payload.call_id)
+    return finish_ringing(call) if call
 
     @caller = payload.from.address
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
@@ -44,8 +46,12 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     return keep_pending(payload.call_id, 'answered', { 'sdp' => payload.sdp }, at) if call.nil?
     return unless call.outgoing?
 
-    accept_outbound_call(call, session: { sdp: payload.sdp })
-    mark_outbound_accepted(call, { timestamp: at&.to_i })
+    # One lock across both, so a hang-up cannot read the call between the answer and the
+    # pickup and end as unanswered a call that was answered.
+    call.with_lock do
+      accept_outbound_call(call, session: { sdp: payload.sdp })
+      mark_outbound_accepted(call, { timestamp: at&.to_i })
+    end
   end
 
   # A call shown only as an activity line has no record to close; one being placed may not
@@ -109,6 +115,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   private
 
   def model = Whatsapp::Session::Model
+
+  # Marked once the agents were rung, which is the last step of taking up an offer.
+  def broadcast_incoming(call, sdp_offer)
+    super
+    call.update!(meta: call.meta.merge('rung' => true))
+  end
+
+  def finish_ringing(call)
+    return if !call.ringing? || call.meta['rung']
+
+    update_conversation(call)
+    broadcast_incoming(call, call.meta['sdp_offer'])
+  end
 
   def apply_kept_pickup(call)
     answer = take_pending(call.provider_call_id, 'answered')

@@ -148,7 +148,9 @@ const cleanup = () => {
   if (remoteAudioEl) remoteAudioEl.srcObject = null;
 
   pc = null;
-  earlyOutboundOutcomes.clear();
+  // Outcomes are kept through a teardown: an end that tore the session down while the
+  // dial was still being answered is what keeps the call it placed from being added
+  // back as ringing. A new dial starts them over.
   localStream = null;
   remoteStream = null;
   mediaRecorder = null;
@@ -368,6 +370,7 @@ export function useWhatsappCallSession() {
     if (hasActiveWhatsappCall())
       return { status: VOICE_CALL_OUTBOUND_INIT_STATUS.LOCKED };
     isInitiatingOutbound.value = true;
+    earlyOutboundOutcomes.clear();
     try {
       const sdpOffer = await prepareOutboundOffer();
       const response = await WhatsappCallsAPI.initiate(target, sdpOffer);
@@ -477,6 +480,14 @@ export const noteEarlyOutboundOutcome = (callId, outcome) => {
   if (!pc || (activeCallId != null && activeCallId !== callId)) return;
   if (earlyOutboundOutcomes.get(callId) === 'ended') return;
   earlyOutboundOutcomes.set(callId, outcome);
+};
+
+// An end alone, for a call this tab no longer owns: a session torn down by the end of
+// the call it was placing. Any other outcome stays where it is.
+export const takeEarlyOutboundEnd = callId => {
+  if (earlyOutboundOutcomes.get(callId) !== 'ended') return undefined;
+  earlyOutboundOutcomes.delete(callId);
+  return 'ended';
 };
 
 export const takeEarlyOutboundOutcome = callId => {

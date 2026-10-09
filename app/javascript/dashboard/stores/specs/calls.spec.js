@@ -4,6 +4,7 @@ import {
   armOutboundRecorder,
   cleanupWhatsappSession,
   isLocalWhatsappCall,
+  takeEarlyOutboundEnd,
   takeEarlyOutboundOutcome,
 } from 'dashboard/composables/useWhatsappCallSession';
 
@@ -11,6 +12,7 @@ vi.mock('dashboard/composables/useWhatsappCallSession', () => ({
   armOutboundRecorder: vi.fn(),
   cleanupWhatsappSession: vi.fn(),
   isLocalWhatsappCall: vi.fn(() => true),
+  takeEarlyOutboundEnd: vi.fn(),
   takeEarlyOutboundOutcome: vi.fn(),
 }));
 vi.mock('dashboard/api/channel/voice/twilioVoiceClient', () => ({
@@ -80,5 +82,17 @@ describe('calls store, a call this tab placed', () => {
 
     expect(store.calls).toHaveLength(0);
     expect(cleanupWhatsappSession).toHaveBeenCalled();
+  });
+
+  // The end tore down the session placing it before the dial added the call.
+  it('is not added when it ended first and the session placing it is gone already', () => {
+    isLocalWhatsappCall.mockReturnValueOnce(false);
+    takeEarlyOutboundEnd.mockReturnValue('ended');
+    const store = useCallsStore();
+    store.addCall(placed);
+
+    expect(store.calls).toHaveLength(0);
+    expect(cleanupWhatsappSession).not.toHaveBeenCalled();
+    expect(takeEarlyOutboundOutcome).not.toHaveBeenCalled();
   });
 });

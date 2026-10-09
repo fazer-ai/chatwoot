@@ -94,6 +94,30 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(events_named('voice_call.incoming').size).to eq(1)
     end
 
+    it 'does not ring again for an offer still ringing that it already rang' do
+      offer('CALLX1')
+      offer('CALLX1')
+
+      expect(events_named('voice_call.incoming').size).to eq(1)
+    end
+
+    # The call is recorded before the agents are rung, and the stream redelivers an offer
+    # whose handling failed in between.
+    it 'rings for an offer redelivered after it failed before ringing anyone' do
+      ringing = 0
+      allow(ActionCable.server).to receive(:broadcast) do |stream, payload|
+        raise Redis::CannotConnectError, 'down' if payload[:event] == 'voice_call.incoming' && (ringing += 1) == 1
+
+        broadcasts << [stream, payload]
+      end
+      expect { offer('CALLX1') }.to raise_error(Redis::CannotConnectError)
+
+      offer('CALLX1')
+
+      expect(Call.where(provider_call_id: 'CALLX1').count).to eq(1)
+      expect(events_named('voice_call.incoming').size).to eq(1)
+    end
+
     it 'is one Call however many times the offer arrives' do
       offer('CALLX1')
       offer('CALLX1')

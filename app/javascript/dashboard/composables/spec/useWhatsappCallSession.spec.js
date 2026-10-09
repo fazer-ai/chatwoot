@@ -1,6 +1,10 @@
 import WhatsappCallsAPI from 'dashboard/api/channel/whatsapp/whatsappCallsAPI';
 import {
+  applyOutboundAnswer,
   cleanupWhatsappSession,
+  handleWhatsappRemoteEnd,
+  noteEarlyOutboundOutcome,
+  takeEarlyOutboundEnd,
   useWhatsappCallSession,
 } from 'dashboard/composables/useWhatsappCallSession';
 
@@ -81,5 +85,29 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     peer.onconnectionstatechange();
 
     expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+  });
+
+  // The dial is applying an answer that raced ahead of it when the call ends, and the
+  // end tears the session down before the dial returns the call it placed.
+  it('keeps an end that tore the session down for the call the dial returns', async () => {
+    let answered;
+    WhatsappCallsAPI.initiate.mockImplementation(async () => {
+      await applyOutboundAnswer(42, 'v=0\r\n');
+      peers.at(-1).setRemoteDescription = () =>
+        new Promise(resolve => {
+          answered = resolve;
+        });
+      return { id: 42, call_id: 'CALLOUT1' };
+    });
+    const session = useWhatsappCallSession();
+    const dialing = session.initiateOutboundCall({ conversationId: 1 });
+    await vi.waitFor(() => expect(answered).toBeDefined());
+
+    noteEarlyOutboundOutcome(42, 'ended');
+    await handleWhatsappRemoteEnd(42);
+    answered();
+    await dialing;
+
+    expect(takeEarlyOutboundEnd(42)).toBe('ended');
   });
 });
