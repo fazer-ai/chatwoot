@@ -426,7 +426,9 @@ export function useWhatsappCallSession() {
       if (response?.id) {
         activeCallId = response.id;
         activeCallSid = response.call_id || null;
-        startRingingTimer(activeCallId, activeCallSid);
+        // Not for a call already picked up while the dial was out: its pickup armed the
+        // recorder, and it is the transport's to report from there.
+        if (!recorderArmed) startRingingTimer(activeCallId, activeCallSid);
         callRecordingEnabled = response.recording_enabled !== false;
         // A connect webhook that raced ahead of this response was buffered;
         // apply our own by id now that we know it, then drop every buffered

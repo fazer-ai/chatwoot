@@ -212,6 +212,21 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
     });
 
+    // The pickup can be handled while the request placing the call is still out.
+    it('is not timed when it was picked up before the dial returned', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockImplementation(async () => {
+        armOutboundRecorder();
+        return { id: 42, call_id: 'CALLOUT1' };
+      });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS * 2);
+
+      expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+    });
+
     it('is left to the transport once the callee picked up', async () => {
       vi.useFakeTimers();
       WhatsappCallsAPI.initiate.mockResolvedValue({
