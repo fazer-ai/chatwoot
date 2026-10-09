@@ -24,8 +24,10 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
   # line is written instead.
   def take_up_call(_contact_inbox) = nil
 
-  # Refuses the call when the calling flow says the inbox takes no incoming calls. The
-  # connector refuses every call itself when calling is off, so here there is none.
+  # Refuses the call when the calling flow says the inbox takes no incoming calls, and is
+  # then the outcome: a refused call files nothing, no contact, no thread and no line, the
+  # way the Cloud API's refusal does. The connector refuses every call itself when calling
+  # is off, so here there is none.
   def refuse_call = nil
 
   # Prefixed, and not the raw call id: this shares a column with WhatsApp's message ids,
@@ -41,7 +43,8 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
 
     # Before anything about who is calling: a call refused on the inbox's instruction is
     # refused for a blocked contact too, who is otherwise filed nowhere.
-    refuse_call
+    refused = refuse_call
+    return refused if refused
 
     contact_inbox = inbound::ContactResolver.new(inbox: inbox, party: payload.from, overwrite: true).perform
     return :ignored if contact_inbox.nil?
