@@ -134,6 +134,15 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(backend.last_command.to.id).to eq('5511977776666')
     end
 
+    # A number picked as one is dialled as one, even when the same digits are a LID the
+    # connector pairs with somebody else's phone.
+    it 'dials a number picked from the contact panel as that number' do
+      facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact, number: true)
+
+      expect(backend.last_command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '182736451928374' }, 'sdp' => 'SDP-OFFER')
+      expect(backend.commands_of('contact.resolve')).to be_empty
+    end
+
     # The digits of a LID the connector pairs with nothing can be somebody's phone number.
     it 'refuses digits nothing says are a number' do
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '998877665544332')

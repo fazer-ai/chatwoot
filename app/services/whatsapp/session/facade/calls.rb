@@ -41,10 +41,12 @@ module Whatsapp::Session::Facade::Calls
   # Answers in the Cloud service's shape, so the controller reads the call id the same way
   # for both. Keyed on the offer itself: a retried request carrying the same offer is the
   # same call, and the connector answers it without ringing the phone again. The contact
-  # is the one the call is placed to, which the Cloud service has no use for.
-  def initiate_call(recipient, sdp_offer, contact: nil)
+  # is the one the call is placed to, which the Cloud service has no use for, and `number`
+  # says the recipient is that contact's number, picked as one: the contact panel's call.
+  def initiate_call(recipient, sdp_offer, contact: nil, number: false)
     calls_supported!
-    command = model::Commands::CallStart.new(to: callee_address(recipient, contact), sdp: sdp_offer)
+    to = number ? model::Address.phone(recipient.to_s.delete('+')) : callee_address(recipient, contact)
+    command = model::Commands::CallStart.new(to: to, sdp: sdp_offer)
     { 'call_id' => backend.start_call(command, idempotency_key: "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}") }
   end
 

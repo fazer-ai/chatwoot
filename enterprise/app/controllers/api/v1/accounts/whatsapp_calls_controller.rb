@@ -161,10 +161,13 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
     create_call_record(provider_call_id)
   end
 
-  # The connector dials numbers only, and the contact called is what tells a conversation's
-  # bare-digit source id apart from a LID's.
+  # The connector dials numbers only. The contact panel hands over the contact's number,
+  # which is one; a conversation hands over its bare-digit source id, which the contact
+  # called is what tells apart from a LID's.
   def connector_call_context
-    @inbox.channel.session_provider? ? { contact: @contact } : {}
+    return {} unless @inbox.channel.session_provider?
+
+    { contact: @contact, number: params[:conversation_id].blank? }
   end
 
   def call_recipient

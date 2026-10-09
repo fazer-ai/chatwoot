@@ -106,6 +106,16 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
       expect(backend.commands_of('call.start').sole.to.id).to eq('5511977776666')
     end
 
+    # The fake connector pairs these digits, as a LID, with another phone.
+    it 'rings the contact\'s number even when its digits are a LID the connector knows' do
+      collision = create(:contact, account: account, phone_number: '+182736451928374')
+      post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
+           params: { inbox_id: inbox.id, contact_id: collision.id, sdp_offer: 'SDP-OFFER' }, headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:ok)
+      expect(backend.commands_of('call.start').sole.to.id).to eq('182736451928374')
+    end
+
     # A pickup that beat the record of the call it answers is applied as soon as the record exists.
     it 'connects a call picked up before this request recorded it' do
       allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|
