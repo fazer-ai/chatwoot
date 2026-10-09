@@ -21,6 +21,7 @@ vi.mock('dashboard/helper/voice', async importOriginal => ({
 vi.mock('dashboard/api/channel/whatsapp/whatsappCallsAPI', () => ({
   default: {
     initiate: vi.fn(),
+    show: vi.fn(() => Promise.resolve({ status: 'ringing' })),
     terminate: vi.fn(() => Promise.resolve()),
   },
 }));
@@ -247,6 +248,24 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS * 2);
 
       expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+    });
+
+    // The cable can drop after the answer got through and before the pickup did.
+    it('is kept when the call says it was picked up', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      WhatsappCallsAPI.show.mockResolvedValueOnce({ status: 'in-progress' });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS);
+
+      expect(WhatsappCallsAPI.show).toHaveBeenCalledWith(42);
+      expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+      expect(hasActiveWhatsappCall()).toBe(true);
     });
 
     it('is left to the transport once the callee picked up', async () => {

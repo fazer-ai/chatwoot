@@ -237,9 +237,27 @@ const stopRingingTimer = () => {
 
 const startRingingTimer = (callId, placedSid) => {
   stopRingingTimer();
-  ringingTimer = setTimeout(() => {
+  ringingTimer = setTimeout(async () => {
     ringingTimer = null;
-    if (activeCallId === callId) letGoOfCall(callId, placedSid);
+    if (activeCallId !== callId) return;
+    // The pickup broadcast can be what was lost, on a cable that dropped after the answer
+    // got through: the call is asked about before it is taken for unanswered.
+    let status = null;
+    try {
+      ({ status } = await WhatsappCallsAPI.show(callId));
+    } catch (_) {
+      /* unreachable as well: nothing says the call is up */
+    }
+    if (activeCallId !== callId) return;
+    if (status === 'in-progress') {
+      const store = useCallsStore();
+      const card = store.calls.find(c => c.callId === callId);
+      if (card) store.setCallActive(card.callSid);
+      // eslint-disable-next-line no-use-before-define
+      armOutboundRecorder();
+      return;
+    }
+    letGoOfCall(callId, placedSid);
   }, OUTBOUND_RINGING_LIMIT_MS);
 };
 

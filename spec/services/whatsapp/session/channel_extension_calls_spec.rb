@@ -58,11 +58,14 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       .not_to have_enqueued_job(Whatsapp::Session::ApplyProxyJob)
   end
 
-  it 'does not offer calling on an inbox that leaves through a proxy' do
+  it 'does not turn calling on for an inbox that leaves through a proxy, and still turns it off' do
+    channel.enable_voice_calling!
     channel.update!(provider_config: channel.provider_config.merge('proxy_url' => 'http://proxy.example:3128'))
 
-    expect(channel.voice_calling_supported?).to be(false)
-    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /not supported/)
+    expect { channel.reload.enable_voice_calling! }.to raise_error(RuntimeError, /proxy/)
+    channel.disable_voice_calling!
+    expect(channel.reload.provider_config['calling_enabled']).to be(false)
+    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /proxy/)
   end
 
   it 'leaves calling on a Cloud inbox to the Calling API' do
