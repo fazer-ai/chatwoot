@@ -257,7 +257,9 @@ const startRingingTimer = (callId, placedSid) => {
     }
     // A pickup that arrived while the call was being asked about armed the recorder.
     if (activeCallId !== callId || recorderArmed) return;
-    if (status === 'in-progress') {
+    // Up on WhatsApp is only a call here once its answer was applied: without one there is
+    // no media, and no transport whose failure would ever report the call lost.
+    if (status === 'in-progress' && pc?.remoteDescription) {
       const store = useCallsStore();
       const card = store.calls.find(c => c.callId === callId);
       if (card) store.setCallActive(card.callSid);
@@ -269,20 +271,8 @@ const startRingingTimer = (callId, placedSid) => {
   }, OUTBOUND_RINGING_LIMIT_MS);
 };
 
-const stopRecorderAndUpload = async callId => {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    await new Promise(resolve => {
-      mediaRecorder.addEventListener('stop', resolve, { once: true });
-      try {
-        mediaRecorder.stop();
-      } catch (_) {
-        resolve();
-      }
-    });
-  }
-  if (!recorderChunks.length || !callId) return;
-
-  let blob = new Blob(recorderChunks, { type: recorderChunks[0].type });
+const uploadRecording = async (callId, chunks) => {
+  let blob = new Blob(chunks, { type: chunks[0].type });
   const isWebm = blob.type.startsWith('audio/webm');
   let filename = isWebm ? 'call-recording.webm' : 'call-recording.ogg';
   // Remux to OGG so the file carries a real duration (MediaRecorder never
@@ -301,6 +291,25 @@ const stopRecorderAndUpload = async callId => {
   } catch (_) {
     /* noop */
   }
+};
+
+// The recorder is stopped and what it recorded is taken here; the upload goes on by itself.
+// Waiting on it would keep the microphone, the session and the card for as long as the
+// upload takes, and an upload has no ceiling.
+const stopRecorderAndUpload = async callId => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    await new Promise(resolve => {
+      mediaRecorder.addEventListener('stop', resolve, { once: true });
+      try {
+        mediaRecorder.stop();
+      } catch (_) {
+        resolve();
+      }
+    });
+  }
+  if (!recorderChunks.length || !callId) return;
+
+  uploadRecording(callId, recorderChunks.slice());
 };
 
 // devise-token-auth requires access-token / client / uid headers on every

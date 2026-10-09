@@ -22,6 +22,7 @@ vi.mock('dashboard/helper/voice', async importOriginal => ({
 vi.mock('dashboard/api/channel/whatsapp/whatsappCallsAPI', () => ({
   default: {
     initiate: vi.fn(),
+    uploadRecording: vi.fn(() => Promise.resolve()),
     show: vi.fn(() => Promise.resolve({ status: 'ringing' })),
     terminate: vi.fn(() => Promise.resolve()),
   },
@@ -38,7 +39,11 @@ function FakePeerConnection() {
     addTrack: () => {},
     createOffer: () => Promise.resolve({ type: 'offer', sdp: 'v=0\r\n' }),
     setLocalDescription: () => Promise.resolve(),
-    setRemoteDescription: () => Promise.resolve(),
+    remoteDescription: null,
+    setRemoteDescription: description => {
+      peer.remoteDescription = description;
+      return Promise.resolve();
+    },
     addEventListener: () => {},
     removeEventListener: () => {},
     close: () => {
@@ -261,12 +266,30 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       WhatsappCallsAPI.show.mockResolvedValueOnce({ status: 'in-progress' });
       const session = useWhatsappCallSession();
       await session.initiateOutboundCall({ conversationId: 1 });
+      await applyOutboundAnswer(42, 'v=0\r\n');
 
       await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS);
 
       expect(WhatsappCallsAPI.show).toHaveBeenCalledWith(42);
       expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
       expect(hasActiveWhatsappCall()).toBe(true);
+    });
+
+    // The answer can be lost with the pickup: up on WhatsApp, the call carries nothing here.
+    it('is let go of when it is up but its answer never reached this tab', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      WhatsappCallsAPI.show.mockResolvedValueOnce({ status: 'in-progress' });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS);
+
+      expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+      await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
     });
 
     it('is kept when the pickup arrives while the call is being asked about', async () => {
@@ -320,5 +343,66 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
 
       expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
     });
+  });
+
+  // An upload has no ceiling, and the recording is not what holds the microphone.
+  it('releases a lost recorded call while its recording is still uploading', async () => {
+    const tracks = [];
+    global.MediaStream = function FakeMediaStream() {
+      return {
+        getTracks: () => tracks,
+        getAudioTracks: () => tracks,
+        addTrack: track => tracks.push(track),
+      };
+    };
+    global.AudioContext = function FakeAudioContext() {
+      return {
+        state: 'running',
+        resume: () => Promise.resolve(),
+        close: () => Promise.resolve(),
+        createMediaStreamDestination: () => ({ stream: {} }),
+        createMediaStreamSource: () => ({ connect: () => {} }),
+      };
+    };
+    global.MediaRecorder = class FakeMediaRecorder {
+      static isTypeSupported = () => true;
+
+      state = 'inactive';
+
+      listeners = [];
+
+      addEventListener(_, listener) {
+        this.listeners.push(listener);
+      }
+
+      start() {
+        this.state = 'recording';
+        this.ondataavailable({ data: { size: 10, type: 'audio/ogg' } });
+      }
+
+      stop() {
+        this.state = 'inactive';
+        this.listeners.forEach(listener => listener());
+      }
+    };
+    window.HTMLMediaElement.prototype.play = () => Promise.resolve();
+    WhatsappCallsAPI.uploadRecording.mockReturnValueOnce(new Promise(() => {}));
+    WhatsappCallsAPI.initiate.mockResolvedValue({
+      id: 42,
+      call_id: 'CALLOUT1',
+    });
+    const session = useWhatsappCallSession();
+    await session.initiateOutboundCall({ conversationId: 1 });
+    armOutboundRecorder();
+    peers.at(-1).ontrack({ track: { kind: 'audio', stop: () => {} } });
+
+    peers.at(-1).fail();
+
+    await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
+    expect(WhatsappCallsAPI.uploadRecording).toHaveBeenCalledWith(
+      42,
+      expect.anything(),
+      'call-recording.ogg'
+    );
   });
 });
