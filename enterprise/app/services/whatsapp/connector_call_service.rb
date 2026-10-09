@@ -16,7 +16,11 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # A call.offer carrying the connector's WebRTC offer, which rings as a Call. The address
   # it came from is kept on the call, since that is what refusing it names, and the
   # contact's own fields can be edited or merged away while it rings.
+  # A redelivered offer is the call already ringing, or already answered: ringing the
+  # agents again for it would put back the card an accept took away.
   def offer(payload)
+    return if find_call(payload.call_id)
+
     @caller = payload.from.address
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
   end

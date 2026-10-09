@@ -83,6 +83,17 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(inbox.contact_inboxes.count).to eq(1)
     end
 
+    # Redelivered after an agent took it: ringing again would bring back the card the
+    # accept removed from every other agent's screen.
+    it 'does not ring again for an offer it already rang' do
+      offer('CALLX1')
+      Call.find_by!(provider_call_id: 'CALLX1').update!(status: 'in_progress')
+
+      offer('CALLX1')
+
+      expect(events_named('voice_call.incoming').size).to eq(1)
+    end
+
     it 'is one Call however many times the offer arrives' do
       offer('CALLX1')
       offer('CALLX1')

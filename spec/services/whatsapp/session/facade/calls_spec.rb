@@ -122,6 +122,15 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(backend.last_command.to.id).to eq('5511977776666')
     end
 
+    # The contact panel hands over the contact's number before any thread with it exists.
+    it 'dials a contact\'s number from the contact panel, with no thread yet' do
+      contact.update!(phone_number: '+5511977776666')
+
+      facade.initiate_call('5511977776666', 'SDP-OFFER')
+
+      expect(backend.last_command.to.id).to eq('5511977776666')
+    end
+
     # The digits of a LID the connector pairs with nothing can be somebody's phone number.
     it 'refuses digits nothing says are a number' do
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '998877665544332')

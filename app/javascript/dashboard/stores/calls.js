@@ -1,5 +1,9 @@
 import TwilioVoiceClient from 'dashboard/api/channel/voice/twilioVoiceClient';
-import { cleanupWhatsappSession } from 'dashboard/composables/useWhatsappCallSession';
+import {
+  armOutboundRecorder,
+  cleanupWhatsappSession,
+  takeEarlyOutboundOutcome,
+} from 'dashboard/composables/useWhatsappCallSession';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { TERMINAL_STATUSES } from 'dashboard/helper/voice';
 import { defineStore } from 'pinia';
@@ -54,12 +58,26 @@ export const useCallsStore = defineStore('calls', {
         return;
       }
 
+      // A call this tab placed that was picked up, or ended, before it got here.
+      const early =
+        callData.provider === VOICE_CALL_PROVIDERS.WHATSAPP
+          ? takeEarlyOutboundOutcome(callData.callId)
+          : undefined;
+      if (early === 'ended') {
+        cleanupWhatsappSession();
+        return;
+      }
+
       // Prepend so the newest call surfaces as the primary card (incomingCalls[0])
       // and older calls drop into the stack below it.
       this.calls.unshift({
         ...callData,
         isActive: false,
       });
+      if (early === 'accepted') {
+        this.setCallActive(callData.callSid);
+        armOutboundRecorder();
+      }
     },
 
     removeCall(callSid) {

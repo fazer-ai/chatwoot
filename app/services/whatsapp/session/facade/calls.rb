@@ -70,11 +70,12 @@ module Whatsapp::Session::Facade::Calls
     model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
   end
 
-  # The connector answers an address it holds nothing for with that same address alone,
-  # so a number is known to it only when the answer also carries the LID it pairs with.
+  # A contact of this account carrying the number says it is one: that is also what a call
+  # placed from the contact panel hands over, before any thread with the contact exists.
+  # The connector answers an address it holds nothing for with that same address alone, so
+  # a number is known to it only when the answer also carries the LID it pairs with.
   def known_number?(recipient)
-    contact = channel.inbox.contact_inboxes.find_by(source_id: recipient)&.contact
-    contact&.phone_number.to_s.delete('+') == recipient || resolve(model::Address.phone(recipient))&.lid.present?
+    channel.account.contacts.exists?(phone_number: "+#{recipient}") || resolve(model::Address.phone(recipient))&.lid.present?
   end
 
   def paired_phone(lid) = resolve(lid)&.phone.presence

@@ -21,6 +21,11 @@ let activeCallId = null;
 // by call id (a single slot would let a concurrent agent's event clobber ours)
 // and initiateOutboundCall flushes the matching one by id.
 const pendingOutboundAnswers = new Map();
+// The pickup and the end of a placed call are broadcast too, and on a paired phone they
+// can arrive before this tab has the call in its store: the connector answers the dial as
+// soon as the phone rings. They are kept here by call id, like the answers above, and
+// applied by the calls store when the call is added (takeEarlyOutboundOutcome).
+const earlyOutboundOutcomes = new Map();
 // Module-scoped so multiple composable callers (header button + contact-panel
 // button) share the same lock. A per-instance ref let two parallel callers
 // both pass the guard and tear down each other's WebRTC state in cleanup().
@@ -143,6 +148,7 @@ const cleanup = () => {
   if (remoteAudioEl) remoteAudioEl.srcObject = null;
 
   pc = null;
+  earlyOutboundOutcomes.clear();
   localStream = null;
   remoteStream = null;
   mediaRecorder = null;
@@ -455,6 +461,20 @@ export const armOutboundRecorder = () => {
 };
 
 export const cleanupWhatsappSession = () => cleanup();
+
+// outcome: 'accepted' or 'ended'. Kept only while this tab is placing a call whose id it
+// does not know yet, or knows and has not added yet; anything else is not this tab's.
+export const noteEarlyOutboundOutcome = (callId, outcome) => {
+  if (!pc || (activeCallId != null && activeCallId !== callId)) return;
+  if (earlyOutboundOutcomes.get(callId) === 'ended') return;
+  earlyOutboundOutcomes.set(callId, outcome);
+};
+
+export const takeEarlyOutboundOutcome = callId => {
+  const outcome = earlyOutboundOutcomes.get(callId);
+  earlyOutboundOutcomes.delete(callId);
+  return outcome;
+};
 
 export const handleWhatsappRemoteEnd = async callId => {
   // Snapshot before cleanup nulls activeCallId.
