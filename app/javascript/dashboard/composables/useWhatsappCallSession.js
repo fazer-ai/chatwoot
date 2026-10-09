@@ -186,25 +186,27 @@ const buildPeerConnection = iceServers => {
   };
   // A transport that failed carries nothing more, and the provider may never say the call
   // ended: a paired phone's connector hangs up a call it can no longer carry without
-  // always reaching the client. Ending it here lets the call's own end broadcast release
-  // the card, the microphone and the recorder, as an agent hanging up would. When the end
-  // cannot be asked for either, nothing would broadcast it, so this tab lets go of the
-  // call itself: the recording is uploaded, the session released and the card removed.
+  // always reaching the client. The end is asked for here, as an agent hanging up would,
+  // and this tab lets go of the call itself whether or not that went through: the end
+  // broadcast is not replayed to a tab whose cable was down, and a failed request sends
+  // none. The recording is uploaded, the session released and the card removed, once,
+  // however many of these and the broadcast arrive.
   const own = pc;
   own.onconnectionstatechange = () => {
     if (own !== pc || own.connectionState !== 'failed' || !activeCallId) return;
     const callId = activeCallId;
-    WhatsappCallsAPI.terminate(callId).catch(() => {
-      if (activeCallId !== callId) return;
-      // eslint-disable-next-line no-use-before-define
-      handleWhatsappRemoteEnd(callId)
-        .catch(() => {})
-        .finally(() => {
-          const store = useCallsStore();
-          const card = store.calls.find(c => c.callId === callId);
-          if (card) store.removeCall(card.callSid);
-        });
-    });
+    WhatsappCallsAPI.terminate(callId)
+      .catch(() => {})
+      .then(() => {
+        if (activeCallId !== callId) return undefined;
+        // eslint-disable-next-line no-use-before-define
+        return handleWhatsappRemoteEnd(callId).catch(() => {});
+      })
+      .then(() => {
+        const store = useCallsStore();
+        const card = store.calls.find(c => c.callId === callId);
+        if (card) store.removeCall(card.callSid);
+      });
   };
   return pc;
 };

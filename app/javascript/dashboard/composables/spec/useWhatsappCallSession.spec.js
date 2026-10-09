@@ -98,6 +98,29 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     await vi.waitFor(() => expect(useCallsStore().calls).toHaveLength(0));
   });
 
+  // The end went through, but its broadcast is not replayed to a tab whose cable was down.
+  it('releases the session and the card when the end went through unannounced', async () => {
+    WhatsappCallsAPI.initiate.mockResolvedValue({
+      id: 42,
+      call_id: 'CALLOUT1',
+    });
+    setActivePinia(createPinia());
+    const session = useWhatsappCallSession();
+    await session.initiateOutboundCall({ conversationId: 1 });
+    useCallsStore().addCall({
+      callSid: 'CALLOUT1',
+      callId: 42,
+      callDirection: 'outbound',
+      provider: 'whatsapp',
+    });
+
+    peers.at(-1).fail();
+
+    expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+    await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
+    await vi.waitFor(() => expect(useCallsStore().calls).toHaveLength(0));
+  });
+
   it('does nothing for a transport that is only being set up', async () => {
     WhatsappCallsAPI.initiate.mockResolvedValue({
       id: 42,
