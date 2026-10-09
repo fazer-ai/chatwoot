@@ -82,6 +82,8 @@ module Redis::RedisKeys
   WHATSAPP_CALL_TERMINATE_TOMBSTONE = 'WHATSAPP_CALL_TERMINATE_TOMBSTONE::%<call_id>s'.freeze
   # The connector's call commands that answer nothing, by command id, until a failure could still come back for them.
   WHATSAPP_CONNECTOR_CALL_COMMAND = 'WHATSAPP_CONNECTOR_CALL_COMMAND::%<command_id>s'.freeze
+  # A native inbox whose calling was turned on or off while its pairing was still under way.
+  WHATSAPP_CONNECTOR_CALL_POLICY_PENDING = 'WHATSAPP_CONNECTOR_CALL_POLICY_PENDING::%<channel_id>s'.freeze
   # A connector call event that arrived before the Call it is about was recorded.
   WHATSAPP_CONNECTOR_CALL_PENDING = 'WHATSAPP_CONNECTOR_CALL_PENDING::%<inbox_id>s::%<call_id>s::%<kind>s'.freeze
   # The provider message ids this app has just acknowledged to WhatsApp, per conversation, so the

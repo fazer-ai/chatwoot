@@ -186,6 +186,13 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
       Whatsapp::Session::ConnectionStateWriter::PAIRING_KEYS.any? { |key| connection[key].present? }
   end
 
+  # Called once a pairing succeeds: a call policy changed while it was under way goes out.
+  def apply_pending_call_policy
+    return unless Redis::Alfred.delete(call_policy_pending_key).to_i.positive?
+
+    Whatsapp::Session::ApplyProxyJob.perform_later(id)
+  end
+
   private
 
   # Saved without validation, like the Cloud path: the flag is not something the provider's
@@ -229,11 +236,21 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # saving the same address again changes nothing and sends nothing.
   #
   # Calling being turned on or off is the same kind of change: the call policy rides on the
-  # connect too, and the connector keeps the last one it was given.
+  # connect too, and the connector keeps the last one it was given. A pairing under way
+  # was connected with the policy from before, and nothing connects it again once paired,
+  # so the change is kept for the pairing to apply when it succeeds.
   def follow_connect_request_change
-    return unless (proxy_changed? || calling_changed?) && resumable_session?
+    return unless proxy_changed? || calling_changed?
+    return Whatsapp::Session::ApplyProxyJob.perform_later(id) if resumable_session?
 
-    Whatsapp::Session::ApplyProxyJob.perform_later(id)
+    Redis::Alfred.setex(call_policy_pending_key, 1, CALL_POLICY_PENDING_TTL) if calling_changed?
+  end
+
+  # Long enough for any pairing started before the change to end, one way or the other.
+  CALL_POLICY_PENDING_TTL = 1.hour.to_i
+
+  def call_policy_pending_key
+    format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_POLICY_PENDING, channel_id: id)
   end
 
   def proxy_changed?

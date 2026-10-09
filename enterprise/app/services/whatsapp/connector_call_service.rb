@@ -172,11 +172,17 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_PENDING, inbox_id: inbox.id, call_id: call_id, kind: kind)
   end
 
+  # Filed in the thread the contact's messages on this inbox are in, picked the way a
+  # message picks it: a call from the number of a contact whose thread is on its LID is
+  # the same conversation, not a second one.
   def build_inbound_call(payload, sdp_offer)
     extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers, 'caller_address' => @caller&.to_h }
+    conversation = Whatsapp::Session::Inbound::ConversationFinder.new(
+      inbox: inbox, contact: @contact_inbox.contact, contact_inbox: @contact_inbox
+    ).perform
     Voice::InboundCallBuilder.perform!(
       inbox: inbox, call_sid: payload[:id], provider: :whatsapp, extra_meta: extra_meta,
-      caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }
+      caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }, conversation: conversation
     )
   end
 end

@@ -24,6 +24,27 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     expect(a_request(:any, //)).not_to have_been_made
   end
 
+  # The pairing under way was connected with the policy from before, and nothing connects
+  # it again once paired.
+  it 'tells the connector about calling turned on during the pairing, once it succeeds' do
+    channel.update!(provider_connection: { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,AA' })
+    expect { channel.enable_voice_calling! }.not_to have_enqueued_job(Whatsapp::Session::ApplyProxyJob)
+
+    model = Whatsapp::Session::Model
+    paired = model::Event.build(model::Events::PairingSuccess.new(phone: channel.phone_number.delete('+'), lid: '99887766'), epoch: 1)
+    expect { Whatsapp::Session::Inbound::Handlers::ConnectionState.new(channel: channel.reload, event: paired).perform }
+      .to have_enqueued_job(Whatsapp::Session::ApplyProxyJob).with(channel.id)
+  end
+
+  it 'does not connect again a pairing that succeeds with nothing changed under it' do
+    channel.update!(provider_connection: { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,AA' })
+
+    model = Whatsapp::Session::Model
+    paired = model::Event.build(model::Events::PairingSuccess.new(phone: channel.phone_number.delete('+'), lid: '99887766'), epoch: 1)
+    expect { Whatsapp::Session::Inbound::Handlers::ConnectionState.new(channel: channel.reload, event: paired).perform }
+      .not_to have_enqueued_job(Whatsapp::Session::ApplyProxyJob)
+  end
+
   it 'leaves calling on a Cloud inbox to the Calling API' do
     cloud = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
 

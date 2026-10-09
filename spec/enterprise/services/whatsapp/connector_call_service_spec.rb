@@ -83,6 +83,16 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(inbox.contact_inboxes.count).to eq(1)
     end
 
+    # The phone can announce a call by number alone, for a contact whose thread is on its LID.
+    it 'files a call announced by number in the thread the contact\'s LID is in' do
+      offer('CALLX1')
+      first = Call.find_by!(provider_call_id: 'CALLX1')
+      by_number = model::Party.new(phone: '5511988887777', lid: nil, push_name: 'Ana Souza')
+      dispatch(model::Events::CallOffer.new(call_id: 'CALLX2', from: by_number, video: false, timestamp: 1_755_440_000_123, sdp: sdp_offer))
+
+      expect(Call.find_by!(provider_call_id: 'CALLX2').conversation_id).to eq(first.conversation_id)
+    end
+
     # Redelivered after an agent took it: ringing again would bring back the card the
     # accept removed from every other agent's screen.
     it 'does not ring again for an offer it already rang' do
