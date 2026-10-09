@@ -475,6 +475,15 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call.reload.status).to eq('failed')
     end
 
+    # The caller hung up while the stream was stalled, and the agent picked up the card meanwhile.
+    it 'records no negative duration for an end seen before the pickup here' do
+      picked_up = call_in('in_progress', :incoming, 'CALLX7')
+      picked_up.update!(started_at: Time.current)
+      dispatch(model::Events::CallTerminate.new(call_id: 'CALLX7', from: caller_party, reason: nil), ts: (2.minutes.ago.to_f * 1000).to_i)
+
+      expect(picked_up.reload.duration_seconds).to eq(0)
+    end
+
     it 'leaves a closed call as it is when the end arrives again' do
       call = call_in('ringing', :incoming, 'CALLX5')
       terminate('CALLX5')

@@ -69,7 +69,9 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     # end reads the call.
     call.with_lock do
       apply_kept_pickup(call)
-      duration = ((at || Time.current) - call.started_at).to_i if call.in_progress? && call.started_at
+      # An end the connector saw before this side's pickup, handed over late, is a call
+      # that lasted nothing, not one that lasted less than that.
+      duration = [((at || Time.current) - call.started_at).to_i, 0].max if call.in_progress? && call.started_at
       finalize_terminate(call, duration, payload.reason)
     end
   end

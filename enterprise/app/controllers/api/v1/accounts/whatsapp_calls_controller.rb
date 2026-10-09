@@ -114,7 +114,9 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
     render_could_not_create_error(I18n.t('errors.whatsapp.calls.sdp_offer_required'))
   end
 
+  # A group's source id is not a person to dial, and WhatsApp has no group call to place.
   def ensure_call_recipient
+    return render_could_not_create_error(I18n.t('errors.whatsapp.calls.group_not_supported')) if @conversation&.group_type_group?
     return if call_recipient.present?
 
     render_could_not_create_error(I18n.t('errors.whatsapp.calls.contact_phone_required'))

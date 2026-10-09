@@ -179,6 +179,7 @@ en:
         no_message: 'Call has no associated message'
         sdp_offer_required: 'sdp_offer is required'
         contact_phone_required: 'Contact phone number is required'
+        group_not_supported: 'Calls cannot be placed to a group'
         permission_request_failed: 'Failed to send call permission request'
     openai:
       invalid_api_key: 'OpenAI API key is invalid or revoked. Please check your key in your OpenAI dashboard.'

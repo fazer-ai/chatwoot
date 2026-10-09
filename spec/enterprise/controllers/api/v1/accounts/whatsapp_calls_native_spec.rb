@@ -106,6 +106,17 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
         .to have_attributes(direction: 'outgoing', status: 'ringing', conversation_id: conversation.id)
     end
 
+    # A group's source id is no person to dial.
+    it 'refuses to call a group, resolving nothing' do
+      conversation.update!(group_type: :group)
+
+      initiate
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(backend.commands_of('contact.resolve')).to be_empty
+      expect(backend.commands_of('call.start')).to be_empty
+    end
+
     # The contact panel hands over the contact's own number, which the connector need not know yet.
     it 'rings a contact from the contact panel on the contact\'s number' do
       fresh = create(:contact, account: account, phone_number: '+5511977776666')

@@ -37,10 +37,12 @@ const contactsUiFlags = useMapGetter('contacts/getUIFlags');
 const { isCloudFeatureEnabled } = useAccount();
 
 const voiceCallProvider = computed(() => getVoiceCallProvider(props.inbox));
+// A call is placed to a person: WhatsApp has no call a group can be dialled into.
 const isVoiceCallInbox = computed(
   () =>
     voiceCallProvider.value !== null &&
-    isCloudFeatureEnabled(FEATURE_FLAGS.CHANNEL_VOICE)
+    isCloudFeatureEnabled(FEATURE_FLAGS.CHANNEL_VOICE) &&
+    props.chat?.group_type !== 'group'
 );
 const isWhatsappVoiceInbox = computed(
   () => voiceCallProvider.value === VOICE_CALL_PROVIDERS.WHATSAPP

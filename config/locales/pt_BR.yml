@@ -154,6 +154,7 @@ pt_BR:
         no_message: 'A chamada não possui mensagem associada'
         sdp_offer_required: 'sdp_offer é obrigatório'
         contact_phone_required: 'Número de telefone do contato é obrigatório'
+        group_not_supported: 'Não é possível ligar para um grupo'
         permission_request_failed: 'Falha ao enviar solicitação de permissão de chamada'
     openai:
       invalid_api_key: 'A chave da API da OpenAI é inválida ou revogada. Por favor, verifique sua chave no seu painel da OpenAI.'
