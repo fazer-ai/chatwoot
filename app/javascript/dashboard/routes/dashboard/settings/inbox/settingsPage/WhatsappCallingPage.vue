@@ -136,7 +136,11 @@ export default {
       <SettingsToggleSection
         :model-value="callingEnabled"
         :header="$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.LABEL')"
-        :description="$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.DESCRIPTION')"
+        :description="
+          isCloudCalling
+            ? $t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.DESCRIPTION')
+            : $t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PAIRED_DESCRIPTION')
+        "
         :hide-toggle="isTogglingCalling"
         @update:model-value="handleCallingToggle"
       >

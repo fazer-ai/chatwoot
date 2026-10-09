@@ -239,6 +239,11 @@
         "BUTTON_TEXT": "Atualizar",
         "SUCCESS_MESSAGE": "Continuidade da conversa atualizada com sucesso"
       }
+    },
+    "WHATSAPP_CALLING": {
+      "ENABLE": {
+        "PAIRED_DESCRIPTION": "Permite que os agentes recebam e façam ligações de WhatsApp nesta caixa, pelo celular pareado com ela. Os clientes podem ligar para este número direto pelo WhatsApp."
+      }
     }
   }
 }

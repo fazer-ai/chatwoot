@@ -239,6 +239,11 @@
         "BUTTON_TEXT": "Update",
         "SUCCESS_MESSAGE": "Conversation continuity updated successfully"
       }
+    },
+    "WHATSAPP_CALLING": {
+      "ENABLE": {
+        "PAIRED_DESCRIPTION": "Allow agents to receive and place WhatsApp calls on this inbox, through the phone paired with it. Customers can call this number directly from WhatsApp."
+      }
     }
   }
 }

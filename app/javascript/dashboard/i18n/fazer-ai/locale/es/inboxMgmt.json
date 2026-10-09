@@ -239,6 +239,11 @@
         "BUTTON_TEXT": "Actualizar",
         "SUCCESS_MESSAGE": "Continuidad de la conversación actualizada correctamente"
       }
+    },
+    "WHATSAPP_CALLING": {
+      "ENABLE": {
+        "PAIRED_DESCRIPTION": "Permite que los agentes reciban y hagan llamadas de WhatsApp en esta bandeja, a través del teléfono vinculado a ella. Los clientes pueden llamar a este número directamente desde WhatsApp."
+      }
     }
   }
 }
