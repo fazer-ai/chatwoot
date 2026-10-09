@@ -510,18 +510,29 @@ export const takeEarlyOutboundOutcome = callId => {
   return outcome;
 };
 
-export const handleWhatsappRemoteEnd = async callId => {
+// One end of a call can be asked for twice: by its broadcast, and by the store adding a
+// call whose end it kept. The second waits for the first instead of tearing down the
+// recorder whose upload the first is still finishing.
+let ending = null;
+
+export const handleWhatsappRemoteEnd = callId => {
   // Snapshot before cleanup nulls activeCallId.
   const id = callId || activeCallId;
   if (!id) {
     cleanup();
-    return;
+    return Promise.resolve();
   }
-  try {
-    await stopRecorderAndUpload(id);
-  } finally {
-    cleanup();
-  }
+  if (ending?.id === id) return ending.promise;
+  const promise = (async () => {
+    try {
+      await stopRecorderAndUpload(id);
+    } finally {
+      cleanup();
+      ending = null;
+    }
+  })();
+  ending = { id, promise };
+  return promise;
 };
 
 export const setWhatsappCallMuted = muted => {

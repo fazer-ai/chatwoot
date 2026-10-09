@@ -3,6 +3,7 @@ import { useCallsStore } from 'dashboard/stores/calls';
 import {
   armOutboundRecorder,
   cleanupWhatsappSession,
+  handleWhatsappRemoteEnd,
   isLocalWhatsappCall,
   takeEarlyOutboundEnd,
   takeEarlyOutboundOutcome,
@@ -11,6 +12,7 @@ import {
 vi.mock('dashboard/composables/useWhatsappCallSession', () => ({
   armOutboundRecorder: vi.fn(),
   cleanupWhatsappSession: vi.fn(),
+  handleWhatsappRemoteEnd: vi.fn(),
   isLocalWhatsappCall: vi.fn(() => true),
   takeEarlyOutboundEnd: vi.fn(),
   takeEarlyOutboundOutcome: vi.fn(),
@@ -81,7 +83,9 @@ describe('calls store, a call this tab placed', () => {
     store.addCall(placed);
 
     expect(store.calls).toHaveLength(0);
-    expect(cleanupWhatsappSession).toHaveBeenCalled();
+    // Through the call's end, which uploads the recording before releasing the session.
+    expect(handleWhatsappRemoteEnd).toHaveBeenCalledWith(42);
+    expect(cleanupWhatsappSession).not.toHaveBeenCalled();
   });
 
   // The end tore down the session placing it before the dial added the call.
@@ -92,7 +96,7 @@ describe('calls store, a call this tab placed', () => {
     store.addCall(placed);
 
     expect(store.calls).toHaveLength(0);
-    expect(cleanupWhatsappSession).not.toHaveBeenCalled();
+    expect(handleWhatsappRemoteEnd).not.toHaveBeenCalled();
     expect(takeEarlyOutboundOutcome).not.toHaveBeenCalled();
   });
 });

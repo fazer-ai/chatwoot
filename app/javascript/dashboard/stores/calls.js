@@ -2,6 +2,7 @@ import TwilioVoiceClient from 'dashboard/api/channel/voice/twilioVoiceClient';
 import {
   armOutboundRecorder,
   cleanupWhatsappSession,
+  handleWhatsappRemoteEnd,
   isLocalWhatsappCall,
   takeEarlyOutboundEnd,
   takeEarlyOutboundOutcome,
@@ -86,7 +87,9 @@ export const useCallsStore = defineStore('calls', {
         : takeEarlyOutboundEnd(callData.callId);
       if (early === 'ended') {
         this.calls = this.calls.filter(c => c.callSid !== callData.callSid);
-        if (local) cleanupWhatsappSession();
+        // Through the call's own end, which uploads its recording first, and waits for an
+        // end of the same call already doing so.
+        if (local) handleWhatsappRemoteEnd(callData.callId);
       } else if (early === 'accepted') {
         this.setCallActive(callData.callSid);
         armOutboundRecorder();

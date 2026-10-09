@@ -136,4 +136,21 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
 
     expect(takeEarlyOutboundEnd(42)).toBe('ended');
   });
+
+  // Asked for by the broadcast and by the store adding the call whose end it kept.
+  it('ends a call asked to end twice once, the second waiting for the first', async () => {
+    WhatsappCallsAPI.initiate.mockResolvedValue({
+      id: 42,
+      call_id: 'CALLOUT1',
+    });
+    const session = useWhatsappCallSession();
+    await session.initiateOutboundCall({ conversationId: 1 });
+
+    const first = handleWhatsappRemoteEnd(42);
+    const second = handleWhatsappRemoteEnd(42);
+
+    expect(second).toBe(first);
+    await first;
+    expect(hasActiveWhatsappCall()).toBe(false);
+  });
 });

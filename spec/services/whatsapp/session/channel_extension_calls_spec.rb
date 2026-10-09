@@ -36,6 +36,19 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       .to have_enqueued_job(Whatsapp::Session::ApplyProxyJob).with(channel.id)
   end
 
+  it 'still tells the connector when the pairing event is redelivered after the job could not be enqueued' do
+    channel.update!(provider_connection: { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,AA' })
+    channel.enable_voice_calling!
+    model = Whatsapp::Session::Model
+    paired = model::Event.build(model::Events::PairingSuccess.new(phone: channel.phone_number.delete('+'), lid: '99887766'), epoch: 1)
+    handle = -> { Whatsapp::Session::Inbound::Handlers::ConnectionState.new(channel: channel.reload, event: paired).perform }
+    allow(Whatsapp::Session::ApplyProxyJob).to receive(:perform_later).and_raise(Redis::CannotConnectError, 'down')
+    expect(&handle).to raise_error(Redis::CannotConnectError)
+
+    allow(Whatsapp::Session::ApplyProxyJob).to receive(:perform_later).and_call_original
+    expect(&handle).to have_enqueued_job(Whatsapp::Session::ApplyProxyJob).with(channel.id)
+  end
+
   it 'does not connect again a pairing that succeeds with nothing changed under it' do
     channel.update!(provider_connection: { 'connection' => 'connecting', 'qr_data_url' => 'data:image/png;base64,AA' })
 

@@ -187,10 +187,13 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   end
 
   # Called once a pairing succeeds: a call policy changed while it was under way goes out.
+  # Let go of only once the job is on its way, so a pairing event redelivered after the
+  # enqueue failed still finds it.
   def apply_pending_call_policy
-    return unless Redis::Alfred.delete(call_policy_pending_key).to_i.positive?
+    return unless Redis::Alfred.exists?(call_policy_pending_key)
 
     Whatsapp::Session::ApplyProxyJob.perform_later(id)
+    Redis::Alfred.delete(call_policy_pending_key)
   end
 
   private
