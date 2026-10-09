@@ -48,6 +48,8 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
   afterEach(() => cleanupWhatsappSession());
 
   beforeEach(() => {
+    // The failure handler removes the call's card from the store, in every example.
+    setActivePinia(createPinia());
     peers = [];
     vi.clearAllMocks();
     global.RTCPeerConnection = FakePeerConnection;
@@ -73,6 +75,7 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     peers.at(-1).fail();
 
     expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+    await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
   });
 
   // Nothing will broadcast the end of a call whose end could not be asked for.
@@ -82,7 +85,6 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       call_id: 'CALLOUT1',
     });
     WhatsappCallsAPI.terminate.mockRejectedValueOnce(new Error('offline'));
-    setActivePinia(createPinia());
     const session = useWhatsappCallSession();
     await session.initiateOutboundCall({ conversationId: 1 });
     useCallsStore().addCall({
@@ -104,7 +106,6 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       id: 42,
       call_id: 'CALLOUT1',
     });
-    setActivePinia(createPinia());
     const session = useWhatsappCallSession();
     await session.initiateOutboundCall({ conversationId: 1 });
     useCallsStore().addCall({
