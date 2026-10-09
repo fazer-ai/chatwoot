@@ -41,6 +41,8 @@ en:
       messaging_window_closed: Meta's reply window for this contact has closed. It reopens when the contact sends a new message.
       messaging_window_closed_for_automation: Meta only accepts automated replies within 24 hours of the contact's last message. Take over the conversation to reply as an agent.
     whatsapp:
+      calls:
+        group_not_supported: Calls cannot be placed to a group
       group_announcement_only: Only administrators are allowed to send messages in this group
       group_description_cannot_be_removed: WhatsApp does not allow a group description to be removed once it is set. Replace the text instead.
     inboxes:

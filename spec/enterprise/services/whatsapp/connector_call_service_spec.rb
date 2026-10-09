@@ -119,6 +119,25 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(Call.find_by!(provider_call_id: 'CALLX1').meta).to include('sdp_answer' => 'SDP-AGENT', 'rung' => true)
     end
 
+    # Answered by an agent between the redelivery finding the call and ringing for it.
+    it 'does not ring for a redelivered offer whose call an agent took meanwhile' do
+      allow(ActionCable.server).to receive(:broadcast) do |stream, payload|
+        raise Redis::CannotConnectError, 'down' if payload[:event] == 'voice_call.incoming'
+
+        broadcasts << [stream, payload]
+      end
+      expect { offer('CALLX1') }.to raise_error(Redis::CannotConnectError)
+      allow(ActionCable.server).to receive(:broadcast) { |stream, payload| broadcasts << [stream, payload] }
+      stale = Call.find_by!(provider_call_id: 'CALLX1')
+      Call.find(stale.id).update!(status: 'in_progress')
+      service = described_class.new(inbox: inbox)
+      allow(service).to receive(:find_call).and_return(stale)
+
+      service.offer(model::Events::CallOffer.new(call_id: 'CALLX1', from: caller_party, video: false, timestamp: 1, sdp: sdp_offer))
+
+      expect(events_named('voice_call.incoming')).to be_empty
+    end
+
     it 'does not ring again for an offer still ringing that it already rang' do
       offer('CALLX1')
       offer('CALLX1')

@@ -131,11 +131,15 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     call.with_lock { call.update!(meta: call.meta.merge('rung' => true)) }
   end
 
+  # Under the call's lock, read afresh: an agent answering or ending it while this rings
+  # again would otherwise see it brought back as ringing on the other agents' screens.
   def finish_ringing(call)
-    return if !call.ringing? || call.meta['rung']
+    call.with_lock do
+      next if !call.ringing? || call.meta['rung']
 
-    update_conversation(call)
-    broadcast_incoming(call, call.meta['sdp_offer'])
+      update_conversation(call)
+      broadcast_incoming(call, call.meta['sdp_offer'])
+    end
   end
 
   def apply_kept_pickup(call)
