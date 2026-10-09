@@ -94,6 +94,21 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(events_named('voice_call.incoming').size).to eq(1)
     end
 
+    # An agent can answer while the agents are still being rung.
+    it 'keeps what an agent wrote on the call while it was being rung' do
+      allow(ActionCable.server).to receive(:broadcast) do |stream, payload|
+        if payload[:event] == 'voice_call.incoming'
+          answered = Call.find_by!(provider_call_id: 'CALLX1')
+          answered.update!(meta: answered.meta.merge('sdp_answer' => 'SDP-AGENT'))
+        end
+        broadcasts << [stream, payload]
+      end
+
+      offer('CALLX1')
+
+      expect(Call.find_by!(provider_call_id: 'CALLX1').meta).to include('sdp_answer' => 'SDP-AGENT', 'rung' => true)
+    end
+
     it 'does not ring again for an offer still ringing that it already rang' do
       offer('CALLX1')
       offer('CALLX1')
@@ -378,6 +393,32 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
       allow(described_class).to receive(:new).and_call_original
       expect(failed("cmd-accept-3-#{command_suffix}")).to eq(:handled)
+      expect(call.reload.status).to eq('failed')
+    end
+
+    # The refusal could not go out; the failure delivered again refuses the call it closed.
+    it 'refuses again on the failure delivered again when the refusal could not go out' do
+      Whatsapp::Session::CallCommands.remember("cmd-accept-4-#{command_suffix}", 'CALLX3')
+      down = true
+      allow(backend).to receive(:reject_call).and_wrap_original do |original, *args, **kwargs|
+        raise Whatsapp::Session::Errors::NotConnected, 'socket down' if down
+
+        original.call(*args, **kwargs)
+      end
+
+      expect { failed("cmd-accept-4-#{command_suffix}") }.to raise_error(Whatsapp::Session::Errors::NotConnected)
+      expect(call.reload.status).to eq('failed')
+
+      down = false
+      expect(failed("cmd-accept-4-#{command_suffix}")).to eq(:handled)
+      expect(backend.commands_of('call.reject').map(&:call_id)).to eq(['CALLX3'])
+    end
+
+    it 'gives up on a refusal the connector will never take' do
+      Whatsapp::Session::CallCommands.remember("cmd-accept-5-#{command_suffix}", 'CALLX3')
+      allow(backend).to receive(:reject_call).and_raise(Whatsapp::Session::Errors::InvalidPayload, 'no caller')
+
+      expect(failed("cmd-accept-5-#{command_suffix}")).to eq(:handled)
       expect(call.reload.status).to eq('failed')
     end
 

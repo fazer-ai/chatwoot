@@ -97,13 +97,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # The connector could not use the agent's answer, and the call it was for goes on ringing
   # on the caller's phone. It is closed here as failed, and refused there, so neither side
   # is left believing it was picked up.
+  #
+  # A refusal that could not go out for now is raised, so the stream delivers the failure
+  # again, and the call closed by it is refused again then; one the connector will never
+  # take is given up on.
   def accept_failed(call_id)
     call = find_call(call_id)
-    return if call.nil? || call.terminal?
+    return if call.nil? || (call.terminal? && call.end_reason != 'accept_failed')
 
     finalize_terminate(call, nil, 'accept_failed')
     inbox.channel.provider_service.reject_call(call_id)
   rescue Whatsapp::Session::Errors::Error => e
+    raise if e.retryable?
+
     Rails.logger.warn("[WHATSAPP CALL] refusing call #{call_id} after its answer failed: #{e.message}")
   end
 
@@ -119,7 +125,8 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # Marked once the agents were rung, which is the last step of taking up an offer.
   def broadcast_incoming(call, sdp_offer)
     super
-    call.update!(meta: call.meta.merge('rung' => true))
+    # Read again under the lock: an agent can answer or end the call while it rings.
+    call.with_lock { call.update!(meta: call.meta.merge('rung' => true)) }
   end
 
   def finish_ringing(call)
