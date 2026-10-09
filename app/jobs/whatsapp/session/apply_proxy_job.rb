@@ -1,5 +1,6 @@
-# Sends a native inbox's current proxy to the connector, by connecting the session again.
-# Enqueued by Whatsapp::Session::ChannelExtension when the proxy changes; this only checks,
+# Sends a native inbox's current connect request (its proxy and its call policy) to the
+# connector, by connecting the session again.
+# Enqueued by Whatsapp::Session::ChannelExtension when either changes; this only checks,
 # at send time, that there is still a session to resume.
 class Whatsapp::Session::ApplyProxyJob < ApplicationJob
   queue_as :high

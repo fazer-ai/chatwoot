@@ -47,6 +47,11 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # contract has no command for that, and neither does whatsmeow. What it promises
       # is that a call reaches the inbox, which is what an agent can act on.
       #
+      # `voice_calls` is the other half: the connector carrying a call's voice to the
+      # agent's browser, which it does once the inbox turns calling on (`calls.answer` on
+      # the connect). It is what lets the inbox's calling settings and the call commands
+      # reach this provider, the way the Calling API reaches a Cloud inbox.
+      #
       # `history_sync` is the phone's history, published by the connector as `history.sync`
       # and asked for with `history.request`. The field decides only whether the archive is
       # filed: the connect always asks for history, because what arrived while the session
@@ -54,7 +59,8 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       capabilities: %w[
         qr_pairing code_pairing echo_by_reserved_id edit revoke reactions typing presence
         presence_subscribe read_receipts mark_unread check_number profile_picture groups
-        group_management group_admin group_invites group_join_requests media_download calls history_sync
+        group_management group_admin group_invites group_join_requests media_download calls voice_calls
+        history_sync
       ],
       fields: [PROXY_URL, MARK_AS_READ, PRESENCE_SUBSCRIBE, HISTORY_SYNC]
     ),

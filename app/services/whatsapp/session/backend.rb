@@ -165,6 +165,12 @@ class Whatsapp::Session::Backend
   def group_join_requests(_command) = not_supported!(:group_join_requests)
   def handle_group_join_requests(_command) = not_supported!(:handle_group_join_requests)
 
+  # Calls carried to the agent's browser. `start_call` answers the provider's call id.
+  def accept_call(_command) = not_supported!(:accept_call)
+  def reject_call(_command) = not_supported!(:reject_call)
+  def start_call(_command, **) = not_supported!(:start_call)
+  def terminate_call(_command) = not_supported!(:terminate_call)
+
   def capabilities
     self.class.capabilities
   end

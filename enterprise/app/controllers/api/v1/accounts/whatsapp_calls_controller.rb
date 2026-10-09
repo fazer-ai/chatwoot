@@ -11,6 +11,9 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
   rescue_from Voice::CallErrors::NotRinging,
               Voice::CallErrors::CallFailed,
               with: :render_call_error
+  # A paired phone dials through the connector, which refuses a call the way Meta's API
+  # does, only in its own terms: a number not on WhatsApp, a session that is not connected.
+  rescue_from Whatsapp::Session::Errors::Error, with: :render_call_error
   rescue_from Voice::CallErrors::AlreadyAccepted, with: :render_call_already_accepted
   rescue_from Voice::CallErrors::CallAlreadyEnded, with: :render_call_ended
 

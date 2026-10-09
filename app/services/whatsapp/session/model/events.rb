@@ -225,7 +225,9 @@ module Whatsapp::Session::Model::Events
     coerce groups: [Address]
   end
 
-  class CallOffer < Data.define(:call_id, :from, :video, :timestamp)
+  # `sdp` is the connector's WebRTC offer, present only on a 1:1 voice call of a session
+  # connected with `calls.answer`: it is what lets the browser answer the call.
+  class CallOffer < Data.define(:call_id, :from, :video, :timestamp, :sdp)
     include Serializable
     wire_type 'call.offer'
     coerce from: Party
@@ -236,6 +238,13 @@ module Whatsapp::Session::Model::Events
     include Serializable
     wire_type 'call.terminate'
     coerce from: Party
+  end
+
+  # The callee picked up a call placed with `call.start`; `sdp` is the connector's WebRTC
+  # answer for the browser.
+  class CallAnswered < Data.define(:call_id, :sdp)
+    include Serializable
+    wire_type 'call.answered'
   end
 
   class HistorySync < Data.define(:kind, :progress, :data)
@@ -263,7 +272,7 @@ module Whatsapp::Session::Model::Events
     PairingPasskeyConfirmation, MessageReceived, MessageReceipt, MessageEdited, MessageRevoked, MessageReaction,
     MediaDownloadFailed, CommandFailed, ChatPresence, PresenceUpdate, ContactPictureChanged, ContactIdentityChanged,
     GroupJoined, GroupUpdated, GroupPictureChanged, GroupActivity,
-    CallOffer, CallTerminate, HistorySync, Raw
+    CallOffer, CallTerminate, CallAnswered, HistorySync, Raw
   ].freeze
 
   BY_TYPE = CLASSES.index_by(&:wire_type).freeze

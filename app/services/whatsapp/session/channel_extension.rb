@@ -46,6 +46,30 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     Whatsapp::Session::Registry.backend_for(self)
   end
 
+  # A session provider calls through the connector rather than Meta's Calling API, so
+  # whether it can is its capability, and turning it on or off is the flag alone: the
+  # connect that follows the save is what tells the connector.
+  def voice_calling_supported?
+    return super unless session_provider?
+
+    session_capabilities.include?('voice_calls')
+  end
+
+  def enable_voice_calling!
+    return super unless session_provider?
+    raise 'WhatsApp calling is not supported by this provider' unless voice_calling_supported?
+    raise 'WhatsApp calling requires the channel_voice feature' unless account.feature_enabled?('channel_voice')
+
+    update_calling_flag(true)
+  end
+
+  def disable_voice_calling!
+    return super unless session_provider?
+    raise 'WhatsApp calling is not supported by this provider' unless voice_calling_supported?
+
+    update_calling_flag(false)
+  end
+
   # Not a delegate on the model, unlike `setup_channel_provider`: pairing by code is a
   # session-family action, and the legacy services have nothing to answer it with.
   def request_pairing_code
@@ -164,6 +188,13 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
 
   private
 
+  # Saved without validation, like the Cloud path: the flag is not something the provider's
+  # credentials check has anything to say about.
+  def update_calling_flag(enabled)
+    self.provider_config = provider_config.merge('calling_enabled' => enabled)
+    save!(validate: false)
+  end
+
   # Two things a session inbox's config can change that the provider has to be told about,
   # and neither of them changes the provider key, so nothing else in the layer notices.
   #
@@ -179,7 +210,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     previous = self.class.find(id)
     previous.provider_config = saved_change_to_provider_config.first || {}
     let_go_of(previous) if moved_instance?(previous)
-    follow_proxy_change
+    follow_connect_request_change
   rescue Whatsapp::Session::Errors::Error => e
     # This runs after the commit, so raising would answer a save that already succeeded
     # with a 500, and neither half of this is something the save depended on.
@@ -196,8 +227,11 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # The connect goes through a job because the save has already committed: a connector that
   # cannot be reached right now would otherwise leave it on the old proxy for good, since
   # saving the same address again changes nothing and sends nothing.
-  def follow_proxy_change
-    return unless proxy_changed? && resumable_session?
+  #
+  # Calling being turned on or off is the same kind of change: the call policy rides on the
+  # connect too, and the connector keeps the last one it was given.
+  def follow_connect_request_change
+    return unless (proxy_changed? || calling_changed?) && resumable_session?
 
     Whatsapp::Session::ApplyProxyJob.perform_later(id)
   end
@@ -205,6 +239,11 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def proxy_changed?
     before, after = saved_change_to_provider_config
     before.to_h['proxy_url'].presence != after.to_h['proxy_url'].presence
+  end
+
+  def calling_changed?
+    before, after = saved_change_to_provider_config
+    before.to_h['calling_enabled'].present? != after.to_h['calling_enabled'].present?
   end
 
   # False for every save that did not touch the credentials, and for a backend with no

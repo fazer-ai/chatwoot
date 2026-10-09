@@ -39,6 +39,7 @@ export const CAPABILITIES = {
   ACCOUNT_LIMITS: 'account_limits',
   HISTORY_SYNC: 'history_sync',
   CALLS: 'calls',
+  VOICE_CALLS: 'voice_calls',
   MEDIA_DOWNLOAD: 'media_download',
 };
 

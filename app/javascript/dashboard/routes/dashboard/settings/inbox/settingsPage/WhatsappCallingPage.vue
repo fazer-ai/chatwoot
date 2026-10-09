@@ -7,6 +7,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import TextArea from 'next/textarea/TextArea.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import CallRecordingSettings from './CallRecordingSettings.vue';
+import { isSessionProvider } from 'dashboard/helper/whatsappSession';
 
 export default {
   components: {
@@ -40,6 +41,11 @@ export default {
       return (
         this.inbox.provider_config?.phone_number || this.inbox.phone_number
       );
+    },
+    // A paired phone calls through the connector, which has no permission template to
+    // send and none of the Calling API steps the explanation below walks through.
+    isCloudCalling() {
+      return !isSessionProvider(this.inbox.provider);
     },
   },
   watch: {
@@ -171,6 +177,7 @@ export default {
       </SettingsFieldSection>
 
       <SettingsFieldSection
+        v-if="isCloudCalling"
         :label="$t('INBOX_MGMT.WHATSAPP_CALLING.PERMISSION_REQUEST_BODY.LABEL')"
         :help-text="
           $t('INBOX_MGMT.WHATSAPP_CALLING.PERMISSION_REQUEST_BODY.HELP_TEXT')
@@ -189,11 +196,12 @@ export default {
       </SettingsFieldSection>
 
       <SettingsFieldSection
+        v-if="isCloudCalling"
         :label="$t('INBOX_MGMT.WHATSAPP_CALLING.HOW_IT_WORKS.LABEL')"
         :help-text="$t('INBOX_MGMT.WHATSAPP_CALLING.HOW_IT_WORKS.DESCRIPTION')"
       />
 
-      <div>
+      <div v-if="isCloudCalling">
         <NextButton
           :is-loading="isUpdating"
           :label="$t('INBOX_MGMT.SETTINGS_POPUP.UPDATE')"

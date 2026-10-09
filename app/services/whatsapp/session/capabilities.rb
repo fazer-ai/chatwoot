@@ -25,6 +25,7 @@ module Whatsapp::Session::Capabilities
     account_limits
     history_sync
     calls
+    voice_calls
     media_download
   ].freeze
 
@@ -53,7 +54,8 @@ module Whatsapp::Session::Capabilities
     'group_management' => :group_info,
     'group_admin' => :update_group_participants,
     'group_invites' => :group_invite_code,
-    'group_join_requests' => :group_join_requests
+    'group_join_requests' => :group_join_requests,
+    'voice_calls' => :accept_call
   }.freeze
 
   # `groups` and `group_management` are two questions, and a provider can answer one

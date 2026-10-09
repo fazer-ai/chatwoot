@@ -11,6 +11,7 @@ class Whatsapp::Session::Facade
   include Whatsapp::Session::Facade::Groups
   include Whatsapp::Session::Facade::History
   include Whatsapp::Session::Facade::Presence
+  include Whatsapp::Session::Facade::Calls
 
   attr_reader :channel, :backend, :provider, :instance
 
@@ -229,11 +230,20 @@ class Whatsapp::Session::Facade
     state
   end
 
-  # An object in the contract, not a flag: the field says how calls are handled, and the
-  # only policy this layer has is to reject them. Omitted when the backend does not do
-  # calls at all, because `false` is not a value the schema accepts either.
+  # An object in the contract, not a flag: the field says how calls are handled. Omitted
+  # when the backend does not do calls at all, because `false` is not a value the schema
+  # accepts either.
+  #
+  # An inbox with calling on asks the connector to carry the voice, and never with
+  # `auto_reject` beside it: the connector reads that as "no calls on this session", the
+  # placed ones included, so an inbox with incoming calls turned off would lose its
+  # outgoing ones too. Turning incoming calls off is done here instead, by refusing each
+  # offer as it arrives, which is what the Cloud path does. Without calling, every call is
+  # refused, as before.
   def call_policy
-    { 'auto_reject' => true } if capability?('calls')
+    return unless capability?('calls')
+
+    channel.voice_enabled? ? { 'answer' => true } : { 'auto_reject' => true }
   end
 
   # What the inbox names as its way out, in the shape the connector takes. Nothing is a

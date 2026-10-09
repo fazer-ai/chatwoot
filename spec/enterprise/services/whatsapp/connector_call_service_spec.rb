@@ -1,0 +1,199 @@
+require 'rails_helper'
+
+# The connector's call events, end to end through the dispatcher: the same records and
+# broadcasts the Cloud path produces for Meta's webhooks, from the session layer's events.
+RSpec.describe Whatsapp::ConnectorCallService do
+  let(:account) { create(:account) }
+  let(:channel) do
+    create(:channel_whatsapp, account: account, provider: 'native', phone_number: '+5541988887777',
+                              validate_provider_config: false, sync_templates: false)
+  end
+  let(:inbox) { channel.inbox }
+  let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+  let(:model) { Whatsapp::Session::Model }
+  let(:caller_party) { model::Party.new(phone: '5511988887777', lid: '182736451928374', push_name: 'Ana Souza') }
+  let(:sdp_offer) { "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n" }
+  let(:broadcasts) { [] }
+
+  before do
+    account.enable_features!('channel_voice')
+    channel.update!(provider_config: channel.provider_config.merge('calling_enabled' => true))
+    allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+    allow(ActionCable.server).to receive(:broadcast) { |stream, payload| broadcasts << [stream, payload] }
+  end
+
+  def dispatch(payload)
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(Channel::Whatsapp.find(channel.id), model::Event.build(payload))
+  end
+
+  def offer(call_id, sdp: sdp_offer, video: false)
+    dispatch(model::Events::CallOffer.new(call_id: call_id, from: caller_party, video: video, timestamp: 1_755_440_000_123, sdp: sdp))
+  end
+
+  def events_named(name)
+    broadcasts.map(&:last).select { |payload| payload[:event] == name }
+  end
+
+  def call_lines
+    inbox.messages.where(message_type: :activity).where("content LIKE '%WhatsApp%'")
+  end
+
+  describe 'an offer the browser can answer' do
+    # Rung on the agents' own streams, as on the Cloud path, so the inbox needs one.
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    before { create(:inbox_member, user: agent, inbox: inbox) }
+
+    it 'rings as a Call on the caller\'s thread, with no activity line beside it' do
+      expect(offer('CALLX1')).to eq(:handled)
+
+      call = Call.find_by!(provider_call_id: 'CALLX1')
+      expect(call).to have_attributes(inbox_id: inbox.id, direction: 'incoming', status: 'ringing', provider: 'whatsapp')
+      expect(call.meta['sdp_offer']).to eq(sdp_offer)
+      expect(call.conversation.contact_inbox.source_id).to eq('182736451928374')
+      expect(call.message).to be_present
+      expect(call_lines).to be_empty
+      expect(backend.commands).to be_empty
+    end
+
+    it 'rings the inbox\'s agents with the offer for the browser' do
+      offer('CALLX1')
+
+      incoming = events_named('voice_call.incoming')
+      expect(incoming.size).to eq(1)
+      expect(broadcasts.find { |_, payload| payload[:event] == 'voice_call.incoming' }.first).to eq(agent.pubsub_token)
+      expect(incoming.first[:data]).to include(call_id: 'CALLX1', sdp_offer: sdp_offer, provider: 'whatsapp')
+    end
+
+    # The same thread a message from this contact lands on, not a second contact.
+    it 'files the call where the contact\'s messages are' do
+      offer('CALLX1')
+      offer('CALLX2')
+
+      expect(Call.where(provider_call_id: %w[CALLX1 CALLX2]).distinct.pluck(:contact_id).size).to eq(1)
+      expect(inbox.contact_inboxes.count).to eq(1)
+    end
+
+    it 'is one Call however many times the offer arrives' do
+      offer('CALLX1')
+      offer('CALLX1')
+
+      expect(Call.where(provider_call_id: 'CALLX1').count).to eq(1)
+    end
+  end
+
+  describe 'an offer the browser cannot answer' do
+    it 'is the activity line it always was when it carries no sdp' do
+      expect(offer('CALLX9', sdp: nil)).to eq(:handled)
+
+      expect(Call.where(provider_call_id: 'CALLX9')).to be_empty
+      expect(events_named('voice_call.incoming')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+
+    it 'is the activity line on an inbox with calling off' do
+      channel.update!(provider_config: channel.provider_config.merge('calling_enabled' => false))
+
+      expect(offer('CALLX2')).to eq(:handled)
+      expect(Call.where(provider_call_id: 'CALLX2')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+
+    it 'is the activity line on an account without voice' do
+      account.disable_features!('channel_voice')
+
+      expect(offer('CALLX2')).to eq(:handled)
+      expect(Call.where(provider_call_id: 'CALLX2')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+
+    # The connector lets every call ring on an inbox with calling on, so that the inbox can
+    # still place calls; refusing the incoming ones is done here, as the Cloud path does.
+    it 'is refused by name, with the line, when incoming calls are off' do
+      channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
+
+      expect(offer('CALLX4')).to eq(:handled)
+
+      expect(backend.commands.map(&:wire_type)).to eq(['call.reject'])
+      expect(backend.last_command.to_h).to eq('call_id' => 'CALLX4', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' })
+      expect(Call.where(provider_call_id: 'CALLX4')).to be_empty
+      expect(events_named('voice_call.incoming')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+  end
+
+  describe 'a placed call being answered' do
+    let(:conversation) { create(:conversation, inbox: inbox, account: account) }
+    let!(:call) do
+      Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                   direction: :outgoing, status: 'ringing', provider_call_id: 'CALLOUT2', meta: { 'sdp_offer' => 'SDP-OFFER' })
+    end
+
+    it 'hands the browser the connector\'s answer and marks the call as picked up' do
+      expect(dispatch(model::Events::CallAnswered.new(call_id: 'CALLOUT2', sdp: 'SDP-ANSWER-CONNECTOR'))).to eq(:handled)
+
+      expect(call.reload.meta['sdp_answer']).to eq('SDP-ANSWER-CONNECTOR')
+      expect(call.status).to eq('in_progress')
+      expect(events_named('voice_call.outbound_connected').map { |p| p[:data][:sdp_answer] }).to eq(['SDP-ANSWER-CONNECTOR'])
+      expect(events_named('voice_call.outbound_accepted').size).to eq(1)
+    end
+
+    it 'does nothing for a call it does not know' do
+      expect { dispatch(model::Events::CallAnswered.new(call_id: 'NAOEXISTE', sdp: 'x')) }.not_to change(Call, :count)
+
+      expect(call.reload.meta['sdp_answer']).to be_nil
+      expect(broadcasts).to be_empty
+    end
+  end
+
+  describe 'the end of a call' do
+    let(:conversation) { create(:conversation, inbox: inbox, account: account) }
+
+    def call_in(status, direction, id)
+      Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                   direction: direction, status: status, provider_call_id: id, started_at: 1.minute.ago)
+    end
+
+    def terminate(id, reason: nil)
+      dispatch(model::Events::CallTerminate.new(call_id: id, from: caller_party, reason: reason))
+    end
+
+    it 'closes a call the way the Cloud path does' do
+      ringing = call_in('ringing', :incoming, 'CALLX5')
+      answered = call_in('in_progress', :outgoing, 'CALLOUT3')
+
+      expect(terminate('CALLX5')).to eq(:handled)
+      expect(terminate('CALLOUT3')).to eq(:handled)
+
+      expect(ringing.reload.status).to eq('no_answer')
+      expect(answered.reload.status).to eq('completed')
+      expect(events_named('voice_call.ended').map { |p| p[:data][:call_id] }).to eq(%w[CALLX5 CALLOUT3])
+    end
+
+    it 'records a failure the connector names as one' do
+      call = call_in('ringing', :outgoing, 'CALLOUT4')
+
+      terminate('CALLOUT4', reason: 'rejected')
+
+      expect(call.reload.status).to eq('failed')
+    end
+
+    it 'leaves a closed call as it is when the end arrives again' do
+      call = call_in('ringing', :incoming, 'CALLX5')
+      terminate('CALLX5')
+      before = call.reload.attributes
+
+      expect(terminate('CALLX5')).to eq(:handled)
+
+      expect(call.reload.attributes).to eq(before)
+      expect(events_named('voice_call.ended').size).to eq(1)
+    end
+
+    it 'has nothing to close for a call shown only as a line' do
+      offer('ATIVIDADE1', sdp: nil)
+
+      expect { terminate('ATIVIDADE1') }.not_to change(Call, :count)
+      expect(call_lines.count).to eq(1)
+    end
+  end
+end
