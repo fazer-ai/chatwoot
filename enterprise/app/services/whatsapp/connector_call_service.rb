@@ -98,10 +98,9 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # One small key per placed call, so a day costs nothing.
   PENDING_TTL = 1.day.to_i
 
-  private
-
-  def model = Whatsapp::Session::Model
-
+  # A pickup kept for a call recorded since and not applied yet. Whatever ends the call
+  # applies it first, the agent's own hang-up included, so the call is ended as the
+  # answered call it was. Called under the call's lock.
   def apply_kept_pickup(call)
     answer = take_pending(call.provider_call_id, 'answered')
     return if answer.nil?
@@ -109,6 +108,10 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp']), at: answer['at'])
     call.reload
   end
+
+  private
+
+  def model = Whatsapp::Session::Model
 
   def find_call(call_id)
     Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: call_id)

@@ -123,6 +123,24 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
       expect(Call.find_by(provider_call_id: 'FAKECALL0001').meta['sdp_answer']).to eq('SDP-EARLY')
     end
 
+    # The agent hangs up before the reconciliation applies a pickup that beat the record.
+    it 'ends as answered a call picked up before it was recorded, when the agent hangs up first' do
+      allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|
+        call_id = original.call(*args, **kwargs)
+        answered = Whatsapp::Session::Model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY')
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, Whatsapp::Session::Model::Event.build(answered))
+        call_id
+      end
+      initiate
+      placed = Call.find_by(provider_call_id: 'FAKECALL0001')
+
+      post_action(placed, :terminate)
+
+      expect(placed.reload).to have_attributes(status: 'completed', end_reason: 'agent_hangup')
+      expect(placed.meta['sdp_answer']).to eq('SDP-EARLY')
+      expect(placed.duration_seconds).not_to be_nil
+    end
+
     it 'tells the agent when the connector refuses, and records no call' do
       allow(backend).to receive(:start_call).and_raise(Whatsapp::Session::Errors::NotSupported, 'calls are not carried here')
       broadcasts = []
