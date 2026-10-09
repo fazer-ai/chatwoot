@@ -5,9 +5,11 @@
 # down which call it was for: the connector refuses some commands at once. So both sides
 # claim the same key, and whichever claims it second learns what the first one wrote.
 module Whatsapp::Session::CallCommands
-  # Comfortably past the deadline the command carries, so a failure that arrives at all
-  # arrives while the command is remembered.
-  TTL = 2.minutes.to_i
+  # Past the deadline the command carries, and past how long a shard can stall before it
+  # reads the failure (Whatsapp::Connector::Consumer::ShardWorker::BUSY_WAITS add up to
+  # over five minutes), so a failure that arrives at all arrives while the command is
+  # remembered. One small key per answer, so a day costs nothing.
+  TTL = 1.day.to_i
   FAILED = 'failed'.freeze
 
   # The publishing side. Answers false when the failure was read first: the command did

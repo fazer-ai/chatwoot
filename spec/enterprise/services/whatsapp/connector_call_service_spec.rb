@@ -251,6 +251,24 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(late.reload.status).to eq('completed')
       expect(late.meta['sdp_answer']).to eq('SDP-EARLY')
     end
+
+    # Applied later, from a queue, and timed by when the pickup and the end arrived.
+    it 'times the call from when the pickup arrived, not from when it is applied' do
+      call_id = "CALLOUT6#{command_suffix}"
+      freeze_time do
+        dispatch(model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY'))
+        travel 40.seconds
+        dispatch(model::Events::CallTerminate.new(call_id: call_id, from: caller_party, reason: nil))
+        travel 5.minutes
+        late = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                            direction: :outgoing, status: 'ringing', provider_call_id: call_id, meta: {})
+
+        described_class.new(inbox: inbox).reconcile(late)
+
+        expect(late.reload.status).to eq('completed')
+        expect(late.duration_seconds).to eq(40)
+      end
+    end
   end
 
   describe 'an answer the connector could not use' do
@@ -264,6 +282,14 @@ RSpec.describe Whatsapp::ConnectorCallService do
     def failed(command_id, type: 'call.accept')
       dispatch(model::Events::CommandFailed.new(command_id: command_id, command_type: type, message_id: nil,
                                                 error: model::WireError.new(code: 'invalid_payload', message: 'bad sdp')))
+    end
+
+    # A shard stalled on a busy chat can read the failure minutes after the answer went out.
+    it 'remembers the call an answer was for past the longest a shard can stall' do
+      Whatsapp::Session::CallCommands.remember("cmd-accept-2-#{command_suffix}", 'CALLX3')
+
+      stall = Whatsapp::Connector::Consumer::ShardWorker::BUSY_WAITS.sum
+      expect(Redis::Alfred.ttl(Whatsapp::Session::CallCommands.key("cmd-accept-2-#{command_suffix}"))).to be > stall
     end
 
     it 'closes the call it was for as failed and refuses it on the caller\'s phone' do
