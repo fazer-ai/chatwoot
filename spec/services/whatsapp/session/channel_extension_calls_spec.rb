@@ -58,6 +58,13 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       .not_to have_enqueued_job(Whatsapp::Session::ApplyProxyJob)
   end
 
+  it 'does not offer calling on an inbox that leaves through a proxy' do
+    channel.update!(provider_config: channel.provider_config.merge('proxy_url' => 'http://proxy.example:3128'))
+
+    expect(channel.voice_calling_supported?).to be(false)
+    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /not supported/)
+  end
+
   it 'leaves calling on a Cloud inbox to the Calling API' do
     cloud = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
 

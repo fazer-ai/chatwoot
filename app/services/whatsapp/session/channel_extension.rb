@@ -49,10 +49,14 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # A session provider calls through the connector rather than Meta's Calling API, so
   # whether it can is its capability, and turning it on or off is the flag alone: the
   # connect that follows the save is what tells the connector.
+  #
+  # Not through a proxy: a call's voice travels to WhatsApp over UDP, which the proxy does
+  # not carry, and the connector answers every call command on a proxied session as
+  # unsupported.
   def voice_calling_supported?
     return super unless session_provider?
 
-    session_capabilities.include?('voice_calls')
+    session_capabilities.include?('voice_calls') && provider_config.to_h['proxy_url'].blank?
   end
 
   def enable_voice_calling!

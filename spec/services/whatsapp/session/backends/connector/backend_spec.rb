@@ -514,8 +514,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     let(:caller_address) { model::Address.phone('5541999990000') }
 
     # An answer or a refusal that lands after the call stopped ringing does nothing useful,
-    # so both carry the deadline a momentary command does; a hang-up is right whenever it lands.
-    it 'publishes the answer, the refusal and the hang-up with the deadline each deserves' do
+    # so both carry the deadline a momentary command does; a hang-up is right whenever it
+    # lands, so it is bounded only once it runs.
+    it 'publishes the answer, the refusal and the hang-up with the ceiling each deserves' do
       backend.accept_call(model::Commands::CallAccept.new(call_id: 'CALLX3', sdp: 'SDP-ANSWER-BROWSER'))
       backend.reject_call(model::Commands::CallReject.new(call_id: 'CALLX4', from: caller_address))
       backend.terminate_call(model::Commands::CallTerminate.new(call_id: 'CALLX6'))
@@ -525,7 +526,7 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       expect(client).to have_received(:publish)
         .with(have_attributes(call_id: 'CALLX4', from: caller_address), timeout: described_class::MOMENTARY_TIMEOUT)
       expect(client).to have_received(:publish)
-        .with(an_instance_of(model::Commands::CallTerminate), timeout: described_class::DEFERRABLE_TIMEOUT)
+        .with(an_instance_of(model::Commands::CallTerminate), max_runtime: described_class::CALL_HANGUP_RUNTIME)
     end
 
     it 'places a call under the key it was given and answers the call id the connector chose' do

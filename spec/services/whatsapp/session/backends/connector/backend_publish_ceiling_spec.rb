@@ -91,8 +91,9 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
 
       expect(by_bound[:deadline]).to contain_exactly('request_pairing_code', 'mark_read', 'mark_unread',
                                                      'send_chat_presence', 'update_presence', 'subscribe_presence',
-                                                     'accept_call', 'reject_call', 'terminate_call')
-      expect(by_bound[:runtime]).to contain_exactly('disconnect', 'logout', 'delete_session')
+                                                     'accept_call', 'reject_call')
+      # A hang-up queued behind media must not be refused unrun after the call was closed here.
+      expect(by_bound[:runtime]).to contain_exactly('disconnect', 'logout', 'delete_session', 'terminate_call')
       expect(by_bound[:none]).to match_array(unbounded_on_purpose)
     end
 
