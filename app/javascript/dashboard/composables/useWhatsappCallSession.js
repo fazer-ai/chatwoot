@@ -203,18 +203,16 @@ const buildPeerConnection = iceServers => {
 };
 
 // A call this tab can no longer expect to hear the end of. The end is asked for, as an
-// agent hanging up would, and this tab lets go of the call itself whether or not that went
-// through: the end broadcast is not replayed to a tab whose cable was down, and a failed
-// request sends none. The recording is uploaded, the session released and the card
-// removed, once, however many of these and the broadcast arrive.
-const letGoOfCall = (callId, placedSid) =>
-  WhatsappCallsAPI.terminate(callId)
+// agent hanging up would, and this tab lets go of the call itself without waiting on that
+// request: the end broadcast is not replayed to a tab whose cable was down, a failed
+// request sends none, and one that hangs would hold the microphone for as long as it
+// does. The recording is uploaded, the session released and the card removed, once,
+// however many of these and the broadcast arrive.
+const letGoOfCall = (callId, placedSid) => {
+  WhatsappCallsAPI.terminate(callId).catch(() => {});
+  // eslint-disable-next-line no-use-before-define
+  return handleWhatsappRemoteEnd(callId)
     .catch(() => {})
-    .then(() => {
-      if (activeCallId !== callId) return undefined;
-      // eslint-disable-next-line no-use-before-define
-      return handleWhatsappRemoteEnd(callId).catch(() => {});
-    })
     .then(() => {
       const store = useCallsStore();
       const card = store.calls.find(c => c.callId === callId);
@@ -223,6 +221,7 @@ const letGoOfCall = (callId, placedSid) =>
       markCallDismissed(card?.callSid || placedSid);
       if (card) store.removeCall(card.callSid);
     });
+};
 
 // WhatsApp stops ringing an unanswered call well within this. A placed call still
 // ringing past it lost its end on the way: a paired phone's connector that lost its
