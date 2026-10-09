@@ -10,6 +10,8 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
   end
   let(:inbox) { channel.inbox }
   let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+  # The call command registry lives in Redis, which outlives an example.
+  let(:command_suffix) { SecureRandom.hex(4) }
   let(:contact) { create(:contact, account: account, phone_number: '+5511988887777', identifier: '182736451928374@lid') }
   let(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: inbox, source_id: '182736451928374') }
   let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox) }
@@ -39,6 +41,17 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
     expect(call.reload.status).to eq('in_progress')
     expect(backend.commands.map(&:wire_type)).to eq(['call.accept'])
     expect(backend.last_command.to_h).to eq('call_id' => 'CALLX3', 'sdp' => 'SDP-ANSWER-BROWSER')
+  end
+
+  it 'tells the agent when the connector refused the answer at once, and leaves the call ringing' do
+    call = incoming_call('CALLX7')
+    allow(backend).to receive(:accept_call).and_return("cmd-accept-7-#{command_suffix}")
+    Whatsapp::Session::CallCommands.failed("cmd-accept-7-#{command_suffix}")
+
+    post_action(call, :accept, sdp_answer: 'SDP-ANSWER-BROWSER')
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(call.reload.status).to eq('ringing')
   end
 
   it 'refuses a ringing call naming its caller' do
@@ -92,9 +105,11 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
         call_id
       end
 
-      initiate
+      # Applied a moment later, once the tab that placed the call knows it.
+      expect { initiate }.to have_enqueued_job(Whatsapp::ConnectorCallReconcileJob)
+      expect(Call.find_by(provider_call_id: 'FAKECALL0001').meta['sdp_answer']).to be_nil
 
-      expect(response).to have_http_status(:ok)
+      perform_enqueued_jobs(only: Whatsapp::ConnectorCallReconcileJob)
       expect(Call.find_by(provider_call_id: 'FAKECALL0001').meta['sdp_answer']).to eq('SDP-EARLY')
     end
 

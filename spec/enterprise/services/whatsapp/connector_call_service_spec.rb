@@ -11,6 +11,8 @@ RSpec.describe Whatsapp::ConnectorCallService do
   let(:inbox) { channel.inbox }
   let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
   let(:model) { Whatsapp::Session::Model }
+  # The call command registry lives in Redis, which outlives an example.
+  let(:command_suffix) { SecureRandom.hex(4) }
   let(:caller_party) { model::Party.new(phone: '5511988887777', lid: '182736451928374', push_name: 'Ana Souza') }
   let(:sdp_offer) { "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n" }
   let(:broadcasts) { [] }
@@ -66,6 +68,13 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
 
     # The same thread a message from this contact lands on, not a second contact.
+    # Refusing it from the ringing widget names that address, whatever the contact becomes.
+    it 'keeps the address the call came from' do
+      offer('CALLX1')
+
+      expect(Call.find_by!(provider_call_id: 'CALLX1').meta['caller_address']).to eq('kind' => 'lid', 'id' => '182736451928374')
+    end
+
     it 'files the call where the contact\'s messages are' do
       offer('CALLX1')
       offer('CALLX2')
@@ -109,6 +118,16 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
     # The connector lets every call ring on an inbox with calling on, so that the inbox can
     # still place calls; refusing the incoming ones is done here, as the Cloud path does.
+    # A video call carries no sdp, and with calling on the connector lets it ring too.
+    it 'refuses any call, a video one included, when incoming calls are off' do
+      channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
+
+      offer('CALLV1', sdp: nil, video: true)
+
+      expect(backend.commands.map(&:to_h)).to eq([{ 'call_id' => 'CALLV1', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' } }])
+      expect(call_lines.count).to eq(1)
+    end
+
     it 'is refused by name, with the line, when incoming calls are off' do
       channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
 
@@ -178,6 +197,23 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
+  describe 'a pickup kept for a call recorded since' do
+    let(:conversation) { create(:conversation, inbox: inbox, account: account) }
+
+    # The pickup arrived before the record; the end arrived after it and before the
+    # reconciliation. The end is of an answered call.
+    it 'is applied before an end that arrives first' do
+      dispatch(model::Events::CallAnswered.new(call_id: 'CALLOUT8', sdp: 'SDP-EARLY'))
+      late = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                          direction: :outgoing, status: 'ringing', provider_call_id: 'CALLOUT8', meta: {})
+
+      dispatch(model::Events::CallTerminate.new(call_id: 'CALLOUT8', from: caller_party, reason: nil))
+
+      expect(late.reload.status).to eq('completed')
+      expect(late.meta['sdp_answer']).to eq('SDP-EARLY')
+    end
+  end
+
   describe 'an answer the connector could not use' do
     let(:lid_contact) { create(:contact, account: account, identifier: '182736451928374@lid') }
     let(:conversation) { create(:conversation, inbox: inbox, account: account, contact: lid_contact) }
@@ -192,9 +228,9 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
 
     it 'closes the call it was for as failed and refuses it on the caller\'s phone' do
-      Whatsapp::Session::CallCommands.remember('cmd-accept-1', 'CALLX3')
+      Whatsapp::Session::CallCommands.remember("cmd-accept-1-#{command_suffix}", 'CALLX3')
 
-      expect(failed('cmd-accept-1')).to eq(:handled)
+      expect(failed("cmd-accept-1-#{command_suffix}")).to eq(:handled)
 
       expect(call.reload.status).to eq('failed')
       expect(events_named('voice_call.ended').map { |p| p[:data][:call_id] }).to eq(['CALLX3'])
@@ -202,7 +238,7 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
 
     it 'leaves the call alone for a failure it cannot place' do
-      expect(failed('cmd-unknown')).to eq(:ignored)
+      expect(failed("cmd-unknown-#{command_suffix}")).to eq(:ignored)
 
       expect(call.reload.status).to eq('in_progress')
       expect(backend.commands).to be_empty

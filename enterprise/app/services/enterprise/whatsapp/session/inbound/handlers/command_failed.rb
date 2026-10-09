@@ -5,7 +5,7 @@ module Enterprise::Whatsapp::Session::Inbound::Handlers::CommandFailed
   def call_command_failed
     return :ignored unless payload.command_type == 'call.accept'
 
-    call_id = Whatsapp::Session::CallCommands.take(payload.command_id)
+    call_id = Whatsapp::Session::CallCommands.failed(payload.command_id)
     return :ignored if call_id.nil?
 
     Whatsapp::ConnectorCallService.new(inbox: inbox).accept_failed(call_id)

@@ -46,13 +46,17 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
       @call.update!(message_id: @message.id)
     end
     # The connector can report the pickup, or the end, of a call before this request got to
-    # record it; what it said is applied now.
-    Whatsapp::ConnectorCallService.new(inbox: @inbox).reconcile(@call) if @inbox.channel.session_provider?
+    # record it; what it said is applied once this tab knows the call.
+    reconcile_connector_call if @inbox.channel.session_provider?
   rescue Voice::CallErrors::NoCallPermission
     render_permission_request
   end
 
   private
+
+  def reconcile_connector_call
+    Whatsapp::ConnectorCallReconcileJob.set(wait: Whatsapp::ConnectorCallReconcileJob::DELAY).perform_later(@call.id)
+  end
 
   def call_service
     @call_service ||= Whatsapp::CallService.new(call: @call, agent: Current.user, sdp_answer: params[:sdp_answer])

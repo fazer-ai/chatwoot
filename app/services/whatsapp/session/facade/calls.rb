@@ -15,12 +15,12 @@ module Whatsapp::Session::Facade::Calls
 
   # The answer is fire and forget, so a connector that cannot use it says so later, as a
   # `command.failed` naming this command and not the call. The command is remembered
-  # against the call for as long as such a failure could take to come back.
+  # against the call for as long as such a failure could take to come back, and a failure
+  # that came back already is this call failing, the way the Cloud service answers false.
   def accept_call(call_id, sdp_answer)
     calls_supported!
     command_id = backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer))
-    Whatsapp::Session::CallCommands.remember(command_id, call_id) if command_id.present?
-    true
+    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id)
   end
 
   # The connector refuses a call by naming who placed it. A call refused as it arrives is
@@ -56,25 +56,39 @@ module Whatsapp::Session::Facade::Calls
   end
 
   # The connector dials a phone number and nothing else. A conversation hands over the
-  # identity its thread is on, which on this provider is a number or a LID, and is called
-  # on that identity: a LID is turned into its number by the connector, which knows the
-  # pairing, never by the contact's own number, which after an edit or a merge can belong
-  # to somebody else.
+  # identity its thread is on, a number or a LID, and is called on that identity, never on
+  # the contact's own number, which after an edit or a merge can belong to somebody else.
+  # A source id is bare digits either way and nothing on the contact reliably says which
+  # (a merge keeps the other contact's identifier), so the connector, which knows the
+  # pairing, is asked for the number behind it as a LID. One it pairs with nothing is
+  # dialled as a number only when something says it is one: the contact's own number, or
+  # the connector knowing it as a number. Anything else is refused, because the digits of
+  # a LID dialled as a number can be a stranger's phone.
   def callee_address(recipient)
     recipient = recipient.to_s.delete('+')
-    phone = lid?(recipient) ? backend.resolve_contact(model::Commands::ContactResolve.new(party: model::Address.lid(recipient)))&.phone : recipient
-    model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this contact on')
+    phone = paired_phone(model::Address.lid(recipient)) || (recipient if known_number?(recipient))
+    model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
   end
 
-  # A source id is bare digits either way, so a LID is told apart by the contact it was
-  # filed for, which carries it as its identifier.
-  def lid?(recipient)
-    channel.inbox.contact_inboxes.joins(:contact).exists?(source_id: recipient, contacts: { identifier: "#{recipient}@lid" })
+  # The connector answers an address it holds nothing for with that same address alone,
+  # so a number is known to it only when the answer also carries the LID it pairs with.
+  def known_number?(recipient)
+    contact = channel.inbox.contact_inboxes.find_by(source_id: recipient)&.contact
+    contact&.phone_number.to_s.delete('+') == recipient || resolve(model::Address.phone(recipient))&.lid.present?
   end
 
+  def paired_phone(lid) = resolve(lid)&.phone.presence
+
+  def resolve(address)
+    backend.resolve_contact(model::Commands::ContactResolve.new(party: address))
+  end
+
+  # The address the offer named, kept on the call when it rang, and read off its contact
+  # only for a call recorded without one.
   def caller_address(call_id)
     call = Call.whatsapp.find_by(inbox_id: channel.inbox.id, provider_call_id: call_id)
-    address = call && model::Address.for_contact(call.contact)
+    recorded = call&.meta&.dig('caller_address')
+    address = recorded ? model::Address.from_h(recorded) : call && model::Address.for_contact(call.contact)
     address || raise(Whatsapp::Session::Errors::InvalidPayload, "no caller recorded for call #{call_id}")
   end
 end

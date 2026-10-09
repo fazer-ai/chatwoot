@@ -13,17 +13,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     @contact_inbox = contact_inbox
   end
 
-  # A call.offer carrying the connector's WebRTC offer. With incoming calls turned off the
-  # connector is told to refuse it, since it was asked to let calls ring (`calls.answer`)
-  # so that the inbox can still place them; the activity line is then the caller's to write.
+  # A call.offer carrying the connector's WebRTC offer, which rings as a Call. The address
+  # it came from is kept on the call, since that is what refusing it names, and the
+  # contact's own fields can be edited or merged away while it rings.
   def offer(payload)
-    unless inbox.channel.inbound_calls_enabled?
-      inbox.channel.provider_service.reject_call(payload.call_id, from: payload.from.address)
-      return false
-    end
-
+    @caller = payload.from.address
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
-    true
+  end
+
+  # Incoming calls turned off: the connector is told to refuse the call, by the address the
+  # offer named. It was asked to let calls ring (`calls.answer`) so that the inbox can still
+  # place them, and it has nobody else to refuse them.
+  def refuse(payload)
+    inbox.channel.provider_service.reject_call(payload.call_id, from: payload.from.address)
   end
 
   # The callee picked up. Meta tells the two halves of that apart, the tunnel coming up and
@@ -50,11 +52,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     call = find_call(payload.call_id)
     return keep_pending(payload.call_id, 'terminate', 'reason' => payload.reason) if call.nil?
 
+    # A pickup kept for a call recorded since, and not applied yet, happened before this
+    # end: applied first, so the call is ended as the answered call it was.
+    early = take_pending(call.provider_call_id, 'answered')
+    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: early['sdp'])) if early
+    call.reload if early
     duration = (Time.current - call.started_at).to_i if call.in_progress? && call.started_at
     finalize_terminate(call, duration, payload.reason)
   end
 
   # Applies what arrived for a placed call before it was recorded, in the order it happened.
+  # Run a moment after the request that recorded it, from Whatsapp::ConnectorCallReconcileJob:
+  # the tab that placed the call learns of it from that request's answer, and a pickup or
+  # an end broadcast before then reaches a tab that does not know the call yet.
   def reconcile(call)
     answer = take_pending(call.provider_call_id, 'answered')
     answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp'])) if answer
@@ -103,7 +113,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   end
 
   def build_inbound_call(payload, sdp_offer)
-    extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers }
+    extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers, 'caller_address' => @caller&.to_h }
     Voice::InboundCallBuilder.perform!(
       inbox: inbox, call_sid: payload[:id], provider: :whatsapp, extra_meta: extra_meta,
       caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }
