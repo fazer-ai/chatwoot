@@ -40,10 +40,11 @@ module Whatsapp::Session::Facade::Calls
 
   # Answers in the Cloud service's shape, so the controller reads the call id the same way
   # for both. Keyed on the offer itself: a retried request carrying the same offer is the
-  # same call, and the connector answers it without ringing the phone again.
-  def initiate_call(recipient, sdp_offer)
+  # same call, and the connector answers it without ringing the phone again. The contact
+  # is the one the call is placed to, which the Cloud service has no use for.
+  def initiate_call(recipient, sdp_offer, contact: nil)
     calls_supported!
-    command = model::Commands::CallStart.new(to: callee_address(recipient), sdp: sdp_offer)
+    command = model::Commands::CallStart.new(to: callee_address(recipient, contact), sdp: sdp_offer)
     { 'call_id' => backend.start_call(command, idempotency_key: "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}") }
   end
 
@@ -61,21 +62,22 @@ module Whatsapp::Session::Facade::Calls
   # A source id is bare digits either way and nothing on the contact reliably says which
   # (a merge keeps the other contact's identifier), so the connector, which knows the
   # pairing, is asked for the number behind it as a LID. One it pairs with nothing is
-  # dialled as a number only when something says it is one: the contact's own number, or
-  # the connector knowing it as a number. Anything else is refused, because the digits of
-  # a LID dialled as a number can be a stranger's phone.
-  def callee_address(recipient)
+  # dialled as a number only when something says it is one: the called contact's own
+  # number, or the connector knowing it as a number. Anything else is refused, because the
+  # digits of a LID dialled as a number can be a stranger's phone.
+  def callee_address(recipient, contact)
     recipient = recipient.to_s.delete('+')
-    phone = paired_phone(model::Address.lid(recipient)) || (recipient if known_number?(recipient))
+    phone = paired_phone(model::Address.lid(recipient)) || (recipient if known_number?(recipient, contact))
     model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
   end
 
-  # A contact of this account carrying the number says it is one: that is also what a call
-  # placed from the contact panel hands over, before any thread with the contact exists.
+  # The called contact carrying the number says it is one: that is also what a call placed
+  # from the contact panel hands over, before any thread with the contact exists. Another
+  # contact of the account carrying the same digits says nothing about this conversation.
   # The connector answers an address it holds nothing for with that same address alone, so
   # a number is known to it only when the answer also carries the LID it pairs with.
-  def known_number?(recipient)
-    channel.account.contacts.exists?(phone_number: "+#{recipient}") || resolve(model::Address.phone(recipient))&.lid.present?
+  def known_number?(recipient, contact)
+    contact&.phone_number == "+#{recipient}" || resolve(model::Address.phone(recipient))&.lid.present?
   end
 
   def paired_phone(lid) = resolve(lid)&.phone.presence

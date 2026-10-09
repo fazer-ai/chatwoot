@@ -96,6 +96,16 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
         .to have_attributes(direction: 'outgoing', status: 'ringing', conversation_id: conversation.id)
     end
 
+    # The contact panel hands over the contact's own number, which the connector need not know yet.
+    it 'rings a contact from the contact panel on the contact\'s number' do
+      fresh = create(:contact, account: account, phone_number: '+5511977776666')
+      post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
+           params: { inbox_id: inbox.id, contact_id: fresh.id, sdp_offer: 'SDP-OFFER' }, headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:ok)
+      expect(backend.commands_of('call.start').sole.to.id).to eq('5511977776666')
+    end
+
     # A pickup that beat the record of the call it answers is applied as soon as the record exists.
     it 'connects a call picked up before this request recorded it' do
       allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|

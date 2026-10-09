@@ -117,7 +117,7 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       contact.update!(phone_number: '+5511977776666')
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '5511977776666')
 
-      facade.initiate_call('5511977776666', 'SDP-OFFER')
+      facade.initiate_call('5511977776666', 'SDP-OFFER', contact: contact)
 
       expect(backend.last_command.to.id).to eq('5511977776666')
     end
@@ -126,7 +126,7 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
     it 'dials a contact\'s number from the contact panel, with no thread yet' do
       contact.update!(phone_number: '+5511977776666')
 
-      facade.initiate_call('5511977776666', 'SDP-OFFER')
+      facade.initiate_call('5511977776666', 'SDP-OFFER', contact: contact)
 
       expect(backend.last_command.to.id).to eq('5511977776666')
     end
@@ -136,6 +136,15 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '998877665544332')
 
       expect { facade.initiate_call('998877665544332', 'SDP-OFFER') }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+      expect(backend.commands_of('call.start')).to be_empty
+    end
+
+    # Another contact of the account with the same digits says nothing about this thread.
+    it 'refuses digits only an unrelated contact carries as a number' do
+      create(:contact, account: channel.account, phone_number: '+998877665544332')
+      create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '998877665544332')
+
+      expect { facade.initiate_call('998877665544332', 'SDP-OFFER', contact: contact) }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
       expect(backend.commands_of('call.start')).to be_empty
     end
 

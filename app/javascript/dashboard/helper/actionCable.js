@@ -696,11 +696,9 @@ class ActionCableConnector extends BaseActionCableConnector {
     // A still-queued ringing message.created (see onVoiceCallAccepted) must not
     // resurrect a call that has already ended.
     markCallDismissed(data.call_id);
-    if (
-      data.provider === VOICE_CALL_PROVIDERS.WHATSAPP &&
-      !useCallsStore().calls.some(c => c.callSid === data.call_id)
-    ) {
-      // Ended before this tab added the call it placed; it is not added then.
+    if (data.provider === VOICE_CALL_PROVIDERS.WHATSAPP) {
+      // Ended before this tab knew the call it placed, whether or not a message added it
+      // already: kept until the tab adds it, so it is not added back as ringing then.
       noteEarlyOutboundOutcome(data.id, 'ended');
     }
     // The store entry should always be removed for this account-wide broadcast,

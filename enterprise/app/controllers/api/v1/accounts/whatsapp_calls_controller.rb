@@ -152,13 +152,19 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
     # fresh thread (@conversation nil until the dial succeeds) is created already assigned to the caller.
     claim_for_caller = @conversation.present? && @conversation.assigned_entity.nil?
 
-    result = provider_service.initiate_call(call_recipient, params[:sdp_offer])
+    result = provider_service.initiate_call(call_recipient, params[:sdp_offer], **connector_call_context)
     provider_call_id = result.dig('calls', 0, 'id') || result['call_id']
 
     @conversation = open_conversation!
     @conversation.with_lock { @conversation.update!(assignee: Current.user) } if claim_for_caller
 
     create_call_record(provider_call_id)
+  end
+
+  # The connector dials numbers only, and the contact called is what tells a conversation's
+  # bare-digit source id apart from a LID's.
+  def connector_call_context
+    @inbox.channel.session_provider? ? { contact: @contact } : {}
   end
 
   def call_recipient
