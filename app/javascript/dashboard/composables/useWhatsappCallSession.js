@@ -3,6 +3,7 @@ import Cookies from 'js-cookie';
 import WhatsappCallsAPI from 'dashboard/api/channel/whatsapp/whatsappCallsAPI';
 import { remuxWebmToOgg } from 'dashboard/components/widgets/WootWriter/utils/webmOpusToOgg';
 import { VOICE_CALL_OUTBOUND_INIT_STATUS } from 'dashboard/components-next/message/constants';
+import { useCallsStore } from 'dashboard/stores/calls';
 
 // Module-level state lets the cable handlers and unload listeners reach the
 // live PeerConnection without prop-drilling refs through every composable.
@@ -188,7 +189,7 @@ const buildPeerConnection = iceServers => {
   // always reaching the client. Ending it here lets the call's own end broadcast release
   // the card, the microphone and the recorder, as an agent hanging up would. When the end
   // cannot be asked for either, nothing would broadcast it, so this tab lets go of the
-  // call itself: the recording is uploaded and the session released.
+  // call itself: the recording is uploaded, the session released and the card removed.
   const own = pc;
   own.onconnectionstatechange = () => {
     if (own !== pc || own.connectionState !== 'failed' || !activeCallId) return;
@@ -196,7 +197,13 @@ const buildPeerConnection = iceServers => {
     WhatsappCallsAPI.terminate(callId).catch(() => {
       if (activeCallId !== callId) return;
       // eslint-disable-next-line no-use-before-define
-      handleWhatsappRemoteEnd(callId).catch(() => {});
+      handleWhatsappRemoteEnd(callId)
+        .catch(() => {})
+        .finally(() => {
+          const store = useCallsStore();
+          const card = store.calls.find(c => c.callId === callId);
+          if (card) store.removeCall(card.callSid);
+        });
     });
   };
   return pc;

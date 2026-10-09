@@ -1,4 +1,6 @@
+import { setActivePinia, createPinia } from 'pinia';
 import WhatsappCallsAPI from 'dashboard/api/channel/whatsapp/whatsappCallsAPI';
+import { useCallsStore } from 'dashboard/stores/calls';
 import {
   applyOutboundAnswer,
   cleanupWhatsappSession,
@@ -80,12 +82,20 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       call_id: 'CALLOUT1',
     });
     WhatsappCallsAPI.terminate.mockRejectedValueOnce(new Error('offline'));
+    setActivePinia(createPinia());
     const session = useWhatsappCallSession();
     await session.initiateOutboundCall({ conversationId: 1 });
+    useCallsStore().addCall({
+      callSid: 'CALLOUT1',
+      callId: 42,
+      callDirection: 'outbound',
+      provider: 'whatsapp',
+    });
 
     peers.at(-1).fail();
 
     await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
+    await vi.waitFor(() => expect(useCallsStore().calls).toHaveLength(0));
   });
 
   it('does nothing for a transport that is only being set up', async () => {
