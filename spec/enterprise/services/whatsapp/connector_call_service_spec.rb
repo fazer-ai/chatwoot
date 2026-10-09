@@ -221,6 +221,21 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
+  describe 'what arrives for a placed call before it is recorded' do
+    # The job that applies it runs from a queue, which can be backed up well past the
+    # request that records the call.
+    it 'is kept for as long as a backed-up queue can hold the job that applies it' do
+      call_id = "CALLOUT7#{command_suffix}"
+      dispatch(model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY'))
+      dispatch(model::Events::CallTerminate.new(call_id: call_id, from: caller_party, reason: nil))
+
+      %w[answered terminate].each do |kind|
+        key = format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_PENDING, inbox_id: inbox.id, call_id: call_id, kind: kind)
+        expect(Redis::Alfred.ttl(key)).to be > 1.hour.to_i
+      end
+    end
+  end
+
   describe 'a pickup kept for a call recorded since' do
     let(:conversation) { create(:conversation, inbox: inbox, account: account) }
 

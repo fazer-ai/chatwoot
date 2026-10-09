@@ -92,8 +92,10 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     Rails.logger.warn("[WHATSAPP CALL] refusing call #{call_id} after its answer failed: #{e.message}")
   end
 
-  # Kept as long as the request that places a call can take to record it.
-  PENDING_TTL = 60
+  # Kept until the reconciliation job that consumes it runs, which a backed-up queue or a
+  # retry can hold for far longer than the request placing the call takes to record it.
+  # One small key per placed call, so a day costs nothing.
+  PENDING_TTL = 1.day.to_i
 
   private
 
