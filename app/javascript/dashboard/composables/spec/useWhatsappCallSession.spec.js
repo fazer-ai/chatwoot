@@ -5,6 +5,7 @@ import { markCallDismissed } from 'dashboard/helper/voice';
 import {
   applyOutboundAnswer,
   armOutboundRecorder,
+  CALL_STATUS_LOOKUP_LIMIT_MS,
   cleanupWhatsappSession,
   OUTBOUND_RINGING_LIMIT_MS,
   handleWhatsappRemoteEnd,
@@ -285,6 +286,24 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
 
       expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
       expect(hasActiveWhatsappCall()).toBe(true);
+    });
+
+    it('is let go of when asking about it hangs', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      WhatsappCallsAPI.show.mockReturnValueOnce(new Promise(() => {}));
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(
+        OUTBOUND_RINGING_LIMIT_MS + CALL_STATUS_LOOKUP_LIMIT_MS
+      );
+
+      expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+      await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
     });
 
     it('is left to the transport once the callee picked up', async () => {

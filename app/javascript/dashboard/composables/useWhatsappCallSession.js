@@ -229,6 +229,7 @@ const letGoOfCall = (callId, placedSid) => {
 // answers there is no transport yet whose failure would say so.
 export const OUTBOUND_RINGING_LIMIT_MS = 90 * 1000;
 let ringingTimer = null;
+export const CALL_STATUS_LOOKUP_LIMIT_MS = 10 * 1000;
 
 const stopRingingTimer = () => {
   if (ringingTimer) clearTimeout(ringingTimer);
@@ -242,11 +243,17 @@ const startRingingTimer = (callId, placedSid) => {
     if (activeCallId !== callId) return;
     // The pickup broadcast can be what was lost, on a cable that dropped after the answer
     // got through: the call is asked about before it is taken for unanswered.
+    // Bounded: a request that hangs would leave the call it is about holding the microphone.
     let status = null;
     try {
-      ({ status } = await WhatsappCallsAPI.show(callId));
+      ({ status } = await Promise.race([
+        WhatsappCallsAPI.show(callId),
+        new Promise((_, reject) => {
+          setTimeout(reject, CALL_STATUS_LOOKUP_LIMIT_MS);
+        }),
+      ]));
     } catch (_) {
-      /* unreachable as well: nothing says the call is up */
+      /* unreachable as well, or too slow to say: nothing says the call is up */
     }
     // A pickup that arrived while the call was being asked about armed the recorder.
     if (activeCallId !== callId || recorderArmed) return;
