@@ -2,7 +2,8 @@ class Whatsapp::CallService
   pattr_initialize [:call!, :agent!, :sdp_answer]
 
   def accept
-    raise Voice::CallErrors::CallFailed, 'sdp_answer is required' if sdp_answer.blank?
+    # A string, the SDP itself: anything else would be taken as an answer and fail later.
+    raise Voice::CallErrors::CallFailed, 'sdp_answer is required' unless sdp_answer.is_a?(String) && sdp_answer.present?
 
     # All side effects under the lock so a concurrent terminate cannot finalize
     # the call between status update and the message/conversation/broadcast writes.

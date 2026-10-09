@@ -76,6 +76,16 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
     expect(backend.commands_of('call.terminate').map(&:call_id)).to eq(['CALLX6'])
   end
 
+  # An answer is the SDP itself; anything else is refused before the call changes.
+  it 'refuses an answer that is not an sdp string, leaving the call ringing' do
+    call = incoming_call('CALLX9')
+    post_action(call, :accept, sdp_answer: { 'type' => 'answer' })
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(call.reload.status).to eq('ringing')
+    expect(backend.commands_of('call.accept')).to be_empty
+  end
+
   describe 'placing a call' do
     def initiate
       post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
@@ -90,7 +100,7 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
       expect(response.parsed_body).to include('call_id' => 'FAKECALL0001')
       command = backend.commands_of('call.start').sole
       expect(command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'sdp' => 'SDP-OFFER')
-      expect(backend.commands_of('contact.resolve').sole.party.id).to eq('182736451928374')
+      expect(backend.commands_of('contact.resolve').first.party.id).to eq('182736451928374')
       expect(backend.idempotency_keys.sole).to be_present
       expect(Call.find_by(provider_call_id: 'FAKECALL0001'))
         .to have_attributes(direction: 'outgoing', status: 'ringing', conversation_id: conversation.id)

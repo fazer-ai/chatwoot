@@ -61,25 +61,34 @@ module Whatsapp::Session::Facade::Calls
   # The connector dials a phone number and nothing else. A conversation hands over the
   # identity its thread is on, a number or a LID, and is called on that identity, never on
   # the contact's own number, which after an edit or a merge can belong to somebody else.
-  # A source id is bare digits either way and nothing on the contact reliably says which
-  # (a merge keeps the other contact's identifier), so the connector, which knows the
-  # pairing, is asked for the number behind it as a LID. One it pairs with nothing is
-  # dialled as a number only when something says it is one: the called contact's own
-  # number, or the connector knowing it as a number. Anything else is refused, because the
-  # digits of a LID dialled as a number can be a stranger's phone.
+  # A source id is bare digits either way, so what it is has to be told:
+  #
+  # - the called contact's own number is a number, and is dialled as it is;
+  # - otherwise the connector, which knows the pairing, is asked about the digits both as a
+  #   LID (the number behind it) and as a number (one it pairs with a LID). Digits it knows
+  #   one way are dialled that way; digits it knows both ways, to two different phones,
+  #   are refused rather than guessed, and so are digits it knows neither way, because the
+  #   digits of a LID dialled as a number can be a stranger's phone.
   def callee_address(recipient, contact)
     recipient = recipient.to_s.delete('+')
-    phone = paired_phone(model::Address.lid(recipient)) || (recipient if known_number?(recipient, contact))
-    model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
+    return model::Address.phone(recipient) if contact&.phone_number == "+#{recipient}"
+
+    model::Address.phone(connector_number(recipient)) ||
+      raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
   end
 
-  # The called contact carrying the number says it is one: that is also what a call placed
-  # from the contact panel hands over, before any thread with the contact exists. Another
-  # contact of the account carrying the same digits says nothing about this conversation.
+  def connector_number(recipient)
+    behind_lid = paired_phone(model::Address.lid(recipient))
+    as_number = recipient if known_number?(recipient)
+    return behind_lid || as_number unless behind_lid && as_number && behind_lid != as_number
+
+    raise Whatsapp::Session::Errors::InvalidPayload, 'these digits are both a LID and another number'
+  end
+
   # The connector answers an address it holds nothing for with that same address alone, so
   # a number is known to it only when the answer also carries the LID it pairs with.
-  def known_number?(recipient, contact)
-    contact&.phone_number == "+#{recipient}" || resolve(model::Address.phone(recipient))&.lid.present?
+  def known_number?(recipient)
+    resolve(model::Address.phone(recipient))&.lid.present?
   end
 
   def paired_phone(lid) = resolve(lid)&.phone.presence

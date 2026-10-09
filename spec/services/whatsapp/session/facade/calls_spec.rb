@@ -102,7 +102,7 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '182736451928374')
 
       expect(facade.initiate_call('182736451928374', 'SDP-OFFER')).to eq('call_id' => 'FAKECALL0001')
-      expect(backend.commands_of('contact.resolve').sole.to_h).to eq('party' => { 'kind' => 'lid', 'id' => '182736451928374' })
+      expect(backend.commands_of('contact.resolve').first.to_h).to eq('party' => { 'kind' => 'lid', 'id' => '182736451928374' })
       expect(backend.last_command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'sdp' => 'SDP-OFFER')
     end
 
@@ -132,6 +132,28 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       facade.initiate_call('5511977776666', 'SDP-OFFER', contact: contact)
 
       expect(backend.last_command.to.id).to eq('5511977776666')
+    end
+
+    # A thread on the contact's own number is on a number, whatever else the digits are.
+    it 'dials a thread on the contact\'s own number as that number, even when the digits are a known LID' do
+      contact.update!(phone_number: '+182736451928374')
+
+      facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact)
+
+      expect(backend.last_command.to.id).to eq('182736451928374')
+    end
+
+    # Digits the connector knows as a LID of one phone and as another number are not guessed.
+    it 'refuses digits the connector knows both as a LID and as another number' do
+      contact.update!(phone_number: '+5521988880000')
+      allow(backend).to receive(:resolve_contact).and_wrap_original do |original, command|
+        next Whatsapp::Session::Model::Party.new(phone: '5511900000000', lid: '182736451928374', push_name: nil) if command.party.kind == 'phone'
+
+        original.call(command)
+      end
+
+      expect { facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact) }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+      expect(backend.commands_of('call.start')).to be_empty
     end
 
     # A number picked as one is dialled as one, even when the same digits are a LID the
