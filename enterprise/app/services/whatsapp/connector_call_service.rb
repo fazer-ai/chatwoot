@@ -41,11 +41,11 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # is timed from its pickup, not from when the pickup is applied.
   def answered(payload, at: nil)
     call = find_call(payload.call_id)
-    return keep_pending(payload.call_id, 'answered', 'sdp' => payload.sdp) if call.nil?
+    return keep_pending(payload.call_id, 'answered', { 'sdp' => payload.sdp }, at) if call.nil?
     return unless call.outgoing?
 
     accept_outbound_call(call, session: { sdp: payload.sdp })
-    mark_outbound_accepted(call, { timestamp: at })
+    mark_outbound_accepted(call, { timestamp: at&.to_i })
   end
 
   # A call shown only as an activity line has no record to close; one being placed may not
@@ -55,7 +55,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # the agent's own hang-up is, up to when the end arrived.
   def terminate(payload, at: nil)
     call = find_call(payload.call_id)
-    return keep_pending(payload.call_id, 'terminate', 'reason' => payload.reason) if call.nil?
+    return keep_pending(payload.call_id, 'terminate', { 'reason' => payload.reason }, at) if call.nil?
 
     # A pickup kept for a call recorded since, and not applied yet, happened before this
     # end: applied first, so the call is ended as the answered call it was. Under the call's
@@ -63,7 +63,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     # end reads the call.
     call.with_lock do
       apply_kept_pickup(call)
-      duration = ((at ? Time.zone.at(at) : Time.current) - call.started_at).to_i if call.in_progress? && call.started_at
+      duration = ((at || Time.current) - call.started_at).to_i if call.in_progress? && call.started_at
       finalize_terminate(call, duration, payload.reason)
     end
   end
@@ -73,11 +73,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # the tab that placed the call learns of it from that request's answer, and a pickup or
   # an end broadcast before then reaches a tab that does not know the call yet.
   def reconcile(call)
-    call.with_lock do
-      apply_kept_pickup(call)
-      ended = take_pending(call.provider_call_id, 'terminate')
-      terminate(model::Events::CallTerminate.new(call_id: call.provider_call_id, from: nil, reason: ended['reason']), at: ended['at']) if ended
-    end
+    call.with_lock { apply_kept_outcomes(call) }
+  end
+
+  # The pickup and the end kept for a call recorded since and not applied yet, in that
+  # order. Whatever ends the call applies them first, the agent's own hang-up included, so
+  # the call is ended as what it was, and when it was. Called under the call's lock.
+  def apply_kept_outcomes(call)
+    apply_kept_pickup(call)
+    ended = take_pending(call.provider_call_id, 'terminate')
+    return if ended.nil?
+
+    terminate(model::Events::CallTerminate.new(call_id: call.provider_call_id, from: nil, reason: ended['reason']), at: kept_time(ended))
+    call.reload
   end
 
   # The connector could not use the agent's answer, and the call it was for goes on ringing
@@ -98,27 +106,27 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # One small key per placed call, so a day costs nothing.
   PENDING_TTL = 1.day.to_i
 
-  # A pickup kept for a call recorded since and not applied yet. Whatever ends the call
-  # applies it first, the agent's own hang-up included, so the call is ended as the
-  # answered call it was. Called under the call's lock.
+  private
+
+  def model = Whatsapp::Session::Model
+
   def apply_kept_pickup(call)
     answer = take_pending(call.provider_call_id, 'answered')
     return if answer.nil?
 
-    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp']), at: answer['at'])
+    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp']), at: kept_time(answer))
     call.reload
   end
 
-  private
-
-  def model = Whatsapp::Session::Model
+  def kept_time(kept) = kept['at'] && Time.zone.at(kept['at'])
 
   def find_call(call_id)
     Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: call_id)
   end
 
-  def keep_pending(call_id, kind, data)
-    Redis::Alfred.setex(pending_key(call_id, kind), data.merge('at' => Time.current.to_i).to_json, PENDING_TTL)
+  # With the time the connector saw it happen, which is when the call is timed from.
+  def keep_pending(call_id, kind, data, at)
+    Redis::Alfred.setex(pending_key(call_id, kind), data.merge('at' => (at || Time.current).to_f).to_json, PENDING_TTL)
   end
 
   # Taken inside the call's lock, and let go only once what it was applied to commits: a

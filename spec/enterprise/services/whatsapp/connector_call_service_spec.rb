@@ -24,8 +24,8 @@ RSpec.describe Whatsapp::ConnectorCallService do
     allow(ActionCable.server).to receive(:broadcast) { |stream, payload| broadcasts << [stream, payload] }
   end
 
-  def dispatch(payload)
-    Whatsapp::Session::Inbound::Dispatcher.dispatch(Channel::Whatsapp.find(channel.id), model::Event.build(payload))
+  def dispatch(payload, **attributes)
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(Channel::Whatsapp.find(channel.id), model::Event.build(payload, **attributes))
   end
 
   def offer(call_id, sdp: sdp_offer, video: false)
@@ -276,6 +276,20 @@ RSpec.describe Whatsapp::ConnectorCallService do
       described_class.new(inbox: inbox).reconcile(Call.find(late.id))
       expect(late.reload.meta['sdp_answer']).to eq('SDP-EARLY')
       expect(late.status).to eq('completed')
+    end
+
+    # A consumer that stalled hands both over together, long after the connector saw them.
+    it 'times the call by when the connector saw the pickup and the end' do
+      call_id = "CALLOUT4#{command_suffix}"
+      picked_up = 10.minutes.ago
+      dispatch(model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY'), ts: (picked_up.to_f * 1000).to_i)
+      dispatch(model::Events::CallTerminate.new(call_id: call_id, from: caller_party, reason: nil), ts: ((picked_up + 95).to_f * 1000).to_i)
+      late = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                          direction: :outgoing, status: 'ringing', provider_call_id: call_id, meta: {})
+
+      described_class.new(inbox: inbox).reconcile(late)
+
+      expect(late.reload.duration_seconds).to eq(95)
     end
 
     # Applied later, from a queue, and timed by when the pickup and the end arrived.

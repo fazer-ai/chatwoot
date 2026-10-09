@@ -30,7 +30,9 @@ class Whatsapp::CallService
     call.with_lock do
       next if call.terminal?
 
-      apply_kept_connector_pickup
+      apply_kept_connector_outcomes
+      next if call.terminal?
+
       invoke_provider!(:terminate_call)
       # Compute duration from started_at locally — the webhook arrives after the
       # call is already terminal and the idempotency guard there bails before it
@@ -48,13 +50,13 @@ class Whatsapp::CallService
 
   private
 
-  # The connector can report a pickup before the call it answers was recorded, and the
-  # call stays ringing here until that pickup is applied: an agent hanging up before then
-  # ends a call that was answered.
-  def apply_kept_connector_pickup
+  # The connector can report a pickup, or an end, before the call it is about was
+  # recorded, and the call stays ringing here until they are applied: an agent hanging up
+  # before then would end as unanswered a call that was answered, or one that had ended.
+  def apply_kept_connector_outcomes
     return unless call.inbox.channel.session_provider?
 
-    Whatsapp::ConnectorCallService.new(inbox: call.inbox).apply_kept_pickup(call)
+    Whatsapp::ConnectorCallService.new(inbox: call.inbox).apply_kept_outcomes(call)
   end
 
   def transition_to_in_progress!

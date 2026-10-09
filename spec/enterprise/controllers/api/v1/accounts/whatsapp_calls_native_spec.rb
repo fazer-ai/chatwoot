@@ -141,6 +141,24 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
       expect(placed.duration_seconds).not_to be_nil
     end
 
+    # The callee refused before the call was recorded, and the agent hangs up before the
+    # reconciliation applies that end: the call is the one the callee ended.
+    it 'ends as the callee ended it a call refused before it was recorded, when the agent hangs up first' do
+      allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|
+        call_id = original.call(*args, **kwargs)
+        ended = Whatsapp::Session::Model::Events::CallTerminate.new(call_id: call_id, from: nil, reason: 'rejected')
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, Whatsapp::Session::Model::Event.build(ended))
+        call_id
+      end
+      initiate
+      placed = Call.find_by(provider_call_id: 'FAKECALL0001')
+
+      post_action(placed, :terminate)
+
+      expect(placed.reload.end_reason).to eq('rejected')
+      expect(backend.commands_of('call.terminate')).to be_empty
+    end
+
     it 'tells the agent when the connector refuses, and records no call' do
       allow(backend).to receive(:start_call).and_raise(Whatsapp::Session::Errors::NotSupported, 'calls are not carried here')
       broadcasts = []
