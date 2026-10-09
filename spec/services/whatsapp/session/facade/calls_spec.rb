@@ -57,6 +57,16 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(backend.commands.map(&:wire_type)).to eq(%w[call.accept call.reject call.terminate])
     end
 
+    # The answer is fire and forget, so its failure names the command; this is what ties it back.
+    it 'remembers which call an answer was for' do
+      allow(backend).to receive(:accept_call).and_return('cmd-accept-1')
+
+      facade.accept_call('CALLX3', 'SDP')
+
+      expect(Whatsapp::Session::CallCommands.take('cmd-accept-1')).to eq('CALLX3')
+      expect(Whatsapp::Session::CallCommands.take('cmd-accept-1')).to be_nil
+    end
+
     # Uazapi pairs a phone too and carries no call: the flow must hear a refusal rather than
     # a call that seemed to go through.
     it 'refuses on a provider that does not carry calls' do
@@ -71,11 +81,25 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
   describe 'placing a call' do
     let(:contact) { create(:contact, account: channel.account, phone_number: '+5541999990000', identifier: '182736451928374@lid') }
 
-    it 'dials the number behind a conversation addressed by LID and answers in the Cloud shape' do
+    # The connector knows which number a LID is paired with; the contact's own number can
+    # belong to somebody else after an edit or a merge.
+    it 'dials the number the connector pairs with the LID the conversation is on' do
+      contact.update!(phone_number: '+5521988880000')
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '182736451928374')
 
       expect(facade.initiate_call('182736451928374', 'SDP-OFFER')).to eq('call_id' => 'FAKECALL0001')
+      expect(backend.commands_of('contact.resolve').sole.to_h).to eq('party' => { 'kind' => 'lid', 'id' => '182736451928374' })
       expect(backend.last_command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'sdp' => 'SDP-OFFER')
+    end
+
+    it 'dials a conversation on a number at that number, whatever the contact says now' do
+      contact.update!(phone_number: '+5521988880000')
+      create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '5511977776666')
+
+      facade.initiate_call('5511977776666', 'SDP-OFFER')
+
+      expect(backend.commands_of('contact.resolve')).to be_empty
+      expect(backend.last_command.to.id).to eq('5511977776666')
     end
 
     # The same offer is the same request retried; a new click is a new offer.
@@ -90,12 +114,12 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(keys.first).to eq(keys.second)
     end
 
-    it 'refuses a contact with no number to dial' do
-      contact.update!(phone_number: nil)
+    it 'refuses a LID the connector has no number for' do
       create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: '182736451928374')
+      allow(backend).to receive(:resolve_contact).and_return(model::Party.new(lid: '182736451928374'))
 
       expect { facade.initiate_call('182736451928374', 'SDP-OFFER') }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
-      expect(backend.commands).to be_empty
+      expect(backend.commands_of('call.start')).to be_empty
     end
   end
 end

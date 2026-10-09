@@ -331,6 +331,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     result.is_a?(Hash) ? result['url'] : result
   end
 
+  def resolve_contact(command)
+    model::Party.from_h(client.call(command))
+  end
+
   # --- groups --------------------------------------------------------------------
 
   # The connector writes a group creation down before it asks WhatsApp, so a retry under

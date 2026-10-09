@@ -13,9 +13,13 @@ module Whatsapp::Session::Facade::Calls
     true
   end
 
+  # The answer is fire and forget, so a connector that cannot use it says so later, as a
+  # `command.failed` naming this command and not the call. The command is remembered
+  # against the call for as long as such a failure could take to come back.
   def accept_call(call_id, sdp_answer)
     calls_supported!
-    backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer))
+    command_id = backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer))
+    Whatsapp::Session::CallCommands.remember(command_id, call_id) if command_id.present?
     true
   end
 
@@ -51,13 +55,21 @@ module Whatsapp::Session::Facade::Calls
     raise Whatsapp::Session::Errors::NotSupported, "#{provider} does not carry calls"
   end
 
-  # The connector dials a phone number and nothing else. A conversation hands over its
-  # contact's source id, which on this provider is the LID when the contact has one, so the
-  # number is read off the contact behind it.
+  # The connector dials a phone number and nothing else. A conversation hands over the
+  # identity its thread is on, which on this provider is a number or a LID, and is called
+  # on that identity: a LID is turned into its number by the connector, which knows the
+  # pairing, never by the contact's own number, which after an edit or a merge can belong
+  # to somebody else.
   def callee_address(recipient)
-    contact = channel.inbox.contact_inboxes.find_by(source_id: recipient.to_s)&.contact
-    phone = contact ? contact.phone_number : recipient
-    model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'the contact has no phone number to call')
+    recipient = recipient.to_s.delete('+')
+    phone = lid?(recipient) ? backend.resolve_contact(model::Commands::ContactResolve.new(party: model::Address.lid(recipient)))&.phone : recipient
+    model::Address.phone(phone) || raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this contact on')
+  end
+
+  # A source id is bare digits either way, so a LID is told apart by the contact it was
+  # filed for, which carries it as its identifier.
+  def lid?(recipient)
+    channel.inbox.contact_inboxes.joins(:contact).exists?(source_id: recipient, contacts: { identifier: "#{recipient}@lid" })
   end
 
   def caller_address(call_id)

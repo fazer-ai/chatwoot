@@ -4,7 +4,8 @@
 #
 # Commands are kept in `commands` for assertions; `emit` builds canonical events with a
 # monotonic cursor, the way a real backend would.
-class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
+# Grows with every command the contract adds, which is the point of it.
+class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend # rubocop:disable Metrics/ClassLength
   # Per call, never aliased: a constant would hold the pre-reload module. See Handlers::Base.
   def model = Whatsapp::Session::Model
 
@@ -192,6 +193,8 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
 
   %i[accept_call reject_call terminate_call].each { |name| define_method(name) { |command| record(command) && nil } }
   # Keeps the key each `call.start` went out with, in `idempotency_keys`; answers 'FAKECALL0001'.
+  # Answers the LID with the number the specs file it under.
+  def resolve_contact(command) = record(command) && model::Party.new(phone: '5541999990000', lid: command.party.id)
   def start_call(command, idempotency_key:) = record(command) && (@idempotency_keys ||= []).push(idempotency_key) && 'FAKECALL0001'
 
   # --- test helpers ------------------------------------------------------------------

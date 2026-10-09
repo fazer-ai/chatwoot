@@ -28,23 +28,79 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
 
   # The callee picked up. Meta tells the two halves of that apart, the tunnel coming up and
   # the pickup, and the connector reports them as one event, so both broadcasts go out.
+  #
+  # A pickup can beat the record of the call it answers: `call.start` answers once the
+  # phone rings, and the Call is written after that answer. Such an answer is kept for
+  # `reconcile`, since nothing will deliver it again.
   def answered(payload)
-    call = Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: payload.call_id)
-    return unless call&.outgoing?
+    call = find_call(payload.call_id)
+    return keep_pending(payload.call_id, 'answered', 'sdp' => payload.sdp) if call.nil?
+    return unless call.outgoing?
 
     accept_outbound_call(call, session: { sdp: payload.sdp })
     mark_outbound_accepted(call, {})
   end
 
-  # A call shown only as an activity line has no record to close.
+  # A call shown only as an activity line has no record to close; one being placed may not
+  # have its record yet, and is kept for `reconcile` like an answer.
+  #
+  # The connector reports no duration, so an answered call is timed from its pickup, as
+  # the agent's own hang-up is.
   def terminate(payload)
-    call = Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: payload.call_id)
-    return if call.nil?
+    call = find_call(payload.call_id)
+    return keep_pending(payload.call_id, 'terminate', 'reason' => payload.reason) if call.nil?
 
-    finalize_terminate(call, nil, payload.reason)
+    duration = (Time.current - call.started_at).to_i if call.in_progress? && call.started_at
+    finalize_terminate(call, duration, payload.reason)
   end
 
+  # Applies what arrived for a placed call before it was recorded, in the order it happened.
+  def reconcile(call)
+    answer = take_pending(call.provider_call_id, 'answered')
+    answered(model::Events::CallAnswered.new(call_id: call.provider_call_id, sdp: answer['sdp'])) if answer
+    ended = take_pending(call.provider_call_id, 'terminate')
+    terminate(model::Events::CallTerminate.new(call_id: call.provider_call_id, from: nil, reason: ended['reason'])) if ended
+  end
+
+  # The connector could not use the agent's answer, and the call it was for goes on ringing
+  # on the caller's phone. It is closed here as failed, and refused there, so neither side
+  # is left believing it was picked up.
+  def accept_failed(call_id)
+    call = find_call(call_id)
+    return if call.nil? || call.terminal?
+
+    finalize_terminate(call, nil, 'accept_failed')
+    inbox.channel.provider_service.reject_call(call_id)
+  rescue Whatsapp::Session::Errors::Error => e
+    Rails.logger.warn("[WHATSAPP CALL] refusing call #{call_id} after its answer failed: #{e.message}")
+  end
+
+  # Kept as long as the request that places a call can take to record it.
+  PENDING_TTL = 60
+
   private
+
+  def model = Whatsapp::Session::Model
+
+  def find_call(call_id)
+    Call.whatsapp.find_by(inbox_id: inbox.id, provider_call_id: call_id)
+  end
+
+  def keep_pending(call_id, kind, data)
+    Redis::Alfred.setex(pending_key(call_id, kind), data.to_json, PENDING_TTL)
+  end
+
+  def take_pending(call_id, kind)
+    raw = Redis::Alfred.get(pending_key(call_id, kind))
+    return if raw.blank?
+
+    Redis::Alfred.delete(pending_key(call_id, kind))
+    JSON.parse(raw)
+  end
+
+  def pending_key(call_id, kind)
+    format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_PENDING, inbox_id: inbox.id, call_id: call_id, kind: kind)
+  end
 
   def build_inbound_call(payload, sdp_offer)
     extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers }

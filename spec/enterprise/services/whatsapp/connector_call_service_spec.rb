@@ -138,11 +138,74 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(events_named('voice_call.outbound_accepted').size).to eq(1)
     end
 
+    # Only a call this inbox placed can be picked up; an answer naming a received one is not
+    # an answer to anything the browser offered.
+    it 'leaves a received call alone' do
+      received = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact,
+                              provider: :whatsapp, direction: :incoming, status: 'ringing', provider_call_id: 'CALLX10', meta: {})
+
+      dispatch(model::Events::CallAnswered.new(call_id: 'CALLX10', sdp: 'x'))
+
+      expect(received.reload.status).to eq('ringing')
+      expect(received.meta['sdp_answer']).to be_nil
+      expect(broadcasts).to be_empty
+    end
+
     it 'does nothing for a call it does not know' do
       expect { dispatch(model::Events::CallAnswered.new(call_id: 'NAOEXISTE', sdp: 'x')) }.not_to change(Call, :count)
 
       expect(call.reload.meta['sdp_answer']).to be_nil
       expect(broadcasts).to be_empty
+    end
+
+    # `call.start` answers once the phone rings, and the record is written after that; a
+    # quick pickup, or a quick refusal, arrives in between and is not delivered again.
+    it 'applies what arrived for a placed call before it was recorded, once it is' do
+      dispatch(model::Events::CallAnswered.new(call_id: 'CALLOUT9', sdp: 'SDP-EARLY'))
+      dispatch(model::Events::CallTerminate.new(call_id: 'CALLOUT9', from: caller_party, reason: nil))
+      late = Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                          direction: :outgoing, status: 'ringing', provider_call_id: 'CALLOUT9', meta: {})
+
+      described_class.new(inbox: inbox).reconcile(late)
+
+      expect(late.reload.meta['sdp_answer']).to eq('SDP-EARLY')
+      expect(late.status).to eq('completed')
+      expect(events_named('voice_call.outbound_connected').size).to eq(1)
+      expect(events_named('voice_call.ended').size).to eq(1)
+
+      described_class.new(inbox: inbox).reconcile(late)
+      expect(events_named('voice_call.outbound_connected').size).to eq(1)
+    end
+  end
+
+  describe 'an answer the connector could not use' do
+    let(:lid_contact) { create(:contact, account: account, identifier: '182736451928374@lid') }
+    let(:conversation) { create(:conversation, inbox: inbox, account: account, contact: lid_contact) }
+    let!(:call) do
+      Call.create!(account: account, inbox: inbox, conversation: conversation, contact: conversation.contact, provider: :whatsapp,
+                   direction: :incoming, status: 'in_progress', provider_call_id: 'CALLX3', started_at: Time.current, meta: {})
+    end
+
+    def failed(command_id, type: 'call.accept')
+      dispatch(model::Events::CommandFailed.new(command_id: command_id, command_type: type, message_id: nil,
+                                                error: model::WireError.new(code: 'invalid_payload', message: 'bad sdp')))
+    end
+
+    it 'closes the call it was for as failed and refuses it on the caller\'s phone' do
+      Whatsapp::Session::CallCommands.remember('cmd-accept-1', 'CALLX3')
+
+      expect(failed('cmd-accept-1')).to eq(:handled)
+
+      expect(call.reload.status).to eq('failed')
+      expect(events_named('voice_call.ended').map { |p| p[:data][:call_id] }).to eq(['CALLX3'])
+      expect(backend.commands.map(&:to_h)).to eq([{ 'call_id' => 'CALLX3', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' } }])
+    end
+
+    it 'leaves the call alone for a failure it cannot place' do
+      expect(failed('cmd-unknown')).to eq(:ignored)
+
+      expect(call.reload.status).to eq('in_progress')
+      expect(backend.commands).to be_empty
     end
   end
 
@@ -167,6 +230,9 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
       expect(ringing.reload.status).to eq('no_answer')
       expect(answered.reload.status).to eq('completed')
+      # Timed from the pickup, since the connector reports no duration.
+      expect(answered.duration_seconds).to be_within(2).of(60)
+      expect(ringing.duration_seconds).to be_nil
       expect(events_named('voice_call.ended').map { |p| p[:data][:call_id] }).to eq(%w[CALLX5 CALLOUT3])
     end
 

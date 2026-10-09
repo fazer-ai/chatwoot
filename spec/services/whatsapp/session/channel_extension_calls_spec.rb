@@ -55,6 +55,11 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       expect { channel.disable_voice_calling! }.to have_enqueued_job(Whatsapp::Session::ApplyProxyJob).with(channel.id)
     end
 
+    # Off is off, whether the flag was never written or was written false.
+    it 'does not reconnect for calling turned off on an inbox that never had it' do
+      expect { channel.disable_voice_calling! }.not_to have_enqueued_job(Whatsapp::Session::ApplyProxyJob)
+    end
+
     it 'does not reconnect for a save that leaves calling as it was' do
       channel.enable_voice_calling!
 

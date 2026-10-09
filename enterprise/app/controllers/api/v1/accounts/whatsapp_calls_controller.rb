@@ -45,6 +45,9 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
       @message = Voice::CallMessageBuilder.new(@call).perform!
       @call.update!(message_id: @message.id)
     end
+    # The connector can report the pickup, or the end, of a call before this request got to
+    # record it; what it said is applied now.
+    Whatsapp::ConnectorCallService.new(inbox: @inbox).reconcile(@call) if @inbox.channel.session_provider?
   rescue Voice::CallErrors::NoCallPermission
     render_permission_request
   end

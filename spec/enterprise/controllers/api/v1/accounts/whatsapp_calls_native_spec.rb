@@ -69,16 +69,33 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
            params: { conversation_id: conversation.display_id, sdp_offer: 'SDP-OFFER' }, headers: agent.create_new_auth_token
     end
 
-    it 'rings the contact\'s number and records the call id the connector chose' do
+    # The conversation is on the contact's LID, so the number comes from the connector.
+    it 'rings the number behind the conversation and records the call id the connector chose' do
       initiate
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include('call_id' => 'FAKECALL0001')
       command = backend.commands_of('call.start').sole
-      expect(command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5511988887777' }, 'sdp' => 'SDP-OFFER')
+      expect(command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5541999990000' }, 'sdp' => 'SDP-OFFER')
+      expect(backend.commands_of('contact.resolve').sole.party.id).to eq('182736451928374')
       expect(backend.idempotency_keys.sole).to be_present
       expect(Call.find_by(provider_call_id: 'FAKECALL0001'))
         .to have_attributes(direction: 'outgoing', status: 'ringing', conversation_id: conversation.id)
+    end
+
+    # A pickup that beat the record of the call it answers is applied as soon as the record exists.
+    it 'connects a call picked up before this request recorded it' do
+      allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|
+        call_id = original.call(*args, **kwargs)
+        answered = Whatsapp::Session::Model::Events::CallAnswered.new(call_id: call_id, sdp: 'SDP-EARLY')
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, Whatsapp::Session::Model::Event.build(answered))
+        call_id
+      end
+
+      initiate
+
+      expect(response).to have_http_status(:ok)
+      expect(Call.find_by(provider_call_id: 'FAKECALL0001').meta['sdp_answer']).to eq('SDP-EARLY')
     end
 
     it 'tells the agent when the connector refuses, and records no call' do
