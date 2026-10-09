@@ -3,12 +3,14 @@ import { useCallsStore } from 'dashboard/stores/calls';
 import {
   armOutboundRecorder,
   cleanupWhatsappSession,
+  isLocalWhatsappCall,
   takeEarlyOutboundOutcome,
 } from 'dashboard/composables/useWhatsappCallSession';
 
 vi.mock('dashboard/composables/useWhatsappCallSession', () => ({
   armOutboundRecorder: vi.fn(),
   cleanupWhatsappSession: vi.fn(),
+  isLocalWhatsappCall: vi.fn(() => true),
   takeEarlyOutboundOutcome: vi.fn(),
 }));
 vi.mock('dashboard/api/channel/voice/twilioVoiceClient', () => ({
@@ -46,6 +48,17 @@ describe('calls store, a call this tab placed', () => {
 
     expect(store.activeCall?.callSid).toBe('CALLOUT1');
     expect(armOutboundRecorder).toHaveBeenCalled();
+  });
+
+  // Two tabs placing calls at once each buffer both calls' outcomes.
+  it('leaves an outcome alone for a call another tab placed', () => {
+    isLocalWhatsappCall.mockReturnValueOnce(false);
+    takeEarlyOutboundOutcome.mockReturnValue('accepted');
+    const store = useCallsStore();
+    store.addCall(placed);
+
+    expect(takeEarlyOutboundOutcome).not.toHaveBeenCalled();
+    expect(store.calls[0].isActive).toBe(false);
   });
 
   it('is not added when it ended first, and its session is released', () => {

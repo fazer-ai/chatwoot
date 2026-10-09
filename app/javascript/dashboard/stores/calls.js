@@ -2,6 +2,7 @@ import TwilioVoiceClient from 'dashboard/api/channel/voice/twilioVoiceClient';
 import {
   armOutboundRecorder,
   cleanupWhatsappSession,
+  isLocalWhatsappCall,
   takeEarlyOutboundOutcome,
 } from 'dashboard/composables/useWhatsappCallSession';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
@@ -58,9 +59,12 @@ export const useCallsStore = defineStore('calls', {
         return;
       }
 
-      // A call this tab placed that was picked up, or ended, before it got here.
+      // A call this tab placed that was picked up, or ended, before it got here. Only this
+      // tab's own call: a sibling tab's, arriving here as a message, is not this tab's to
+      // start or to release.
       const early =
-        callData.provider === VOICE_CALL_PROVIDERS.WHATSAPP
+        callData.provider === VOICE_CALL_PROVIDERS.WHATSAPP &&
+        isLocalWhatsappCall(callData.callId)
           ? takeEarlyOutboundOutcome(callData.callId)
           : undefined;
       if (early === 'ended') {
