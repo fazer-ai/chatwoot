@@ -186,11 +186,18 @@ const buildPeerConnection = iceServers => {
   // A transport that failed carries nothing more, and the provider may never say the call
   // ended: a paired phone's connector hangs up a call it can no longer carry without
   // always reaching the client. Ending it here lets the call's own end broadcast release
-  // the card, the microphone and the recorder, as an agent hanging up would.
+  // the card, the microphone and the recorder, as an agent hanging up would. When the end
+  // cannot be asked for either, nothing would broadcast it, so this tab lets go of the
+  // call itself: the recording is uploaded and the session released.
   const own = pc;
   own.onconnectionstatechange = () => {
     if (own !== pc || own.connectionState !== 'failed' || !activeCallId) return;
-    WhatsappCallsAPI.terminate(activeCallId).catch(() => {});
+    const callId = activeCallId;
+    WhatsappCallsAPI.terminate(callId).catch(() => {
+      if (activeCallId !== callId) return;
+      // eslint-disable-next-line no-use-before-define
+      handleWhatsappRemoteEnd(callId).catch(() => {});
+    });
   };
   return pc;
 };

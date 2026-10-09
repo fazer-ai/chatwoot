@@ -3,6 +3,7 @@ import {
   applyOutboundAnswer,
   cleanupWhatsappSession,
   handleWhatsappRemoteEnd,
+  hasActiveWhatsappCall,
   noteEarlyOutboundOutcome,
   takeEarlyOutboundEnd,
   useWhatsappCallSession,
@@ -70,6 +71,21 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     peers.at(-1).fail();
 
     expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+  });
+
+  // Nothing will broadcast the end of a call whose end could not be asked for.
+  it('releases the session when the end cannot be asked for either', async () => {
+    WhatsappCallsAPI.initiate.mockResolvedValue({
+      id: 42,
+      call_id: 'CALLOUT1',
+    });
+    WhatsappCallsAPI.terminate.mockRejectedValueOnce(new Error('offline'));
+    const session = useWhatsappCallSession();
+    await session.initiateOutboundCall({ conversationId: 1 });
+
+    peers.at(-1).fail();
+
+    await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
   });
 
   it('does nothing for a transport that is only being set up', async () => {
