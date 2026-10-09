@@ -248,7 +248,8 @@ const startRingingTimer = (callId, placedSid) => {
     } catch (_) {
       /* unreachable as well: nothing says the call is up */
     }
-    if (activeCallId !== callId) return;
+    // A pickup that arrived while the call was being asked about armed the recorder.
+    if (activeCallId !== callId || recorderArmed) return;
     if (status === 'in-progress') {
       const store = useCallsStore();
       const card = store.calls.find(c => c.callId === callId);

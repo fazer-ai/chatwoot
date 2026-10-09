@@ -268,6 +268,25 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       expect(hasActiveWhatsappCall()).toBe(true);
     });
 
+    it('is kept when the pickup arrives while the call is being asked about', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      WhatsappCallsAPI.show.mockImplementationOnce(async () => {
+        armOutboundRecorder();
+        return { status: 'ringing' };
+      });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS);
+
+      expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+      expect(hasActiveWhatsappCall()).toBe(true);
+    });
+
     it('is left to the transport once the callee picked up', async () => {
       vi.useFakeTimers();
       WhatsappCallsAPI.initiate.mockResolvedValue({
