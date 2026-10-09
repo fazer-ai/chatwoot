@@ -165,6 +165,8 @@ const cleanup = () => {
   activeCallSid = null;
   pendingOutboundAnswers.clear();
   recorderArmed = false;
+  // eslint-disable-next-line no-use-before-define
+  stopRingingTimer();
 };
 
 const buildPeerConnection = iceServers => {
@@ -190,33 +192,56 @@ const buildPeerConnection = iceServers => {
   };
   // A transport that failed carries nothing more, and the provider may never say the call
   // ended: a paired phone's connector hangs up a call it can no longer carry without
-  // always reaching the client. The end is asked for here, as an agent hanging up would,
-  // and this tab lets go of the call itself whether or not that went through: the end
-  // broadcast is not replayed to a tab whose cable was down, and a failed request sends
-  // none. The recording is uploaded, the session released and the card removed, once,
-  // however many of these and the broadcast arrive.
+  // always reaching the client.
   const own = pc;
   own.onconnectionstatechange = () => {
     if (own !== pc || own.connectionState !== 'failed' || !activeCallId) return;
-    const callId = activeCallId;
-    const placedSid = activeCallSid;
-    WhatsappCallsAPI.terminate(callId)
-      .catch(() => {})
-      .then(() => {
-        if (activeCallId !== callId) return undefined;
-        // eslint-disable-next-line no-use-before-define
-        return handleWhatsappRemoteEnd(callId).catch(() => {});
-      })
-      .then(() => {
-        const store = useCallsStore();
-        const card = store.calls.find(c => c.callId === callId);
-        // Dismissed as an end broadcast would, so a ringing message still queued for the
-        // call does not add it back.
-        markCallDismissed(card?.callSid || placedSid);
-        if (card) store.removeCall(card.callSid);
-      });
+    // eslint-disable-next-line no-use-before-define
+    letGoOfCall(activeCallId, activeCallSid);
   };
   return pc;
+};
+
+// A call this tab can no longer expect to hear the end of. The end is asked for, as an
+// agent hanging up would, and this tab lets go of the call itself whether or not that went
+// through: the end broadcast is not replayed to a tab whose cable was down, and a failed
+// request sends none. The recording is uploaded, the session released and the card
+// removed, once, however many of these and the broadcast arrive.
+const letGoOfCall = (callId, placedSid) =>
+  WhatsappCallsAPI.terminate(callId)
+    .catch(() => {})
+    .then(() => {
+      if (activeCallId !== callId) return undefined;
+      // eslint-disable-next-line no-use-before-define
+      return handleWhatsappRemoteEnd(callId).catch(() => {});
+    })
+    .then(() => {
+      const store = useCallsStore();
+      const card = store.calls.find(c => c.callId === callId);
+      // Dismissed as an end broadcast would, so a ringing message still queued for the
+      // call does not add it back.
+      markCallDismissed(card?.callSid || placedSid);
+      if (card) store.removeCall(card.callSid);
+    });
+
+// WhatsApp stops ringing an unanswered call well within this. A placed call still
+// ringing past it lost its end on the way: a paired phone's connector that lost its
+// session ends its calls without always reaching the client, and before the callee
+// answers there is no transport yet whose failure would say so.
+export const OUTBOUND_RINGING_LIMIT_MS = 90 * 1000;
+let ringingTimer = null;
+
+const stopRingingTimer = () => {
+  if (ringingTimer) clearTimeout(ringingTimer);
+  ringingTimer = null;
+};
+
+const startRingingTimer = (callId, placedSid) => {
+  stopRingingTimer();
+  ringingTimer = setTimeout(() => {
+    ringingTimer = null;
+    if (activeCallId === callId) letGoOfCall(callId, placedSid);
+  }, OUTBOUND_RINGING_LIMIT_MS);
 };
 
 const stopRecorderAndUpload = async callId => {
@@ -401,6 +426,7 @@ export function useWhatsappCallSession() {
       if (response?.id) {
         activeCallId = response.id;
         activeCallSid = response.call_id || null;
+        startRingingTimer(activeCallId, activeCallSid);
         callRecordingEnabled = response.recording_enabled !== false;
         // A connect webhook that raced ahead of this response was buffered;
         // apply our own by id now that we know it, then drop every buffered
@@ -493,6 +519,8 @@ export const applyOutboundAnswer = async (callId, sdpAnswer) => {
 // MediaRecorder. Idempotent — safe if ontrack hasn't fired yet (setupRecorder
 // bails until the remote stream has audio tracks; ontrack will retry).
 export const armOutboundRecorder = () => {
+  // Picked up: from here a lost call is the transport's to report.
+  stopRingingTimer();
   recorderArmed = true;
   setupRecorder();
 };

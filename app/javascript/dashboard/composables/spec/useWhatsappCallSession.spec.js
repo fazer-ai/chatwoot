@@ -4,7 +4,9 @@ import { useCallsStore } from 'dashboard/stores/calls';
 import { markCallDismissed } from 'dashboard/helper/voice';
 import {
   applyOutboundAnswer,
+  armOutboundRecorder,
   cleanupWhatsappSession,
+  OUTBOUND_RINGING_LIMIT_MS,
   handleWhatsappRemoteEnd,
   hasActiveWhatsappCall,
   noteEarlyOutboundOutcome,
@@ -59,7 +61,11 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     vi.clearAllMocks();
     global.RTCPeerConnection = FakePeerConnection;
     global.MediaStream = function FakeMediaStream() {
-      return { getTracks: () => [], addTrack: () => {} };
+      return {
+        getTracks: () => [],
+        getAudioTracks: () => [],
+        addTrack: () => {},
+      };
     };
     Object.defineProperty(global.navigator, 'mediaDevices', {
       configurable: true,
@@ -183,5 +189,42 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     expect(second).toBe(first);
     await first;
     expect(hasActiveWhatsappCall()).toBe(false);
+  });
+
+  // Before the callee answers there is no transport whose failure would report a lost call.
+  describe('a placed call still ringing', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('is let go of once it rang longer than WhatsApp rings', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS - 1);
+      expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+      await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
+    });
+
+    it('is left to the transport once the callee picked up', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      armOutboundRecorder();
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS * 2);
+
+      expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+    });
   });
 });
