@@ -91,7 +91,7 @@
             "PROXY_URL": {
               "LABEL": "Proxy (opcional)",
               "PLACEHOLDER": "socks5://usuario:senha{'@'}host:porta",
-              "DESCRIPTION": "O WhatsApp desta caixa de entrada sai por este endereço. Deixe vazio para conectar direto.",
+              "DESCRIPTION": "O WhatsApp desta caixa de entrada sai por este endereço. Deixe vazio para conectar direto. As ligações do WhatsApp não passam por proxy: salvar um proxy desliga as chamadas desta caixa de entrada.",
               "ERROR": "Use um endereço http, https ou socks5 com host"
             }
           }
@@ -238,6 +238,13 @@
       "EDIT": {
         "BUTTON_TEXT": "Atualizar",
         "SUCCESS_MESSAGE": "Continuidade da conversa atualizada com sucesso"
+      }
+    },
+    "WHATSAPP_CALLING": {
+      "ENABLE": {
+        "PAIRED_DESCRIPTION": "Permite que os agentes recebam e façam ligações de WhatsApp nesta caixa, pelo celular pareado com ela. Os clientes podem ligar para este número direto pelo WhatsApp.",
+        "PROXY_BLOCKED": "Esta caixa de entrada sai por um proxy, e as ligações do WhatsApp não passam por proxy: a voz vai direto do servidor para o WhatsApp. Para ligar as chamadas, remova o proxy na aba {tab}.",
+        "CONNECTOR_WITHOUT_CALLS": "O conector de WhatsApp desta instalação não está levando a voz das ligações. Para ligar as chamadas, defina WAC_CALLS_UDP_PORT (por exemplo 40000) e publique essa porta em UDP no container onde o conector roda (o worker do Sidekiq, no modo embutido). Atrás de NAT, defina também WAC_CALLS_PUBLIC_IP com o IP público do servidor."
       }
     }
   }

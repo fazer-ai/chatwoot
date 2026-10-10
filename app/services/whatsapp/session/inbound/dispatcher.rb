@@ -35,6 +35,8 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.activity' => 'GroupActivity',
     'history.sync' => 'HistorySync',
     'call.offer' => 'CallOffer',
+    'call.answered' => 'CallAnswered',
+    'call.terminate' => 'CallTerminate',
     'raw' => 'Raw'
   }.freeze
 
@@ -45,13 +47,8 @@ class Whatsapp::Session::Inbound::Dispatcher
   # are stored by the handler that stores every message, so nothing is lost by not
   # reading these. What they would buy is telling an agent that a backlog is on its way
   # instead of watching the thread fill on its own, which is #407's to spend.
-  #
-  # `call.terminate` is here because every call ends: a second activity line per call
-  # would say nothing an agent can act on, and on an inbox that auto-rejects it would
-  # always say the same thing. The offer is the one that carries news.
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
-    call.terminate
     session.offline_sync_preview session.offline_sync_completed
   ].freeze
 

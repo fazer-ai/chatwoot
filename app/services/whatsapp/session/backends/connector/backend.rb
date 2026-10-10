@@ -72,6 +72,9 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # the unlink runs outside this ceiling, by contract.
   TEARDOWN_RUNTIME = 30
 
+  # A hang-up answered by WhatsApp at once; what this bounds is one parked on a socket.
+  CALL_HANGUP_RUNTIME = 30
+
   class << self
     def provider_key
       'native'
@@ -294,6 +297,36 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
+  # --- calls -----------------------------------------------------------------------
+
+  # An answer that lands after the caller gave up is not an answer, and a refusal that
+  # lands after the call stopped ringing refuses nothing, so both are momentary.
+  def accept_call(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
+  end
+
+  def reject_call(command)
+    client.publish(command, timeout: MOMENTARY_TIMEOUT)
+  end
+
+  # A hang-up is still right whenever it lands, and the connector drops one for a call
+  # that already ended. So it takes the runtime ceiling, like the teardown: a deadline would
+  # throw away, unrun, a hang-up queued behind long media sends, after the call was already
+  # closed here, and nothing would send it again.
+  def terminate_call(command)
+    client.publish(command, max_runtime: CALL_HANGUP_RUNTIME)
+  end
+
+  # Rings somebody's phone, which a redelivery must not do twice: the key is what makes
+  # the connector answer a resend with the call it already placed.
+  def start_call(command, idempotency_key:)
+    result = client.call(command, idempotency_key: idempotency_key)
+    call_id = result.is_a?(Hash) ? result['call_id'] : nil
+    raise Whatsapp::Session::Errors::InvalidPayload, 'call.start answered without a call_id' if call_id.blank?
+
+    call_id
+  end
+
   def check_numbers(command)
     Array(client.call(command)).map { |check| model::NumberCheck.from_h(check) }
   end
@@ -301,6 +334,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   def profile_picture_url(command)
     result = client.call(command)
     result.is_a?(Hash) ? result['url'] : result
+  end
+
+  def resolve_contact(command)
+    model::Party.from_h(client.call(command))
   end
 
   # --- groups --------------------------------------------------------------------

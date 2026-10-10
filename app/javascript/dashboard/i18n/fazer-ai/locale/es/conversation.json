@@ -104,6 +104,9 @@
           "BEFORE_ATTRIBUTE": "{name} antes de que la regla se ejecutara"
         }
       }
+    },
+    "HEADER": {
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "No se puede llamar a un grupo por WhatsApp"
     }
   },
   "CONVERSATION_SIDEBAR": {

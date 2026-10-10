@@ -4,7 +4,8 @@
 #
 # Commands are kept in `commands` for assertions; `emit` builds canonical events with a
 # monotonic cursor, the way a real backend would.
-class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
+# Grows with every command the contract adds, which is the point of it.
+class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend # rubocop:disable Metrics/ClassLength
   # Per call, never aliased: a constant would hold the pre-reload module. See Handlers::Base.
   def model = Whatsapp::Session::Model
 
@@ -24,7 +25,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     def unpairs? = true
   end
 
-  attr_reader :commands, :connection_state
+  attr_reader :commands, :connection_state, :idempotency_keys
 
   def initialize(channel)
     super
@@ -189,6 +190,20 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend
     record(command)
     command.participants.map { |participant| { 'address' => participant.to_h, 'status' => 'success' } }
   end
+
+  %i[accept_call reject_call terminate_call].each { |name| define_method(name) { |command| record(command) && nil } }
+  # Keeps the key each `call.start` went out with, in `idempotency_keys`; answers 'FAKECALL0001'.
+  # The LIDs this fake pairs with a number, as the connector would from what it was shown.
+  PAIRED_LIDS = { '182736451928374' => '5541999990000' }.freeze
+  def resolve_contact(command)
+    record(command)
+    id = command.party.id
+    return model::Party.new(phone: PAIRED_LIDS[id], lid: id) if command.party.kind == 'lid'
+
+    model::Party.new(phone: id, lid: PAIRED_LIDS.key(id))
+  end
+
+  def start_call(command, idempotency_key:) = record(command) && (@idempotency_keys ||= []).push(idempotency_key) && 'FAKECALL0001'
 
   # --- test helpers ------------------------------------------------------------------
 

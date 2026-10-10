@@ -104,6 +104,9 @@
           "BEFORE_ATTRIBUTE": "{name} antes da regra rodar"
         }
       }
+    },
+    "HEADER": {
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "Não é possível ligar para um grupo pelo WhatsApp"
     }
   },
   "CONVERSATION_SIDEBAR": {

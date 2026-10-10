@@ -41,6 +41,12 @@ en:
       messaging_window_closed: Meta's reply window for this contact has closed. It reopens when the contact sends a new message.
       messaging_window_closed_for_automation: Meta only accepts automated replies within 24 hours of the contact's last message. Take over the conversation to reply as an agent.
     whatsapp:
+      calls:
+        group_not_supported: Calls cannot be placed to a group
+        proxy_unsupported: 'WhatsApp calls do not go through a proxy. Remove the proxy from this inbox to turn calls on.'
+        connector_without_calls: 'The WhatsApp connector of this installation does not carry call voice: it needs WAC_CALLS_UDP_PORT set and that port published over UDP.'
+        provider_unsupported: 'This WhatsApp provider does not support calls.'
+        channel_voice_required: 'Calls are not available on this account''s plan.'
       group_announcement_only: Only administrators are allowed to send messages in this group
       group_description_cannot_be_removed: WhatsApp does not allow a group description to be removed once it is set. Replace the text instead.
     inboxes:

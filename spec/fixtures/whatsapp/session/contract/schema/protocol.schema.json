@@ -394,6 +394,7 @@
             { "properties": { "type": { "const": "group.activity" }, "payload": { "$ref": "#/definitions/event_group_activity" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.offer" }, "payload": { "$ref": "#/definitions/event_call_offer" } }, "required": ["type"] },
             { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/event_call_terminate" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.answered" }, "payload": { "$ref": "#/definitions/event_call_answered" } }, "required": ["type"] },
             { "properties": { "type": { "const": "history.sync" }, "payload": { "$ref": "#/definitions/event_history_sync" } }, "required": ["type"] },
             { "properties": { "type": { "const": "raw" }, "payload": { "$ref": "#/definitions/event_raw" } }, "required": ["type"] }
           ]
@@ -713,7 +714,8 @@
         "call_id": { "type": "string" },
         "from": { "$ref": "#/definitions/party" },
         "video": { "type": "boolean" },
-        "timestamp": { "$ref": "#/definitions/timestamp_ms" }
+        "timestamp": { "$ref": "#/definitions/timestamp_ms" },
+        "sdp": { "type": "string", "description": "The connector's WebRTC offer, for the browser to answer with call.accept. Present only on a session that asked for calls.answer, for a 1:1 voice call." }
       },
       "required": ["call_id", "from"],
       "additionalProperties": true
@@ -726,6 +728,15 @@
         "reason": { "type": ["string", "null"] }
       },
       "required": ["call_id"],
+      "additionalProperties": true
+    },
+    "event_call_answered": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" },
+        "sdp": { "type": "string", "description": "The connector's WebRTC answer to the browser's call.start offer." }
+      },
+      "required": ["call_id", "sdp"],
       "additionalProperties": true
     },
     "event_raw": {
@@ -781,7 +792,10 @@
             { "properties": { "type": { "const": "group.invite.get" }, "payload": { "$ref": "#/definitions/command_group_invite_get" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.join_requests.list" }, "payload": { "$ref": "#/definitions/command_group_target" } }, "required": ["type"] },
             { "properties": { "type": { "const": "group.join_requests.update" }, "payload": { "$ref": "#/definitions/command_group_join_requests_update" } }, "required": ["type"] },
-            { "properties": { "type": { "const": "call.reject" }, "payload": { "$ref": "#/definitions/command_call_reject" } }, "required": ["type"] }
+            { "properties": { "type": { "const": "call.reject" }, "payload": { "$ref": "#/definitions/command_call_reject" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.accept" }, "payload": { "$ref": "#/definitions/command_call_accept" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.start" }, "payload": { "$ref": "#/definitions/command_call_start" } }, "required": ["type"] },
+            { "properties": { "type": { "const": "call.terminate" }, "payload": { "$ref": "#/definitions/command_call_terminate" } }, "required": ["type"] }
           ]
         }
       ]
@@ -796,7 +810,7 @@
         "proxy": { "type": ["object", "null"], "properties": { "url": { "type": "string" } }, "additionalProperties": true },
         "groups": { "type": "boolean" },
         "history_sync": { "type": "boolean" },
-        "calls": { "type": "object", "properties": { "auto_reject": { "type": "boolean" } }, "additionalProperties": true }
+        "calls": { "type": "object", "properties": { "auto_reject": { "type": "boolean" }, "answer": { "type": "boolean" } }, "additionalProperties": true }
       },
       "required": ["pairing"],
       "additionalProperties": true
@@ -1075,6 +1089,32 @@
         "from": { "$ref": "#/definitions/address" }
       },
       "required": ["call_id", "from"],
+      "additionalProperties": true
+    },
+    "command_call_accept": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" },
+        "sdp": { "type": "string", "description": "The browser's WebRTC answer to the sdp of the call.offer." }
+      },
+      "required": ["call_id", "sdp"],
+      "additionalProperties": true
+    },
+    "command_call_start": {
+      "type": "object",
+      "properties": {
+        "to": { "$ref": "#/definitions/address" },
+        "sdp": { "type": "string", "description": "The browser's WebRTC offer for the call." }
+      },
+      "required": ["to", "sdp"],
+      "additionalProperties": true
+    },
+    "command_call_terminate": {
+      "type": "object",
+      "properties": {
+        "call_id": { "type": "string" }
+      },
+      "required": ["call_id"],
       "additionalProperties": true
     }
   }

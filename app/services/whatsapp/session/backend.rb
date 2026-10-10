@@ -147,6 +147,8 @@ class Whatsapp::Session::Backend
   # --- contacts --------------------------------------------------------------------
   def check_numbers(_command) = not_supported!(:check_numbers)
   def profile_picture_url(_command) = not_supported!(:profile_picture_url)
+  # Both of WhatsApp's namespaces for one person, as a Party.
+  def resolve_contact(_command) = not_supported!(:resolve_contact)
 
   # --- groups ----------------------------------------------------------------------
   def create_group(_command) = not_supported!(:create_group)
@@ -164,6 +166,12 @@ class Whatsapp::Session::Backend
   def group_invite_code(_command) = not_supported!(:group_invite_code)
   def group_join_requests(_command) = not_supported!(:group_join_requests)
   def handle_group_join_requests(_command) = not_supported!(:handle_group_join_requests)
+
+  # Calls carried to the agent's browser. `start_call` answers the provider's call id.
+  def accept_call(_command) = not_supported!(:accept_call)
+  def reject_call(_command) = not_supported!(:reject_call)
+  def start_call(_command, **) = not_supported!(:start_call)
+  def terminate_call(_command) = not_supported!(:terminate_call)
 
   def capabilities
     self.class.capabilities

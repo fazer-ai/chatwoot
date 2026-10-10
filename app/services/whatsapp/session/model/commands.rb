@@ -278,13 +278,33 @@ module Whatsapp::Session::Model::Commands
     coerce from: Address
   end
 
+  # The browser's WebRTC answer to a call the connector offered with an `sdp`.
+  class CallAccept < Data.define(:call_id, :sdp)
+    include Serializable
+    wire_type 'call.accept'
+  end
+
+  # Rings `to` with the browser's WebRTC offer. An RPC: the result is the call id that
+  # `call.answered` and `call.terminate` carry for it.
+  class CallStart < Data.define(:to, :sdp)
+    include Serializable
+    wire_type 'call.start'
+    coerce to: Address
+  end
+
+  class CallTerminate < Data.define(:call_id)
+    include Serializable
+    wire_type 'call.terminate'
+  end
+
   CLASSES = [
     SessionConnect, SessionDisconnect, SessionLogout, SessionDelete, SessionStatus, SessionUpdate, SessionWake,
     AdminPing, PairingRequestCode, PairingPasskeyResponse, PairingPasskeyConfirm, HistoryRequest, MessageSend, MessageEdit,
     MessageRevoke, MessageReact, MessageMarkRead, MessageMarkUnread, MessageDownloadMedia, PresenceSet,
     PresenceSubscribe, ChatPresence, ContactCheck, ContactProfilePicture, ContactInfo, ContactResolve, GroupCreate,
     GroupInfo, GroupList, GroupLeave, GroupParticipantsUpdate, GroupNameSet, GroupDescriptionSet, GroupPhotoSet,
-    GroupSettingsSet, GroupInviteGet, GroupJoinRequestsList, GroupJoinRequestsUpdate, CallReject
+    GroupSettingsSet, GroupInviteGet, GroupJoinRequestsList, GroupJoinRequestsUpdate, CallReject,
+    CallAccept, CallStart, CallTerminate
   ].freeze
 
   BY_TYPE = CLASSES.index_by(&:wire_type).freeze
@@ -300,6 +320,7 @@ module Whatsapp::Session::Model::Commands
     group.create group.info group.list group.leave group.participants.update group.name.set
     group.description.set group.photo.set group.settings.set group.invite.get
     group.join_requests.list group.join_requests.update
+    call.start
   ].freeze
 
   def self.rpc?(type)

@@ -41,6 +41,12 @@ pt_BR:
       messaging_window_closed: A janela de resposta da Meta para este contato fechou. Ela reabre quando o contato enviar uma nova mensagem.
       messaging_window_closed_for_automation: A Meta só aceita resposta automática até 24 horas depois da última mensagem do contato. Assuma a conversa para responder como agente.
     whatsapp:
+      calls:
+        group_not_supported: Não é possível ligar para um grupo
+        proxy_unsupported: 'As ligações do WhatsApp não passam por proxy. Remova o proxy desta caixa de entrada para ligar as chamadas.'
+        connector_without_calls: 'O conector de WhatsApp desta instalação não leva a voz das ligações: ele precisa de WAC_CALLS_UDP_PORT definido e dessa porta publicada em UDP.'
+        provider_unsupported: 'Este provedor de WhatsApp não faz ligações.'
+        channel_voice_required: 'As ligações não estão disponíveis no plano desta conta.'
       group_announcement_only: Somente administradores podem enviar mensagens neste grupo
       group_description_cannot_be_removed: O WhatsApp não permite remover a descrição de um grupo depois que ela existe. Substitua o texto em vez de apagá-lo.
     inboxes:

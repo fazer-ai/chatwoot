@@ -1,5 +1,12 @@
 import TwilioVoiceClient from 'dashboard/api/channel/voice/twilioVoiceClient';
-import { cleanupWhatsappSession } from 'dashboard/composables/useWhatsappCallSession';
+import {
+  armOutboundRecorder,
+  cleanupWhatsappSession,
+  handleWhatsappRemoteEnd,
+  isLocalWhatsappCall,
+  takeEarlyOutboundEnd,
+  takeEarlyOutboundOutcome,
+} from 'dashboard/composables/useWhatsappCallSession';
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { TERMINAL_STATUSES } from 'dashboard/helper/voice';
 import { defineStore } from 'pinia';
@@ -51,6 +58,9 @@ export const useCallsStore = defineStore('calls', {
         const next = { ...callData };
         if (existing.caller && !next.caller) delete next.caller;
         Object.assign(existing, next, { isActive: existing.isActive });
+        // The message can add this tab's placed call before the tab does; an outcome kept
+        // for it is applied when the tab adds it all the same.
+        this.applyEarlyOutcome(callData);
         return;
       }
 
@@ -60,6 +70,30 @@ export const useCallsStore = defineStore('calls', {
         ...callData,
         isActive: false,
       });
+      this.applyEarlyOutcome(callData);
+    },
+
+    // A call this tab placed that was picked up, or ended, before the tab had it. Only this
+    // tab's own call: a sibling tab's, arriving here as a message, is not this tab's to
+    // start or to release.
+    //
+    // An end is applied to a call the tab no longer owns too: the end that tore down the
+    // session placing it can arrive before the dial's answer adds the call.
+    applyEarlyOutcome(callData) {
+      if (callData.provider !== VOICE_CALL_PROVIDERS.WHATSAPP) return;
+      const local = isLocalWhatsappCall(callData.callId);
+      const early = local
+        ? takeEarlyOutboundOutcome(callData.callId)
+        : takeEarlyOutboundEnd(callData.callId);
+      if (early === 'ended') {
+        this.calls = this.calls.filter(c => c.callSid !== callData.callSid);
+        // Through the call's own end, which uploads its recording first, and waits for an
+        // end of the same call already doing so.
+        if (local) handleWhatsappRemoteEnd(callData.callId);
+      } else if (early === 'accepted') {
+        this.setCallActive(callData.callSid);
+        armOutboundRecorder();
+      }
     },
 
     removeCall(callSid) {

@@ -1,13 +1,15 @@
 # Somebody rang this account on WhatsApp.
 #
-# Chatwoot cannot answer a WhatsApp call -- there is no command for it in the contract and
-# nothing in whatsmeow to build one on -- so what an inbox can do with a call is show that
-# it happened, next to the conversation it happened in. That is an activity line, the same
-# shape a group rename gets, and it is the whole of this handler.
+# A call the agent cannot answer here is shown as having happened, next to the conversation
+# it happened in. That is an activity line, the same shape a group rename gets.
 #
-# `call.terminate` is deliberately not routed here. Every call ends, so a second line per
-# call would say nothing an agent can act on, and with `auto_reject` on it would always
-# say the same thing.
+# A call the agent can answer is the other branch: the offer carries the connector's WebRTC
+# offer (`sdp`), and an installation with voice calling takes it up through `take_up_call`
+# instead, the way it takes up a Cloud API call. The calling flow lives in the enterprise
+# half, so here that hook takes nothing up.
+#
+# The end of a call writes no second line. Every call ends, so it would say nothing an agent
+# can act on, and with `auto_reject` on it would always say the same thing.
 class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbound::Handlers::Base
   def perform
     return :ignored unless capability?(:calls)
@@ -17,6 +19,16 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
   end
 
   private
+
+  # The outcome when the call was taken up by the calling flow, nil when it was not and the
+  # line is written instead.
+  def take_up_call(_contact_inbox) = nil
+
+  # Refuses the call when the calling flow says the inbox takes no incoming calls, and is
+  # then the outcome: a refused call files nothing, no contact, no thread and no line, the
+  # way the Cloud API's refusal does. The connector refuses every call itself when calling
+  # is off, so here there is none.
+  def refuse_call = nil
 
   # Prefixed, and not the raw call id: this shares a column with WhatsApp's message ids,
   # and the prefix is what keeps a call from ever being the target of an edit, a revoke
@@ -29,11 +41,19 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     # dedupe there is per session.
     return :duplicate if payload.call_id.present? && find_message(source_id).present?
 
+    # Before anything about who is calling: a call refused on the inbox's instruction is
+    # refused for a blocked contact too, who is otherwise filed nowhere.
+    refused = refuse_call
+    return refused if refused
+
     contact_inbox = inbound::ContactResolver.new(inbox: inbox, party: payload.from, overwrite: true).perform
     return :ignored if contact_inbox.nil?
 
     contact = contact_inbox.contact
     return :ignored if Whatsapp::BlockedSender.silenced?(contact, from_me: false)
+
+    taken = take_up_call(contact_inbox)
+    return taken if taken
 
     conversation = inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, occurred_at: occurred_at
@@ -80,3 +100,5 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     Time.zone.at(payload.timestamp / 1000.0)
   end
 end
+
+Whatsapp::Session::Inbound::Handlers::CallOffer.prepend_mod_with('Whatsapp::Session::Inbound::Handlers::CallOffer')

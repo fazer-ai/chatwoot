@@ -104,6 +104,9 @@
           "BEFORE_ATTRIBUTE": "{name} before the rule ran"
         }
       }
+    },
+    "HEADER": {
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "WhatsApp calls cannot be placed to a group"
     }
   },
   "CONVERSATION_SIDEBAR": {
