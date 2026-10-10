@@ -11,6 +11,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def self.prepended(base)
     base.validate :validate_provider_eligible
     base.after_update_commit :handle_provider_config_change, if: :saved_change_to_provider_config?
+    base.before_save :turn_calling_off_through_proxy, if: :session_provider?
     # Prepended so it runs before the model's own teardown callback. It is the only thing
     # that tells the destroy path apart from an explicit disconnect, which reaches the
     # same method through the inboxes controller.
@@ -60,16 +61,16 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # as unsupported. Turning it off stays possible whatever the inbox goes out through.
   def enable_voice_calling!
     return super unless session_provider?
-    raise 'WhatsApp calling is not supported by this provider' unless voice_calling_supported?
-    raise 'WhatsApp calling does not work through a proxy' if provider_config.to_h['proxy_url'].present?
-    raise 'WhatsApp calling requires the channel_voice feature' unless account.feature_enabled?('channel_voice')
+    raise I18n.t('errors.whatsapp.calls.provider_unsupported') unless voice_calling_supported?
+    raise I18n.t('errors.whatsapp.calls.proxy_unsupported') if provider_config.to_h['proxy_url'].present?
+    raise I18n.t('errors.whatsapp.calls.channel_voice_required') unless account.feature_enabled?('channel_voice')
 
     update_calling_flag(true)
   end
 
   def disable_voice_calling!
     return super unless session_provider?
-    raise 'WhatsApp calling is not supported by this provider' unless voice_calling_supported?
+    raise I18n.t('errors.whatsapp.calls.provider_unsupported') unless voice_calling_supported?
 
     update_calling_flag(false)
   end
@@ -258,6 +259,17 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
 
   def call_policy_pending_key
     format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_POLICY_PENDING, channel_id: id)
+  end
+
+  # A proxy saved on an inbox with calling on turns calling off in the same save, for the
+  # reason enable_voice_calling! refuses the pair: an inbox that reads as calling and can
+  # neither place nor answer a call is worse than one that says it is off. The settings
+  # page says so next to the proxy before it is saved.
+  def turn_calling_off_through_proxy
+    config = provider_config.to_h
+    return unless config['proxy_url'].present? && config['calling_enabled'].present?
+
+    self.provider_config = config.merge('calling_enabled' => false)
   end
 
   def proxy_changed?

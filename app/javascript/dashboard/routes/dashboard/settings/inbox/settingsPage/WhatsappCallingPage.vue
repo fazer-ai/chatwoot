@@ -47,6 +47,26 @@ export default {
     isCloudCalling() {
       return !isSessionProvider(this.inbox.provider);
     },
+    // The connector carries no call on a session that leaves through a proxy, so the
+    // switch is not offered there and the page says what to change instead.
+    isBlockedByProxy() {
+      return (
+        !this.isCloudCalling &&
+        !this.callingEnabled &&
+        Boolean(this.inbox.provider_config?.proxy_url)
+      );
+    },
+    callingDescription() {
+      if (this.isCloudCalling) {
+        return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.DESCRIPTION');
+      }
+      if (this.isBlockedByProxy) {
+        return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PROXY_BLOCKED', {
+          tab: this.$t('INBOX_MGMT.TABS.CONFIGURATION'),
+        });
+      }
+      return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PAIRED_DESCRIPTION');
+    },
   },
   watch: {
     'inbox.provider_config.calling_enabled'(val) {
@@ -89,12 +109,13 @@ export default {
         }
         await this.$store.dispatch('inboxes/get', this.inbox.id);
         useAlert(this.$t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
-      } catch (_) {
+      } catch (error) {
         this.callingEnabled = previousValue;
         const fallbackKey = newValue
           ? 'INBOX_MGMT.WHATSAPP_CALLING.ENABLE_FAILED'
           : 'INBOX_MGMT.EDIT.API.ERROR_MESSAGE';
-        useAlert(this.$t(fallbackKey));
+        // The server says why it refused (a proxy, a plan without calls), translated.
+        useAlert(error?.response?.data?.error || this.$t(fallbackKey));
       } finally {
         this.isTogglingCalling = false;
       }
@@ -136,16 +157,18 @@ export default {
       <SettingsToggleSection
         :model-value="callingEnabled"
         :header="$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.LABEL')"
-        :description="
-          isCloudCalling
-            ? $t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.DESCRIPTION')
-            : $t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PAIRED_DESCRIPTION')
-        "
-        :hide-toggle="isTogglingCalling"
+        :description="callingDescription"
+        :hide-toggle="isTogglingCalling || isBlockedByProxy"
         @update:model-value="handleCallingToggle"
       >
         <template v-if="isTogglingCalling" #hiddenToggle>
           <Spinner class="size-4 text-n-slate-11" />
+        </template>
+        <template v-else-if="isBlockedByProxy" #hiddenToggle>
+          <span
+            class="i-lucide-lock size-4 text-n-slate-10"
+            data-test-id="calling-blocked-by-proxy"
+          />
         </template>
       </SettingsToggleSection>
     </div>

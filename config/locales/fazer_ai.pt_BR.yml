@@ -43,6 +43,9 @@ pt_BR:
     whatsapp:
       calls:
         group_not_supported: Não é possível ligar para um grupo
+        proxy_unsupported: As ligações do WhatsApp não passam por proxy. Remova o proxy desta caixa de entrada para ligar as chamadas.
+        provider_unsupported: Este provedor de WhatsApp não faz ligações.
+        channel_voice_required: As ligações não estão disponíveis no plano desta conta.
       group_announcement_only: Somente administradores podem enviar mensagens neste grupo
       group_description_cannot_be_removed: O WhatsApp não permite remover a descrição de um grupo depois que ela existe. Substitua o texto em vez de apagá-lo.
     inboxes:

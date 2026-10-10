@@ -59,13 +59,31 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
   end
 
   it 'does not turn calling on for an inbox that leaves through a proxy, and still turns it off' do
-    channel.enable_voice_calling!
     channel.update!(provider_config: channel.provider_config.merge('proxy_url' => 'http://proxy.example:3128'))
 
-    expect { channel.reload.enable_voice_calling! }.to raise_error(RuntimeError, /proxy/)
+    expect { channel.reload.enable_voice_calling! }
+      .to raise_error(RuntimeError, I18n.t('errors.whatsapp.calls.proxy_unsupported'))
     channel.disable_voice_calling!
     expect(channel.reload.provider_config['calling_enabled']).to be(false)
-    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /proxy/)
+  end
+
+  # Left on, the inbox would read as calling while the connector refuses every call on it.
+  it 'turns calling off when a proxy is saved on an inbox that calls, and tells the connector' do
+    channel.enable_voice_calling!
+    channel.update!(provider_connection: { 'connection' => 'open' })
+
+    expect { channel.reload.update!(provider_config: channel.provider_config.merge('proxy_url' => 'http://proxy.example:3128')) }
+      .to have_enqueued_job(Whatsapp::Session::ApplyProxyJob).with(channel.id)
+    expect(channel.reload.provider_config).to include('calling_enabled' => false, 'proxy_url' => 'http://proxy.example:3128')
+    expect(channel.voice_enabled?).to be(false)
+  end
+
+  it 'leaves calling alone when the proxy is taken off' do
+    channel.update!(provider_config: channel.provider_config.merge('proxy_url' => 'http://proxy.example:3128'))
+    channel.reload.update!(provider_config: channel.provider_config.merge('proxy_url' => ''))
+    channel.reload.enable_voice_calling!
+
+    expect(channel.reload.provider_config['calling_enabled']).to be(true)
   end
 
   it 'leaves calling on a Cloud inbox to the Calling API' do
@@ -79,14 +97,14 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     allow(channel).to receive(:session_capabilities).and_return(%w[calls])
 
     expect(channel.voice_calling_supported?).to be(false)
-    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /not supported/)
+    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, I18n.t('errors.whatsapp.calls.provider_unsupported'))
     expect(channel.reload.provider_config['calling_enabled']).to be_nil
   end
 
   it 'refuses calling on an account without voice' do
     account.disable_features!('channel_voice')
 
-    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, /channel_voice/)
+    expect { channel.enable_voice_calling! }.to raise_error(RuntimeError, I18n.t('errors.whatsapp.calls.channel_voice_required'))
   end
 
   # The call policy rides on the connect and the connector keeps the last one it was given,
