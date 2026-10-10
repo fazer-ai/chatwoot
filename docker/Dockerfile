@@ -2,7 +2,7 @@
 FROM node:24-alpine as node
 # The WhatsApp connector Sidekiq runs unless WHATSAPP_CONNECTOR_ENABLED=false (see
 # docker/entrypoints/helpers/whatsapp_connector.rb). Pinned, and moved by Dependabot.
-FROM ghcr.io/fazer-ai/whatsapp-connector:0.8.0 AS whatsapp-connector
+FROM ghcr.io/fazer-ai/whatsapp-connector:0.8.1 AS whatsapp-connector
 FROM ruby:3.4.4-alpine3.21 AS pre-builder
 
 ARG NODE_VERSION="24.13.0"
