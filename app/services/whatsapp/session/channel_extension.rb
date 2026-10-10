@@ -63,9 +63,22 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     return super unless session_provider?
     raise I18n.t('errors.whatsapp.calls.provider_unsupported') unless voice_calling_supported?
     raise I18n.t('errors.whatsapp.calls.proxy_unsupported') if provider_config.to_h['proxy_url'].present?
+    raise I18n.t('errors.whatsapp.calls.connector_without_calls') unless voice_calls_carried?
     raise I18n.t('errors.whatsapp.calls.channel_voice_required') unless account.feature_enabled?('channel_voice')
 
     update_calling_flag(true)
+  end
+
+  # Whether the connector this inbox talks to carries the voice of calls, which takes a
+  # UDP port the deployment opens (WAC_CALLS_UDP_PORT). Asked of the registry the
+  # connector announces, so it follows a port opened or closed by a redeploy. Only the
+  # connector-backed providers answer it; the others are not asked.
+  def voice_calls_carried?
+    return false unless session_provider? && voice_calling_supported?
+
+    Whatsapp::Connector::Client.carries_calls?
+  rescue Whatsapp::Session::Errors::ProviderUnavailable
+    false
   end
 
   def disable_voice_calling!

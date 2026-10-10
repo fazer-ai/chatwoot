@@ -136,6 +136,15 @@ class Whatsapp::Connector::Client
     instances.any?
   end
 
+  # Whether the fleet carries the voice of calls: every live instance announced that it
+  # opened the UDP socket call media goes through. Every one and not any, because a
+  # session can move to any instance, and one landing where the socket is not open has no
+  # call voice. An instance from before the field announces nothing and counts as not.
+  def self.carries_calls?
+    live = new(nil).instances
+    live.any? && live.all? { |instance| instance['calls'] == 'true' }
+  end
+
   # Both sides serve a range of protocol majors; they can talk when the ranges overlap.
   def compatible?
     instances.any? { |instance| speaks_our_protocol?(instance) }

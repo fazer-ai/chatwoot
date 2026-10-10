@@ -8,7 +8,12 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false)
   end
 
-  before { account.enable_features!('channel_voice') }
+  let(:carries_calls) { true }
+
+  before do
+    account.enable_features!('channel_voice')
+    allow(Whatsapp::Connector::Client).to receive(:carries_calls?) { carries_calls }
+  end
 
   it 'supports calling on the native provider and turns it on and off without reaching Meta' do
     expect(channel.voice_calling_supported?).to be(true)
@@ -84,6 +89,20 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     channel.reload.enable_voice_calling!
 
     expect(channel.reload.provider_config['calling_enabled']).to be(true)
+  end
+
+  context 'when the connector does not carry call voice' do
+    let(:carries_calls) { false }
+
+    it 'does not turn calling on, says why, and still turns it off' do
+      expect { channel.enable_voice_calling! }
+        .to raise_error(RuntimeError, I18n.t('errors.whatsapp.calls.connector_without_calls'))
+      expect(channel.reload.provider_config['calling_enabled']).to be_nil
+      expect(channel.voice_calls_carried?).to be(false)
+
+      channel.disable_voice_calling!
+      expect(channel.reload.provider_config['calling_enabled']).to be(false)
+    end
   end
 
   it 'leaves calling on a Cloud inbox to the Calling API' do

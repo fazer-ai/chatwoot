@@ -39,9 +39,9 @@ const ToggleSection = defineComponent({
   },
 });
 
-const mountPage = provider_config =>
+const mountPage = (provider_config, extra = {}) =>
   mount(WhatsappCallingPage, {
-    props: { inbox: { id: 7, provider: 'native', provider_config } },
+    props: { inbox: { id: 7, provider: 'native', provider_config, ...extra } },
     global: {
       mocks: {
         $t: (key, params) =>
@@ -69,9 +69,9 @@ describe('WhatsappCallingPage on a paired phone', () => {
     const wrapper = mountPage({ proxy_url: 'socks5://proxy.example:1080' });
 
     expect(wrapper.find('.switch').exists()).toBe(false);
-    expect(
-      wrapper.find('[data-test-id="calling-blocked-by-proxy"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test-id="calling-blocked"]').exists()).toBe(
+      true
+    );
     expect(wrapper.find('.description').text()).toContain(
       'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PROXY_BLOCKED'
     );
@@ -86,6 +86,29 @@ describe('WhatsappCallingPage on a paired phone', () => {
     expect(wrapper.find('.switch').exists()).toBe(true);
     expect(wrapper.find('.description').text()).toBe(
       'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PAIRED_DESCRIPTION'
+    );
+  });
+
+  // Without the UDP port the connector carries no call voice, and enabling would offer
+  // agents calls that all fail.
+  it('offers no switch when the connector does not carry calls, and says what is missing', () => {
+    const wrapper = mountPage({}, { voice_calls_carried: false });
+
+    expect(wrapper.find('.switch').exists()).toBe(false);
+    expect(wrapper.find('.description').text()).toBe(
+      'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.CONNECTOR_WITHOUT_CALLS'
+    );
+  });
+
+  it('keeps the switch to turn calls off when they were on and the connector stopped carrying them', () => {
+    const wrapper = mountPage(
+      { calling_enabled: true },
+      { voice_calls_carried: false }
+    );
+
+    expect(wrapper.find('.switch').exists()).toBe(true);
+    expect(wrapper.find('.description').text()).toBe(
+      'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.CONNECTOR_WITHOUT_CALLS'
     );
   });
 

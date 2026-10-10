@@ -56,6 +56,18 @@ export default {
         Boolean(this.inbox.provider_config?.proxy_url)
       );
     },
+    // The connector announces whether it opened the UDP port call voice needs; without
+    // it no call can be placed or answered, so the switch is not offered to turn on, and
+    // a page where calls were already on says why they fail.
+    isConnectorWithoutCalls() {
+      return !this.isCloudCalling && this.inbox.voice_calls_carried === false;
+    },
+    isBlocked() {
+      return (
+        this.isBlockedByProxy ||
+        (this.isConnectorWithoutCalls && !this.callingEnabled)
+      );
+    },
     callingDescription() {
       if (this.isCloudCalling) {
         return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.DESCRIPTION');
@@ -64,6 +76,11 @@ export default {
         return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PROXY_BLOCKED', {
           tab: this.$t('INBOX_MGMT.TABS.CONFIGURATION'),
         });
+      }
+      if (this.isConnectorWithoutCalls) {
+        return this.$t(
+          'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.CONNECTOR_WITHOUT_CALLS'
+        );
       }
       return this.$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.PAIRED_DESCRIPTION');
     },
@@ -158,16 +175,16 @@ export default {
         :model-value="callingEnabled"
         :header="$t('INBOX_MGMT.WHATSAPP_CALLING.ENABLE.LABEL')"
         :description="callingDescription"
-        :hide-toggle="isTogglingCalling || isBlockedByProxy"
+        :hide-toggle="isTogglingCalling || isBlocked"
         @update:model-value="handleCallingToggle"
       >
         <template v-if="isTogglingCalling" #hiddenToggle>
           <Spinner class="size-4 text-n-slate-11" />
         </template>
-        <template v-else-if="isBlockedByProxy" #hiddenToggle>
+        <template v-else-if="isBlocked" #hiddenToggle>
           <span
             class="i-lucide-lock size-4 text-n-slate-10"
-            data-test-id="calling-blocked-by-proxy"
+            data-test-id="calling-blocked"
           />
         </template>
       </SettingsToggleSection>

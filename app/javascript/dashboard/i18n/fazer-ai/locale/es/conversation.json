@@ -106,7 +106,8 @@
       }
     },
     "HEADER": {
-      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "No se puede llamar a un grupo por WhatsApp"
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "No se puede llamar a un grupo por WhatsApp",
+      "WHATSAPP_CALL_CONNECTOR_WITHOUT_CALLS": "El conector de esta instalación no lleva la voz de las llamadas. Pide a un administrador que abra el puerto de llamadas."
     }
   },
   "CONVERSATION_SIDEBAR": {

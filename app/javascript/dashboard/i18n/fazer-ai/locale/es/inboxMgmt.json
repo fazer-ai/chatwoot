@@ -243,7 +243,8 @@
     "WHATSAPP_CALLING": {
       "ENABLE": {
         "PAIRED_DESCRIPTION": "Permite que los agentes reciban y hagan llamadas de WhatsApp en esta bandeja, a través del teléfono vinculado a ella. Los clientes pueden llamar a este número directamente desde WhatsApp.",
-        "PROXY_BLOCKED": "Esta bandeja sale por un proxy, y las llamadas de WhatsApp no pasan por un proxy: la voz va directo del servidor a WhatsApp. Para activar las llamadas, quita el proxy en la pestaña {tab}."
+        "PROXY_BLOCKED": "Esta bandeja sale por un proxy, y las llamadas de WhatsApp no pasan por un proxy: la voz va directo del servidor a WhatsApp. Para activar las llamadas, quita el proxy en la pestaña {tab}.",
+        "CONNECTOR_WITHOUT_CALLS": "El conector de WhatsApp de esta instalación no lleva la voz de las llamadas. Para activar las llamadas, define WAC_CALLS_UDP_PORT (por ejemplo 40000) y publica ese puerto en UDP en el contenedor donde corre el conector (el worker de Sidekiq, en modo embebido). Detrás de NAT, define también WAC_CALLS_PUBLIC_IP con la IP pública del servidor."
       }
     }
   }

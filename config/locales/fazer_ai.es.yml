@@ -43,9 +43,10 @@ es:
     whatsapp:
       calls:
         group_not_supported: No se puede llamar a un grupo
-        proxy_unsupported: Las llamadas de WhatsApp no pasan por un proxy. Quita el proxy de esta bandeja para activar las llamadas.
-        provider_unsupported: Este proveedor de WhatsApp no hace llamadas.
-        channel_voice_required: Las llamadas no están disponibles en el plan de esta cuenta.
+        proxy_unsupported: 'Las llamadas de WhatsApp no pasan por un proxy. Quita el proxy de esta bandeja para activar las llamadas.'
+        connector_without_calls: 'El conector de WhatsApp de esta instalación no lleva la voz de las llamadas: necesita WAC_CALLS_UDP_PORT definido y ese puerto publicado en UDP.'
+        provider_unsupported: 'Este proveedor de WhatsApp no hace llamadas.'
+        channel_voice_required: 'Las llamadas no están disponibles en el plan de esta cuenta.'
       group_announcement_only: Solo los administradores pueden enviar mensajes en este grupo
       group_description_cannot_be_removed: WhatsApp no permite eliminar la descripción de un grupo una vez definida. Reemplace el texto en lugar de borrarlo.
     inboxes:
