@@ -21,6 +21,7 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
     channel.update!(provider_config: channel.provider_config.merge('calling_enabled' => true))
     create(:inbox_member, user: agent, inbox: inbox)
     allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+    allow(Whatsapp::Connector::Client).to receive(:carries_calls?).and_return(true)
   end
 
   def incoming_call(id, status: 'ringing')

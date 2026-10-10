@@ -34,6 +34,8 @@ export default {
       isUpdating: false,
       isTogglingCalling: false,
       isTogglingInbound: false,
+      // null until the connector answers: nothing is blocked on a guess.
+      voiceCallsCarried: null,
     };
   },
   computed: {
@@ -60,7 +62,7 @@ export default {
     // it no call can be placed or answered, so the switch is not offered to turn on, and
     // a page where calls were already on says why they fail.
     isConnectorWithoutCalls() {
-      return !this.isCloudCalling && this.inbox.voice_calls_carried === false;
+      return !this.isCloudCalling && this.voiceCallsCarried === false;
     },
     isBlocked() {
       return (
@@ -96,7 +98,23 @@ export default {
       this.inboundCallsEnabled = val !== false;
     },
   },
+  mounted() {
+    this.fetchCallingStatus();
+  },
   methods: {
+    async fetchCallingStatus() {
+      if (this.isCloudCalling) return;
+      try {
+        const { data } = await InboxesAPI.getWhatsappCallingStatus(
+          this.inbox.id
+        );
+        this.voiceCallsCarried = data.voice_calls_carried;
+      } catch (_) {
+        // Unknown is not "missing": the switch stays, and the server refuses with the
+        // reason if the connector really carries no calls.
+        this.voiceCallsCarried = null;
+      }
+    },
     async handleInboundToggle(newValue) {
       if (this.isTogglingInbound) return;
       const previousValue = this.inboundCallsEnabled;

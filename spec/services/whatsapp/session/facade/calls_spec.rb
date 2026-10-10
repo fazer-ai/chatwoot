@@ -11,6 +11,7 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
 
   before do
     allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+    allow(Whatsapp::Connector::Client).to receive(:carries_calls?).and_return(true)
     channel.account.enable_features!('channel_voice')
   end
 
@@ -90,6 +91,16 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect { facade.initiate_call('5541999990000', 'x') }.to raise_error(Whatsapp::Session::Errors::NotSupported)
       expect(backend.commands).to be_empty
     end
+  end
+
+  # Without the connector's call port the call.start would only come back unsupported;
+  # refused here, the agent reads why instead of a generic failure.
+  it 'refuses a call with the reason when the connector carries no call voice' do
+    allow(Whatsapp::Connector::Client).to receive(:carries_calls?).and_return(false)
+
+    expect { facade.initiate_call('5541999990000', 'SDP-OFFER') }
+      .to raise_error(Whatsapp::Session::Errors::NotSupported, I18n.t('errors.whatsapp.calls.connector_without_calls'))
+    expect(backend.commands).to be_empty
   end
 
   describe 'placing a call' do

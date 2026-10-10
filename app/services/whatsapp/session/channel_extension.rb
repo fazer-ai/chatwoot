@@ -71,10 +71,11 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
 
   # Whether the connector this inbox talks to carries the voice of calls, which takes a
   # UDP port the deployment opens (WAC_CALLS_UDP_PORT). Asked of the registry the
-  # connector announces, so it follows a port opened or closed by a redeploy. Only the
-  # connector-backed providers answer it; the others are not asked.
+  # connector announces, so it follows a port opened or closed by a redeploy. A Cloud
+  # inbox calls through Meta and has no port to miss, so it is never asked.
   def voice_calls_carried?
-    return false unless session_provider? && voice_calling_supported?
+    return true unless session_provider?
+    return false unless voice_calling_supported?
 
     Whatsapp::Connector::Client.carries_calls?
   rescue Whatsapp::Session::Errors::ProviderUnavailable

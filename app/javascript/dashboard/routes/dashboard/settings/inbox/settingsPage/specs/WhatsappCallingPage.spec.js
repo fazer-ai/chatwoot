@@ -6,6 +6,7 @@ import InboxesAPI from 'dashboard/api/inboxes';
 
 vi.mock('dashboard/api/inboxes', () => ({
   default: {
+    getWhatsappCallingStatus: vi.fn(),
     enableWhatsappCalling: vi.fn(),
     disableWhatsappCalling: vi.fn(),
     setInboundCalls: vi.fn(),
@@ -39,9 +40,9 @@ const ToggleSection = defineComponent({
   },
 });
 
-const mountPage = (provider_config, extra = {}) =>
+const mountPage = provider_config =>
   mount(WhatsappCallingPage, {
-    props: { inbox: { id: 7, provider: 'native', provider_config, ...extra } },
+    props: { inbox: { id: 7, provider: 'native', provider_config } },
     global: {
       mocks: {
         $t: (key, params) =>
@@ -61,7 +62,17 @@ const mountPage = (provider_config, extra = {}) =>
   });
 
 describe('WhatsappCallingPage on a paired phone', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    InboxesAPI.getWhatsappCallingStatus.mockResolvedValue({
+      data: { voice_calls_carried: true },
+    });
+  });
+
+  const carried = value =>
+    InboxesAPI.getWhatsappCallingStatus.mockResolvedValue({
+      data: { voice_calls_carried: value },
+    });
 
   // The connector carries no call through a proxy: the page says so instead of a switch
   // that only fails when pressed.
@@ -80,8 +91,9 @@ describe('WhatsappCallingPage on a paired phone', () => {
     );
   });
 
-  it('offers the switch on an inbox without a proxy', () => {
+  it('offers the switch on an inbox without a proxy', async () => {
     const wrapper = mountPage({});
+    await flushPromises();
 
     expect(wrapper.find('.switch').exists()).toBe(true);
     expect(wrapper.find('.description').text()).toBe(
@@ -91,8 +103,10 @@ describe('WhatsappCallingPage on a paired phone', () => {
 
   // Without the UDP port the connector carries no call voice, and enabling would offer
   // agents calls that all fail.
-  it('offers no switch when the connector does not carry calls, and says what is missing', () => {
-    const wrapper = mountPage({}, { voice_calls_carried: false });
+  it('offers no switch when the connector does not carry calls, and says what is missing', async () => {
+    carried(false);
+    const wrapper = mountPage({});
+    await flushPromises();
 
     expect(wrapper.find('.switch').exists()).toBe(false);
     expect(wrapper.find('.description').text()).toBe(
@@ -100,16 +114,24 @@ describe('WhatsappCallingPage on a paired phone', () => {
     );
   });
 
-  it('keeps the switch to turn calls off when they were on and the connector stopped carrying them', () => {
-    const wrapper = mountPage(
-      { calling_enabled: true },
-      { voice_calls_carried: false }
-    );
+  it('keeps the switch to turn calls off when they were on and the connector stopped carrying them', async () => {
+    carried(false);
+    const wrapper = mountPage({ calling_enabled: true });
+    await flushPromises();
 
     expect(wrapper.find('.switch').exists()).toBe(true);
     expect(wrapper.find('.description').text()).toBe(
       'INBOX_MGMT.WHATSAPP_CALLING.ENABLE.CONNECTOR_WITHOUT_CALLS'
     );
+  });
+
+  // Asked when the page opens, so a deployment fixed after the inbox list was cached
+  // offers the switch again.
+  it('asks the connector when the page opens', async () => {
+    mountPage({});
+    await flushPromises();
+
+    expect(InboxesAPI.getWhatsappCallingStatus).toHaveBeenCalledWith(7);
   });
 
   it('shows the reason the server gives for refusing to turn calls on', async () => {

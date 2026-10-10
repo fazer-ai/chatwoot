@@ -164,9 +164,6 @@ if resource.whatsapp?
   # What this provider can do, so the dashboard gates features by capability instead of
   # by provider name. See Whatsapp::Session::Capabilities.
   json.capabilities resource.channel.try(:session_capabilities)
-  # Whether the connector carries call voice (a UDP port the deployment opened), so the
-  # dashboard can say why calls are unavailable instead of offering ones that fail.
-  json.voice_calls_carried resource.channel.voice_calls_carried? if resource.channel.try(:session_provider?)
 end
 
 ## Voice attributes for TwilioSms

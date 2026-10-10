@@ -106,8 +106,7 @@
       }
     },
     "HEADER": {
-      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "Não é possível ligar para um grupo pelo WhatsApp",
-      "WHATSAPP_CALL_CONNECTOR_WITHOUT_CALLS": "O conector desta instalação não está levando a voz das ligações. Peça ao administrador para abrir a porta de chamadas."
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "Não é possível ligar para um grupo pelo WhatsApp"
     }
   },
   "CONVERSATION_SIDEBAR": {

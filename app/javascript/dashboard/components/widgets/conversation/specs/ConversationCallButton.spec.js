@@ -27,10 +27,10 @@ vi.mock('vue-i18n', async () => {
 
 const INBOX = { id: 3, channel_type: 'Channel::Whatsapp', voice_enabled: true };
 
-const mountButton = (chat, inbox = INBOX) => {
+const mountButton = chat => {
   const tooltips = [];
   const wrapper = mount(ConversationCallButton, {
-    props: { inbox, chat },
+    props: { inbox: INBOX, chat },
     global: {
       directives: {
         tooltip: { mounted: (el, binding) => tooltips.push(binding.value) },
@@ -54,18 +54,6 @@ describe('ConversationCallButton', () => {
     expect(wrapper.find('button.call').attributes('disabled')).toBeDefined();
     expect(tooltips).toEqual([
       'CONVERSATION.HEADER.WHATSAPP_CALL_GROUP_UNSUPPORTED',
-    ]);
-  });
-
-  it('shows a disabled button that says why when the connector carries no call voice', () => {
-    const { wrapper, tooltips } = mountButton(
-      { id: 1 },
-      { ...INBOX, voice_calls_carried: false }
-    );
-
-    expect(wrapper.find('button.call').attributes('disabled')).toBeDefined();
-    expect(tooltips).toEqual([
-      'CONVERSATION.HEADER.WHATSAPP_CALL_CONNECTOR_WITHOUT_CALLS',
     ]);
   });
 

@@ -45,17 +45,12 @@ const isVoiceCallInbox = computed(
 // A call is placed to a person: WhatsApp has no call a group can be dialled into. The
 // button stays, disabled, so the agent reads why there is no call here.
 const isGroupChat = computed(() => props.chat?.group_type === 'group');
-// The connector announced it has no UDP port for call voice: every call would fail, so
-// the button says so instead (see the inbox's calling settings).
-const isConnectorWithoutCalls = computed(
-  () => props.inbox?.voice_calls_carried === false
-);
 const isWhatsappVoiceInbox = computed(
   () => voiceCallProvider.value === VOICE_CALL_PROVIDERS.WHATSAPP
 );
 
 const isCallButtonDisabled = computed(() => {
-  if (isGroupChat.value || isConnectorWithoutCalls.value) return true;
+  if (isGroupChat.value) return true;
   if (callsStore.hasActiveCall || callsStore.hasIncomingCall) return true;
   if (isWhatsappVoiceInbox.value) {
     return whatsappCallSession.isInitiating.value;
@@ -72,9 +67,6 @@ const isCallButtonLoading = computed(() =>
 const callButtonTooltip = computed(() => {
   if (isGroupChat.value) {
     return t('CONVERSATION.HEADER.WHATSAPP_CALL_GROUP_UNSUPPORTED');
-  }
-  if (isConnectorWithoutCalls.value) {
-    return t('CONVERSATION.HEADER.WHATSAPP_CALL_CONNECTOR_WITHOUT_CALLS');
   }
   return isWhatsappVoiceInbox.value
     ? t('CONVERSATION.HEADER.WHATSAPP_CALL')

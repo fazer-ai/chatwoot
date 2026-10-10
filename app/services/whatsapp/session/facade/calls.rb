@@ -45,6 +45,7 @@ module Whatsapp::Session::Facade::Calls
   # says the recipient is that contact's number, picked as one: the contact panel's call.
   def initiate_call(recipient, sdp_offer, contact: nil, number: false)
     calls_supported!
+    voice_carried!
     to = number ? model::Address.phone(recipient.to_s.delete('+')) : callee_address(recipient, contact)
     command = model::Commands::CallStart.new(to: to, sdp: sdp_offer)
     { 'call_id' => backend.start_call(command, idempotency_key: "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}") }
@@ -56,6 +57,14 @@ module Whatsapp::Session::Facade::Calls
     return if capability?('voice_calls')
 
     raise Whatsapp::Session::Errors::NotSupported, "#{provider} does not carry calls"
+  end
+
+  # Placing a call needs the connector's call port too, or the call.start only comes back
+  # unsupported; refused here, the agent reads why. A refusal or a hang-up needs no port.
+  def voice_carried!
+    return if channel.voice_calls_carried?
+
+    raise Whatsapp::Session::Errors::NotSupported, I18n.t('errors.whatsapp.calls.connector_without_calls')
   end
 
   # The connector dials a phone number and nothing else. A conversation hands over the

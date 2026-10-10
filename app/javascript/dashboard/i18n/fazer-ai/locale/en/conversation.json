@@ -106,8 +106,7 @@
       }
     },
     "HEADER": {
-      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "WhatsApp calls cannot be placed to a group",
-      "WHATSAPP_CALL_CONNECTOR_WITHOUT_CALLS": "This installation's connector does not carry call voice. Ask an administrator to open the call port."
+      "WHATSAPP_CALL_GROUP_UNSUPPORTED": "WhatsApp calls cannot be placed to a group"
     }
   },
   "CONVERSATION_SIDEBAR": {
