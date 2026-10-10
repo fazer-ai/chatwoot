@@ -128,6 +128,19 @@ RSpec.describe 'WhatsApp Calls API on a native inbox', type: :request do
       expect(backend.commands_of('call.start').sole.to.id).to eq('5511977776666')
     end
 
+    # The person's thread is keyed by LID; the contact panel dials the number and must land there.
+    it 'files a call from the contact panel in the contact\'s LID thread' do
+      conversation
+      inbox.update!(lock_to_single_conversation: true)
+      post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
+           params: { inbox_id: inbox.id, contact_id: contact.id, sdp_offer: 'SDP-OFFER' }, headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:ok)
+      expect(backend.commands_of('call.start').sole.to.id).to eq('5511988887777')
+      expect(Call.last.conversation).to eq(conversation)
+      expect(inbox.conversations.count).to eq(1)
+    end
+
     # The fake connector pairs these digits, as a LID, with another phone.
     it 'rings the contact\'s number even when its digits are a LID the connector knows' do
       collision = create(:contact, account: account, phone_number: '+182736451928374')

@@ -66,11 +66,33 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
 
       expect(facade.accept_call('CALLX3', 'SDP')).to be(true)
 
-      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to eq('CALLX3')
+      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}").call_id).to eq('CALLX3')
       # Delivered again before it was applied, it is the same failure of the same call.
-      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to eq('CALLX3')
+      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}").call_id).to eq('CALLX3')
       Whatsapp::Session::CallCommands.settled("cmd-accept-1-#{command_suffix}")
       expect(Whatsapp::Session::CallCommands.failed("cmd-accept-1-#{command_suffix}")).to be_nil
+    end
+
+    # A refusal or a hang-up the connector could not carry out is sent again, and for that
+    # the refusal's caller and the attempt travel with the command.
+    it 'remembers what a refusal and a hang-up need to be sent again' do
+      allow(backend).to receive(:reject_call).and_return("cmd-reject-1-#{command_suffix}")
+      allow(backend).to receive(:terminate_call).and_return("cmd-terminate-1-#{command_suffix}")
+
+      expect(facade.reject_call('CALLX4', from: model::Address.lid('182736451928374'), attempt: 2)).to be(true)
+      expect(facade.terminate_call('CALLX6')).to be(true)
+
+      expect(Whatsapp::Session::CallCommands.failed("cmd-reject-1-#{command_suffix}").to_h).to eq(
+        call_id: 'CALLX4', from: { 'kind' => 'lid', 'id' => '182736451928374' }, attempt: 2
+      )
+      expect(Whatsapp::Session::CallCommands.failed("cmd-terminate-1-#{command_suffix}").to_h).to eq(call_id: 'CALLX6', from: nil, attempt: 0)
+    end
+
+    it 'answers that a hang-up failed when its failure was read first' do
+      allow(backend).to receive(:terminate_call).and_return("cmd-terminate-2-#{command_suffix}")
+      expect(Whatsapp::Session::CallCommands.failed("cmd-terminate-2-#{command_suffix}")).to be_nil
+
+      expect(facade.terminate_call('CALLX6')).to be(false)
     end
 
     # The connector refuses some answers at once, and its failure can be read before the

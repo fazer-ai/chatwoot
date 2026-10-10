@@ -1,5 +1,7 @@
 # Which call a fire-and-forget call command was about. `command.failed` names the command
-# and not the call, so a failed answer can only be put back on its call through this.
+# and not the call, so a failed answer can only be put back on its call through this, and a
+# failed refusal or hang-up can only be sent again through it: what a refusal names as the
+# caller and how many times it was already sent travel with it.
 #
 # The failure can be read before the request that published the command gets to write
 # down which call it was for: the connector refuses some commands at once. So both sides
@@ -12,22 +14,29 @@ module Whatsapp::Session::CallCommands
   TTL = 1.day.to_i
   FAILED = 'failed'.freeze
 
+  # What was written down about one command: `from` only for a refusal, `attempt` counting
+  # from 0 for the first time it went out.
+  Remembered = Data.define(:call_id, :from, :attempt)
+
   # The publishing side. Answers false when the failure was read first: the command did
   # not go through, and the caller says so instead of reporting it carried out.
-  def self.remember(command_id, call_id)
-    return true if claim(command_id, call_id)
+  def self.remember(command_id, call_id, from: nil, attempt: 0)
+    return true if claim(command_id, { call_id: call_id, from: from&.to_h, attempt: attempt }.compact.to_json)
 
     Redis::Alfred.get(key(command_id)) != FAILED
   end
 
-  # The failure side. Answers the call the command was about when that was written down
-  # first; nil when the failure is the first word of this command. Answered again for the
-  # same failure delivered again, until `settled` says it was carried out.
+  # The failure side. Answers what the command was about when that was written down first;
+  # nil when the failure is the first word of this command. Answered again for the same
+  # failure delivered again, until `settled` says it was carried out.
   def self.failed(command_id)
     return if command_id.blank? || claim(command_id, FAILED)
 
-    call_id = Redis::Alfred.get(key(command_id))
-    call_id unless call_id.nil? || call_id == FAILED
+    value = Redis::Alfred.get(key(command_id))
+    return if value.nil? || value == FAILED
+
+    fields = JSON.parse(value)
+    Remembered.new(call_id: fields['call_id'], from: fields['from'], attempt: fields['attempt'].to_i)
   end
 
   # The failure was applied to its call, so a redelivery of it has nothing left to do.

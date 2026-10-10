@@ -26,16 +26,19 @@ module Whatsapp::Session::Facade::Calls
   # The connector refuses a call by naming who placed it. A call refused as it arrives is
   # refused with the caller the offer named; one refused from the ringing widget is read
   # off the call this inbox recorded.
-  def reject_call(call_id, from: nil)
+  # Both remembered like the answer, so that one the connector could not carry out is sent
+  # again (Whatsapp::CallCommandRetryJob); `attempt` is how many times it already went out.
+  def reject_call(call_id, from: nil, attempt: 0)
     calls_supported!
-    backend.reject_call(model::Commands::CallReject.new(call_id: call_id, from: from || caller_address(call_id)))
-    true
+    command = model::Commands::CallReject.new(call_id: call_id, from: from || caller_address(call_id))
+    command_id = backend.reject_call(command)
+    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id, from: command.from, attempt: attempt)
   end
 
-  def terminate_call(call_id)
+  def terminate_call(call_id, attempt: 0)
     calls_supported!
-    backend.terminate_call(model::Commands::CallTerminate.new(call_id: call_id))
-    true
+    command_id = backend.terminate_call(model::Commands::CallTerminate.new(call_id: call_id))
+    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id, attempt: attempt)
   end
 
   # Answers in the Cloud service's shape, so the controller reads the call id the same way

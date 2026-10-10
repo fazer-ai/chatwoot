@@ -472,6 +472,65 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
+  # The call was closed here when the refusal or the hang-up went out, so nothing else sends
+  # one the connector could not carry out.
+  describe 'a refusal or a hang-up the connector could not carry out' do
+    let(:lid) { model::Address.lid('182736451928374') }
+
+    def failed(command_id, type, code)
+      dispatch(model::Events::CommandFailed.new(command_id: command_id, command_type: type, message_id: nil,
+                                                error: model::WireError.new(code: code, message: 'gave up')))
+    end
+
+    it 'sends again a hang-up that hit its runtime ceiling, counting the attempt' do
+      Whatsapp::Session::CallCommands.remember("cmd-terminate-1-#{command_suffix}", 'CALLX6')
+
+      expect { expect(failed("cmd-terminate-1-#{command_suffix}", 'call.terminate', 'expired')).to eq(:handled) }
+        .to have_enqueued_job(Whatsapp::CallCommandRetryJob).with(inbox.id, 'call.terminate', 'CALLX6', nil, 1)
+      perform_enqueued_jobs
+
+      expect(backend.commands_of('call.terminate').map(&:call_id)).to eq(['CALLX6'])
+    end
+
+    it 'sends again a refusal that expired, to the caller it named' do
+      Whatsapp::Session::CallCommands.remember("cmd-reject-1-#{command_suffix}", 'CALLX4', from: lid)
+
+      failed("cmd-reject-1-#{command_suffix}", 'call.reject', 'expired')
+      perform_enqueued_jobs
+
+      expect(backend.commands_of('call.reject').map(&:to_h)).to eq([{ 'call_id' => 'CALLX4', 'from' => lid.to_h }])
+    end
+
+    it 'does not send again what a retry would not change' do
+      Whatsapp::Session::CallCommands.remember("cmd-terminate-2-#{command_suffix}", 'CALLX6')
+
+      expect { expect(failed("cmd-terminate-2-#{command_suffix}", 'call.terminate', 'invalid_payload')).to eq(:handled) }
+        .not_to have_enqueued_job(Whatsapp::CallCommandRetryJob)
+    end
+
+    it 'gives up once the attempts are spent' do
+      spent = Whatsapp::CallCommandRetryJob::WAITS.size
+      Whatsapp::Session::CallCommands.remember("cmd-terminate-3-#{command_suffix}", 'CALLX6', attempt: spent)
+
+      expect { failed("cmd-terminate-3-#{command_suffix}", 'call.terminate', 'expired') }.not_to have_enqueued_job(Whatsapp::CallCommandRetryJob)
+    end
+
+    # A failure read before the request wrote down its call is dropped unread, so the retry
+    # that published the command is the only one that knows it did not go through.
+    it 'schedules the next attempt itself when the failure of its own came first' do
+      allow(backend).to receive(:terminate_call).and_return("cmd-terminate-4-#{command_suffix}")
+      Whatsapp::Session::CallCommands.failed("cmd-terminate-4-#{command_suffix}")
+
+      expect { Whatsapp::CallCommandRetryJob.perform_now(inbox.id, 'call.terminate', 'CALLX6', nil, 1) }
+        .to have_enqueued_job(Whatsapp::CallCommandRetryJob).with(inbox.id, 'call.terminate', 'CALLX6', nil, 2)
+    end
+
+    it 'leaves alone a failure it cannot place' do
+      expect { expect(failed("cmd-unknown-#{command_suffix}", 'call.terminate', 'expired')).to eq(:ignored) }
+        .not_to have_enqueued_job(Whatsapp::CallCommandRetryJob)
+    end
+  end
+
   describe 'the end of a call' do
     let(:conversation) { create(:conversation, inbox: inbox, account: account) }
 
