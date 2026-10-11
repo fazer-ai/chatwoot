@@ -25,16 +25,15 @@ module AssignmentHandler
     @reopen_assignee_check = { team: team, assignee_id: assignee_id }
   end
 
-  # Auto-assignment (both versions) draws only from the inbox's reopen team for a
-  # conversation whose owner this rule dropped. The marker is written in the dropping
-  # save, so the legacy assignment in that same save sees it and so does the v2 job
-  # that runs after it. Other conversations, new ones included, keep the usual pool.
-  # Returns nil when the pool is not restricted.
-  def reopen_assignee_team_member_ids
-    return if inbox.reopen_assignee_team_id.blank?
-    return unless additional_attributes&.dig(REOPEN_TEAM_RESTRICTED)
+  # The one eligibility gate every automatic pick goes through: legacy assignment, the
+  # v2 AssignmentService and the pick on a team change. While the conversation carries
+  # the mark this rule leaves when it drops an owner, only members of the inbox's
+  # reopen team can be picked; every other conversation keeps the pool it was given.
+  def reopen_eligible_agent_ids(agent_ids)
+    return agent_ids if inbox.reopen_assignee_team_id.blank?
+    return agent_ids unless additional_attributes&.dig(REOPEN_TEAM_RESTRICTED)
 
-    inbox.reopen_assignee_team.members.ids
+    agent_ids & inbox.reopen_assignee_team.members.ids
   end
 
   private
@@ -58,6 +57,17 @@ module AssignmentHandler
 
   def reopen_unassignment?
     @reopen_unassignment.present?
+  end
+
+  # The mark only governs the stretch between the drop and the next owner, however that
+  # owner arrives. Read under the row lock so the write keeps keys another writer added
+  # after this copy was loaded; a save that writes the column itself keeps its own value.
+  def end_reopen_team_restriction
+    stored_attributes = self.class.lock.where(id: id).pick(:additional_attributes) || {}
+    return unless stored_attributes.key?(REOPEN_TEAM_RESTRICTED) || additional_attributes&.key?(REOPEN_TEAM_RESTRICTED)
+
+    base = will_save_change_to_additional_attributes? ? additional_attributes : stored_attributes
+    self.additional_attributes = base.except(REOPEN_TEAM_RESTRICTED)
   end
 
   # The conversation belongs to whoever claimed it first. Only the current
@@ -123,7 +133,7 @@ module AssignmentHandler
   def find_assignee_from_team
     return if team&.allow_auto_assign.blank?
 
-    team_members_with_capacity = inbox.member_ids_with_assignment_capacity & team.members.ids
+    team_members_with_capacity = reopen_eligible_agent_ids(inbox.member_ids_with_assignment_capacity & team.members.ids)
     ::AutoAssignment::AgentAssignmentService.new(conversation: self, allowed_agent_ids: team_members_with_capacity).find_assignee
   end
 

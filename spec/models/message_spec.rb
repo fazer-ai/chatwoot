@@ -513,6 +513,28 @@ RSpec.describe Message do
         expect(conversation.reload.assignee).to eq(member)
       end
 
+      it 'stops restricting once the conversation has an owner again' do
+        conversation.resolved!
+        message.save!
+        conversation.reload.update!(assignee: member)
+        conversation.update!(assignee: nil)
+        AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
+
+        expect(conversation.reload.assignee).to eq(outsider)
+      end
+
+      it 'clears the mark without dropping keys another writer added' do
+        conversation.resolved!
+        message.save!
+        stale_copy = Conversation.find(conversation.id)
+        other_writer = Conversation.find(conversation.id)
+        other_writer.update!(additional_attributes: other_writer.additional_attributes.merge('mail_subject' => 'Ingresso'))
+
+        stale_copy.update!(assignee: member)
+
+        expect(conversation.reload.additional_attributes).to eq('mail_subject' => 'Ingresso')
+      end
+
       it 'leaves the pool of a new conversation alone' do
         new_conversation
         AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
@@ -537,13 +559,28 @@ RSpec.describe Message do
         expect(conversation.reload.assignee).to be_nil
       end
 
-      it 'hands it to an online member of the team' do
+      it 'hands it to an online member of the team, ending the restriction in the same save' do
         allow(OnlineStatusTracker).to receive(:get_available_users)
           .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
         conversation.resolved!
         message.save!
 
         expect(conversation.reload.assignee).to eq(member)
+        expect(conversation.additional_attributes).not_to have_key('reopen_team_restricted')
+      end
+
+      # An automation that routes the reopened conversation to a team picks from that team,
+      # and the reopen pool still applies to that pick.
+      it 'does not hand it back through a team change' do
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ outsider.id.to_s => 'online' })
+        routing_team = create(:team, account: account)
+        routing_team.add_members([outsider.id])
+        conversation.resolved!
+        message.save!
+
+        conversation.update!(team: routing_team)
+
+        expect(conversation.reload.assignee).to be_nil
       end
     end
 
