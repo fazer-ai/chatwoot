@@ -3,6 +3,8 @@ module AssignmentHandler
   include Events::Types
 
   included do
+    # First, so the owner it settles is what the team and takeover guards see.
+    before_save :apply_reopen_assignee_team, if: -> { @reopen_assignee_check }
     before_save :ensure_assignee_is_from_team
     # Declared after the team callback on purpose: that one can null the assignee
     # when the new team excludes them, and the guard has to see the final value.
@@ -12,17 +14,33 @@ module AssignmentHandler
 
   # Inbox setting: a customer message that reopens the conversation keeps the
   # assignee only while they are in the inbox's reopen team. Called before the
-  # status save so the unassignment rides on the same write.
-  def unassign_outside_reopen_team
+  # status save; the decision is taken inside that save, so the unassignment
+  # rides on the same write.
+  def drop_assignee_outside_reopen_team_on_save
     team = inbox.reopen_assignee_team
     return if team.blank? || assignee_id.blank?
-    return if team.team_members.exists?(user_id: assignee_id)
+
+    @reopen_assignee_check = { team: team, assignee_id: assignee_id }
+  end
+
+  private
+
+  # An agent can hand the conversation to someone else after the customer's message
+  # read it and before this save. Judging under the row lock leaves their choice alone:
+  # the owner is dropped only if the row still holds the one judged.
+  def apply_reopen_assignee_team
+    team, judged_id = @reopen_assignee_check.values_at(:team, :assignee_id)
+    @reopen_assignee_check = nil
+    return unless locked_assignee_id == judged_id
+    return if team.team_members.exists?(user_id: judged_id)
 
     @reopen_unassignment = { assignee_name: assignee.name, team_name: team.name }
     self.assignee = nil
   end
 
-  private
+  def reopen_unassignment?
+    @reopen_unassignment.present?
+  end
 
   # The conversation belongs to whoever claimed it first. Only the current
   # assignee and administrators get to change that; every other agent is turned
@@ -65,7 +83,7 @@ module AssignmentHandler
   def assignment_change_allowed?(current_assignee_id)
     # Dropping the owner on reopen hands the conversation to nobody, so it is not a takeover,
     # whoever happens to be in Current.user (an API inbox can take the customer's message from an agent token).
-    return true if @reopen_unassignment
+    return true if reopen_unassignment?
     return true unless Current.user.is_a?(User)
     return true if Current.user.id == current_assignee_id
 

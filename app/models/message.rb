@@ -567,7 +567,7 @@ class Message < ApplicationRecord
     return if reaction?
     return unless conversation.snoozed? || conversation.resolved?
 
-    conversation.unassign_outside_reopen_team
+    conversation.drop_assignee_outside_reopen_team_on_save
     conversation.snoozed? ? conversation.open! : reopen_resolved_conversation
   end
 

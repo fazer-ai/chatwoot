@@ -40,7 +40,10 @@ module AutoAssignmentHandler
 
   def legacy_allowed_agent_ids
     # If conversation has a team, only consider team members for assignment
-    team_id.present? ? team_member_ids_with_capacity : inbox.member_ids_with_assignment_capacity
+    agent_ids = team_id.present? ? team_member_ids_with_capacity : inbox.member_ids_with_assignment_capacity
+    # A reopen that just dropped an owner outside the inbox's reopen team hands the
+    # conversation to a member of that team or to nobody, never back out of rotation.
+    reopen_unassignment? ? agent_ids & inbox.reopen_assignee_team.members.ids : agent_ids
   end
 
   def conversation_status_changed_to_resolved_or_snoozed?

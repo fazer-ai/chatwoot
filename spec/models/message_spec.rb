@@ -451,6 +451,44 @@ RSpec.describe Message do
       expect(conversation.reload.assignee).to eq(outsider)
     end
 
+    # Between reading the conversation for the customer's message and saving the reopen, an agent can
+    # hand it to someone else; the reopen must judge the owner the row holds, not the one it read.
+    it 'keeps the owner an agent assigned while the reopen was in flight' do
+      conversation.resolved!
+      Conversation.find(conversation.id).update!(assignee: member)
+
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(member)
+    end
+
+    # With no routing team on the conversation, legacy auto-assignment draws from every inbox member.
+    context 'when auto-assignment picks a new owner for the reopened conversation' do
+      before do
+        inbox.update!(enable_auto_assignment: true)
+        inbox.add_members([member.id, outsider.id])
+        conversation.update!(team: nil)
+      end
+
+      it 'does not hand it back to the agent it just dropped' do
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ outsider.id.to_s => 'online' })
+        conversation.resolved!
+        message.save!
+
+        expect(conversation.reload.assignee).to be_nil
+      end
+
+      it 'hands it to an online member of the team' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
+        conversation.resolved!
+        message.save!
+
+        expect(conversation.reload.assignee).to eq(member)
+      end
+    end
+
     it 'ignores outgoing messages on a resolved conversation' do
       conversation.resolved!
       create(:message, message_type: :outgoing, conversation: conversation, account: account, inbox: inbox, sender: member)

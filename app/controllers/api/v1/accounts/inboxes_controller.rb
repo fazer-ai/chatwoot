@@ -7,6 +7,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :check_authorization,
                 except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
   # rubocop:enable Rails/LexicallyScopedActionFilter
+  before_action :validate_reopen_assignee_team_id, only: [:create, :update]
 
   include Api::V1::Accounts::Concerns::InboxHealthManagement
   include Api::V1::Accounts::Concerns::InboxSecretManagement
@@ -217,6 +218,18 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
              end
 
     render json: { error: error.message, code: error.class::CODE }, status: status
+  end
+
+  # Strong params would coerce "3oops" and 3.9 to 3 and "" to nil (turning the setting
+  # off), so the id is checked as sent. The literal 'null' is the null permitted_params
+  # already maps for every inbox field.
+  def validate_reopen_assignee_team_id
+    return unless params.key?(:reopen_assignee_team_id)
+
+    value = params[:reopen_assignee_team_id]
+    return if value.nil? || value == 'null' || value.is_a?(Integer) || (value.is_a?(String) && value.match?(/\A\d+\z/))
+
+    render_could_not_create_error('reopen_assignee_team_id must be a team id or null')
   end
 
   def fetch_inbox
