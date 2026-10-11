@@ -574,6 +574,23 @@ RSpec.describe Message do
         expect(conversation.reload.assignee).to be_nil
       end
 
+      # Two customer messages race: the first reopen drops the owner and leaves the mark, the second
+      # works on a copy loaded before that and finds nothing left to drop. Its legacy pick still has
+      # to follow the mark the row carries.
+      it 'keeps the restriction for a concurrent reopen that finds the owner already dropped' do
+        bystander = create(:user, account: account, role: :agent)
+        inbox.add_members([bystander.id])
+        inbox.remove_members([outsider.id])
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ bystander.id.to_s => 'online' })
+        conversation.resolved!
+        stale_copy = Conversation.find(conversation.id)
+
+        message.save!
+        build(:message, message_type: :incoming, conversation: stale_copy, account: account, inbox: inbox).save!
+
+        expect(conversation.reload.assignee).to be_nil
+      end
+
       it 'hands it to an online member of the team, ending the restriction in the same save' do
         allow(OnlineStatusTracker).to receive(:get_available_users)
           .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })

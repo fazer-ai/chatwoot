@@ -54,6 +54,9 @@ module ReopenAssigneeTeamHandler
     team, judged_id = @reopen_assignee_check.values_at(:team, :assignee_id)
     @reopen_assignee_check = nil
     owner_id, persisted_status, stored_attributes = self.class.lock.where(id: id).pick(:assignee_id, :status, :additional_attributes)
+    # A concurrent reopen may have dropped the owner already; the auto-assignment later in
+    # this save has to see the mark it left, not this older copy.
+    self.additional_attributes = stored_attributes if stored_attributes&.key?(REOPEN_TEAM_RESTRICTED)
     return unless owner_id == judged_id && %w[resolved snoozed].include?(persisted_status)
     return if team.team_members.exists?(user_id: judged_id)
 
