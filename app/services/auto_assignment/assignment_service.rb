@@ -76,6 +76,7 @@ class AutoAssignment::AssignmentService
   end
 
   def filter_agents_by_team(agents, conversation)
+    agents = agents.where(user_id: conversation.reopen_eligible_agent_ids(agents.pluck(:user_id))) if conversation
     return agents if conversation&.team_id.blank?
 
     team = conversation.team

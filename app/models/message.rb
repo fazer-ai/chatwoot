@@ -565,10 +565,10 @@ class Message < ApplicationRecord
     return if conversation.muted?
     return unless incoming?
     return if reaction?
+    return unless conversation.snoozed? || conversation.resolved?
 
-    conversation.open! if conversation.snoozed?
-
-    reopen_resolved_conversation if conversation.resolved?
+    conversation.drop_assignee_outside_reopen_team_on_save
+    conversation.snoozed? ? conversation.open! : reopen_resolved_conversation
   end
 
   def mark_pending_conversation_as_open_for_human_response

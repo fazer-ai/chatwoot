@@ -674,6 +674,54 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response.parsed_body['name']).to eq 'new test inbox'
       end
 
+      it 'sets, exposes and clears the reopen assignee team' do
+        team = create(:team, account: account)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_assignee_team_id: team.id }, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['reopen_assignee_team_id']).to eq(team.id)
+        expect(inbox.reload.reopen_assignee_team).to eq(team)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_assignee_team_id: nil }, as: :json
+
+        expect(response.parsed_body['reopen_assignee_team_id']).to be_nil
+        expect(inbox.reload.reopen_assignee_team).to be_nil
+      end
+
+      it 'refuses a reopen assignee team from another account' do
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_assignee_team_id: create(:team).id }, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(inbox.reload.reopen_assignee_team_id).to be_nil
+      end
+
+      it 'accepts the reopen assignee team id as a numeric string' do
+        team = create(:team, account: account)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_assignee_team_id: team.id.to_s }, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(inbox.reload.reopen_assignee_team).to eq(team)
+      end
+
+      it 'refuses a reopen assignee team id that is not an integer, without touching the setting' do
+        team = create(:team, account: account)
+        inbox.update!(reopen_assignee_team: team)
+
+        ["#{team.id}oops", team.id + 0.9, '', [team.id]].each do |value|
+          patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+                headers: admin.create_new_auth_token, params: { reopen_assignee_team_id: value }, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity), "accepted #{value.inspect}"
+          expect(inbox.reload.reopen_assignee_team).to eq(team)
+        end
+      end
+
       it 'updates api inbox when administrator' do
         api_channel = create(:channel_api, account: account)
         api_inbox = create(:inbox, channel: api_channel, account: account)

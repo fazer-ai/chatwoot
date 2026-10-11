@@ -158,6 +158,9 @@ class Conversation < ApplicationRecord
   has_many :recurring_scheduled_messages, dependent: :destroy
   has_many :automation_rule_pending_executions, dependent: :delete_all
 
+  # After the assignment concerns' own before_save callbacks, so an owner the legacy
+  # auto-assignment picks in the same save also ends the reopen-team restriction.
+  before_save :end_reopen_team_restriction, if: -> { persisted? && assignee_id_changed? && assignee_id.present? }
   before_save :ensure_snooze_until_reset
   before_save :set_status_changed_at
   before_create :determine_conversation_status

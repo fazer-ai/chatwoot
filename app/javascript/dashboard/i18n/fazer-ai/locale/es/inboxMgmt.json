@@ -187,7 +187,12 @@
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Impedir que otro agente tome la conversación",
-      "PREVENT_TAKEOVER_SUB_TEXT": "Cuando un agente toma una conversación, solo él o un administrador pueden cambiar quién la atiende. La asignación automática no se ve afectada."
+      "PREVENT_TAKEOVER_SUB_TEXT": "Cuando un agente toma una conversación, solo él o un administrador pueden cambiar quién la atiende. La asignación automática no se ve afectada.",
+      "REOPEN_TEAM": {
+        "TITLE": "Mantener al responsable al reabrir solo para miembros del equipo",
+        "DESCRIPTION": "Cuando el mensaje de un cliente reabre una conversación resuelta o pospuesta, se queda con su responsable solo si es miembro de este equipo. Si no, vuelve a Sin asignar, con su equipo y etiquetas. Quite al agente del equipo antes de unas vacaciones y vuelva a agregarlo cuando regrese.",
+        "NONE": "Ninguno (mantener siempre al responsable)"
+      }
     },
     "CSAT": {
       "TEMPLATE_MODE": {

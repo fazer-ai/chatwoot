@@ -7,6 +7,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :check_authorization,
                 except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
   # rubocop:enable Rails/LexicallyScopedActionFilter
+  before_action :validate_reopen_assignee_team_id, only: [:create, :update]
 
   include Api::V1::Accounts::Concerns::InboxHealthManagement
   include Api::V1::Accounts::Concerns::InboxSecretManagement
@@ -219,6 +220,18 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     render json: { error: error.message, code: error.class::CODE }, status: status
   end
 
+  # Strong params would coerce "3oops" and 3.9 to 3 and "" to nil (turning the setting
+  # off), so the id is checked as sent. The literal 'null' is the null permitted_params
+  # already maps for every inbox field.
+  def validate_reopen_assignee_team_id
+    return unless params.key?(:reopen_assignee_team_id)
+
+    value = params[:reopen_assignee_team_id]
+    return if value.nil? || value == 'null' || value.is_a?(Integer) || (value.is_a?(String) && value.match?(/\A\d+\z/))
+
+    render_could_not_create_error('reopen_assignee_team_id must be a team id or null')
+  end
+
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:id])
     authorize @inbox, :show?
@@ -342,7 +355,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   def inbox_attributes
     [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
      :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
-     :lock_to_single_conversation, :prevent_assignment_takeover, :portal_id, :sender_name_type, :business_name,
+     :lock_to_single_conversation, :prevent_assignment_takeover, :reopen_assignee_team_id, :portal_id, :sender_name_type, :business_name,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
                        template: [:name, :template_id, :friendly_name, :content_sid, :approval_sid,
