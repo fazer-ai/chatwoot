@@ -494,6 +494,15 @@ RSpec.describe Message do
         expect(conversation.reload.assignee).to be_nil
       end
 
+      it 'does not hand it back when no human ever replied before it was resolved' do
+        conversation.update!(first_reply_created_at: nil)
+        conversation.resolved!
+        message.save!
+        AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
+
+        expect(conversation.reload.assignee).to be_nil
+      end
+
       it 'hands the reopened conversation to an online member of the team' do
         allow(OnlineStatusTracker).to receive(:get_available_users)
           .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })

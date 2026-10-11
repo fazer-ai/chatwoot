@@ -2,6 +2,8 @@ module AssignmentHandler
   extend ActiveSupport::Concern
   include Events::Types
 
+  REOPEN_TEAM_RESTRICTED = 'reopen_team_restricted'.freeze
+
   included do
     # First, so the owner it settles is what the team and takeover guards see.
     before_save :apply_reopen_assignee_team, if: -> { @reopen_assignee_check }
@@ -24,13 +26,13 @@ module AssignmentHandler
   end
 
   # Auto-assignment (both versions) draws only from the inbox's reopen team for a
-  # conversation that comes back: the one this save just took from an agent outside
-  # it, or any conversation a human agent already answered. V2 assigns after the
-  # save, so only the persisted half reaches it. New conversations keep the usual pool.
+  # conversation whose owner this rule dropped. The marker is written in the dropping
+  # save, so the legacy assignment in that same save sees it and so does the v2 job
+  # that runs after it. Other conversations, new ones included, keep the usual pool.
   # Returns nil when the pool is not restricted.
   def reopen_assignee_team_member_ids
     return if inbox.reopen_assignee_team_id.blank?
-    return unless reopen_unassignment? || first_reply_created_at.present?
+    return unless additional_attributes&.dig(REOPEN_TEAM_RESTRICTED)
 
     inbox.reopen_assignee_team.members.ids
   end
@@ -44,12 +46,14 @@ module AssignmentHandler
   def apply_reopen_assignee_team
     team, judged_id = @reopen_assignee_check.values_at(:team, :assignee_id)
     @reopen_assignee_check = nil
-    owner_id, persisted_status = self.class.lock.where(id: id).pick(:assignee_id, :status)
+    owner_id, persisted_status, stored_attributes = self.class.lock.where(id: id).pick(:assignee_id, :status, :additional_attributes)
     return unless owner_id == judged_id && %w[resolved snoozed].include?(persisted_status)
     return if team.team_members.exists?(user_id: judged_id)
 
     @reopen_unassignment = { assignee_name: assignee.name, team_name: team.name }
     self.assignee = nil
+    # Merged into the locked row's copy: the one in memory may predate another writer's keys.
+    self.additional_attributes = (stored_attributes || {}).merge(REOPEN_TEAM_RESTRICTED => true)
   end
 
   def reopen_unassignment?
