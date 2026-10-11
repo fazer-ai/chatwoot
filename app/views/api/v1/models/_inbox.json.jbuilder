@@ -13,6 +13,7 @@ json.csat_config resource.csat_config
 json.enable_auto_assignment resource.enable_auto_assignment
 json.auto_assignment_config resource.auto_assignment_config
 json.prevent_assignment_takeover resource.prevent_assignment_takeover
+json.drop_assignee_outside_team_on_reopen resource.drop_assignee_outside_team_on_reopen
 json.out_of_office_message resource.out_of_office_message
 json.working_hours resource.weekly_schedule
 json.timezone resource.timezone

@@ -674,6 +674,36 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response.parsed_body['name']).to eq 'new test inbox'
       end
 
+      it 'turns the reopen team setting on and off and exposes it' do
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { drop_assignee_outside_team_on_reopen: true }, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['drop_assignee_outside_team_on_reopen']).to be(true)
+        expect(inbox.reload.drop_assignee_outside_team_on_reopen).to be(true)
+
+        get "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}", headers: admin.create_new_auth_token, as: :json
+        expect(response.parsed_body['drop_assignee_outside_team_on_reopen']).to be(true)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { drop_assignee_outside_team_on_reopen: false }, as: :json
+
+        expect(response.parsed_body['drop_assignee_outside_team_on_reopen']).to be(false)
+        expect(inbox.reload.drop_assignee_outside_team_on_reopen).to be(false)
+      end
+
+      it 'refuses a reopen team setting that is not a boolean, without touching it' do
+        inbox.update!(drop_assignee_outside_team_on_reopen: true)
+
+        ['false', 0, '', nil, 'null', [false]].each do |value|
+          patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+                headers: admin.create_new_auth_token, params: { drop_assignee_outside_team_on_reopen: value }, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity), "accepted #{value.inspect}"
+          expect(inbox.reload.drop_assignee_outside_team_on_reopen).to be(true)
+        end
+      end
+
       it 'updates api inbox when administrator' do
         api_channel = create(:channel_api, account: account)
         api_inbox = create(:inbox, channel: api_channel, account: account)
