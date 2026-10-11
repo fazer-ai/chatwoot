@@ -76,6 +76,8 @@ class AutoAssignment::AssignmentService
   end
 
   def filter_agents_by_team(agents, conversation)
+    reopen_team_ids = conversation&.reopen_assignee_team_member_ids
+    agents = agents.where(user_id: reopen_team_ids) if reopen_team_ids
     return agents if conversation&.team_id.blank?
 
     team = conversation.team

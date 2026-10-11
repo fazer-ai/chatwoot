@@ -23,15 +23,29 @@ module AssignmentHandler
     @reopen_assignee_check = { team: team, assignee_id: assignee_id }
   end
 
+  # Auto-assignment (both versions) draws only from the inbox's reopen team for a
+  # conversation that comes back: the one this save just took from an agent outside
+  # it, or any conversation a human agent already answered. V2 assigns after the
+  # save, so only the persisted half reaches it. New conversations keep the usual pool.
+  # Returns nil when the pool is not restricted.
+  def reopen_assignee_team_member_ids
+    return if inbox.reopen_assignee_team_id.blank?
+    return unless reopen_unassignment? || first_reply_created_at.present?
+
+    inbox.reopen_assignee_team.members.ids
+  end
+
   private
 
-  # An agent can hand the conversation to someone else after the customer's message
-  # read it and before this save. Judging under the row lock leaves their choice alone:
-  # the owner is dropped only if the row still holds the one judged.
+  # An agent can reassign or reopen the conversation after the customer's message
+  # read it and before this save. Judging under the row lock leaves their action
+  # alone: the owner is dropped only if the row still holds the one judged and is
+  # still resolved or snoozed (an agent's manual reopen is exempt).
   def apply_reopen_assignee_team
     team, judged_id = @reopen_assignee_check.values_at(:team, :assignee_id)
     @reopen_assignee_check = nil
-    return unless locked_assignee_id == judged_id
+    owner_id, persisted_status = self.class.lock.where(id: id).pick(:assignee_id, :status)
+    return unless owner_id == judged_id && %w[resolved snoozed].include?(persisted_status)
     return if team.team_members.exists?(user_id: judged_id)
 
     @reopen_unassignment = { assignee_name: assignee.name, team_name: team.name }

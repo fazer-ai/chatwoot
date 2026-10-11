@@ -463,6 +463,55 @@ RSpec.describe Message do
       expect(conversation.assignee).to eq(member)
     end
 
+    # Manual reopen is exempt: an agent who opened it after the customer's message loaded it as resolved
+    # keeps the owner, even though the row still holds the agent the reopen judged.
+    it 'keeps the owner when an agent reopened the conversation while the reopen was in flight' do
+      conversation.resolved!
+      Conversation.find(conversation.id).open!
+
+      message.save!
+
+      expect(conversation.reload.assignee).to eq(outsider)
+    end
+
+    context 'with assignment v2' do
+      let(:new_conversation) { create(:conversation, account: account, inbox: inbox, assignee: nil) }
+
+      before do
+        account.enable_features('assignment_v2')
+        account.save!
+        inbox.update!(enable_auto_assignment: true)
+        inbox.add_members([member.id, outsider.id])
+        conversation.update!(team: nil, first_reply_created_at: 1.day.ago)
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ outsider.id.to_s => 'online' })
+      end
+
+      it 'does not hand the reopened conversation back to an agent outside the team' do
+        conversation.resolved!
+        message.save!
+        AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
+
+        expect(conversation.reload.assignee).to be_nil
+      end
+
+      it 'hands the reopened conversation to an online member of the team' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
+        conversation.resolved!
+        message.save!
+        AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
+
+        expect(conversation.reload.assignee).to eq(member)
+      end
+
+      it 'leaves the pool of a new conversation alone' do
+        new_conversation
+        AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment
+
+        expect(new_conversation.reload.assignee).to eq(outsider)
+      end
+    end
+
     # With no routing team on the conversation, legacy auto-assignment draws from every inbox member.
     context 'when auto-assignment picks a new owner for the reopened conversation' do
       before do
