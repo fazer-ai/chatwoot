@@ -453,6 +453,21 @@ RSpec.describe Message do
       expect(message.webhook_data.key?(:attachments)).to be false
     end
 
+    # The bot payload's consumer orders the contact and the inbox it mirrors by these clocks, which no
+    # conversation timestamp can stand in for: a contact edit moves neither conversation clock.
+    it 'carries the contact and inbox clocks in meta.sender, sender and inbox' do
+      message = create(:message, message_type: :incoming)
+      contact = message.conversation.contact
+      message.update!(sender: contact)
+      contact.update!(custom_attributes: { 'plano' => 'prata' })
+
+      payload = message.reload.webhook_data
+
+      expect(payload[:conversation][:meta][:sender][:updated_at]).to eq(contact.reload.updated_at.to_f)
+      expect(payload[:sender][:updated_at]).to eq(contact.updated_at.to_f)
+      expect(payload[:inbox][:updated_at]).to eq(message.inbox.updated_at.to_f)
+    end
+
     it 'uses raw content without markdown rendering for webhook content' do
       message = create(:message, content: 'Test **bold** content')
 

@@ -181,7 +181,8 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       phone_number: phone_number,
       thumbnail: avatar_url,
       blocked: blocked,
-      type: 'contact'
+      type: 'contact',
+      updated_at: updated_at.to_f
     }
     data[:company_id] = company_id if account.feature_enabled?('companies')
     data
@@ -199,7 +200,8 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       name: name,
       phone_number: phone_number,
       thumbnail: avatar_url,
-      blocked: blocked
+      blocked: blocked,
+      updated_at: updated_at.to_f
     }
   end
 

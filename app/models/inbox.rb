@@ -188,7 +188,8 @@ class Inbox < ApplicationRecord
   def webhook_data
     {
       id: id,
-      name: name
+      name: name,
+      updated_at: updated_at.to_f
     }
   end
 

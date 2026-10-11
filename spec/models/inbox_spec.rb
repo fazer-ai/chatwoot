@@ -426,4 +426,18 @@ RSpec.describe Inbox do
       end
     end
   end
+
+  describe '#webhook_data' do
+    it 'ships the inbox updated_at as sub-second float seconds that move on a rename' do
+      inbox = create(:inbox, name: 'Inbox A')
+      first = inbox.webhook_data[:updated_at]
+
+      inbox.update!(name: 'Inbox B')
+
+      expect(inbox.webhook_data).to include(id: inbox.id, name: 'Inbox B')
+      expect(inbox.webhook_data[:updated_at]).to be_a(Float)
+      expect(inbox.webhook_data[:updated_at]).to be > first
+      expect(inbox.webhook_data[:updated_at]).to eq(inbox.reload.updated_at.to_f)
+    end
+  end
 end
