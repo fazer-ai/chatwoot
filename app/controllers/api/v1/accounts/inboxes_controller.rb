@@ -7,6 +7,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :check_authorization,
                 except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
   # rubocop:enable Rails/LexicallyScopedActionFilter
+  before_action :validate_drop_assignee_outside_team_on_reopen, only: [:create, :update]
 
   include Api::V1::Accounts::Concerns::InboxHealthManagement
   include Api::V1::Accounts::Concerns::InboxSecretManagement
@@ -219,6 +220,15 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     render json: { error: error.message, code: error.class::CODE }, status: status
   end
 
+  # Strong params would cast "yes", 1 or "" into a boolean (or nil, which the column refuses
+  # with a 500), so only a JSON boolean is accepted.
+  def validate_drop_assignee_outside_team_on_reopen
+    return unless params.key?(:drop_assignee_outside_team_on_reopen)
+    return if [true, false].include?(params[:drop_assignee_outside_team_on_reopen])
+
+    render_could_not_create_error('drop_assignee_outside_team_on_reopen must be true or false')
+  end
+
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:id])
     authorize @inbox, :show?
@@ -342,7 +352,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   def inbox_attributes
     [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
      :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
-     :lock_to_single_conversation, :prevent_assignment_takeover, :portal_id, :sender_name_type, :business_name,
+     :lock_to_single_conversation, :prevent_assignment_takeover, :drop_assignee_outside_team_on_reopen, :portal_id, :sender_name_type, :business_name,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
                        template: [:name, :template_id, :friendly_name, :content_sid, :approval_sid,
