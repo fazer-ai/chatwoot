@@ -187,7 +187,12 @@
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Prevent assignment takeover",
-      "PREVENT_TAKEOVER_SUB_TEXT": "Once an agent takes a conversation, only they or an administrator can change who is handling it. Automatic assignment is not affected."
+      "PREVENT_TAKEOVER_SUB_TEXT": "Once an agent takes a conversation, only they or an administrator can change who is handling it. Automatic assignment is not affected.",
+      "REOPEN_TEAM": {
+        "TITLE": "Keep the assignee on reopen only for team members",
+        "DESCRIPTION": "When a customer's message reopens a resolved or snoozed conversation, it stays with its assignee only if they are a member of this team. Otherwise it goes back to Unassigned, keeping its team and labels. Remove an agent from the team before a vacation and add them back when they return.",
+        "NONE": "None (always keep the assignee)"
+      }
     },
     "CSAT": {
       "TEMPLATE_MODE": {
