@@ -535,6 +535,21 @@ RSpec.describe Message do
         expect(conversation.reload.additional_attributes).to eq('mail_subject' => 'Ingresso')
       end
 
+      # The bulk run loads its batch first and claims each row later; a drop that lands in
+      # between must still bind the claim.
+      it 'does not assign from a snapshot taken before the restriction landed' do
+        service = AutoAssignment::AssignmentService.new(inbox: inbox)
+        allow(service).to receive(:find_available_agent).and_wrap_original do |original, snapshot|
+          Conversation.find(snapshot.id).update!(additional_attributes: { 'reopen_team_restricted' => true })
+          original.call(snapshot)
+        end
+
+        new_conversation
+        service.perform_bulk_assignment
+
+        expect(new_conversation.reload.assignee).to be_nil
+      end
+
       it 'leaves the pool of a new conversation alone' do
         new_conversation
         AutoAssignment::AssignmentService.new(inbox: inbox).perform_bulk_assignment

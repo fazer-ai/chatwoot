@@ -76,7 +76,7 @@ class AutoAssignment::AssignmentService
   end
 
   def filter_agents_by_team(agents, conversation)
-    agents = agents.where(user_id: conversation.reopen_eligible_agent_ids(agents.pluck(:user_id))) if conversation
+    agents = conversation.reopen_eligible_inbox_members(agents) if conversation
     return agents if conversation&.team_id.blank?
 
     team = conversation.team
@@ -116,6 +116,8 @@ class AutoAssignment::AssignmentService
                     .lock('FOR UPDATE SKIP LOCKED')
                     .first
       next false unless locked
+      # The batch was loaded before this lock; a reopen that restricted the pool since then binds the claim.
+      next false unless locked.reopen_eligible_agent_ids([agent.id]).include?(agent.id)
 
       locked.update!(assignee: agent)
       true
