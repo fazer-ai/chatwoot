@@ -16,6 +16,26 @@ RSpec.describe Inbox do
     end
   end
 
+  describe 'reopen_assignee_team' do
+    let(:inbox) { create(:inbox) }
+
+    it 'refuses a team from another account' do
+      inbox.reopen_assignee_team = create(:team)
+
+      expect(inbox).not_to be_valid
+      expect(inbox.errors[:reopen_assignee_team_id]).to be_present
+    end
+
+    it 'turns the setting off when the team is deleted' do
+      team = create(:team, account: inbox.account)
+      inbox.update!(reopen_assignee_team: team)
+
+      team.destroy!
+
+      expect(inbox.reload.reopen_assignee_team_id).to be_nil
+    end
+  end
+
   describe 'associations' do
     it { is_expected.to belong_to(:account) }
 

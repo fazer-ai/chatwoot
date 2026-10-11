@@ -4,12 +4,26 @@ module AssigneeActivityMessageHandler
   private
 
   def create_assignee_change_activity(user_name)
+    if @reopen_unassignment
+      create_reopen_unassignment_activity
+      @reopen_unassignment = nil
+      # Auto-assignment can hand the reopened conversation to someone else in the same save.
+      return if assignee_id.blank?
+    end
+
     user_name = activity_message_owner(user_name)
 
     return unless user_name
 
     content = generate_assignee_change_activity_content(user_name)
     ::Conversations::ActivityMessageJob.perform_later(self, activity_message_params(content)) if content
+  end
+
+  # Runs with no user and no executed_by (a customer message did it), which would make
+  # the generic path drop the activity; the reason is the point of this line anyway.
+  def create_reopen_unassignment_activity
+    content = I18n.t('conversations.activity.assignee.removed_not_in_reopen_team', **@reopen_unassignment, locale: account.locale)
+    ::Conversations::ActivityMessageJob.perform_later(self, activity_message_params(content))
   end
 
   def generate_assignee_change_activity_content(user_name)

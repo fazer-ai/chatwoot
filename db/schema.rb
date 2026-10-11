@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_09_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_10_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1229,9 +1229,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_120000) do
     t.string "business_name"
     t.jsonb "csat_config", default: {}, null: false
     t.boolean "prevent_assignment_takeover", default: false, null: false
+    t.bigint "reopen_assignee_team_id"
     t.index ["account_id"], name: "index_inboxes_on_account_id"
     t.index ["channel_id", "channel_type"], name: "index_inboxes_on_channel_id_and_channel_type"
     t.index ["portal_id"], name: "index_inboxes_on_portal_id"
+    t.index ["reopen_assignee_team_id"], name: "index_inboxes_on_reopen_assignee_team_id"
   end
 
   create_table "installation_configs", force: :cascade do |t|
@@ -1886,6 +1888,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_09_120000) do
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "inboxes", "teams", column: "reopen_assignee_team_id", on_delete: :nullify
   add_foreign_key "internal_chat_channel_members", "internal_chat_channels"
   add_foreign_key "internal_chat_channel_members", "users", on_delete: :cascade
   add_foreign_key "internal_chat_channel_teams", "internal_chat_channels"

@@ -28,16 +28,19 @@
 #  account_id                    :integer          not null
 #  channel_id                    :integer          not null
 #  portal_id                     :bigint
+#  reopen_assignee_team_id       :bigint
 #
 # Indexes
 #
 #  index_inboxes_on_account_id                   (account_id)
 #  index_inboxes_on_channel_id_and_channel_type  (channel_id,channel_type)
 #  index_inboxes_on_portal_id                    (portal_id)
+#  index_inboxes_on_reopen_assignee_team_id      (reopen_assignee_team_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (portal_id => portals.id)
+#  fk_rails_...  (reopen_assignee_team_id => teams.id) ON DELETE => nullify
 #
 
 class Inbox < ApplicationRecord
@@ -56,9 +59,11 @@ class Inbox < ApplicationRecord
   validates :out_of_office_message, length: { maximum: Limits::OUT_OF_OFFICE_MESSAGE_MAX_LENGTH }
   validates :greeting_message, length: { maximum: Limits::GREETING_MESSAGE_MAX_LENGTH }
   validate :ensure_valid_max_assignment_limit
+  validate :ensure_reopen_assignee_team_from_account
 
   belongs_to :account
   belongs_to :portal, optional: true
+  belongs_to :reopen_assignee_team, class_name: 'Team', optional: true
 
   belongs_to :channel, polymorphic: true, dependent: :destroy
 
@@ -263,6 +268,13 @@ class Inbox < ApplicationRecord
 
   def ensure_valid_max_assignment_limit
     # overridden in enterprise/app/models/enterprise/inbox.rb
+  end
+
+  def ensure_reopen_assignee_team_from_account
+    return if reopen_assignee_team_id.blank?
+    return if account.teams.exists?(id: reopen_assignee_team_id)
+
+    errors.add(:reopen_assignee_team_id, 'must be a team of this account')
   end
 
   def delete_round_robin_agents

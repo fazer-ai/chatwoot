@@ -10,6 +10,18 @@ module AssignmentHandler
     after_commit :notify_assignment_change, :process_assignment_changes
   end
 
+  # Inbox setting: a customer message that reopens the conversation keeps the
+  # assignee only while they are in the inbox's reopen team. Called before the
+  # status save so the unassignment rides on the same write.
+  def unassign_outside_reopen_team
+    team = inbox.reopen_assignee_team
+    return if team.blank? || assignee_id.blank?
+    return if team.team_members.exists?(user_id: assignee_id)
+
+    @reopen_unassignment = { assignee_name: assignee.name, team_name: team.name }
+    self.assignee = nil
+  end
+
   private
 
   # The conversation belongs to whoever claimed it first. Only the current
@@ -51,6 +63,9 @@ module AssignmentHandler
   # puts an AgentBot in `Current.user`, and its id lives in a different sequence
   # than `users.id`, so comparing the two would match by coincidence.
   def assignment_change_allowed?(current_assignee_id)
+    # Dropping the owner on reopen hands the conversation to nobody, so it is not a takeover,
+    # whoever happens to be in Current.user (an API inbox can take the customer's message from an agent token).
+    return true if @reopen_unassignment
     return true unless Current.user.is_a?(User)
     return true if Current.user.id == current_assignee_id
 

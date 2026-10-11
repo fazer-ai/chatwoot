@@ -323,6 +323,142 @@ RSpec.describe Message do
     end
   end
 
+  describe 'reopen assignee team' do
+    let(:account) { create(:account) }
+    let(:team) { create(:team, account: account, name: 'plantao') }
+    let(:inbox) { create(:inbox, account: account, enable_auto_assignment: false, reopen_assignee_team: team) }
+    let(:member) { create(:user, account: account, role: :agent, name: 'Ana') }
+    let(:outsider) { create(:user, account: account, role: :agent, name: 'Bia') }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: outsider, team: team) }
+    let(:message) { build(:message, message_type: :incoming, conversation: conversation, account: account, inbox: inbox) }
+    let(:reason) { "Conversation unassigned from #{outsider.name} because they are not a member of the #{team.name} team" }
+    let(:unassignment_activity) { hash_including(content: a_string_matching(/unassigned/i)) }
+
+    # The outsider took the conversation while in the team and left it afterwards (a vacation, say):
+    # assigning a non-member to a conversation of the team is refused on its own.
+    before do
+      team.add_members([member.id, outsider.id])
+      conversation.update!(label_list: ['vip'])
+      team.remove_members([outsider.id])
+    end
+
+    after { Current.reset }
+
+    it 'drops an assignee outside the team when a customer reopens a resolved conversation' do
+      conversation.resolved!
+      message.save!
+
+      conversation.reload
+      expect(conversation).to be_open
+      expect(conversation.assignee).to be_nil
+      expect(conversation.team).to eq(team)
+      expect(conversation.label_list).to eq(['vip'])
+    end
+
+    it 'drops an assignee outside the team when a customer reopens a snoozed conversation' do
+      conversation.snoozed!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to be_nil
+    end
+
+    it 'explains the unassignment in a single activity message' do
+      conversation.resolved!
+
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
+        .and have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity).exactly(:once)
+    end
+
+    it 'writes the activity message in the account locale' do
+      account.update!(locale: 'pt_BR')
+      conversation.resolved!
+
+      expect { message.save! }.to have_enqueued_job(Conversations::ActivityMessageJob)
+        .with(conversation, hash_including(content: "Conversa desatribuída de #{outsider.name} porque não faz parte do time #{team.name}"))
+    end
+
+    it 'keeps an assignee who is a member of the team' do
+      conversation.update!(assignee: member)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload.assignee).to eq(member)
+    end
+
+    it 'drops the assignee when an active agent bot takes the reopened conversation as pending' do
+      inbox.update!(agent_bot: create(:agent_bot))
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.assignee).to be_nil
+    end
+
+    # An API inbox can create the customer's message with an agent's token; the rule is not that agent taking over.
+    it 'drops the assignee even when the inbox prevents takeover and an agent created the message' do
+      inbox.update!(prevent_assignment_takeover: true)
+      conversation.resolved!
+      Current.user = member
+
+      # Nor is the activity signed by that agent: the reason is the only line.
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity).exactly(:once)
+      expect(conversation.reload.assignee).to be_nil
+    end
+
+    it 'keeps the assignee when the inbox has no reopen team' do
+      inbox.update!(reopen_assignee_team: nil)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(outsider)
+    end
+
+    it 'leaves a conversation without assignee untouched' do
+      conversation.update!(assignee: nil)
+      conversation.resolved!
+
+      expect { message.save! }.not_to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity)
+      expect(conversation.reload.assignee).to be_nil
+    end
+
+    it 'leaves a conversation assigned to an agent bot untouched' do
+      agent_bot = create(:agent_bot)
+      inbox.update!(agent_bot: agent_bot)
+      Conversations::AssignmentService.new(conversation: conversation, assignee_id: agent_bot.id, assignee_type: 'AgentBot').perform
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'does not touch the assignee of a conversation that is already open' do
+      message.save!
+
+      expect(conversation.reload.assignee).to eq(outsider)
+    end
+
+    it 'does not override an agent reopening the conversation or assigning it by hand' do
+      conversation.resolved!
+      Current.user = member
+
+      conversation.open!
+      conversation.update!(assignee: outsider)
+
+      expect(conversation.reload.assignee).to eq(outsider)
+    end
+
+    it 'ignores outgoing messages on a resolved conversation' do
+      conversation.resolved!
+      create(:message, message_type: :outgoing, conversation: conversation, account: account, inbox: inbox, sender: member)
+
+      expect(conversation.reload.assignee).to eq(outsider)
+    end
+  end
+
   describe '#mark_pending_conversation_as_open_for_human_response' do
     let(:conversation) { create(:conversation, status: :pending) }
 
