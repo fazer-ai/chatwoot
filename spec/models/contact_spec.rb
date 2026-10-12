@@ -221,9 +221,21 @@ RSpec.describe Contact do
       [contact.push_event_data, contact.webhook_data].each do |payload|
         expect(payload[:updated_at]).to be_a(Float)
         expect(payload[:updated_at]).to be > first
-        # Linux keeps nanoseconds in memory after the write and Postgres stores microseconds.
-        expect(payload[:updated_at]).to be_within(0.000001).of(contact.reload.updated_at.to_f)
+        expect(payload[:updated_at]).to eq(contact.reload.updated_at.to_f)
       end
+    end
+
+    # Postgres keeps microseconds, while the record that was just saved keeps whatever the clock gave it
+    # (nanoseconds on Linux). A consumer compares this value for equality as the row's version, so the
+    # payload built from the record in memory must name the instant the row stores.
+    it 'ships the instant the database stores, not the sub-microsecond clock of the record in memory' do
+      contact = create(:contact)
+      contact.update!(updated_at: Time.zone.at(1_791_823_361, 121_236_812, :nsec))
+
+      stored = described_class.find(contact.id).updated_at.to_f
+      expect(stored).to eq(Time.zone.at(1_791_823_361, 121_236, :usec).to_f)
+      expect(contact.push_event_data[:updated_at]).to eq(stored)
+      expect(contact.webhook_data[:updated_at]).to eq(stored)
     end
   end
 

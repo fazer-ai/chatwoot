@@ -190,7 +190,7 @@ class Inbox < ApplicationRecord
     {
       id: id,
       name: name,
-      updated_at: updated_at.to_f
+      updated_at: updated_at&.floor(6).to_f
     }
   end
 
