@@ -39,8 +39,8 @@ class Webhooks::Trigger
     # The same holds for an api_inbox message marked `failed` here: a later attempt can still
     # deliver it, leaving an agent to resend what the customer already received.
     # Escalation belongs to whoever learns the delivery is over, which is the retries-exhausted
-    # block in WebhookJob (`Webhooks::ErrorHandler` applies the same guards and the same activity
-    # note as `update_conversation_status`).
+    # block in WebhookJob (`Webhooks::ErrorHandler`, whose handoff `update_conversation_status`
+    # shares).
     Rails.logger.warn "Exception: webhook request to #{@url} failed : #{e.message}"
     raise CustomExceptions::Webhook::RetriableError, "Webhook request failed: #{e.message}"
   end
@@ -89,26 +89,7 @@ class Webhooks::Trigger
   end
 
   def update_conversation_status(message)
-    conversation = message.conversation
-    return unless conversation&.pending?
-    return if conversation&.account&.keep_pending_on_bot_failure
-
-    conversation.open!
-    create_agent_bot_error_activity(conversation)
-  end
-
-  def create_agent_bot_error_activity(conversation)
-    content = I18n.t('conversations.activity.agent_bot.error_moved_to_open')
-    Conversations::ActivityMessageJob.perform_later(conversation, activity_message_params(conversation, content))
-  end
-
-  def activity_message_params(conversation, content)
-    {
-      account_id: conversation.account_id,
-      inbox_id: conversation.inbox_id,
-      message_type: :activity,
-      content: content
-    }
+    Webhooks::ErrorHandler.hand_off_after_bot_failure(message.conversation)
   end
 
   def update_message_status(error)

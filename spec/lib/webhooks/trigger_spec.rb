@@ -119,6 +119,51 @@ describe Webhooks::Trigger do
         expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
       end
 
+      # A 500 or 429 that outlasts AgentBots::WebhookJob's retries ends here, not in ErrorHandler,
+      # and it has to land the conversation in the same human queue.
+      it 'hands a bot-owned conversation to the human queue once the retries are gone' do
+        agent_bot = create(:agent_bot, account: account)
+        pending_conversation.update!(ai_assignee: agent_bot, waiting_since: nil)
+        allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+        payload = { event: 'message_created', id: pending_message.id }
+
+        perform_enqueued_jobs do
+          trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+        end
+
+        expect(Conversation.unassigned.open).to include(pending_conversation)
+        expect(pending_conversation.reload.waiting_since).to be_present
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Conversation::CONVERSATION_BOT_HANDOFF, anything, hash_including(conversation: pending_conversation))
+        expect(pending_conversation.messages.activity.last.content).to eq(agent_bot_error_content)
+      end
+
+      it 'hands off once when a second exhausted delivery read the conversation before the first' do
+        pending_conversation.update!(ai_assignee: create(:agent_bot, account: account))
+        stale_message = Message.find(pending_message.id)
+        stale_message.conversation.status
+        payload = { event: 'message_created', id: pending_message.id }
+
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+        allow(Message).to receive(:find_by).with(id: pending_message.id).and_return(stale_message)
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+
+        expect(Conversations::ActivityMessageJob).to have_been_enqueued.once
+      end
+
+      it 'keeps a bot-owned conversation pending when the account asks for it' do
+        agent_bot = create(:agent_bot, account: account)
+        pending_conversation.update!(ai_assignee: agent_bot)
+        pending_conversation.account.update!(keep_pending_on_bot_failure: true)
+        payload = { event: 'message_created', id: pending_message.id }
+
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+
+        expect(pending_conversation.reload.status).to eq('pending')
+        expect(pending_conversation.ai_assignee).to eq(agent_bot)
+        expect(Conversations::ActivityMessageJob).not_to have_been_enqueued
+      end
+
       it 'does not change message status or enqueue activity when conversation is not pending' do
         payload = { event: 'message_created', conversation: { id: conversation.id }, id: message.id }
 
