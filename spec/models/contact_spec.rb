@@ -221,7 +221,8 @@ RSpec.describe Contact do
       [contact.push_event_data, contact.webhook_data].each do |payload|
         expect(payload[:updated_at]).to be_a(Float)
         expect(payload[:updated_at]).to be > first
-        expect(payload[:updated_at]).to eq(contact.reload.updated_at.to_f)
+        # Linux keeps nanoseconds in memory after the write and Postgres stores microseconds.
+        expect(payload[:updated_at]).to be_within(0.000001).of(contact.reload.updated_at.to_f)
       end
     end
   end

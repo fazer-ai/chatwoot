@@ -437,7 +437,8 @@ RSpec.describe Inbox do
       expect(inbox.webhook_data).to include(id: inbox.id, name: 'Inbox B')
       expect(inbox.webhook_data[:updated_at]).to be_a(Float)
       expect(inbox.webhook_data[:updated_at]).to be > first
-      expect(inbox.webhook_data[:updated_at]).to eq(inbox.reload.updated_at.to_f)
+      # Linux keeps nanoseconds in memory after the write and Postgres stores microseconds.
+      expect(inbox.webhook_data[:updated_at]).to be_within(0.000001).of(inbox.reload.updated_at.to_f)
     end
   end
 end
