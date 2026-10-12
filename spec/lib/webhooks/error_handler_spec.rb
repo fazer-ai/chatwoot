@@ -38,6 +38,22 @@ describe Webhooks::ErrorHandler do
       expect(activity_message.content).to eq(agent_bot_error_content)
     end
 
+    # A bot that is still the assignee keeps the conversation out of `unassigned` and out of
+    # auto-assignment, so an `open` that leaves it there is a conversation nobody sees.
+    it 'hands a bot-owned conversation to the human queue' do
+      agent_bot = create(:agent_bot, account: account)
+      pending_conversation.update!(ai_assignee: agent_bot, waiting_since: nil)
+      allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+      payload = { event: 'message_created', id: pending_message.id }
+
+      described_class.perform(payload, webhook_type, error)
+
+      expect(Conversation.unassigned.open).to include(pending_conversation)
+      expect(pending_conversation.reload.waiting_since).to be_present
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Conversation::CONVERSATION_BOT_HANDOFF, anything, hash_including(conversation: pending_conversation))
+    end
+
     it 'does not change conversation status or enqueue activity when conversation is not pending' do
       payload = { event: 'message_created', id: message.id }
 
