@@ -32,7 +32,9 @@ class Webhooks::ErrorHandler
     return unless conversation&.pending?
     return if conversation&.account&.keep_pending_on_bot_failure
 
-    conversation.open!
+    # A handoff, not a bare `open!`: with the bot still the assignee the conversation stays out of
+    # Unassigned and out of auto-assignment, open and owned by nobody who can answer it.
+    conversation.bot_handoff!
     Conversations::ActivityMessageJob.perform_later(conversation, activity_message_params(conversation))
   end
 
