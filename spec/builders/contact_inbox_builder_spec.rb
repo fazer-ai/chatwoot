@@ -430,6 +430,45 @@ describe ContactInboxBuilder do
       end
     end
 
+    # A native inbox answers the number check through its paired session. With no session
+    # running there is nobody to answer, and the request used to wait out its whole budget
+    # and end in a 500 with no contact inbox.
+    describe 'native whatsapp inbox that is not connected' do
+      let(:native_channel) do
+        create(:channel_whatsapp, account: account, provider: 'native',
+                                  sync_templates: false, validate_provider_config: false)
+      end
+      let(:native_inbox) { native_channel.inbox }
+      let(:contact) { create(:contact, phone_number: '+5511912345678', account: account) }
+
+      def build
+        described_class.new(contact: contact, inbox: native_inbox, validate_whatsapp_phone: true).perform
+      end
+
+      [nil, 'close', 'connecting'].each do |state|
+        it "keeps the typed number without asking the session when the connection is #{state.inspect}" do
+          native_channel.update!(provider_connection: state ? { 'connection' => state } : {})
+          expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+
+          contact_inbox = build
+
+          expect(contact_inbox.source_id).to eq('5511912345678')
+          expect(contact.reload.phone_number).to eq('+5511912345678')
+        end
+      end
+
+      it 'still resolves the canonical number once the session is open' do
+        native_channel.update!(provider_connection: { 'connection' => 'open' })
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => '551112345678@s.whatsapp.net', 'exists' => true })
+
+        contact_inbox = build
+
+        expect(contact_inbox.source_id).to eq('551112345678')
+        expect(contact.reload.phone_number).to eq('+551112345678')
+      end
+    end
+
     context 'when there is a race condition' do
       let(:account) { create(:account) }
       let(:contact) { create(:contact, account: account) }

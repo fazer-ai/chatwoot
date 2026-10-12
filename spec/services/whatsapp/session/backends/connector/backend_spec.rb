@@ -110,6 +110,17 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     expect(described_class.capabilities).to eq(Whatsapp::Session::Registry.descriptor('native').capabilities)
   end
 
+  # A number check runs inside a request (opening a conversation, the inbox's number
+  # lookup), and the caller already treats a failed check as "keep the typed number". Left
+  # on the RPC default it waited 20 s for a session that does not answer, longer than the
+  # request itself may run, so the request died with a 500 before the fallback could run.
+  it 'gives a number check a ceiling well inside a request' do
+    backend.check_numbers(model::Commands::ContactCheck.new(phones: ['5541999990000']))
+
+    expect(client).to have_received(:call)
+      .with(an_instance_of(model::Commands::ContactCheck), timeout: be <= 5)
+  end
+
   # The connector answers `history.request` with `null` once the phone was asked, and
   # refuses one with no anchor; the answer itself comes back as `history.sync`.
   it 'carries a history request to the session and waits for the connector to take it' do
