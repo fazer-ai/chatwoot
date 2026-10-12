@@ -138,6 +138,19 @@ describe Webhooks::Trigger do
         expect(pending_conversation.messages.activity.last.content).to eq(agent_bot_error_content)
       end
 
+      it 'hands off once when a second exhausted delivery read the conversation before the first' do
+        pending_conversation.update!(ai_assignee: create(:agent_bot, account: account))
+        stale_message = Message.find(pending_message.id)
+        stale_message.conversation.status
+        payload = { event: 'message_created', id: pending_message.id }
+
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+        allow(Message).to receive(:find_by).with(id: pending_message.id).and_return(stale_message)
+        trigger.new(url, payload, webhook_type).handle_failure(StandardError.new('bot down'))
+
+        expect(Conversations::ActivityMessageJob).to have_been_enqueued.once
+      end
+
       it 'keeps a bot-owned conversation pending when the account asks for it' do
         agent_bot = create(:agent_bot, account: account)
         pending_conversation.update!(ai_assignee: agent_bot)

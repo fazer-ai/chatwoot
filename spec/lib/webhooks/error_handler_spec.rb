@@ -54,6 +54,21 @@ describe Webhooks::ErrorHandler do
         .with(Conversation::CONVERSATION_BOT_HANDOFF, anything, hash_including(conversation: pending_conversation))
     end
 
+    # Two messages in a row exhaust their ladders milliseconds apart, and both handlers read the
+    # conversation as pending before either one writes.
+    it 'hands off once when a second exhausted delivery read the conversation before the first' do
+      pending_conversation.update!(ai_assignee: create(:agent_bot, account: account))
+      stale_message = Message.find(pending_message.id)
+      stale_message.conversation.status
+      payload = { event: 'message_created', id: pending_message.id }
+
+      described_class.perform(payload, webhook_type, error)
+      allow(Message).to receive(:find_by).with(id: pending_message.id).and_return(stale_message)
+      described_class.perform(payload, webhook_type, error)
+
+      expect(Conversations::ActivityMessageJob).to have_been_enqueued.once
+    end
+
     it 'does not change conversation status or enqueue activity when conversation is not pending' do
       payload = { event: 'message_created', id: message.id }
 
