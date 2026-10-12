@@ -47,6 +47,9 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # later is a typing bubble for something nobody is typing.
   MOMENTARY_TIMEOUT = 30
 
+  # Under the 15 s a request may run: see `check_numbers`.
+  NUMBER_CHECK_TIMEOUT = 5
+
   # These are still right whenever they land, so the only reason to bound them is the
   # executor, and the ceiling has to clear the longest command that can legitimately be
   # ahead of them on the same queue: a send carrying a file. A queue holding several of
@@ -294,8 +297,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(command, timeout: DEFERRABLE_TIMEOUT)
   end
 
+  # Asked from inside a request, whose caller falls back to the typed number when the
+  # check fails, so the check gives up long before the request does (#838). On the RPC
+  # default it waited 20 s, past the request's own limit, and the fallback never ran.
   def check_numbers(command)
-    Array(client.call(command)).map { |check| model::NumberCheck.from_h(check) }
+    Array(client.call(command, timeout: NUMBER_CHECK_TIMEOUT)).map { |check| model::NumberCheck.from_h(check) }
   end
 
   def profile_picture_url(command)
