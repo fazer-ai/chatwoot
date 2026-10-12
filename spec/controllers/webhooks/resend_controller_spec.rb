@@ -44,6 +44,18 @@ RSpec.describe 'Webhooks::ResendController', type: :request do
     expect(Webhooks::ResendInboundEmailJob).not_to have_received(:perform_later)
   end
 
+  context 'when the installation has no signing secret' do
+    let(:secret) { '' }
+    let(:key) { '' }
+
+    it 'rejects a signature made with an empty key' do
+      deliver("v1,#{signature}")
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(Webhooks::ResendInboundEmailJob).not_to have_received(:perform_later)
+    end
+  end
+
   context 'when the timestamp is older than the tolerance' do
     let(:timestamp) { 10.minutes.ago.to_i }
 

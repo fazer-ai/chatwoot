@@ -17,13 +17,12 @@ class Webhooks::ResendController < ActionController::API
     @request_payload ||= request.body.read
   end
 
-  # Resend signs webhooks with Svix: base64(HMAC-SHA256(key, "<id>.<timestamp>.<body>")), where the
-  # signing secret is "whsec_" + the base64 key, and the header lists "v1,<signature>" entries.
+  # Svix scheme: base64(HMAC-SHA256(key, "<id>.<timestamp>.<body>")), the secret is "whsec_" + base64 key, the header lists "v1,<sig>".
   def verify_signature!
     id = request.headers['svix-id']
     timestamp = request.headers['svix-timestamp']
     signatures = request.headers['svix-signature']
-    return head :unauthorized if [id, timestamp, signatures].any?(&:blank?)
+    return head :unauthorized if [id, timestamp, signatures, signing_key].any?(&:blank?)
     return head :unauthorized if (Time.current.to_i - timestamp.to_i).abs > SIGNATURE_TOLERANCE
 
     expected = expected_signature(id, timestamp)
@@ -32,8 +31,12 @@ class Webhooks::ResendController < ActionController::API
     head :unauthorized
   end
 
+  # An installation that never set the secret must not accept a signature made with an empty key.
+  def signing_key
+    @signing_key ||= Base64.strict_decode64(ENV.fetch('RESEND_INBOUND_WEBHOOK_SECRET', '').delete_prefix('whsec_'))
+  end
+
   def expected_signature(id, timestamp)
-    key = Base64.decode64(ENV.fetch('RESEND_INBOUND_WEBHOOK_SECRET').delete_prefix('whsec_'))
-    Base64.strict_encode64(OpenSSL::HMAC.digest('SHA256', key, "#{id}.#{timestamp}.#{request_payload}"))
+    Base64.strict_encode64(OpenSSL::HMAC.digest('SHA256', signing_key, "#{id}.#{timestamp}.#{request_payload}"))
   end
 end

@@ -1,10 +1,10 @@
-# The email.received webhook carries only metadata: the message itself is fetched through the
-# receiving API, whose raw.download_url points at the original file, attachments included.
+# The webhook carries only metadata; raw.download_url from the receiving API points at the original file, attachments included.
 # https://resend.com/docs/api-reference/emails/retrieve-received-email
 class Webhooks::ResendInboundEmailJob < ApplicationJob
   queue_as :default
 
-  RECEIVED_EMAIL_URL = 'https://api.resend.com/emails/receiving/%<id>s'.freeze
+  # html_format=cid keeps inline images out of the response instead of embedding each one as a base64 data URI this job never reads.
+  RECEIVED_EMAIL_URL = 'https://api.resend.com/emails/receiving/%<id>s?html_format=cid'.freeze
 
   def perform(email_id)
     received = HTTParty.get(
