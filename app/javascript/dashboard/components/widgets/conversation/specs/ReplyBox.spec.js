@@ -980,6 +980,31 @@ describe('ReplyBox', () => {
         { channel_type: 'Channel::Whatsapp', provider: 'whatsapp_cloud' },
         AUDIO_FORMATS.OGG,
       ],
+      // The native connector sends what it is given and does not transcode, and Android
+      // plays a voice note only as Opus in Ogg: an MP3 note plays on WhatsApp Web and
+      // shows "something is wrong with the audio file" on the phone.
+      [
+        'native WhatsApp',
+        { channel_type: 'Channel::Whatsapp', provider: 'native' },
+        AUDIO_FORMATS.OGG,
+      ],
+      // The other session providers convert on their own side (baileys-api runs every
+      // voice note through ffmpeg), so they stay on the container they already take.
+      [
+        'Baileys WhatsApp',
+        { channel_type: 'Channel::Whatsapp', provider: 'baileys' },
+        AUDIO_FORMATS.MP3,
+      ],
+      [
+        'Z-API WhatsApp',
+        { channel_type: 'Channel::Whatsapp', provider: 'zapi' },
+        AUDIO_FORMATS.MP3,
+      ],
+      [
+        'uazapi WhatsApp',
+        { channel_type: 'Channel::Whatsapp', provider: 'uazapi' },
+        AUDIO_FORMATS.MP3,
+      ],
       [
         'Twilio WhatsApp',
         { channel_type: 'Channel::TwilioSms', medium: 'whatsapp' },

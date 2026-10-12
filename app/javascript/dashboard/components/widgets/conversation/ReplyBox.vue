@@ -589,7 +589,14 @@ export default {
       if (this.isOnPrivateNote) {
         return AUDIO_FORMATS.MP3;
       }
-      if (this.isAWhatsAppCloudChannel) {
+      // The native connector sends the file as it gets it and does not transcode,
+      // and Android plays a voice note only as Opus in Ogg. OGG costs nothing here:
+      // Chrome and Firefox record Opus in WebM and convertAudio only remuxes it.
+      // The other session providers convert on their own side, so they keep MP3.
+      if (
+        this.isAWhatsAppCloudChannel ||
+        (this.isAWhatsAppChannel && this.whatsAppAPIProvider === 'native')
+      ) {
         return AUDIO_FORMATS.OGG;
       }
       if (this.isAWhatsAppChannel || this.isATelegramChannel) {
