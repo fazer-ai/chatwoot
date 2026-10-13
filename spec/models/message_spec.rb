@@ -362,6 +362,16 @@ RSpec.describe Message do
       expect(conversation.reload.ai_assignee).to eq(agent_bot)
     end
 
+    it 'leaves a conversation delegated to a specialist bot with that bot' do
+      specialist = create(:agent_bot, account: account)
+      conversation.update!(assignee: nil, ai_assignee: specialist)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.ai_assignee).to eq(specialist)
+    end
+
     it 'leaves the person in place when the inbox bot is inactive' do
       agent_bot_inbox.update!(status: :inactive)
       conversation.resolved!

@@ -35,8 +35,11 @@ module ReopenAgentBotHandler
     bot_inbox = inbox.agent_bot_inbox
     return unless bot_inbox&.active?
 
-    owner_id, persisted_status = self.class.lock.where(id: id).pick(:assignee_id, :status)
+    owner_id, persisted_status, ai_owner_type = self.class.lock.where(id: id).pick(:assignee_id, :status, :ai_assignee_type)
     return unless persisted_status == 'resolved' && owner_id == judged[:assignee_id]
+    # A bot already owns it (a specialist the conversation was delegated to, or the inbox's own):
+    # it keeps getting the customer's messages.
+    return if ai_owner_type.present?
 
     # The team handler of this same save may have dropped the person already; its line says so.
     @reopen_agent_bot_handoff = { assignee_name: assignee&.name, bot_name: bot_inbox.agent_bot.name }
