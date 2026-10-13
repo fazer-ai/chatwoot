@@ -434,6 +434,22 @@ RSpec.describe Message do
         expect(conversation.ai_assignee).to be_nil
       end
 
+      it 'announces the bot when a second customer message reopens a copy read before the first' do
+        conversation.resolved!
+        stale_copy = Conversation.find(conversation.id)
+        second = build(:message, message_type: :incoming, conversation: stale_copy, account: account, inbox: inbox)
+
+        message.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+        second.save!
+
+        expect(stale_copy.assignee_type).to eq('AgentBot')
+        expect(stale_copy.assignee_id).to be_nil
+        # The first message already made it pending: the second announces no status change of its own.
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::CONVERSATION_STATUS_CHANGED, any_args)
+        expect(conversation.reload.ai_assignee).to eq(agent_bot)
+      end
+
       it 'keeps the person when an agent reopened the conversation in the meantime' do
         conversation.resolved!
         Conversation.find(conversation.id).open!

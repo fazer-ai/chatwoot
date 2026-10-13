@@ -35,8 +35,11 @@ module ReopenAgentBotHandler
     bot_inbox = inbox.agent_bot_inbox
     return unless bot_inbox&.active?
 
-    owner_id, persisted_status, ai_owner_type = self.class.lock.where(id: id).pick(:assignee_id, :status, :ai_assignee_type)
-    return unless persisted_status == 'resolved' && owner_id == judged[:assignee_id]
+    owner_id, persisted_status, ai_owner_id, ai_owner_type =
+      self.class.lock.where(id: id).pick(:assignee_id, :status, :assignee_agent_bot_id, :ai_assignee_type)
+    unless persisted_status == 'resolved' && owner_id == judged[:assignee_id]
+      return adopt_persisted_ownership(owner_id, persisted_status, ai_owner_id, ai_owner_type)
+    end
     # A bot already owns it (a specialist the conversation was delegated to, or the inbox's own):
     # it keeps getting the customer's messages.
     return if ai_owner_type.present?
@@ -45,6 +48,18 @@ module ReopenAgentBotHandler
     @reopen_agent_bot_handoff = { assignee_name: assignee&.name, bot_name: bot_inbox.agent_bot.name }
     self.assignee = nil
     self.ai_assignee = bot_inbox.agent_bot
+  end
+
+  # Someone else changed the row first (another customer message that already handed it to the bot,
+  # an agent who reassigned or reopened it). This instance still holds what the message read, and
+  # the events of this save serialize it: take the owner the row has, and drop a status this save
+  # would only repeat, so a stale owner is neither announced nor written.
+  def adopt_persisted_ownership(owner_id, persisted_status, ai_owner_id, ai_owner_type)
+    self.assignee_id = owner_id
+    self.assignee_agent_bot_id = ai_owner_id
+    self.ai_assignee_type = ai_owner_type
+    clear_attribute_changes(%i[assignee_id assignee_agent_bot_id ai_assignee_type])
+    clear_attribute_changes([:status]) if status == persisted_status
   end
 
   # Written in place of the bot-assignment line (AgentBotAssignment::BotAssignmentActivity), which
