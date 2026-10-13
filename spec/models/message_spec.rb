@@ -323,6 +323,88 @@ RSpec.describe Message do
     end
   end
 
+  describe 'handing a reopened conversation to the inbox agent bot' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
+    let(:agent_bot) { create(:agent_bot, account: account) }
+    let!(:agent_bot_inbox) { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot) }
+    let(:person) { create(:user, account: account, role: :agent) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: person) }
+    let(:message) { build(:message, message_type: :incoming, conversation: conversation, account: account, inbox: inbox) }
+
+    it 'makes the bot the owner of a conversation a person resolved, when the customer writes again' do
+      conversation.resolved!
+      message.save!
+
+      conversation.reload
+      expect(conversation).to be_pending
+      expect(conversation.assignee).to be_nil
+      expect(conversation.ai_assignee).to eq(agent_bot)
+      expect(conversation.assignee_type).to eq('AgentBot')
+    end
+
+    it 'makes the bot the owner of a conversation resolved with no one assigned' do
+      conversation.update!(assignee: nil)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'leaves the person in place when the inbox bot is inactive' do
+      agent_bot_inbox.update!(status: :inactive)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+    end
+
+    # Dialogflow keeps the inbox's bot active on its own, so the reopen goes pending with the
+    # agent bot switched off: the person stays, and Dialogflow answers.
+    it 'does not hand the conversation to an inactive agent bot when Dialogflow keeps the inbox pending' do
+      agent_bot_inbox.update!(status: :inactive)
+      create(:integrations_hook, :dialogflow, inbox: inbox, account: account)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.assignee).to eq(person)
+      expect(conversation.ai_assignee).to be_nil
+    end
+
+    it 'leaves a snoozed conversation with its person' do
+      conversation.snoozed!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+    end
+
+    context 'when something changes the conversation while the reopen is in flight' do
+      it 'keeps a person an agent assigned in the meantime' do
+        other = create(:user, account: account, role: :agent)
+        conversation.resolved!
+        Conversation.find(conversation.id).update!(assignee: other)
+
+        message.save!
+
+        expect(conversation.reload.assignee).to eq(other)
+        expect(conversation.ai_assignee).to be_nil
+      end
+
+      it 'keeps the person when an agent reopened the conversation in the meantime' do
+        conversation.resolved!
+        Conversation.find(conversation.id).open!
+
+        message.save!
+
+        expect(conversation.reload.assignee).to eq(person)
+        expect(conversation.ai_assignee).to be_nil
+      end
+    end
+  end
+
   describe 'dropping an assignee outside the conversation team on reopen' do
     let(:account) { create(:account) }
     let(:team) { create(:team, account: account, name: 'plantão') }
