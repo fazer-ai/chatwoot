@@ -184,4 +184,26 @@ describe Email::SendOnEmailService do
       end
     end
   end
+
+  # Not stubbed on purpose: the defect lives in how the real mailer stack hands back a
+  # failure. ApplicationMailer rescues Net::SMTPSyntaxError, and ActionMailer then
+  # returns the rescued exception from `deliver_now` instead of raising it.
+  describe '#perform with the real mailer' do
+    let(:contact) { create(:contact, account: account, email: 'customer@example.com') }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
+    let(:server_reply) { '501 5.1.3 Bad recipient address syntax' }
+
+    before do
+      allow_any_instance_of(Mail::Message).to receive(:deliver).and_raise(Net::SMTPSyntaxError, server_reply) # rubocop:disable RSpec/AnyInstance
+    end
+
+    it 'marks the message failed with the reply the mail server gave' do
+      with_modified_env SMTP_ADDRESS: 'smtp.example.com' do
+        service.perform
+      end
+
+      expect(message.reload.status).to eq('failed')
+      expect(message.external_error).to eq(server_reply)
+    end
+  end
 end

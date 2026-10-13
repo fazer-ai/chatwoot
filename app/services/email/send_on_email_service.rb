@@ -56,6 +56,11 @@ class Email::SendOnEmailService < Base::SendOnChannelService
 
     reply_mail = mail.deliver_now
     raise "Email delivery returned nil for message #{message.id}" if reply_mail.nil?
+    # ApplicationMailer rescues ExceptionList::SMTP_EXCEPTIONS (a 50x reply, e.g. a recipient
+    # address the server rejects), and ActionMailer then returns the rescued exception from
+    # `deliver_now` instead of raising it. Re-raise so the message fails with the server's
+    # reply rather than a NoMethodError on `message_id`.
+    raise reply_mail if reply_mail.is_a?(Exception)
 
     Rails.logger.info("Email message #{message.id} sent with source_id: #{reply_mail.message_id}")
     message.update!(source_id: reply_mail.message_id)
