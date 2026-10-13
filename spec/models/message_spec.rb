@@ -323,6 +323,145 @@ RSpec.describe Message do
     end
   end
 
+  describe 'handing a reopened conversation to the inbox agent bot' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
+    let(:agent_bot) { create(:agent_bot, account: account) }
+    let!(:agent_bot_inbox) { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot) }
+    let(:person) { create(:user, account: account, role: :agent) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: person) }
+    let(:message) { build(:message, message_type: :incoming, conversation: conversation, account: account, inbox: inbox) }
+
+    it 'makes the bot the owner of a conversation a person resolved, when the customer writes again' do
+      conversation.resolved!
+      message.save!
+
+      conversation.reload
+      expect(conversation).to be_pending
+      expect(conversation.assignee).to be_nil
+      expect(conversation.ai_assignee).to eq(agent_bot)
+      expect(conversation.assignee_type).to eq('AgentBot')
+    end
+
+    it 'explains the handoff in a single activity line, in the account locale' do
+      account.update!(locale: 'pt_BR')
+      person.update!(name: 'Ana')
+      agent_bot.update!(name: 'Atendente')
+      conversation.resolved!
+
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob)
+        .with(conversation, hash_including(content: 'Conversa passada de Ana para Atendente porque o cliente escreveu de novo')).exactly(:once)
+    end
+
+    it 'makes the bot the owner of a conversation resolved with no one assigned' do
+      conversation.update!(assignee: nil)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'leaves a conversation delegated to a specialist bot with that bot' do
+      specialist = create(:agent_bot, account: account)
+      conversation.update!(assignee: nil, ai_assignee: specialist)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.ai_assignee).to eq(specialist)
+    end
+
+    it 'leaves the person in place when the inbox bot is inactive' do
+      agent_bot_inbox.update!(status: :inactive)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+    end
+
+    # Dialogflow keeps the inbox's bot active on its own, so the reopen goes pending with the
+    # agent bot switched off: the person stays, and Dialogflow answers.
+    it 'does not hand the conversation to an inactive agent bot when Dialogflow keeps the inbox pending' do
+      agent_bot_inbox.update!(status: :inactive)
+      create(:integrations_hook, :dialogflow, inbox: inbox, account: account)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.assignee).to eq(person)
+      expect(conversation.ai_assignee).to be_nil
+    end
+
+    # An API inbox can create the customer's message with an agent's token; the handoff is not that agent taking over.
+    it 'hands the conversation to the bot when the inbox prevents takeover and another agent created the message' do
+      inbox.update!(prevent_assignment_takeover: true)
+      conversation.resolved!
+      Current.user = create(:user, account: account, role: :agent)
+
+      # Nor is the activity signed by that agent: the reason is the only assignment line.
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob)
+        .with(conversation, hash_including(content: a_string_matching(/because the customer wrote again/))).exactly(:once)
+      activity_lines = ActiveJob::Base.queue_adapter.enqueued_jobs
+                                      .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                                      .map { |job| job['arguments'].last['content'] }
+      expect(activity_lines.grep(/assigned/i)).to be_empty
+      expect(conversation.reload).to be_pending
+      expect(conversation.ai_assignee).to eq(agent_bot)
+    ensure
+      Current.reset
+    end
+
+    it 'leaves a snoozed conversation with its person' do
+      conversation.snoozed!
+      message.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+    end
+
+    context 'when something changes the conversation while the reopen is in flight' do
+      it 'keeps a person an agent assigned in the meantime' do
+        other = create(:user, account: account, role: :agent)
+        conversation.resolved!
+        Conversation.find(conversation.id).update!(assignee: other)
+
+        message.save!
+
+        expect(conversation.reload.assignee).to eq(other)
+        expect(conversation.ai_assignee).to be_nil
+      end
+
+      it 'announces the bot when a second customer message reopens a copy read before the first' do
+        conversation.resolved!
+        stale_copy = Conversation.find(conversation.id)
+        second = build(:message, message_type: :incoming, conversation: stale_copy, account: account, inbox: inbox)
+
+        message.save!
+        allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+        second.save!
+
+        expect(stale_copy.assignee_type).to eq('AgentBot')
+        expect(stale_copy.assignee_id).to be_nil
+        # The first message already made it pending: the second announces no status change of its own.
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(Events::Types::CONVERSATION_STATUS_CHANGED, any_args)
+        expect(conversation.reload.ai_assignee).to eq(agent_bot)
+      end
+
+      it 'keeps the person when an agent reopened the conversation in the meantime' do
+        conversation.resolved!
+        Conversation.find(conversation.id).open!
+
+        message.save!
+
+        expect(conversation.reload.assignee).to eq(person)
+        expect(conversation.ai_assignee).to be_nil
+      end
+    end
+  end
+
   describe 'dropping an assignee outside the conversation team on reopen' do
     let(:account) { create(:account) }
     let(:team) { create(:team, account: account, name: 'plantão') }
@@ -370,6 +509,22 @@ RSpec.describe Message do
 
       expect(conversation.reload).to be_pending
       expect(conversation.assignee).to be_nil
+    end
+
+    # The bot's own handoff line would name nobody, and the bot-assignment line would credit the agent
+    # whose token posted the customer's message.
+    it 'explains the team unassignment, and nothing else, when the inbox bot takes the reopened conversation' do
+      inbox.update!(agent_bot: create(:agent_bot))
+      conversation.resolved!
+      Current.user = member
+
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
+      activity_lines = ActiveJob::Base.queue_adapter.enqueued_jobs
+                                      .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                                      .map { |job| job['arguments'].last['content'] }
+      expect(activity_lines.grep(/assigned to|handed from/i)).to be_empty
+      expect(conversation.reload.ai_assignee).to be_present
     end
 
     it 'explains the unassignment in a single activity message' do
