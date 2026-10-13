@@ -38,8 +38,8 @@ module ReopenAgentBotHandler
     owner_id, persisted_status = self.class.lock.where(id: id).pick(:assignee_id, :status)
     return unless persisted_status == 'resolved' && owner_id == judged[:assignee_id]
 
-    # The team handler of this same save may have dropped the person already, with its own line.
-    @reopen_agent_bot_handoff = { assignee_name: assignee.name, bot_name: bot_inbox.agent_bot.name } if assignee
+    # The team handler of this same save may have dropped the person already; its line says so.
+    @reopen_agent_bot_handoff = { assignee_name: assignee&.name, bot_name: bot_inbox.agent_bot.name }
     self.assignee = nil
     self.ai_assignee = bot_inbox.agent_bot
   end
@@ -47,8 +47,12 @@ module ReopenAgentBotHandler
   # Written in place of the bot-assignment line (AgentBotAssignment::BotAssignmentActivity), which
   # needs a user and would name the token's agent of an API inbox, who did not do it.
   def create_reopen_agent_bot_activity
-    content = I18n.t('conversations.activity.assignee.handed_to_agent_bot_on_reopen', **@reopen_agent_bot_handoff, locale: account.locale)
+    handoff = @reopen_agent_bot_handoff
     @reopen_agent_bot_handoff = nil
+    return create_reopen_team_unassignment_activity if reopen_team_unassignment?
+    return if handoff[:assignee_name].blank?
+
+    content = I18n.t('conversations.activity.assignee.handed_to_agent_bot_on_reopen', **handoff, locale: account.locale)
     ::Conversations::ActivityMessageJob.perform_later(self, activity_message_params(content))
   end
 end

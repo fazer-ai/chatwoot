@@ -485,6 +485,22 @@ RSpec.describe Message do
       expect(conversation.assignee).to be_nil
     end
 
+    # The bot's own handoff line would name nobody, and the bot-assignment line would credit the agent
+    # whose token posted the customer's message.
+    it 'explains the team unassignment, and nothing else, when the inbox bot takes the reopened conversation' do
+      inbox.update!(agent_bot: create(:agent_bot))
+      conversation.resolved!
+      Current.user = member
+
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
+      activity_lines = ActiveJob::Base.queue_adapter.enqueued_jobs
+                                      .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                                      .map { |job| job['arguments'].last['content'] }
+      expect(activity_lines.grep(/assigned to|handed from/i)).to be_empty
+      expect(conversation.reload.ai_assignee).to be_present
+    end
+
     it 'explains the unassignment in a single activity message' do
       conversation.resolved!
 
