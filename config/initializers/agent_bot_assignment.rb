@@ -50,6 +50,8 @@ module AgentBotAssignment
     private
 
     def process_assignment_activities
+      # The customer's message handing a reopened conversation back to the inbox bot says why instead.
+      return create_reopen_agent_bot_activity if reopen_agent_bot_handoff?
       return super if saved_change_to_team_id? || !ai_assignee_handed_over?
 
       user_name = activity_message_owner(Current.user&.name)

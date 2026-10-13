@@ -53,7 +53,7 @@ module AssignmentHandler
   def assignment_change_allowed?(current_assignee_id)
     # Dropping the assignee on reopen hands the conversation to nobody, so it is not a takeover,
     # whoever is in Current.user (an API inbox can post the customer's message with an agent token).
-    return true if reopen_team_unassignment?
+    return true if reopen_team_unassignment? || reopen_agent_bot_handoff?
     return true unless Current.user.is_a?(User)
     return true if Current.user.id == current_assignee_id
 

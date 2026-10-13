@@ -135,6 +135,7 @@ pt_BR:
       unknown_agent: Desconhecido
       assignee:
         removed_not_in_conversation_team: "Conversa desatribuída de %{assignee_name} porque não é membro do time da conversa, %{team_name}"
+        handed_to_agent_bot_on_reopen: "Conversa passada de %{assignee_name} para %{bot_name} porque o cliente escreveu de novo"
   contacts:
     group:
       inbox_id_required: Este grupo está em mais de uma caixa de entrada. Diga por qual delas a ação vale enviando inbox_id.

@@ -343,6 +343,17 @@ RSpec.describe Message do
       expect(conversation.assignee_type).to eq('AgentBot')
     end
 
+    it 'explains the handoff in a single activity line, in the account locale' do
+      account.update!(locale: 'pt_BR')
+      person.update!(name: 'Ana')
+      agent_bot.update!(name: 'Atendente')
+      conversation.resolved!
+
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob)
+        .with(conversation, hash_including(content: 'Conversa passada de Ana para Atendente porque o cliente escreveu de novo')).exactly(:once)
+    end
+
     it 'makes the bot the owner of a conversation resolved with no one assigned' do
       conversation.update!(assignee: nil)
       conversation.resolved!
@@ -371,6 +382,26 @@ RSpec.describe Message do
       expect(conversation.reload).to be_pending
       expect(conversation.assignee).to eq(person)
       expect(conversation.ai_assignee).to be_nil
+    end
+
+    # An API inbox can create the customer's message with an agent's token; the handoff is not that agent taking over.
+    it 'hands the conversation to the bot when the inbox prevents takeover and another agent created the message' do
+      inbox.update!(prevent_assignment_takeover: true)
+      conversation.resolved!
+      Current.user = create(:user, account: account, role: :agent)
+
+      # Nor is the activity signed by that agent: the reason is the only assignment line.
+      expect { message.save! }
+        .to have_enqueued_job(Conversations::ActivityMessageJob)
+        .with(conversation, hash_including(content: a_string_matching(/because the customer wrote again/))).exactly(:once)
+      activity_lines = ActiveJob::Base.queue_adapter.enqueued_jobs
+                                      .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                                      .map { |job| job['arguments'].last['content'] }
+      expect(activity_lines.grep(/assigned/i)).to be_empty
+      expect(conversation.reload).to be_pending
+      expect(conversation.ai_assignee).to eq(agent_bot)
+    ensure
+      Current.reset
     end
 
     it 'leaves a snoozed conversation with its person' do

@@ -135,6 +135,7 @@ en:
       unknown_agent: Unknown
       assignee:
         removed_not_in_conversation_team: "Conversation unassigned from %{assignee_name} because they are not a member of the conversation's team %{team_name}"
+        handed_to_agent_bot_on_reopen: "Conversation handed from %{assignee_name} to %{bot_name} because the customer wrote again"
   contacts:
     group:
       inbox_id_required: This group is in more than one inbox. Say which one the action is for by sending inbox_id.
