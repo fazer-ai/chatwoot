@@ -91,6 +91,21 @@ describe('WhatsappCallingPage on a paired phone', () => {
     );
   });
 
+  // Turning incoming calls off on a paired phone leaves them ringing on the phone, since a
+  // refusal would end them there too, and the switch says that instead of "refused".
+  it('describes incoming calls off as ringing on the phone, not as refused', async () => {
+    const wrapper = mountPage({ calling_enabled: true });
+    await flushPromises();
+
+    const descriptions = wrapper.findAll('.description').map(d => d.text());
+    expect(descriptions).toContain(
+      'INBOX_MGMT.WHATSAPP_CALLING.INBOUND_PHONE.DESCRIPTION'
+    );
+    expect(descriptions).not.toContain(
+      'INBOX_MGMT.VOICE_CONFIGURATION.INBOUND.DESCRIPTION'
+    );
+  });
+
   it('offers the switch on an inbox without a proxy', async () => {
     const wrapper = mountPage({});
     await flushPromises();

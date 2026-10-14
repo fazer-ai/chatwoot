@@ -207,42 +207,39 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call_lines.count).to eq(1)
     end
 
-    # The connector lets every call ring on an inbox with calling on, so that the inbox can
-    # still place calls; refusing the incoming ones is done here, as the Cloud path does.
-    # A video call carries no sdp, and with calling on the connector lets it ring too.
-    it 'refuses any call, a video one included, when incoming calls are off' do
+    # Incoming calls off means Chatwoot does not ring, not that the call is refused: a refusal
+    # from a linked device ends the call on every device of the account, the phone included
+    # (#850), and a native inbox has a phone. So nothing goes to the connector, and the call
+    # is the activity line, the way it is on an inbox with calling off.
+    it 'sends no refusal and writes the activity line when incoming calls are off' do
+      channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
+
+      expect(offer('CALLX4')).to eq(:handled)
+
+      expect(backend.commands_of('call.reject')).to be_empty
+      expect(Call.where(provider_call_id: 'CALLX4')).to be_empty
+      expect(events_named('voice_call.incoming')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+
+    it 'sends no refusal for a video call either when incoming calls are off' do
       channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
 
       offer('CALLV1', sdp: nil, video: true)
 
-      expect(backend.commands.map(&:to_h)).to eq([{ 'call_id' => 'CALLV1', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' } }])
-      expect(call_lines.count).to eq(0)
+      expect(backend.commands_of('call.reject')).to be_empty
+      expect(call_lines.count).to eq(1)
     end
 
-    # A blocked contact is filed nowhere, and the inbox takes no calls: the call is refused
-    # all the same, or it would go on ringing on the paired phone.
-    it 'refuses a blocked contact\'s call too, filing nothing' do
+    it 'files nothing for a blocked contact\'s call and sends no refusal' do
       channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
       blocked = create(:contact, account: account, identifier: '182736451928374@lid', blocked: true)
       create(:contact_inbox, contact: blocked, inbox: inbox, source_id: '182736451928374')
 
       offer('CALLB1')
 
-      expect(backend.commands_of('call.reject').map(&:call_id)).to eq(%w[CALLB1])
+      expect(backend.commands_of('call.reject')).to be_empty
       expect(call_lines.count).to eq(0)
-    end
-
-    # The calling settings promise it: declined, agents not notified, no conversation created.
-    it 'is refused by name, filing nothing, when incoming calls are off' do
-      channel.update!(provider_config: channel.provider_config.merge('inbound_calls_enabled' => false))
-
-      expect(offer('CALLX4')).to eq(:handled)
-
-      expect(backend.commands.map(&:wire_type)).to eq(['call.reject'])
-      expect(backend.last_command.to_h).to eq('call_id' => 'CALLX4', 'from' => { 'kind' => 'lid', 'id' => '182736451928374' })
-      expect(Call.where(provider_call_id: 'CALLX4')).to be_empty
-      expect(events_named('voice_call.incoming')).to be_empty
-      expect([call_lines.count, inbox.conversations.count, inbox.contact_inboxes.count]).to eq([0, 0, 0])
     end
   end
 

@@ -27,13 +27,6 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
   end
 
-  # Incoming calls turned off: the connector is told to refuse the call, by the address the
-  # offer named. It was asked to let calls ring (`calls.answer`) so that the inbox can still
-  # place them, and it has nobody else to refuse them.
-  def refuse(payload)
-    inbox.channel.provider_service.reject_call(payload.call_id, from: payload.from.address)
-  end
-
   # The callee picked up. Meta tells the two halves of that apart, the tunnel coming up and
   # the pickup, and the connector reports them as one event, so both broadcasts go out.
   #

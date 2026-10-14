@@ -49,6 +49,13 @@ export default {
     isCloudCalling() {
       return !isSessionProvider(this.inbox.provider);
     },
+    // A paired phone is a device of its own: with incoming calls off the call is not
+    // refused, which would end it on the phone too, but left to ring there.
+    inboundDescription() {
+      return this.isCloudCalling
+        ? this.$t('INBOX_MGMT.VOICE_CONFIGURATION.INBOUND.DESCRIPTION')
+        : this.$t('INBOX_MGMT.WHATSAPP_CALLING.INBOUND_PHONE.DESCRIPTION');
+    },
     // The connector carries no call on a session that leaves through a proxy, so the
     // switch is not offered there and the page says what to change instead.
     isBlockedByProxy() {
@@ -216,9 +223,7 @@ export default {
         <SettingsToggleSection
           :model-value="inboundCallsEnabled"
           :header="$t('INBOX_MGMT.VOICE_CONFIGURATION.INBOUND.LABEL')"
-          :description="
-            $t('INBOX_MGMT.VOICE_CONFIGURATION.INBOUND.DESCRIPTION')
-          "
+          :description="inboundDescription"
           :hide-toggle="isTogglingInbound"
           @update:model-value="handleInboundToggle"
         >
