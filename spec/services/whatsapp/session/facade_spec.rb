@@ -525,18 +525,18 @@ RSpec.describe Whatsapp::Session::Facade do
     end
   end
 
-  # The schema types `calls` as an object, so a boolean makes the whole connect command
-  # invalid and the session never pairs. `false` is not a value it accepts either, which
-  # is why a backend without the capability sends nothing at all.
-  it 'describes the call policy the way the contract types it' do
-    allow(channel).to receive(:session_capabilities).and_return(%w[groups])
+  # A linked device that refuses a call ends it on every device of the account, the phone
+  # included (`rejected_elsewhere`), so asking the connector to refuse is what stopped the
+  # operator's phone from ringing (fazer-ai/chatwoot#850). The offer still reaches the inbox:
+  # the connector publishes it whatever the policy says.
+  it 'does not ask the connector to refuse calls, on a pairing or on a resume' do
+    allow(channel).to receive(:session_capabilities).and_return(%w[calls])
+
     channel.provider_service.setup_channel_provider
     expect(backend.last_command.calls).to be_nil
 
-    allow(channel).to receive(:session_capabilities).and_return(%w[calls])
-    channel.provider_service.setup_channel_provider
-
-    expect(backend.last_command.calls).to eq({ 'auto_reject' => true })
+    channel.reassert_desired_state
+    expect(backend.last_command.calls).to be_nil
   end
 
   # The channel calls this from before_destroy and from convert_provider!, so it is a
