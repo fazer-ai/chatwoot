@@ -230,6 +230,32 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     end
   end
 
+  # A logout is the operator's Disconnect too since it stopped deleting the session
+  # (fazer-ai/chatwoot#852), so it has to reach the same places the teardown did.
+  describe 'a logout' do
+    after { Whatsapp::Session::TeardownRetry.withdrawn(session_id) }
+
+    # A connector reads a session's own stream only while it runs the session, so a logout
+    # for one nobody owns -- handed back, or waiting out a resume backoff -- would sit there
+    # undelivered. The wake has some instance adopt it, and with `disconnected` stop there.
+    it 'has the session adopted, without connecting it, before it asks for the logout' do
+      backend.logout
+
+      expect(client).to have_received(:control)
+        .with(have_attributes(class: model::Commands::SessionWake, desired: 'disconnected')).ordered
+      expect(client).to have_received(:publish)
+        .with(an_instance_of(model::Commands::SessionLogout), max_runtime: described_class::TEARDOWN_RUNTIME).ordered
+    end
+
+    # One the connector never attempted is sent again only while somebody still wants it,
+    # and an inbox that is still here wants it only if this note says so.
+    it 'leaves the note a retry of it checks' do
+      backend.logout
+
+      expect(Whatsapp::Session::TeardownRetry.wanted?(session_id)).to be(true)
+    end
+  end
+
   # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
   # deliberately leaves a teardown pending with no reply while the session is between
   # owners, so there is no answer to wait for.
