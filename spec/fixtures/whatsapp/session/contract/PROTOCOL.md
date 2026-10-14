@@ -382,6 +382,15 @@ theirs, and the connector is always upgraded first.
   Providers that cannot accept a caller-supplied id use `client_ref` instead.
 - Media bytes never travel in a frame. Inbound media carries a `media_ref` the
   client fetches over HTTP; outbound media carries a URL the connector fetches.
+- `voice_note` on an outbound audio is honoured only for opus in an Ogg container, the
+  one format WhatsApp's Android client plays as a voice note: any other format sent with
+  the flag plays on WhatsApp Web and fails on Android with "something is wrong with the
+  audio file". The connector does not transcode, so a voice note whose type is anything
+  else (`audio/mpeg`, `audio/mp4`, `audio/ogg; codecs=vorbis`, `audio/webm`) goes out as
+  an ordinary audio file, without the flag and without its `waveform`, and the send
+  succeeds. `audio/ogg` with no codec named is read as opus, and so is a voice note nobody
+  gave a type to. A client that wants the voice bubble records or converts to opus before
+  it sends.
 - A media message published with no `ref` is followed by `media.download_failed`, and
   `recoverable` on it is what says whether that is the end. False is every reason the
   file is not coming back -- the key lapsed, the bytes did not check out, the file is
