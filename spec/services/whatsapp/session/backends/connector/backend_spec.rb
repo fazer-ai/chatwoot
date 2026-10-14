@@ -230,6 +230,34 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     end
   end
 
+  # The consumer only takes an event ahead of the position it last processed for the session.
+  # A teardown has the connector forget the session, so the pairing after it starts again at
+  # epoch 1, seq 1, under a position the old session left far ahead: every event of the new
+  # pairing, its QR included, would be dropped as a redelivery (fazer-ai/chatwoot#852).
+  describe 'the position the consumer keeps for the session' do
+    let(:cursor_key) { Whatsapp::Connector::Consumer.cursor_key(session_id) }
+
+    before { Whatsapp::Connector::Client.with_redis { |redis| redis.set(cursor_key, '1:271') } }
+    after { Whatsapp::Connector::Client.with_redis { |redis| redis.del(cursor_key) } }
+
+    it 'is forgotten by a pairing, whether by QR or by code' do
+      backend.connect(model::Commands::SessionConnect.new(pairing: 'qr'))
+      expect(Whatsapp::Connector::Client.with_redis { |redis| redis.get(cursor_key) }).to be_nil
+
+      Whatsapp::Connector::Client.with_redis { |redis| redis.set(cursor_key, '1:271') }
+      backend.connect(model::Commands::SessionConnect.new(pairing: 'code', phone: '5541999990000'))
+      expect(Whatsapp::Connector::Client.with_redis { |redis| redis.get(cursor_key) }).to be_nil
+    end
+
+    # A resume carries on the session the connector still holds, under the same epoch
+    # counter, so its position is still the one that tells a redelivery apart.
+    it 'is kept by a resume' do
+      backend.connect(model::Commands::SessionConnect.new(pairing: 'resume'))
+
+      expect(Whatsapp::Connector::Client.with_redis { |redis| redis.get(cursor_key) }).to eq('1:271')
+    end
+  end
+
   # Not `call`. This runs inside the transaction that destroys the inbox, and the connector
   # deliberately leaves a teardown pending with no reply while the session is between
   # owners, so there is no answer to wait for.
