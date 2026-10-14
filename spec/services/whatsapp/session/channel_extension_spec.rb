@@ -302,6 +302,25 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       expect(channel.reload.provider_config['session_id']).to eq(original)
     end
 
+    # Moving to another provider tears the session down, and the connector forgets a
+    # deleted session, epoch counter included. Coming back to native under the same id
+    # would start again at epoch 1 under the epoch and position kept for the old session,
+    # and every event of the new pairing would be dropped (fazer-ai/chatwoot#852).
+    it 'mints a new one when the inbox moves to another provider, and again when it comes back' do
+      channel = build_channel('native')
+      native = channel.provider_config['session_id']
+
+      channel.assign_attributes(provider: 'uazapi')
+      channel.valid?
+      moved = channel.provider_config['session_id']
+
+      channel.assign_attributes(provider: 'native')
+      channel.valid?
+
+      expect(moved).not_to eq(native)
+      expect(channel.provider_config['session_id']).not_to eq(moved)
+    end
+
     it 'refuses one handed to it by a caller' do
       channel = build_channel('native', { 'session_id' => 'a-session-that-belongs-to-someone-else' })
 

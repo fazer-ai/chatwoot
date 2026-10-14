@@ -138,28 +138,12 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     # Asking to connect withdraws any teardown still owed to this session, so a retry of
     # one the connector never attempted does not end the session being set up now.
     Whatsapp::Session::TeardownRetry.withdrawn(session_id)
-    forget_position if command.pairing != 'resume'
     client.control(commands::SessionWake.new(desired: 'connected'))
     model::ConnectionState.from_h(client.call(command))
   end
 
   def disconnect
     client.publish(commands::SessionDisconnect.new, max_runtime: TEARDOWN_RUNTIME)
-  end
-
-  # A pairing does not inherit the position the consumer kept for the session before it.
-  # A teardown has the connector forget the session, epoch counter included, so the pairing
-  # after one starts again at epoch 1, seq 1; under the old position every event of the new
-  # pairing, its QR first, would be dropped as a redelivery (fazer-ai/chatwoot#852). Not done
-  # in the teardown itself: the old session's last event, its `session.logged_out`, is
-  # published after the delete and would put the position back. By the time somebody pairs
-  # again, it has long been processed.
-  #
-  # Harmless where nothing was torn down. The position only spares the handlers a
-  # redelivery they already tolerate, and a resume, which carries on under the same counter,
-  # keeps it.
-  def forget_position
-    Whatsapp::Connector::Client.with_redis { |redis| redis.del(Whatsapp::Connector::Consumer.cursor_key(session_id)) }
   end
 
   def logout
