@@ -146,7 +146,16 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(commands::SessionDisconnect.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
+  # The operator's Disconnect since it stopped deleting the session (fazer-ai/chatwoot#852),
+  # so it reaches the places the teardown below does, by the same means. A connector reads
+  # `wa:cmd:<sid>` only while it runs the session, and a session nobody owns -- handed back,
+  # or waiting out a resume backoff -- would leave the logout there undelivered: the wake, on
+  # the control stream, has some instance adopt it, and `disconnected` has it stop there
+  # instead of dialling. And the note is what lets a logout the connector never attempted be
+  # sent again while the inbox still exists; connecting withdraws it, as it does a teardown.
   def logout
+    Whatsapp::Session::TeardownRetry.requested(session_id)
+    client.control(commands::SessionWake.new(desired: 'disconnected'))
     client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
