@@ -6,8 +6,7 @@
 # shape a group rename gets, and it is the whole of this handler.
 #
 # `call.terminate` is deliberately not routed here. Every call ends, so a second line per
-# call would say nothing an agent can act on, and with `auto_reject` on it would always
-# say the same thing.
+# call would say nothing an agent can act on.
 class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbound::Handlers::Base
   def perform
     return :ignored unless capability?(:calls)
@@ -56,10 +55,9 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     )
   end
 
-  # Neutral about what happened next, because this layer does not know. With
-  # `auto_reject` on the connector refused it; with the policy off the operator's phone
-  # rang and they may well have answered it there. "Missed" would be a guess, and the
-  # wrong one half the time.
+  # Neutral about what happened next, because this layer does not know. The call rang on
+  # the operator's phone, and they may well have answered it there. "Missed" would be a
+  # guess, and the wrong one half the time.
   def line_for(contact)
     key = payload.video ? 'video' : 'voice'
     locale = account.locale || I18n.default_locale
