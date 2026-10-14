@@ -71,10 +71,10 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     return super unless session_provider?
 
     unless @session_teardown
-      # The same teardown `super` performs, minus its logging branch. Not
-      # `backend.disconnect`: the facade deletes the session, and only disconnecting
-      # leaves the pairing alive under a session id Chatwoot is about to stop using.
-      provider_service.disconnect_channel_provider
+      # A logout, not the teardown: the inbox stays, and the session id with it (see
+      # Facade#logout_channel_provider). Not `backend.disconnect` either, which would leave
+      # the device linked on the phone.
+      provider_service.logout_channel_provider
       return session_backend.release_registration
     end
 
@@ -280,7 +280,11 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
     return super unless session_provider?
 
     provider_config['webhook_verify_token'] = kept('webhook_verify_token') { SecureRandom.hex(16) }
-    provider_config['session_id'] = kept('session_id') { SecureRandom.uuid }
+    # A new one when the provider changes. Leaving the provider tears the session down, and
+    # the connector forgets a deleted session, epoch counter included: back on native under
+    # the old id, the new pairing would start at epoch 1 under the epoch and position kept for
+    # the old one, and be dropped (fazer-ai/chatwoot#852).
+    provider_config['session_id'] = provider_changed? ? SecureRandom.uuid : kept('session_id') { SecureRandom.uuid }
   end
 
   # Written from the stored value rather than from whatever came in, because

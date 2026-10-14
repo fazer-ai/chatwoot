@@ -573,6 +573,7 @@ RSpec.describe Whatsapp::Session::Facade do
     )
     allow(Rails.logger).to receive(:warn)
 
+    channel.begin_session_teardown
     channel.disconnect_channel_provider
 
     expect(Rails.logger).to have_received(:warn).with(/leaves the pairing alive/)
