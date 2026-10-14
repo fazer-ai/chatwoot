@@ -82,7 +82,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: 'resume', phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
+        groups: capability?('groups'), history_sync: history_on_connect?, proxy: proxy
       )
     )
   end
@@ -229,13 +229,6 @@ class Whatsapp::Session::Facade
     state
   end
 
-  # An object in the contract, not a flag: the field says how calls are handled, and the
-  # only policy this layer has is to reject them. Omitted when the backend does not do
-  # calls at all, because `false` is not a value the schema accepts either.
-  def call_policy
-    { 'auto_reject' => true } if capability?('calls')
-  end
-
   # What the inbox names as its way out, in the shape the connector takes. Nothing is a
   # request to go out directly: every connect states the whole request, so a connect that
   # left the proxy out would take a session off the one it had.
@@ -270,7 +263,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
+        groups: capability?('groups'), history_sync: history_on_connect?, proxy: proxy
       )
     )
   rescue Whatsapp::Session::Errors::Error
