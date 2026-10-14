@@ -822,7 +822,7 @@ RSpec.describe Conversation do
         contact_last_seen_at: conversation.contact_last_seen_at.to_i,
         agent_last_seen_at: conversation.agent_last_seen_at.to_i,
         created_at: conversation.created_at.to_i,
-        updated_at: conversation.updated_at.to_f,
+        updated_at: described_class.find(conversation.id).updated_at.to_f,
         waiting_since: conversation.waiting_since.to_i,
         priority: nil,
         unread_count: 0,
@@ -1038,6 +1038,14 @@ RSpec.describe Conversation do
       it 'returns the list in asc order if asc is passed as sort direction' do
         records = described_class.sort_on_last_activity_at(:asc)
         expect(records.map(&:id)).to eq last_activity_asc_order
+      end
+
+      it 'breaks a last_activity_at tie by id in the sort direction' do
+        conversation_2.update_columns(last_activity_at: conversation_1.last_activity_at) # rubocop:disable Rails/SkipsModelValidations
+        tied = [conversation_1.id, conversation_2.id].sort
+
+        expect(described_class.sort_on_last_activity_at(:asc).map(&:id) & tied).to eq tied
+        expect(described_class.sort_on_last_activity_at(:desc).map(&:id) & tied).to eq tied.reverse
       end
     end
 

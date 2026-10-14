@@ -91,6 +91,29 @@ RSpec.describe 'the ceilings of the one-off integrations' do
     expect(options).to include(timeout: 15, max_retries: 0)
   end
 
+  # Nobody is waiting on this one: a job fetches the received email after the webhook was
+  # already answered. What the ceiling buys is the worker, and failing lets Sidekiq retry
+  # the job. The download carries the attachments, so it reads for longer than the lookup.
+  it 'bounds both Resend calls of the inbound email job, the download longer than the lookup' do
+    options = {}
+    allow(HTTParty).to receive(:get) do |url, **kwargs|
+      if url.start_with?('https://api.resend.com/')
+        options[:lookup] = kwargs
+        instance_double(HTTParty::Response, parsed_response: { 'raw' => { 'download_url' => 'https://inbound.resend.test/raw' } })
+      else
+        options[:download] = kwargs
+        instance_double(HTTParty::Response, body: file_fixture('support_1.eml').read)
+      end
+    end
+
+    with_modified_env RESEND_INBOUND_API_KEY: 're_full_access' do
+      Webhooks::ResendInboundEmailJob.perform_now('em_123')
+    end
+
+    expect(options[:lookup]).to include(timeout: 15, max_retries: 0)
+    expect(options[:download]).to include(timeout: 30, max_retries: 0)
+  end
+
   # The fence the whole of #589 was for. Every HTTParty call in the tree carries both axes,
   # read by parsing the call rather than counting the word, because options arrive three
   # ways: written at the call, splatted from a constant, or built in a local first.

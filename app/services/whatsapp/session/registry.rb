@@ -42,10 +42,11 @@ module Whatsapp::Session::Registry # rubocop:disable Metrics/ModuleLength
       # so what the declaration bought was a promise on the inbox payload that the next
       # caller would have read as an answer.
       #
-      # `calls` is what puts `{auto_reject: true}` on the connect and what lets the
-      # offer through the dispatcher. It does not promise a call can be answered: the
-      # contract has no command for that, and neither does whatsmeow. What it promises
-      # is that a call reaches the inbox, which is what an agent can act on.
+      # `calls` is what lets the offer through the dispatcher. It does not promise a call
+      # can be answered here, and it puts no policy on the connect: the call rings on the
+      # operator's phone, and the inbox shows that it happened. Asking the connector to
+      # refuse would end the call on every device of the account, the phone included
+      # (fazer-ai/chatwoot#850).
       #
       # `voice_calls` is the other half: the connector carrying a call's voice to the
       # agent's browser, which it does once the inbox turns calling on (`calls.answer` on

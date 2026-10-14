@@ -17,20 +17,20 @@ require 'rails_helper'
 RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
   describe 'the ceiling on every fire-and-forget command' do
     let(:source) { Rails.root.join('app/services/whatsapp/session/backends/connector/backend.rb') }
-
-    # The wake, and the last site with no ceiling of either kind. It starts a session that
-    # may not be running and nothing here waits on it, so a deadline would drop the very
-    # command that was meant to bring the session up; what follows it is an RPC with a
-    # ceiling of its own, which is what bounds the connect it asks for.
-    let(:unbounded_on_purpose) { %w[connect] }
-
     # [method name, source line] for every `client.publish` call in the backend.
     let(:publish_sites) { sites_calling('client.publish(') }
-
     # The same question, asked of the other fire-and-forget door. A command written to the
     # control stream has no caller waiting on it either, so nothing else bounds it, and
     # moving a command from one door to the other must not take it out of the sweep.
     let(:control_sites) { sites_calling('client.control(') }
+
+    # The wake, the one command with no ceiling of either kind: the contract applies neither
+    # to it. It has an instance adopt a session that may not be running, and nothing here
+    # waits on it, so a deadline would drop the very command meant to reach the session.
+    # Told apart by the command and not by the method, because two methods send one: the
+    # connect, whose RPC bounds what it asks for, and the logout, whose own publish is
+    # bounded and must stay under this sweep.
+    def wake?(line) = line.include?('SessionWake')
 
     def sites_calling(call)
       method = nil
@@ -58,12 +58,12 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
     end
 
     it 'finds every control site the backend has' do
-      expect(control_sites.map(&:first)).to contain_exactly('connect', 'delete_session')
+      expect(control_sites.map(&:first)).to contain_exactly('connect', 'logout', 'delete_session')
     end
 
     it 'declares a ceiling at every site that is not the wake' do
       sites = publish_sites + control_sites
-      missing = sites.reject { |method, line| unbounded_on_purpose.include?(method) || bound(line) != :none }
+      missing = sites.reject { |_, line| wake?(line) || bound(line) != :none }
 
       expect(missing.map(&:first)).to be_empty,
                                       "these send a command with no ceiling: #{missing.map(&:first).uniq.join(', ')}. " \
@@ -76,7 +76,7 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       # than left to whichever one somebody reaches for next. A deadline here would refuse
       # the teardown that arrives while the session is between owners.
       teardown = (publish_sites + control_sites).filter_map do |method, line|
-        bound(line) if %w[disconnect logout delete_session].include?(method)
+        bound(line) if %w[disconnect logout delete_session].include?(method) && !wake?(line)
       end
 
       expect(teardown.size).to eq(4)
@@ -94,11 +94,8 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
                                                      'accept_call', 'reject_call')
       # A hang-up queued behind media must not be refused unrun after the call was closed here.
       expect(by_bound[:runtime]).to contain_exactly('disconnect', 'logout', 'delete_session', 'terminate_call')
-      expect(by_bound[:none]).to match_array(unbounded_on_purpose)
-    end
-
-    it 'names methods that exist' do
-      expect(described_class.instance_methods(false).map(&:to_s)).to include(*unbounded_on_purpose)
+      expect(by_bound[:none]).to contain_exactly('connect', 'logout')
+      expect((publish_sites + control_sites).select { |_, line| bound(line) == :none }).to all(satisfy { |_, line| wake?(line) })
     end
   end
 end

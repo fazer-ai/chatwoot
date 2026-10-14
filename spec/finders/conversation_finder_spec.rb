@@ -334,6 +334,35 @@ describe ConversationFinder do
       end
     end
 
+    context 'when paging through conversations that tie on every sort key' do
+      let(:params) { { status: 'open', assignee_type: 'all' } }
+      let(:page_size) { 5 }
+      let(:tied_at) { Time.zone.parse('2026-01-01 12:00:00.123456') }
+
+      before do
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with('CONVERSATION_RESULTS_PER_PAGE', '25').and_return(page_size.to_s)
+        create_list(:conversation, 18, account: account, inbox: inbox)
+        # rubocop:disable Rails/SkipsModelValidations
+        account.conversations.update_all(last_activity_at: tied_at, created_at: tied_at, waiting_since: tied_at, priority: nil,
+                                         status: :open)
+        # rubocop:enable Rails/SkipsModelValidations
+      end
+
+      it 'returns every conversation exactly once across the pages, for every sort option', :aggregate_failures do
+        expected = account.conversations.pluck(:id).sort
+        pages = (expected.length.to_f / page_size).ceil
+
+        Conversations::SortService::SORT_OPTIONS.each_key do |sort_by|
+          seen = (1..pages).flat_map do |page|
+            described_class.new(user_1, params.merge(sort_by: sort_by, page: page)).perform[:conversations].map(&:id)
+          end
+          expect(seen.sort).to eq(expected), "sort_by=#{sort_by} returned #{seen.tally.select { |_, n| n > 1 }.keys} twice " \
+                                             "and missed #{expected - seen}"
+        end
+      end
+    end
+
     context 'with perform_meta_only' do
       let(:params) { { assignee_type: 'assigned' } }
 

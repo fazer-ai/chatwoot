@@ -35,11 +35,22 @@ class Whatsapp::Connector::Consumer::SessionCursor
     @redis = redis
   end
 
+  # A refusal is said out loud. It is right for a redelivery and wrong for a session whose
+  # counter started over, and from the consumer the two look the same: this line is what
+  # tells them apart, since nothing in the inbox changes either way (fazer-ai/chatwoot#852).
   def behind?(event)
-    held = @redis.get(key(event.sid))
-    return true if held.blank?
+    held = position(event.sid)
+    return true if held.blank? || event.newer_than?(held.split(':').map(&:to_i))
 
-    event.newer_than?(held.split(':').map(&:to_i))
+    Rails.logger.warn(
+      "[WHATSAPP CONNECTOR] #{event.type} for session #{event.sid} at #{event.cursor.join(':')} dropped: " \
+      "the session was already processed up to #{held}"
+    )
+    false
+  end
+
+  def position(session_id)
+    @redis.get(key(session_id))
   end
 
   def advance(event)

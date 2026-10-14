@@ -5,7 +5,7 @@ class ContactInboxBuilder
   pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false, validate_whatsapp_phone: false }]
 
   def perform
-    normalize_phone_for_whatsapp! if validate_whatsapp_phone && whatsapp_session_inbox?
+    normalize_phone_for_whatsapp! if validate_whatsapp_phone && whatsapp_session_inbox? && session_can_answer?
     @source_id ||= generate_source_id
     create_contact_inbox if source_id.present?
   end
@@ -19,6 +19,18 @@ class ContactInboxBuilder
     return false unless @inbox.channel_type == 'Channel::Whatsapp'
 
     @inbox.channel.session_provider? || @inbox.channel.provider == 'baileys'
+  end
+
+  # A session inbox answers the number check through its paired session, so with the
+  # session not open (never paired, dropped, still connecting) nobody can answer: the check
+  # would only wait out its timeout before falling back to the typed number anyway, and
+  # long enough to take the request down with it (#838). Baileys reports its connection
+  # elsewhere and keeps its own HTTP timeout, so it is left as it was.
+  def session_can_answer?
+    channel = @inbox.channel
+    return true unless channel.session_provider?
+
+    channel.provider_connection.to_h['connection'] == 'open'
   end
 
   # WhatsApp matches the canonical phone for an account, but a paired session requires

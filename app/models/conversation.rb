@@ -66,6 +66,8 @@ class Conversation < ApplicationRecord
   include JsonColumnMerge
   include Labelable
   include LlmFormattable
+  include ReopenTeamAssigneeHandler
+  include ReopenAgentBotHandler
   include AssignmentHandler
   include AutoAssignmentHandler
   include ActivityMessageHandler

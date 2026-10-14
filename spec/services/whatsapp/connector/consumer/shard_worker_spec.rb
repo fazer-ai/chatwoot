@@ -119,6 +119,20 @@ RSpec.describe Whatsapp::Connector::Consumer::ShardWorker, :redis_streams do
     expect(inbox.messages).to be_empty
   end
 
+  # The drop is right for a redelivery and wrong for a session whose counter started over,
+  # and from here the two look the same: the line is what lets anybody tell, since nothing
+  # else in the inbox or the log changes (fazer-ai/chatwoot#852).
+  it 'says so in the log when it drops an event behind the position of its session' do
+    redis.set("#{prefix}cursor:#{session_id}", '1:271')
+    allow(Rails.logger).to receive(:warn)
+
+    redis.xadd(stream, frame)
+    worker.poll
+
+    expect(inbox.messages).to be_empty
+    expect(Rails.logger).to have_received(:warn).with(/#{session_id}.*1:1.*1:271/)
+  end
+
   it 'still processes an event from a newer epoch' do
     redis.xadd(stream, frame)
     worker.poll

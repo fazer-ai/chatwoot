@@ -525,18 +525,18 @@ RSpec.describe Whatsapp::Session::Facade do
     end
   end
 
-  # The schema types `calls` as an object, so a boolean makes the whole connect command
-  # invalid and the session never pairs. `false` is not a value it accepts either, which
-  # is why a backend without the capability sends nothing at all.
-  it 'describes the call policy the way the contract types it' do
-    allow(channel).to receive(:session_capabilities).and_return(%w[groups])
+  # A linked device that refuses a call ends it on every device of the account, the phone
+  # included (`rejected_elsewhere`), so asking the connector to refuse is what stopped the
+  # operator's phone from ringing (fazer-ai/chatwoot#850). The offer still reaches the inbox:
+  # the connector publishes it whatever the policy says.
+  it 'does not ask the connector to refuse calls, on a pairing or on a resume' do
+    allow(channel).to receive(:session_capabilities).and_return(%w[calls])
+
     channel.provider_service.setup_channel_provider
     expect(backend.last_command.calls).to be_nil
 
-    allow(channel).to receive(:session_capabilities).and_return(%w[calls])
-    channel.provider_service.setup_channel_provider
-
-    expect(backend.last_command.calls).to eq({ 'auto_reject' => true })
+    channel.reassert_desired_state
+    expect(backend.last_command.calls).to be_nil
   end
 
   # The channel calls this from before_destroy and from convert_provider!, so it is a
@@ -544,9 +544,23 @@ RSpec.describe Whatsapp::Session::Facade do
   # disconnecting leaves the pairing alive on the provider under a session id Chatwoot
   # has just thrown away.
   it 'deletes the session when the inbox is torn down' do
+    channel.begin_session_teardown
     channel.disconnect_channel_provider
 
     expect(backend.commands_of('session.delete')).to be_present
+  end
+
+  # The operator's Disconnect keeps the inbox, and the session id with it. Deleting the
+  # session has the connector forget it, epoch counter included, so the pairing after it
+  # would start again at epoch 1 under the epoch and position Chatwoot kept for the old one,
+  # and every event of it, the QR first, would be dropped (fazer-ai/chatwoot#852). A logout
+  # unlinks the device and keeps the counter, which is what pairing again under the same
+  # session id needs.
+  it 'logs out without deleting the session when the operator disconnects' do
+    channel.disconnect_channel_provider
+
+    expect(backend.commands_of('session.logout')).to be_present
+    expect(backend.commands_of('session.delete')).to be_empty
   end
 
   # A backend that cannot tear down its session is not a quiet case. What the fallback can
@@ -559,6 +573,7 @@ RSpec.describe Whatsapp::Session::Facade do
     )
     allow(Rails.logger).to receive(:warn)
 
+    channel.begin_session_teardown
     channel.disconnect_channel_provider
 
     expect(Rails.logger).to have_received(:warn).with(/leaves the pairing alive/)

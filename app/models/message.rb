@@ -565,10 +565,10 @@ class Message < ApplicationRecord
     return if conversation.muted?
     return unless incoming?
     return if reaction?
+    return unless conversation.snoozed? || conversation.resolved?
 
-    conversation.open! if conversation.snoozed?
-
-    reopen_resolved_conversation if conversation.resolved?
+    conversation.check_assignee_team_on_reopen
+    conversation.snoozed? ? conversation.open! : reopen_resolved_conversation
   end
 
   def mark_pending_conversation_as_open_for_human_response
@@ -587,6 +587,7 @@ class Message < ApplicationRecord
   def reopen_resolved_conversation
     # mark resolved bot conversation as pending to be reopened by bot processor service
     if conversation.inbox.active_bot?
+      conversation.hand_reopen_to_agent_bot
       conversation.pending!
     elsif conversation.inbox.api?
       Current.executed_by = sender if reopened_by_contact?

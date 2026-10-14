@@ -20,24 +20,25 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
   end
 
   describe 'the call policy on the connect' do
-    # `auto_reject` beside `answer` is read by the connector as no calls on the session at
-    # all, the placed ones included. So incoming calls turned off never put it there.
-    it 'asks for the voice whenever calling is on, and refuses every call only when it is off' do
+    # `auto_reject` is never sent: the connector reads it as no calls on the session at all,
+    # the placed ones included, and a refusal from a linked device ends the call on the
+    # phone too (#850). Without calling the field is left out, and the phone rings.
+    it 'asks for the voice whenever calling is on, and states no policy when it is off' do
       policies = [[false, true], [true, true], [true, false]].map do |calling, inbound|
         turn_calling(calling, inbound: inbound)
         facade.setup_channel_provider
         backend.last_command.calls
       end
 
-      expect(policies).to eq([{ 'auto_reject' => true }, { 'answer' => true }, { 'answer' => true }])
+      expect(policies).to eq([nil, { 'answer' => true }, { 'answer' => true }])
     end
 
-    it 'keeps refusing calls on an installation without voice' do
+    it 'states no policy on an installation without voice, so the phone rings' do
       turn_calling(true)
       channel.account.disable_features!('channel_voice')
       facade.setup_channel_provider
 
-      expect(backend.last_command.calls).to eq({ 'auto_reject' => true })
+      expect(backend.last_command.calls).to be_nil
     end
   end
 

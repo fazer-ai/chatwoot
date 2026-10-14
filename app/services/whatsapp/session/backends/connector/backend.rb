@@ -47,6 +47,9 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
   # later is a typing bubble for something nobody is typing.
   MOMENTARY_TIMEOUT = 30
 
+  # Under the 15 s a request may run: see `check_numbers`.
+  NUMBER_CHECK_TIMEOUT = 5
+
   # These are still right whenever they land, so the only reason to bound them is the
   # executor, and the ceiling has to clear the longest command that can legitimately be
   # ahead of them on the same queue: a send carrying a file. A queue holding several of
@@ -146,7 +149,16 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     client.publish(commands::SessionDisconnect.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
+  # The operator's Disconnect since it stopped deleting the session (fazer-ai/chatwoot#852),
+  # so it reaches the places the teardown below does, by the same means. A connector reads
+  # `wa:cmd:<sid>` only while it runs the session, and a session nobody owns -- handed back,
+  # or waiting out a resume backoff -- would leave the logout there undelivered: the wake, on
+  # the control stream, has some instance adopt it, and `disconnected` has it stop there
+  # instead of dialling. And the note is what lets a logout the connector never attempted be
+  # sent again while the inbox still exists; connecting withdraws it, as it does a teardown.
   def logout
+    Whatsapp::Session::TeardownRetry.requested(session_id)
+    client.control(commands::SessionWake.new(desired: 'disconnected'))
     client.publish(commands::SessionLogout.new, max_runtime: TEARDOWN_RUNTIME)
   end
 
@@ -327,8 +339,11 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     call_id
   end
 
+  # Asked from inside a request, whose caller falls back to the typed number when the
+  # check fails, so the check gives up long before the request does (#838). On the RPC
+  # default it waited 20 s, past the request's own limit, and the fallback never ran.
   def check_numbers(command)
-    Array(client.call(command)).map { |check| model::NumberCheck.from_h(check) }
+    Array(client.call(command, timeout: NUMBER_CHECK_TIMEOUT)).map { |check| model::NumberCheck.from_h(check) }
   end
 
   def profile_picture_url(command)

@@ -106,12 +106,15 @@ class AutoAssignment::AssignmentService
 
   # Atomically claim the row so two bulk runs that overlap (the in-flight gate
   # is best-effort and can lapse on TTL) can't both assign the same conversation.
+  # The agent was picked from the team in the batch snapshot, so the claim also
+  # requires the row to still be in that team: a team change in between (or a reopen
+  # that dropped an assignee outside the new team) would otherwise get an outsider.
   def claim_and_assign(conversation, agent)
     Current.executed_by = inbox.assignment_policy || inbox
 
     Conversation.transaction do
       locked = inbox.conversations
-                    .where(id: conversation.id).unassigned
+                    .where(id: conversation.id, team_id: conversation.team_id).unassigned
                     .lock('FOR UPDATE SKIP LOCKED')
                     .first
       next false unless locked

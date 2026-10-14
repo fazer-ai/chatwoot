@@ -187,7 +187,11 @@
     },
     "ASSIGNMENT": {
       "PREVENT_TAKEOVER": "Impedir tomada de conversa atribuída",
-      "PREVENT_TAKEOVER_SUB_TEXT": "Depois que um agente assume uma conversa, só ele ou um administrador pode mudar quem está atendendo. Não afeta a atribuição automática."
+      "PREVENT_TAKEOVER_SUB_TEXT": "Depois que um agente assume uma conversa, só ele ou um administrador pode mudar quem está atendendo. Não afeta a atribuição automática.",
+      "REOPEN_TEAM": {
+        "TITLE": "Na reabertura, manter o responsável só se ele estiver no time da conversa",
+        "DESCRIPTION": "Quando a mensagem de um cliente reabre uma conversa resolvida ou adiada que tem time, o responsável continua com ela só se for membro desse time. Se não for, a conversa vai para Não atribuídas, com o time e as etiquetas de antes."
+      }
     },
     "CSAT": {
       "TEMPLATE_MODE": {

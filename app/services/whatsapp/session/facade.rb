@@ -107,6 +107,16 @@ class Whatsapp::Session::Facade
     backend.disconnect
   end
 
+  # The operator's Disconnect, which keeps the inbox and therefore its session id. A logout
+  # and not the teardown above: deleting the session has the connector forget it, epoch
+  # counter included, so the pairing after it would start again at epoch 1 under the epoch
+  # and position Chatwoot kept for the old session, and every event of it, the QR first,
+  # would be dropped (fazer-ai/chatwoot#852). The contract keeps the counter across a logout
+  # for exactly this: the account can be paired again under the same id.
+  def logout_channel_provider
+    backend.logout
+  end
+
   # Session providers pair a real phone: there is no template catalog to sync and no
   # template to send.
   def sync_templates
@@ -232,18 +242,17 @@ class Whatsapp::Session::Facade
 
   # An object in the contract, not a flag: the field says how calls are handled. Omitted
   # when the backend does not do calls at all, because `false` is not a value the schema
-  # accepts either.
+  # accepts either, and omitted on an inbox without calling, so the phone rings as it
+  # always did (#850).
   #
-  # An inbox with calling on asks the connector to carry the voice, and never with
-  # `auto_reject` beside it: the connector reads that as "no calls on this session", the
-  # placed ones included, so an inbox with incoming calls turned off would lose its
-  # outgoing ones too. Turning incoming calls off is done here instead, by refusing each
-  # offer as it arrives, which is what the Cloud path does. Without calling, every call is
-  # refused, as before.
+  # An inbox with calling on asks the connector to carry the voice. Never with
+  # `auto_reject`: the connector reads that as "no calls on this session", the placed ones
+  # included, and a refusal from a linked device ends the call on every device of the
+  # account, the phone included.
   def call_policy
     return unless capability?('calls')
 
-    channel.voice_enabled? ? { 'answer' => true } : { 'auto_reject' => true }
+    { 'answer' => true } if channel.voice_enabled?
   end
 
   # What the inbox names as its way out, in the shape the connector takes. Nothing is a

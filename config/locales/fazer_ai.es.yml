@@ -139,6 +139,9 @@ es:
       recurring_message_completed: La serie de mensajes programados recurrentes terminó después de %{count} repeticiones.
       recurring_message_cancelled: "%{agent} detuvo el mensaje programado recurrente."
       unknown_agent: Desconocido
+      assignee:
+        removed_not_in_conversation_team: "Conversación desasignada de %{assignee_name} porque no es miembro del equipo de la conversación, %{team_name}"
+        handed_to_agent_bot_on_reopen: "Conversación pasada de %{assignee_name} a %{bot_name} porque el cliente volvió a escribir"
   contacts:
     group:
       inbox_id_required: Este grupo está en más de una bandeja de entrada. Indique por cuál vale la acción enviando inbox_id.
