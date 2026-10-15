@@ -53,6 +53,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageEdited do
     expect(message.reload.is_edited).to be_nil
   end
 
+  # The connector publishes a correction whose new body it cannot render with the
+  # unsupported placeholder rather than holding it back (PROTOCOL.md, connector #402). It
+  # says the message was corrected into something nobody here can show, not what it says
+  # now, so the readable body the bubble has stays.
+  %w[unknown_type empty].each do |reason|
+    it "keeps the bubble it has for an edit published as unsupported (#{reason})" do
+      unsupported = event.payload.with(content: model::Content::Unsupported.new(reason: reason))
+
+      expect(described_class.new(channel: channel, event: model::Event.build(unsupported)).perform).to eq(:ignored)
+
+      expect(message.reload.content).to eq('oi')
+      expect(message.is_edited).to be_nil
+    end
+  end
+
   it 'refuses an edit for a message the contact revoked' do
     message.update!(content_attributes: message.content_attributes.merge('deleted_by_contact' => true))
 

@@ -166,6 +166,16 @@ hands mid-publish -- and every one of them is written on the assumption that the
 keeps the first row and discards the repeat. A client that does not deduplicate on
 `message.id` will show the same message twice without having done anything wrong.
 
+**A `message.edited` may carry `unsupported` content, and a client keeps the bubble it
+has.** A correction whose new body the connector cannot render is published with the
+`unsupported` placeholder (`unknown_type`, or `empty` for a correction with no body)
+rather than held back: WhatsApp closes the session's socket fifty minutes after
+delivering anything that was not acknowledged, and again on every redelivery, so a
+correction kept for a later build costs a dropped connection every fifty minutes (#402).
+The event says the message was corrected into something this connector cannot show. It
+is not a new body, and writing it over the one the client holds would blank a message
+that was readable.
+
 **Which stream a command goes on is part of the contract, not a detail.** A connector
 reads `wa:cmd:<sid>` only for the sessions it is running, so a command addressed to a
 session nobody has adopted is delivered to no connector at all and is lost when the
