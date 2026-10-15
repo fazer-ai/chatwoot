@@ -77,7 +77,7 @@ module Whatsapp::Session::Facade::Calls
   # for as long as the call.start can take, so that side tells this dial from a call off a
   # handset (Whatsapp::ConnectorCallService#internal_call?).
   def mark_dialling(to, timeout)
-    Redis::Alfred.setex(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: to.id), channel.id.to_s, timeout + 5)
+    Redis::Alfred.setex(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: to.id, channel_id: channel.id), '1', timeout + 5)
   end
 
   def dial_time_left(least = Whatsapp::Connector::Client::DEADLINE_MARGIN + 1)

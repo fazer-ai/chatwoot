@@ -196,11 +196,27 @@ RSpec.describe Whatsapp::ConnectorCallService do
       end.inbox
     end
 
+    def dialling_key(dialler) = format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5541988887777', channel_id: dialler.channel_id)
+
     def dialling_here_from(dialler)
-      Redis::Alfred.setex(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5541988887777'), dialler.channel_id.to_s, 30)
+      Redis::Alfred.setex(dialling_key(dialler), '1', 30)
     end
 
-    after { Redis::Alfred.delete(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5541988887777')) }
+    after { Redis::Alfred.delete(dialling_key(other)) }
+
+    # Two inboxes dialling this one at once each keep their own mark: one dial must not
+    # erase the evidence of the other.
+    it 'is the activity line while another inbox is dialling this one too' do
+      third = create(:channel_whatsapp, account: create(:account), provider: 'native', phone_number: '+5511977776666',
+                                        validate_provider_config: false, sync_templates: false).inbox
+      dialling_here_from(other)
+      dialling_here_from(third)
+
+      expect(offer('CALLLEG5')).to eq(:handled)
+
+      expect(Call.where(provider_call_id: 'CALLLEG5')).to be_empty
+      Redis::Alfred.delete(dialling_key(third))
+    end
 
     it 'is the activity line while that inbox is dialling this one, before it recorded its call' do
       dialling_here_from(other)
@@ -261,6 +277,14 @@ RSpec.describe Whatsapp::ConnectorCallService do
 
       expect(call.reload).to be_terminal
       expect(events_named('voice_call.ended').size).to eq(1)
+    end
+
+    # The expiry is scheduled after the call is recorded, and a failure in between has the
+    # offer redelivered, which finds the call: the redelivery schedules it again.
+    it 'schedules the expiry again when the offer is redelivered for a call still ringing' do
+      offer('CALLEXP4')
+
+      expect { offer('CALLEXP4') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob)
     end
 
     it 'leaves a call that was answered alone' do

@@ -163,7 +163,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   def dialling_here_from?(dialler)
     own = inbox.channel.provider_connection.to_h['phone_number'].presence || inbox.channel.phone_number
     Whatsapp::Session::PhoneMatch.variants(own).any? do |phone|
-      Redis::Alfred.get(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: phone)) == dialler.id.to_s
+      Redis::Alfred.exists?(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: phone, channel_id: dialler.id))
     end
   end
 
@@ -186,13 +186,23 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
 
   # Under the call's lock, read afresh: an agent answering or ending it while this rings
   # again would otherwise see it brought back as ringing on the other agents' screens.
+  # A redelivered offer finds its call, and the failure that had it redelivered may have
+  # come between recording the call and scheduling its expiry: the expiry is scheduled
+  # again, and a second one finds the call already ended.
   def finish_ringing(call)
     call.with_lock do
-      next if !call.ringing? || call.meta['rung']
+      next unless call.ringing?
+
+      schedule_expiry(call)
+      next if call.meta['rung']
 
       update_conversation(call)
       broadcast_incoming(call, call.meta['sdp_offer'])
     end
+  end
+
+  def schedule_expiry(call)
+    Whatsapp::ConnectorCallExpireJob.set(wait: RING_EXPIRY).perform_later(call.id)
   end
 
   def apply_kept_pickup(call)
@@ -251,7 +261,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
       finalize_terminate(recorded, nil, ended['reason']) if ended
       recorded
     end
-    Whatsapp::ConnectorCallExpireJob.set(wait: RING_EXPIRY).perform_later(call.id) unless call.terminal?
+    schedule_expiry(call) unless call.terminal?
     call
   end
 end

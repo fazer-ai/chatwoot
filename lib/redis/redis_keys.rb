@@ -86,8 +86,9 @@ module Redis::RedisKeys
   WHATSAPP_CONNECTOR_CALL_POLICY_PENDING = 'WHATSAPP_CONNECTOR_CALL_POLICY_PENDING::%<channel_id>s'.freeze
   # A connector call event that arrived before the Call it is about was recorded.
   WHATSAPP_CONNECTOR_CALL_PENDING = 'WHATSAPP_CONNECTOR_CALL_PENDING::%<inbox_id>s::%<call_id>s::%<kind>s'.freeze
-  # The native channel dialling this phone through Chatwoot, while its call.start is out.
-  WHATSAPP_CONNECTOR_CALL_DIALING = 'WHATSAPP_CONNECTOR_CALL_DIALING::%<phone>s'.freeze
+  # A native channel dialling this phone through Chatwoot, while its call.start is out. One
+  # key per dialler, so two dialling the same number at once do not erase each other.
+  WHATSAPP_CONNECTOR_CALL_DIALING = 'WHATSAPP_CONNECTOR_CALL_DIALING::%<phone>s::%<channel_id>s'.freeze
   # The provider message ids this app has just acknowledged to WhatsApp, per conversation, so the
   # provider's echo of that receipt is not read back as a device of this account opening the chat.
   WHATSAPP_SELF_READ_RECEIPT = 'WHATSAPP_SELF_READ_RECEIPT::%<conversation_id>s::%<source_id>s'.freeze
