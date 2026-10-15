@@ -7,10 +7,16 @@ class Api::V1::Accounts::Conversations::AttachmentsController < Api::V1::Account
 
   def update
     @attachment.update!(permitted_params)
+    record_transcription
     @attachment.message.send_update_event
   end
 
   private
+
+  # Where a recording belongs to something that shows its own transcription, the text
+  # written here is carried there before the message goes out again. Nothing does in the
+  # open-source edition.
+  def record_transcription; end
 
   def set_message
     @message = @conversation.messages.find(params[:message_id])
@@ -32,3 +38,5 @@ class Api::V1::Accounts::Conversations::AttachmentsController < Api::V1::Account
     render json: { error: "Metadata size exceeds maximum allowed (#{MAX_META_SIZE / 1024}KB)" }, status: :unprocessable_entity
   end
 end
+
+Api::V1::Accounts::Conversations::AttachmentsController.prepend_mod_with('Api::V1::Accounts::Conversations::AttachmentsController')
