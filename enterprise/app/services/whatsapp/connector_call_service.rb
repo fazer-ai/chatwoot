@@ -8,6 +8,9 @@
 # same thread that contact's messages do. And the connector delivers a session's events in
 # order on one shard, so a terminate never overtakes its offer and needs no tombstone.
 class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
+  # Past what WhatsApp rings an unanswered call, with room for a late end to arrive first.
+  RING_EXPIRY = 2.minutes
+
   def initialize(inbox:, contact_inbox: nil)
     super(inbox: inbox, params: {})
     @contact_inbox = contact_inbox
@@ -42,6 +45,19 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
 
     Channel::Whatsapp.where(provider: 'native').where.not(id: inbox.channel_id).any? do |channel|
       paired_as?(channel, lid, phones)
+    end
+  end
+
+  # An incoming call nobody answered whose end never arrived: the protocol lets a session's
+  # instance go without its call.terminate reaching the client, and before the agent answers
+  # there is no peer connection in the browser whose failure would say so. WhatsApp stops
+  # ringing well within RING_EXPIRY, so a call still ringing past it is over. Run from
+  # Whatsapp::ConnectorCallExpireJob.
+  def expire_unanswered(call)
+    call.with_lock do
+      next unless call.ringing?
+
+      finalize_terminate(call, nil, 'unanswered')
     end
   end
 
@@ -208,14 +224,16 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     # An end the connector published before the offer, kept by `terminate`, is applied in
     # the same transaction, as the Cloud path applies its tombstone: the call's message is
     # then written already ended, and nobody is rung for a call that is over.
-    ActiveRecord::Base.transaction do
-      call = Voice::InboundCallBuilder.perform!(
+    call = ActiveRecord::Base.transaction do
+      recorded = Voice::InboundCallBuilder.perform!(
         inbox: inbox, call_sid: payload[:id], provider: :whatsapp, extra_meta: extra_meta,
         caller: { source_ids: [@contact_inbox.source_id], contact_attributes: {} }, conversation: conversation
       )
-      ended = take_pending(call.provider_call_id, 'terminate')
-      finalize_terminate(call, nil, ended['reason']) if ended
-      call
+      ended = take_pending(recorded.provider_call_id, 'terminate')
+      finalize_terminate(recorded, nil, ended['reason']) if ended
+      recorded
     end
+    Whatsapp::ConnectorCallExpireJob.set(wait: RING_EXPIRY).perform_later(call.id) unless call.terminal?
+    call
   end
 end

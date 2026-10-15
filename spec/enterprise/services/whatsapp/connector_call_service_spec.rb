@@ -228,6 +228,36 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
+  # The end of an unanswered call can be lost: the protocol lets a session's instance go
+  # without its call.terminate reaching the client. Nothing in the browser can notice before
+  # the agent answers, so a call still ringing well past what WhatsApp rings is ended here.
+  describe 'an incoming call nobody answered whose end never arrived' do
+    it 'schedules its expiry when it starts ringing' do
+      expect { offer('CALLEXP1') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob)
+    end
+
+    it 'is ended as unanswered once the ring limit passes' do
+      offer('CALLEXP2')
+      call = Call.find_by!(provider_call_id: 'CALLEXP2')
+
+      Whatsapp::ConnectorCallExpireJob.perform_now(call.id)
+
+      expect(call.reload).to be_terminal
+      expect(events_named('voice_call.ended').size).to eq(1)
+    end
+
+    it 'leaves a call that was answered alone' do
+      offer('CALLEXP3')
+      call = Call.find_by!(provider_call_id: 'CALLEXP3')
+      call.update!(status: 'in_progress')
+
+      Whatsapp::ConnectorCallExpireJob.perform_now(call.id)
+
+      expect(call.reload.status).to eq('in_progress')
+      expect(events_named('voice_call.ended')).to be_empty
+    end
+  end
+
   describe 'an offer the browser cannot answer' do
     it 'is the activity line it always was when it carries no sdp' do
       expect(offer('CALLX9', sdp: nil)).to eq(:handled)
