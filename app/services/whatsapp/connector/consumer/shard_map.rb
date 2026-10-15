@@ -20,11 +20,17 @@
 class Whatsapp::Connector::Consumer::ShardMap
   Consumer = Whatsapp::Connector::Consumer
 
-  # Keeps the largest count it is given, and answers with whatever is largest now.
+  # Keeps the largest count it is given, and answers with whatever is largest now. It
+  # writes only when the count grows: every consumer runs this on every tick, and the
+  # topology changes only on a re-shard.
   RECORD_TOPOLOGY = <<~LUA.freeze
-    local largest = math.max(tonumber(redis.call('get', KEYS[1]) or '0'), tonumber(ARGV[1]))
-    redis.call('set', KEYS[1], largest)
-    return largest
+    local recorded = tonumber(redis.call('get', KEYS[1]) or '0')
+    local count = tonumber(ARGV[1])
+    if count > recorded then
+      redis.call('set', KEYS[1], count)
+      return count
+    end
+    return recorded
   LUA
   # How often a stopped consumer repeats itself, in supervisor ticks. A process that has
   # stopped reading must not also go quiet, and the state only clears on a restart.
