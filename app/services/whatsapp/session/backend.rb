@@ -148,7 +148,7 @@ class Whatsapp::Session::Backend
   def check_numbers(_command) = not_supported!(:check_numbers)
   def profile_picture_url(_command) = not_supported!(:profile_picture_url)
   # Both of WhatsApp's namespaces for one person, as a Party.
-  def resolve_contact(_command) = not_supported!(:resolve_contact)
+  def resolve_contact(_command, **) = not_supported!(:resolve_contact)
 
   # --- groups ----------------------------------------------------------------------
   def create_group(_command) = not_supported!(:create_group)

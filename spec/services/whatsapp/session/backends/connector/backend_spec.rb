@@ -570,7 +570,7 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       command = model::Commands::CallStart.new(to: caller_address, sdp: 'SDP-OFFER')
 
       expect(backend.start_call(command, idempotency_key: 'call:abc')).to eq('CALLOUT1')
-      expect(client).to have_received(:call).with(command, idempotency_key: 'call:abc')
+      expect(client).to have_received(:call).with(command, idempotency_key: 'call:abc', timeout: Whatsapp::Connector::Client::RPC_TIMEOUT)
     end
 
     # A call id is what every later event is matched by, so a result without one is a

@@ -331,8 +331,8 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
   # Rings somebody's phone, which a redelivery must not do twice: the key is what makes
   # the connector answer a resend with the call it already placed.
-  def start_call(command, idempotency_key:)
-    result = client.call(command, idempotency_key: idempotency_key)
+  def start_call(command, idempotency_key:, timeout: Whatsapp::Connector::Client::RPC_TIMEOUT)
+    result = client.call(command, idempotency_key: idempotency_key, timeout: timeout)
     call_id = result.is_a?(Hash) ? result['call_id'] : nil
     raise Whatsapp::Session::Errors::InvalidPayload, 'call.start answered without a call_id' if call_id.blank?
 
@@ -351,8 +351,8 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
     result.is_a?(Hash) ? result['url'] : result
   end
 
-  def resolve_contact(command)
-    model::Party.from_h(client.call(command))
+  def resolve_contact(command, timeout: Whatsapp::Connector::Client::RPC_TIMEOUT)
+    model::Party.from_h(client.call(command, timeout: timeout))
   end
 
   # --- groups --------------------------------------------------------------------

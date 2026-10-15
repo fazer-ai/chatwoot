@@ -7,6 +7,16 @@
 # answers once Meta took the request: the outcome of a call arrives as events, and a
 # command the connector could not carry out comes back as `command.failed`.
 module Whatsapp::Session::Facade::Calls
+  # The dial runs inside a request that Rack::Timeout kills after 15 s, and the connector
+  # drops a command past its deadline. Every connector call the dial makes is bounded by
+  # what is left of this budget, so a call.start that reaches the connector late is dropped
+  # there instead of ringing somebody after the request died with no call recorded.
+  CALL_INITIATION_BUDGET = 10
+
+  # The least a call.start is sent with: the connector deadline is the timeout less the
+  # client's margin, and a deadline that leaves no time to dial only rings nobody.
+  CALL_START_MIN_WINDOW = Whatsapp::Connector::Client::DEADLINE_MARGIN + 2
+
   # The Calling API takes the browser's answer in two steps, and the connector in one.
   def pre_accept_call(_call_id, _sdp_answer)
     calls_supported!
@@ -49,12 +59,23 @@ module Whatsapp::Session::Facade::Calls
   def initiate_call(recipient, sdp_offer, contact: nil, number: false)
     calls_supported!
     voice_carried!
+    @dial_deadline = monotonic_now + CALL_INITIATION_BUDGET
     to = number ? model::Address.phone(recipient.to_s.delete('+')) : callee_address(recipient, contact)
     command = model::Commands::CallStart.new(to: to, sdp: sdp_offer)
-    { 'call_id' => backend.start_call(command, idempotency_key: "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}") }
+    key = "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}"
+    { 'call_id' => backend.start_call(command, idempotency_key: key, timeout: dial_time_left(CALL_START_MIN_WINDOW)) }
   end
 
   private
+
+  def monotonic_now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+  def dial_time_left(least = Whatsapp::Connector::Client::DEADLINE_MARGIN + 1)
+    left = (@dial_deadline - monotonic_now).floor
+    raise Whatsapp::Session::Errors::Timeout, 'no time left to place the call within the request' if left < least
+
+    left
+  end
 
   def calls_supported!
     return if capability?('voice_calls')
@@ -106,7 +127,7 @@ module Whatsapp::Session::Facade::Calls
   def paired_phone(lid) = resolve(lid)&.phone.presence
 
   def resolve(address)
-    backend.resolve_contact(model::Commands::ContactResolve.new(party: address))
+    backend.resolve_contact(model::Commands::ContactResolve.new(party: address), timeout: dial_time_left)
   end
 
   # The address the offer named, kept on the call when it rang, and read off its contact

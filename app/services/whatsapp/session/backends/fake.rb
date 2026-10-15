@@ -195,7 +195,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend # rubocop:d
   # Keeps the key each `call.start` went out with, in `idempotency_keys`; answers 'FAKECALL0001'.
   # The LIDs this fake pairs with a number, as the connector would from what it was shown.
   PAIRED_LIDS = { '182736451928374' => '5541999990000' }.freeze
-  def resolve_contact(command)
+  def resolve_contact(command, **)
     record(command)
     id = command.party.id
     return model::Party.new(phone: PAIRED_LIDS[id], lid: id) if command.party.kind == 'lid'
@@ -203,7 +203,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend # rubocop:d
     model::Party.new(phone: id, lid: PAIRED_LIDS.key(id))
   end
 
-  def start_call(command, idempotency_key:) = record(command) && (@idempotency_keys ||= []).push(idempotency_key) && 'FAKECALL0001'
+  def start_call(command, idempotency_key:, **) = record(command) && (@idempotency_keys ||= []).push(idempotency_key) && 'FAKECALL0001'
 
   # --- test helpers ------------------------------------------------------------------
 

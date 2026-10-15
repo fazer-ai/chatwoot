@@ -190,6 +190,43 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(backend.commands_of('call.start')).to be_empty
     end
 
+    # The dial runs inside a request that is killed after 15 s. Every connector call it makes
+    # is bounded by what is left of one budget below that, so the connector, which drops a
+    # command past its deadline, never rings somebody after the request died.
+    describe 'the time a dial may take' do
+      let(:budget) { described_class::CALL_INITIATION_BUDGET }
+
+      it 'bounds every connector call of the dial by what is left of one budget' do
+        timeouts = []
+        %i[resolve_contact start_call].each do |name|
+          allow(backend).to receive(name).and_wrap_original do |original, *args, **kwargs|
+            timeouts << [name, kwargs[:timeout]]
+            original.call(*args, **kwargs)
+          end
+        end
+
+        facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact)
+
+        expect(timeouts.map(&:first)).to include(:resolve_contact, :start_call)
+        expect(timeouts.map(&:last)).to all(be_a(Numeric).and(be <= budget))
+        expect(budget).to be < 15
+      end
+
+      it 'does not place the call when the lookups left too little of the budget' do
+        clock = [0.0]
+        allow(Process).to receive(:clock_gettime).and_call_original
+        allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC) { clock.first }
+        allow(backend).to receive(:resolve_contact).and_wrap_original do |original, *args, **kwargs|
+          clock[0] += budget
+          original.call(*args, **kwargs)
+        end
+
+        expect { facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact) }
+          .to raise_error(Whatsapp::Session::Errors::Timeout)
+        expect(backend.commands_of('call.start')).to be_empty
+      end
+    end
+
     # A number picked as one is dialled as one, even when the same digits are a LID the
     # connector pairs with somebody else's phone.
     it 'dials a number picked from the contact panel as that number' do
