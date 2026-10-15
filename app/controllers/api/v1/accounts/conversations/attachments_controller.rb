@@ -2,6 +2,7 @@ class Api::V1::Accounts::Conversations::AttachmentsController < Api::V1::Account
   before_action :set_message
   before_action :set_attachment
   before_action :validate_meta_size, only: [:update]
+  before_action :validate_transcribed_text, only: [:update]
 
   MAX_META_SIZE = 16.kilobytes
 
@@ -36,6 +37,15 @@ class Api::V1::Accounts::Conversations::AttachmentsController < Api::V1::Account
     return unless params[:meta].to_json.bytesize > MAX_META_SIZE
 
     render json: { error: "Metadata size exceeds maximum allowed (#{MAX_META_SIZE / 1024}KB)" }, status: :unprocessable_entity
+  end
+
+  # The transcription is text wherever it is read, the call's included: a `false` or a
+  # number stored here would come back as the string "false" or "42".
+  def validate_transcribed_text
+    return unless params[:meta].respond_to?(:key?) && params[:meta].key?(:transcribed_text)
+    return if params[:meta][:transcribed_text].is_a?(String)
+
+    render json: { error: 'transcribed_text must be a string' }, status: :unprocessable_entity
   end
 end
 

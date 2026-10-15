@@ -47,6 +47,16 @@ RSpec.describe 'Conversation Message Attachments API (call recordings)', type: :
     expect(call.reload.transcript).to eq('original')
   end
 
+  it 'refuses a transcription that is not text, and writes nothing' do
+    [false, 42, ['a']].each do |value|
+      write_meta({ transcribed_text: value })
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+    expect(call.reload.transcript).to eq('original')
+    expect(recording.reload.meta).not_to have_key('transcribed_text')
+  end
+
   it 'writes to no call for an audio message that is not a call' do
     voice_note = create(:message, conversation: conversation, account: account)
     audio = voice_note.attachments.create!(account: account, file_type: :audio, file: audio_file)
