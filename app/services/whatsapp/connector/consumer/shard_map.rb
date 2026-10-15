@@ -20,7 +20,6 @@
 class Whatsapp::Connector::Consumer::ShardMap
   Consumer = Whatsapp::Connector::Consumer
 
-  SCAN_BATCH = 100
   # How often a stopped consumer repeats itself, in supervisor ticks. A process that has
   # stopped reading must not also go quiet, and the state only clears on a restart.
   REMINDER_TICKS = 60
@@ -100,22 +99,23 @@ class Whatsapp::Connector::Consumer::ShardMap
   end
 
   def retired_with_work(advertised)
-    existing.select { |shard| shard >= advertised && backlog?(shard) }.sort
+    retired(advertised).select { |shard| backlog?(shard) }
   end
 
-  # From the keys that are there, not from the local setting: the connector may have been
-  # publishing more shards than this installation was ever configured for, and those
-  # streams have to be found too. The lease keys share the prefix, so only the ones
-  # ending in the shard number count.
-  def existing
-    cursor = '0'
-    found = []
-    loop do
-      cursor, keys = @redis.scan(cursor, match: Consumer.shard_key('*'), count: SCAN_BATCH)
-      found.concat(keys)
-      break if cursor == '0'
-    end
-    found.filter_map { |key| key[/:(\d+)\z/, 1]&.to_i }
+  # The streams of a previous, larger topology: the ones from the current count upwards
+  # that are still there, which on any installation without a past re-shard is one EXISTS
+  # that answers no.
+  #
+  # Found by asking for each in turn rather than by looking for the pattern, because a
+  # SCAN for a pattern walks every key in the Redis the installation shares, on every
+  # tick. Stopping at the first gap is safe because a topology's streams are contiguous:
+  # its consumers created the group, and with it the stream, on every shard they read,
+  # and they read all of them. Nor does it lean on the local setting, which the connector
+  # may have been publishing more shards than.
+  def retired(advertised)
+    shard = advertised
+    shard += 1 while @redis.exists?(Consumer.shard_key(shard))
+    (advertised...shard).to_a
   end
 
   # Pending entries, or entries still sitting past where the group stopped.

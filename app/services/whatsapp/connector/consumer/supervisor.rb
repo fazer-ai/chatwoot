@@ -76,6 +76,8 @@ class Whatsapp::Connector::Consumer::Supervisor
   # One pass of the claim loop, which is also what the specs drive directly.
   def tick
     @mutex.synchronize do
+      next unless connector_running?
+
       @peers = nil
       @shards = nil
       # Twice on purpose: the first announces this consumer so peers count it before it
@@ -98,6 +100,20 @@ class Whatsapp::Connector::Consumer::Supervisor
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP CONNECTOR] consumer tick failed: #{e.class}: #{e.message}")
     ChatwootExceptionTracker.new(e).capture_exception
+  end
+
+  # Whether a connector has ever come up against this Redis. Every Sidekiq process runs a
+  # consumer by default, including on installations that never run one, and until the
+  # connector publishes its shard count there is nothing to read: the consumer then costs
+  # one read per tick and leaves nothing behind. Once the count is there it stays there,
+  # so the connector coming up is all it takes to start reading, with nothing to set and
+  # nothing to restart.
+  def connector_running?
+    return true if @connector_running
+    return false unless Whatsapp::Connector.published_shards(redis)
+
+    Rails.logger.info("[WHATSAPP CONNECTOR] #{consumer_id} found a running connector; consuming its events")
+    @connector_running = true
   end
 
   def redis
@@ -130,7 +146,7 @@ class Whatsapp::Connector::Consumer::Supervisor
   end
 
   # Memoized for the tick: every share and both loops below ask for it, and answering
-  # walks the keyspace.
+  # takes a round trip or more to Redis.
   def shards
     @shards ||= shard_map.shards
   end
