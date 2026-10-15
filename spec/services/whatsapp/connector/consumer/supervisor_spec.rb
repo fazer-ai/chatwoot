@@ -278,6 +278,25 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(redis.ttl("#{prefix}events:0:lease")).to be > 1
   end
 
+  # Every process records the topology on every tick, and it only changes on a re-shard.
+  # Writing it anyway is a write per process every few seconds, forever, into the AOF and
+  # out to every replica. A rewrite also drops a TTL, which is what this watches.
+  it 'leaves the recorded topology alone while it does not grow' do
+    redis.set(described_class::Consumer.topology_key, 4, ex: 600)
+
+    supervisor.tick
+
+    expect(redis.ttl(described_class::Consumer.topology_key)).to be > 0
+  end
+
+  it 'raises the recorded topology when the connector publishes more shards' do
+    redis.set(described_class::Consumer.topology_key, 2)
+
+    supervisor.tick
+
+    expect(redis.get(described_class::Consumer.topology_key)).to eq('4')
+  end
+
   # The consumers' whole steady state, on the Redis the installation shares: peers to
   # count, a retired stream to look for. Walking the keyspace for either cost a production
   # Redis 72% of its CPU.
