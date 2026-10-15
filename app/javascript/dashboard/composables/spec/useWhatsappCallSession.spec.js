@@ -269,7 +269,9 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     // The pickup can be handled while the request placing the call is still out.
     it('is not timed when it was picked up before the dial returned', async () => {
       vi.useFakeTimers();
+      // The connector reports the pickup and its answer as one event.
       WhatsappCallsAPI.initiate.mockImplementation(async () => {
+        await applyOutboundAnswer(42, 'v=0\r\n');
         armOutboundRecorder();
         return { id: 42, call_id: 'CALLOUT1' };
       });
@@ -324,6 +326,7 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
         call_id: 'CALLOUT1',
       });
       WhatsappCallsAPI.show.mockImplementationOnce(async () => {
+        await applyOutboundAnswer(42, 'v=0\r\n');
         armOutboundRecorder();
         return { status: 'ringing' };
       });
@@ -363,10 +366,30 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
       const session = useWhatsappCallSession();
       await session.initiateOutboundCall({ conversationId: 1 });
 
+      await applyOutboundAnswer(42, 'v=0\r\n');
       armOutboundRecorder();
       await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS * 2);
 
       expect(WhatsappCallsAPI.terminate).not.toHaveBeenCalled();
+    });
+
+    // A pickup whose answer never reached this tab, or failed to apply, leaves a peer that
+    // never negotiates and so never fails: the pickup alone does not hand the call over.
+    it('is let go of when the callee picked up but the answer was never applied', async () => {
+      vi.useFakeTimers();
+      WhatsappCallsAPI.initiate.mockResolvedValue({
+        id: 42,
+        call_id: 'CALLOUT1',
+      });
+      WhatsappCallsAPI.show.mockResolvedValue({ status: 'in-progress' });
+      const session = useWhatsappCallSession();
+      await session.initiateOutboundCall({ conversationId: 1 });
+
+      armOutboundRecorder();
+      await vi.advanceTimersByTimeAsync(OUTBOUND_RINGING_LIMIT_MS);
+
+      expect(WhatsappCallsAPI.terminate).toHaveBeenCalledWith(42);
+      await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
     });
   });
 

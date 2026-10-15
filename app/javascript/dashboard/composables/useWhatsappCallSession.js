@@ -259,8 +259,9 @@ const startRingingTimer = (callId, placedSid) => {
     } catch (_) {
       /* unreachable as well, or too slow to say: nothing says the call is up */
     }
-    // A pickup that arrived while the call was being asked about armed the recorder.
-    if (activeCallId !== callId || recorderArmed) return;
+    // A pickup that arrived, answer applied, while the call was being asked about.
+    if (activeCallId !== callId || (recorderArmed && pc?.remoteDescription))
+      return;
     // Up on WhatsApp is only a call here once its answer was applied: without one there is
     // no media, and no transport whose failure would ever report the call lost.
     if (status === 'in-progress' && pc?.remoteDescription) {
@@ -464,9 +465,9 @@ export function useWhatsappCallSession() {
       if (response?.id) {
         activeCallId = response.id;
         activeCallSid = response.call_id || null;
-        // Not for a call already picked up while the dial was out: its pickup armed the
-        // recorder, and it is the transport's to report from there.
-        if (!recorderArmed) startRingingTimer(activeCallId, activeCallSid);
+        // Timed until a pickup with its answer applied hands the call to the transport; a
+        // pickup that raced the dial is settled once the buffered answer below is applied.
+        startRingingTimer(activeCallId, activeCallSid);
         callRecordingEnabled = response.recording_enabled !== false;
         // A connect webhook that raced ahead of this response was buffered;
         // apply our own by id now that we know it, then drop every buffered
@@ -479,6 +480,7 @@ export function useWhatsappCallSession() {
             sdp: buffered,
           });
         }
+        if (recorderArmed && pc?.remoteDescription) stopRingingTimer();
         return response;
       }
       // No call id back: this is the permission-request branch. The mic +
@@ -552,6 +554,8 @@ export const applyOutboundAnswer = async (callId, sdpAnswer) => {
   // activeCallId known → only apply the answer for this tab's call.
   if (callId !== activeCallId) return;
   await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer });
+  // A pickup that came before its answer left the watchdog running for this.
+  if (recorderArmed) stopRingingTimer();
 };
 
 // Called by the cable handler when Meta delivers status=ACCEPTED for the
@@ -559,8 +563,10 @@ export const applyOutboundAnswer = async (callId, sdpAnswer) => {
 // MediaRecorder. Idempotent — safe if ontrack hasn't fired yet (setupRecorder
 // bails until the remote stream has audio tracks; ontrack will retry).
 export const armOutboundRecorder = () => {
-  // Picked up: from here a lost call is the transport's to report.
-  stopRingingTimer();
+  // Picked up, and with the answer applied the transport is negotiating: from here a lost
+  // call is its to report. Without the answer it never negotiates and never fails, so the
+  // watchdog stays until the answer is applied.
+  if (pc?.remoteDescription) stopRingingTimer();
   recorderArmed = true;
   setupRecorder();
 };
