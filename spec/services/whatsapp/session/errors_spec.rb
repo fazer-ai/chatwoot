@@ -76,4 +76,16 @@ RSpec.describe Whatsapp::Session::Errors do
     expect(errors::RateLimited.new.code).to eq('rate_limited')
     expect(errors::NotSupported.new.code).to eq('unsupported')
   end
+
+  # Whether the same command asked again could answer differently. A lost pairing cannot:
+  # it comes back only when somebody scans the QR (#855).
+  {
+    Whatsapp::Session::Errors::NotPaired => false,
+    Whatsapp::Session::Errors::NotConnected => true,
+    Whatsapp::Session::Errors::SessionNotFound => true
+  }.each do |error, retryable|
+    it "says #{error.name.demodulize} is #{'not ' unless retryable}worth retrying" do
+      expect(error.new.retryable?).to be(retryable)
+    end
+  end
 end

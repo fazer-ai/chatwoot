@@ -169,6 +169,30 @@ RSpec.describe Whatsapp::Session::Outbound::MessageSender do
     expect(message.external_error).to eq('number is not on whatsapp')
   end
 
+  # A phone that was logged out stays logged out until somebody scans the QR again, so a
+  # retry cannot answer differently: the bubble used to sit on the clock for the four
+  # attempts before it said so (#855).
+  it 'fails the message at once when the session lost its pairing' do
+    allow(backend).to receive(:send_message).and_raise(Whatsapp::Session::Errors::NotPaired, 'not paired')
+
+    expect { send_message }.not_to raise_error
+
+    expect(backend).to have_received(:send_message).once
+    expect(message.reload.status).to eq('failed')
+    expect(message.external_error).to eq('not paired')
+  end
+
+  # A socket that is reconnecting, or a session that is being brought back, can work a
+  # few seconds later, so those still take the job down for a retry.
+  [Whatsapp::Session::Errors::NotConnected, Whatsapp::Session::Errors::SessionNotFound].each do |error|
+    it "lets #{error.name.demodulize} take the job down for a retry" do
+      allow(backend).to receive(:send_message).and_raise(error)
+
+      expect { send_message }.to raise_error(error)
+      expect(message.reload.status).not_to eq('failed')
+    end
+  end
+
   # The other half: a provider that is down answers differently once it is back, so the
   # job has to fail and be retried rather than bury a message the agent could still send.
   it 'lets a provider that may answer differently take the job down with it' do
