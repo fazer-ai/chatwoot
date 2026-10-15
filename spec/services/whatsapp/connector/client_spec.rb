@@ -88,6 +88,30 @@ RSpec.describe Whatsapp::Connector::Client, :redis_streams do
     end
   end
 
+  # A session can move to any instance, so calls are carried only when every live one
+  # opened the call port, and an instance older than the field counts as not.
+  describe '.carries_calls?' do
+    def announce(id, calls)
+      redis.hset("#{prefix}instance:#{id}", 'protocol_min', '1', 'protocol_max', '1', *(calls.nil? ? [] : ['calls', calls]))
+      redis.sadd("#{prefix}instances", id)
+    end
+
+    it 'says yes only when every live instance carries calls' do
+      announce('one', 'true')
+      expect(described_class.carries_calls?).to be(true)
+
+      announce('two', 'false')
+      expect(described_class.carries_calls?).to be(false)
+    end
+
+    it 'says no for an instance that does not announce the field, and with no instance at all' do
+      expect(described_class.carries_calls?).to be(false)
+
+      announce('old', nil)
+      expect(described_class.carries_calls?).to be(false)
+    end
+  end
+
   describe '#call' do
     before { redis.hset("#{prefix}instance:one", 'protocol_min', '1', 'protocol_max', '1') && redis.sadd("#{prefix}instances", 'one') }
 

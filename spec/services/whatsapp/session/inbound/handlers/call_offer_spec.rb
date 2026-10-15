@@ -97,7 +97,6 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::CallOffer do
       model::Events::CallTerminate.new(call_id: 'call-1', from: caller_party, reason: 'rejected')
     )
 
-    expect(Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, terminate)).to eq(:ignored)
-    expect(activity_lines.count).to eq(1)
+    expect { Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, terminate) }.not_to change(inbox.messages, :count)
   end
 end

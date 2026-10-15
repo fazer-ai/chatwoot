@@ -3,17 +3,21 @@ class Voice::InboundCallBuilder
 
   # `caller` carries the contact identity: { source_ids:, contact_attributes: }. Twilio passes
   # its single +phone source_id; WhatsApp passes the message-path phone/user_id/parent_user_id set.
-  def self.perform!(inbox:, call_sid:, caller:, provider: :twilio, extra_meta: {})
-    new(inbox: inbox, call_sid: call_sid, caller: caller, provider: provider, extra_meta: extra_meta).perform!
+  #
+  # `conversation` is the thread a caller that files its own messages already picked for
+  # the call, the way it picks one for a message; without it the call's ContactInbox decides.
+  def self.perform!(inbox:, call_sid:, caller:, provider: :twilio, extra_meta: {}, conversation: nil) # rubocop:disable Metrics/ParameterLists
+    new(inbox: inbox, call_sid: call_sid, caller: caller, provider: provider, extra_meta: extra_meta, conversation: conversation).perform!
   end
 
-  def initialize(inbox:, call_sid:, caller:, provider: :twilio, extra_meta: {})
+  def initialize(inbox:, call_sid:, caller:, provider: :twilio, extra_meta: {}, conversation: nil) # rubocop:disable Metrics/ParameterLists
     @inbox = inbox
     @call_sid = call_sid
     @provider = provider.to_sym
     @extra_meta = extra_meta || {}
     @source_ids = Array(caller[:source_ids]).compact_blank
     @contact_attributes = caller[:contact_attributes] || {}
+    @conversation = conversation
   end
 
   def perform!
@@ -23,7 +27,7 @@ class Voice::InboundCallBuilder
     ActiveRecord::Base.transaction do
       contact_inbox = ensure_contact_inbox!
       contact = contact_inbox.contact
-      conversation = resolve_conversation!(contact, contact_inbox)
+      conversation = @conversation || resolve_conversation!(contact, contact_inbox)
       call = create_call!(contact, conversation)
       message = Voice::CallMessageBuilder.new(call).perform!
       call.update!(message_id: message.id)

@@ -141,6 +141,8 @@ RSpec.describe 'WhatsApp inbound entry points and a blocked contact' do # ruboco
     'session:MessageRevoked' => 'flags a message already filed',
     'session:MediaDownloadFailed' => 'media of a message already filed',
     'session:CommandFailed' => 'the outcome of a command we sent',
+    'session:CallAnswered' => 'the pickup of a call we placed',
+    'session:CallTerminate' => 'the end of a call already filed',
     'session:Presence' => 'typing and online state',
     'session:ContactPictureChanged' => 'the avatar of a contact already filed',
     'session:GroupJoined' => 'groups: the rule is per contact',

@@ -14,7 +14,10 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     # previous instance's state, down to the number it was paired with, which reads as the
     # wrong one and ends the session that just replaced it.
     result = Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state, instance: instance)
-    result == :stale ? :ignored : :handled
+    return :ignored if result == :stale
+
+    channel.apply_pending_call_policy if payload.wire_type == 'pairing.success'
+    :handled
   end
 
   private

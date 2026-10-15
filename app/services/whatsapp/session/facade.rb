@@ -11,6 +11,7 @@ class Whatsapp::Session::Facade
   include Whatsapp::Session::Facade::Groups
   include Whatsapp::Session::Facade::History
   include Whatsapp::Session::Facade::Presence
+  include Whatsapp::Session::Facade::Calls
 
   attr_reader :channel, :backend, :provider, :instance
 
@@ -82,7 +83,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: 'resume', phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), history_sync: history_on_connect?, proxy: proxy
+        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
       )
     )
   end
@@ -239,6 +240,21 @@ class Whatsapp::Session::Facade
     state
   end
 
+  # An object in the contract, not a flag: the field says how calls are handled. Omitted
+  # when the backend does not do calls at all, because `false` is not a value the schema
+  # accepts either, and omitted on an inbox without calling, so the phone rings as it
+  # always did (#850).
+  #
+  # An inbox with calling on asks the connector to carry the voice. Never with
+  # `auto_reject`: the connector reads that as "no calls on this session", the placed ones
+  # included, and a refusal from a linked device ends the call on every device of the
+  # account, the phone included.
+  def call_policy
+    return unless capability?('calls')
+
+    { 'answer' => true } if channel.voice_enabled?
+  end
+
   # What the inbox names as its way out, in the shape the connector takes. Nothing is a
   # request to go out directly: every connect states the whole request, so a connect that
   # left the proxy out would take a session off the one it had.
@@ -273,7 +289,7 @@ class Whatsapp::Session::Facade
     backend.connect(
       model::Commands::SessionConnect.new(
         pairing: mode, phone: channel.phone_number.to_s.delete('+'),
-        groups: capability?('groups'), history_sync: history_on_connect?, proxy: proxy
+        groups: capability?('groups'), calls: call_policy, history_sync: history_on_connect?, proxy: proxy
       )
     )
   rescue Whatsapp::Session::Errors::Error

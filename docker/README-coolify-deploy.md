@@ -63,6 +63,8 @@ O canal WhatsApp (nativo) vem ligado em toda instalação e toda conta; `WHATSAP
 
 **Instalação que já roda o conector como application separada põe `WHATSAPP_CONNECTOR_EMBEDDED=false` no worker antes de atualizar a imagem, mesmo que nunca tenha definido `WHATSAPP_CONNECTOR_ENABLED`.** Sem isso sobe um segundo conector dentro do worker, com um banco sem os pareamentos, disputando as mesmas sessões pelo mesmo Redis.
 
+**Chamadas de WhatsApp na caixa nativa precisam de uma porta UDP.** A voz das ligações passa pelo conector numa porta UDP só, e o navegador dos agentes manda o áudio direto para ela. Defina `WAC_CALLS_UDP_PORT` (por exemplo `40000`) no container onde o conector roda (o worker, no modo embutido; a application `whatsapp-connector`, no modo separado) e publique essa porta em UDP no container, com o firewall do servidor liberando a mesma porta. Atrás de NAT, defina também `WAC_CALLS_PUBLIC_IP` com o IPv4 público do servidor. Sem a porta, as chamadas ficam desligadas, e a tela de chamadas da caixa diz o que falta.
+
 Como application separada, o conector tem imagem e trem de release próprios, o que serve para atualizá-lo sem esperar uma release do Chatwoot (o whatsmeow muda a cada duas semanas). O resto desta seção vale para esse modo.
 
 - **`REDIS_URL` e `REDIS_PASSWORD` são sem prefixo `WAC_`, de propósito:** os dois lados leem a mesma variável, então não dá para apontá-los para servidores diferentes. Redis separado produziria silêncio, não erro.

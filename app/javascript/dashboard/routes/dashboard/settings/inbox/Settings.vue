@@ -57,6 +57,7 @@ import Widget from 'dashboard/modules/widget-preview/components/Widget.vue';
 import AccessToken from 'dashboard/routes/dashboard/settings/profile/AccessToken.vue';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import { META_RESTRICTION_STATUS_URL } from 'dashboard/constants/globals';
+import { CAPABILITIES } from 'dashboard/helper/whatsappSession';
 
 export default {
   components: {
@@ -335,7 +336,8 @@ export default {
       }
 
       if (
-        this.isAWhatsAppCloudChannel &&
+        (this.isAWhatsAppCloudChannel ||
+          this.hasInboxCapability(CAPABILITIES.VOICE_CALLS)) &&
         this.isFeatureEnabledonAccount(
           this.accountId,
           FEATURE_FLAGS.CHANNEL_VOICE

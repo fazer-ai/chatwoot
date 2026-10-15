@@ -12,10 +12,15 @@ class Whatsapp::CallConversationBuilder
     ).perform.first
   end
 
+  # A paired phone files one person under its LID and its number in the same inbox, and its
+  # inbound messages follow the contact across both (Whatsapp::Session::Inbound::ConversationFinder),
+  # so a call matched on the number alone would open a second thread beside the LID's.
   def contact_conversations
-    inbox.conversations.joins(:contact_inbox)
-         .where(contact_id: contact.id, contact_inboxes: { source_id: contact.phone_number&.delete('+') })
-         .order(last_activity_at: :desc)
+    scope = inbox.conversations.where(contact_id: contact.id)
+    unless inbox.channel.try(:session_provider?)
+      scope = scope.joins(:contact_inbox).where(contact_inboxes: { source_id: contact.phone_number&.delete('+') })
+    end
+    scope.order(last_activity_at: :desc)
   end
 
   # Unsaved, so callers can authorize the thread a call would open before dialing.
