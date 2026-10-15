@@ -169,13 +169,22 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     normalized = provider_connection.deep_stringify_keys
     return if normalized == self.provider_connection
 
+    connection_changed = normalized['connection'] != self.provider_connection['connection']
     assign_attributes(provider_connection: normalized)
     # NOTE: Skip `validate_provider_config?` check.
-    # `Inbox.no_touching` suppresses the `has_one :inbox, touch: true` callback
-    # (inherited from Channelable) so this high-frequency connection-status change does
-    # NOT touch the inbox and invalidate the whole account inbox cache. The change is
-    # pushed to clients via a targeted `inbox.provider_connection_updated` event.
-    Inbox.no_touching { save!(validate: false) }
+    # The change goes to clients through a targeted `inbox.provider_connection_updated`
+    # event, and most of these writes are frequent and say nothing a cached inbox list
+    # needs (a new QR every few seconds while pairing, an error, the epoch), so
+    # `Inbox.no_touching` keeps them from touching the inbox and invalidating the whole
+    # account inbox cache. A change of `connection` itself is rare and is the one thing
+    # that list shows: the inbox is touched for it, which moves the account's inbox key, so
+    # a dashboard that missed the event loads the right state on its next revalidation
+    # (reconnect or page load) instead of a dropped session as connected (#856).
+    if connection_changed
+      save!(validate: false)
+    else
+      Inbox.no_touching { save!(validate: false) }
+    end
     broadcast_provider_connection_updated
   end
 
