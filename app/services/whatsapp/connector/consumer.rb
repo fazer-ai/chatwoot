@@ -21,6 +21,13 @@ module Whatsapp::Connector::Consumer
     Whatsapp::Connector.key('events', shard)
   end
 
+  # The largest event shard count the consumers have read on this Redis, which is how they
+  # find the streams a re-shard retired. Named outside `events:<n>` and `consumer:*`, the
+  # patterns the previous version scans for.
+  def self.topology_key
+    Whatsapp::Connector.key('consumers', 'topology')
+  end
+
   def self.lease_key(shard)
     Whatsapp::Connector.key('events', shard, 'lease')
   end

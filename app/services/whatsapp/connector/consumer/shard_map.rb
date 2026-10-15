@@ -20,6 +20,12 @@
 class Whatsapp::Connector::Consumer::ShardMap
   Consumer = Whatsapp::Connector::Consumer
 
+  # Keeps the largest count it is given, and answers with whatever is largest now.
+  RECORD_TOPOLOGY = <<~LUA.freeze
+    local largest = math.max(tonumber(redis.call('get', KEYS[1]) or '0'), tonumber(ARGV[1]))
+    redis.call('set', KEYS[1], largest)
+    return largest
+  LUA
   # How often a stopped consumer repeats itself, in supervisor ticks. A process that has
   # stopped reading must not also go quiet, and the state only clears on a restart.
   REMINDER_TICKS = 60
@@ -102,20 +108,18 @@ class Whatsapp::Connector::Consumer::ShardMap
     retired(advertised).select { |shard| backlog?(shard) }
   end
 
-  # The streams of a previous, larger topology: the ones from the current count upwards
-  # that are still there, which on any installation without a past re-shard is one EXISTS
-  # that answers no.
+  # The streams of a previous, larger topology that are still there. On an installation
+  # that never re-sharded the range is empty and this is one round trip.
   #
-  # Found by asking for each in turn rather than by looking for the pattern, because a
-  # SCAN for a pattern walks every key in the Redis the installation shares, on every
-  # tick. Stopping at the first gap is safe because a topology's streams are contiguous:
-  # its consumers created the group, and with it the stream, on every shard they read,
-  # and they read all of them. Nor does it lean on the local setting, which the connector
-  # may have been publishing more shards than.
+  # The range comes from the largest count any consumer has read here, which each of them
+  # records as it goes, and not from looking for the pattern: a SCAN for a pattern walks
+  # every key in the Redis the installation shares, and this runs on every tick. Nor can
+  # it stop at the first stream that is missing, because the connector writes a stream
+  # only once a session lands on it, so a retired stream with work can sit above one that
+  # was never created.
   def retired(advertised)
-    shard = advertised
-    shard += 1 while @redis.exists?(Consumer.shard_key(shard))
-    (advertised...shard).to_a
+    largest = @redis.eval(RECORD_TOPOLOGY, keys: [Consumer.topology_key], argv: [advertised]).to_i
+    (advertised...largest).select { |shard| @redis.exists?(Consumer.shard_key(shard)) }
   end
 
   # Pending entries, or entries still sitting past where the group stopped.

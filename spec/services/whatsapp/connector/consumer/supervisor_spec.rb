@@ -116,6 +116,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # share, so a consumer holding them would stay full of dead streams and never claim the
   # live ones.
   it 'takes nothing from a previous topology that has been drained' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.hset("#{prefix}meta", 'event_shards', '2')
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
@@ -150,24 +151,21 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # cursor past what the older one has not reached, so the retired stream goes first and
   # alone.
   it 'reads only the retired shards until they are empty' do
-    redis.xgroup(:create, "#{prefix}events:2", described_class::Consumer::GROUP, '$', mkstream: true)
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
 
-    # Not 0 and 1: the new range waits until nothing is left on 3. Nor 2, which is retired
-    # too but already drained.
+    # Not 0 and 1: the new range waits until nothing is left on 3.
     expect(supervisor.workers.keys).to eq([3])
   end
 
   # The connector may have been publishing more shards than this installation was ever
   # configured for, so the local setting cannot bound the search for retired streams.
   it 'finds a retired shard above anything it was configured for' do
-    # Every stream of the previous topology exists, because its consumers created the
-    # group on each one they read; only the last still holds anything.
-    (2..10).each { |shard| redis.xgroup(:create, "#{prefix}events:#{shard}", described_class::Consumer::GROUP, '$', mkstream: true) }
+    redis.set(described_class::Consumer.topology_key, 12)
     redis.xadd("#{prefix}events:11", { 'v' => '1' })
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
@@ -178,14 +176,33 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
 
   # Written to before any consumer created the group: answering "nothing here" would
   # mean nobody ever creates it and the events sit on the stream for good.
+  #
+  # The connector only creates a stream once a session lands on it, so the retired stream
+  # with work can sit above one that never existed.
   it 'counts a retired stream with no consumer group as work' do
-    redis.xadd("#{prefix}events:2", { 'v' => '1' })
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
 
-    expect(supervisor.workers.keys).to eq([2, 3])
+    expect(supervisor.workers.keys).to eq([3])
+  end
+
+  # The consumers that read the previous topology are what tell the next ones how far up
+  # to look once the connector has re-sharded.
+  it 'finds the shards a re-shard retired from the topology a predecessor read' do
+    supervisor.tick
+    supervisor.stop
+    successor = described_class.new(consumer_id: 'consumer-2', worker_class: worker_class)
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    successor.tick
+
+    expect(successor.workers.keys).to eq([3])
+  ensure
+    successor&.stop
   end
 
   # MAXLEN trimming and XDEL take away entries the group was never handed, so its cursor
@@ -200,6 +217,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     redis.xreadgroup(described_class::Consumer::GROUP, 'someone', stream, '>', count: 1)
     redis.xack(stream, described_class::Consumer::GROUP, handed)
     redis.xdel(stream, trimmed)
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
@@ -208,6 +226,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   it 'lets a drained retired shard go' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
     redis.xreadgroup(described_class::Consumer::GROUP, 'someone', "#{prefix}events:3", '>')
@@ -264,6 +283,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # Redis 72% of its CPU.
   it 'never walks the keyspace' do
     Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([])
+    redis.set(described_class::Consumer.topology_key, 3)
     redis.xadd("#{prefix}events:2", { 'v' => '1' })
     redis.hset("#{prefix}meta", 'event_shards', '2')
     allow_any_instance_of(Redis).to receive(:scan).and_raise('walked the keyspace') # rubocop:disable RSpec/AnyInstance
