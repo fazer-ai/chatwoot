@@ -12,7 +12,7 @@ module Enterprise::Whatsapp::Session::Inbound::Handlers::CallOffer
     return if payload.sdp.blank? || payload.video
 
     service = Whatsapp::ConnectorCallService.new(inbox: inbox, contact_inbox: contact_inbox)
-    return if service.internal_call?(payload.from)
+    return if service.internal_call?(payload.from, payload.call_id)
 
     service.offer(payload)
     :handled

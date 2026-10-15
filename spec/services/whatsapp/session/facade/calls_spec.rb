@@ -193,6 +193,21 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
     # The dial runs inside a request that is killed after 15 s. Every connector call it makes
     # is bounded by what is left of one budget below that, so the connector, which drops a
     # command past its deadline, never rings somebody after the request died.
+    # The callee may be another native inbox here, which records nothing of this call until
+    # it reads the offer. The number being rung is marked first, so that side can tell this
+    # dial from a call off a handset.
+    it 'marks the number it rings before it places the call' do
+      marked = nil
+      allow(backend).to receive(:start_call).and_wrap_original do |original, *args, **kwargs|
+        marked = Redis::Alfred.get(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5511999990000'))
+        original.call(*args, **kwargs)
+      end
+
+      facade.initiate_call('5511999990000', 'SDP-OFFER', contact: contact, number: true)
+
+      expect(marked).to eq(channel.id.to_s)
+    end
+
     describe 'the time a dial may take' do
       let(:budget) { described_class::CALL_INITIATION_BUDGET }
 

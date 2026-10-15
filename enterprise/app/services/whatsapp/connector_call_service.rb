@@ -30,22 +30,20 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
   end
 
-  # Two native inboxes of one installation calling each other see one WhatsApp call id on
-  # both legs, and a call id is unique per provider across the installation. So a call
-  # placed by another native inbox here is not taken up on the receiving side, whichever leg
-  # arrives first: the dialling side records its call only once this one rings, and taking
-  # this leg up would either be refused by the unique index or hand the dialling side the
-  # wrong record. Told apart by who is calling, which does not depend on that order.
-  def internal_call?(caller_party)
-    return false if caller_party.nil?
+  # Two native inboxes of one installation calling each other through Chatwoot see one
+  # WhatsApp call id on both legs, and a call id is unique per provider across the
+  # installation. So such a leg is not taken up on the receiving side, whichever arrives
+  # first: the dialling side records its call only once this one rings, and taking this leg
+  # up would either be refused by the unique index or hand the dialling side the wrong
+  # record. Told apart by evidence of the dial, not by who is calling alone: the dialling
+  # inbox marks the number it rings before the call.start, and records the call after it.
+  # A call off that inbox's own handset has neither, and rings here as any call.
+  def internal_call?(caller_party, call_id)
+    dialler = channels_paired_as(caller_party)
+    return false if dialler.empty?
 
-    lid = caller_party.lid.to_s.presence
-    phones = Whatsapp::Session::PhoneMatch.variants(caller_party.phone)
-    return false if lid.nil? && phones.empty?
-
-    Channel::Whatsapp.where(provider: 'native').where.not(id: inbox.channel_id).any? do |channel|
-      paired_as?(channel, lid, phones)
-    end
+    Call.whatsapp.exists?(inbox_id: dialler.map { |channel| channel.inbox.id }, provider_call_id: call_id) ||
+      dialler.any? { |channel| dialling_here_from?(channel) }
   end
 
   # An incoming call nobody answered whose end never arrived: the protocol lets a session's
@@ -148,6 +146,26 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   PENDING_TTL = 1.day.to_i
 
   private
+
+  # The other native channels paired as the account this party names, by LID or phone.
+  def channels_paired_as(caller_party)
+    return [] if caller_party.nil?
+
+    lid = caller_party.lid.to_s.presence
+    phones = Whatsapp::Session::PhoneMatch.variants(caller_party.phone)
+    return [] if lid.nil? && phones.empty?
+
+    Channel::Whatsapp.where(provider: 'native').where.not(id: inbox.channel_id).select do |channel|
+      paired_as?(channel, lid, phones)
+    end
+  end
+
+  def dialling_here_from?(dialler)
+    own = inbox.channel.provider_connection.to_h['phone_number'].presence || inbox.channel.phone_number
+    Whatsapp::Session::PhoneMatch.variants(own).any? do |phone|
+      Redis::Alfred.get(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: phone)) == dialler.id.to_s
+    end
+  end
 
   # Whether a native channel is paired as the account named by this LID or phone.
   def paired_as?(channel, lid, phones)

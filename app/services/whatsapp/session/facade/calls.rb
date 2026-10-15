@@ -63,12 +63,22 @@ module Whatsapp::Session::Facade::Calls
     to = number ? model::Address.phone(recipient.to_s.delete('+')) : callee_address(recipient, contact)
     command = model::Commands::CallStart.new(to: to, sdp: sdp_offer)
     key = "call:#{Digest::SHA256.hexdigest(sdp_offer.to_s)}"
-    { 'call_id' => backend.start_call(command, idempotency_key: key, timeout: dial_time_left(CALL_START_MIN_WINDOW)) }
+    timeout = dial_time_left(CALL_START_MIN_WINDOW)
+    mark_dialling(to, timeout)
+    { 'call_id' => backend.start_call(command, idempotency_key: key, timeout: timeout) }
   end
 
   private
 
   def monotonic_now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+  # The callee can be another native inbox of this installation, which sees this call's id
+  # and records nothing of it until it reads the offer. The number rung is marked first,
+  # for as long as the call.start can take, so that side tells this dial from a call off a
+  # handset (Whatsapp::ConnectorCallService#internal_call?).
+  def mark_dialling(to, timeout)
+    Redis::Alfred.setex(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: to.id), channel.id.to_s, timeout + 5)
+  end
 
   def dial_time_left(least = Whatsapp::Connector::Client::DEADLINE_MARGIN + 1)
     left = (@dial_deadline - monotonic_now).floor

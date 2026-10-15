@@ -182,11 +182,12 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
-  # Two native inboxes of one installation calling each other see the same WhatsApp call id
-  # on both legs, and a call id is unique per provider across the installation. The leg
-  # that arrives is not the agents' to answer here, whichever leg was recorded first: the
-  # dialling side records its call only once the destination rings, so the offer can come
-  # before it. It rings on the phone and is the line, and the dialling side records freely.
+  # Two native inboxes of one installation calling each other through Chatwoot see the same
+  # WhatsApp call id on both legs, and a call id is unique per provider across the
+  # installation. The leg that arrives is not the agents' to answer here, whichever leg was
+  # recorded first: the dialling side records its call only once this one rings, so the
+  # offer can come before it, and the dial marks the number it rings before it starts. A
+  # call from the other inbox's own handset went through no dial and rings here as any call.
   describe 'an offer placed by another native inbox of this installation' do
     let!(:other) do
       create(:channel_whatsapp, account: create(:account), provider: 'native', phone_number: '+5511988887777',
@@ -195,7 +196,15 @@ RSpec.describe Whatsapp::ConnectorCallService do
       end.inbox
     end
 
-    it 'is the activity line before the dialling inbox recorded its call' do
+    def dialling_here_from(dialler)
+      Redis::Alfred.setex(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5541988887777'), dialler.channel_id.to_s, 30)
+    end
+
+    after { Redis::Alfred.delete(format(Redis::Alfred::WHATSAPP_CONNECTOR_CALL_DIALING, phone: '5541988887777')) }
+
+    it 'is the activity line while that inbox is dialling this one, before it recorded its call' do
+      dialling_here_from(other)
+
       expect(offer('CALLLEG1')).to eq(:handled)
 
       expect(Call.where(provider_call_id: 'CALLLEG1')).to be_empty
@@ -203,7 +212,7 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call_lines.count).to eq(1)
     end
 
-    it 'is the activity line after the dialling inbox recorded its call' do
+    it 'is the activity line after that inbox recorded its call' do
       Call.create!(account: other.account, inbox: other, conversation: create(:conversation, inbox: other, account: other.account),
                    contact: create(:contact, account: other.account), provider: :whatsapp, direction: :outgoing,
                    status: 'ringing', provider_call_id: 'CALLLEG2')
@@ -214,11 +223,19 @@ RSpec.describe Whatsapp::ConnectorCallService do
       expect(call_lines.count).to eq(1)
     end
 
+    it 'rings as any call when it came from that inbox\'s handset' do
+      expect(offer('CALLLEG4')).to eq(:handled)
+
+      expect(Call.where(provider_call_id: 'CALLLEG4').pluck(:inbox_id)).to eq([inbox.id])
+      expect(call_lines.count).to eq(0)
+    end
+
     context 'when the offer names the caller by LID only' do
       let(:caller_party) { model::Party.new(lid: '182736451928374', push_name: 'Ana Souza') }
 
       it 'is found by the LID the other inbox paired with' do
         other.channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '182736451928374' })
+        dialling_here_from(other)
 
         expect(offer('CALLLEG3')).to eq(:handled)
 
