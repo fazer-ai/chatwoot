@@ -28,11 +28,21 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   end
 
   # Two native inboxes of one installation calling each other see one WhatsApp call id on
-  # both legs, and a call id is unique per provider across the installation. The leg that
-  # arrives second, when the other inbox already recorded the call, is left to ring on the
-  # phone and filed as the activity line instead of being refused by the unique index.
-  def other_leg?(call_id)
-    Call.whatsapp.where(provider_call_id: call_id).where.not(inbox_id: inbox.id).exists?
+  # both legs, and a call id is unique per provider across the installation. So a call
+  # placed by another native inbox here is not taken up on the receiving side, whichever leg
+  # arrives first: the dialling side records its call only once this one rings, and taking
+  # this leg up would either be refused by the unique index or hand the dialling side the
+  # wrong record. Told apart by who is calling, which does not depend on that order.
+  def internal_call?(caller_party)
+    return false if caller_party.nil?
+
+    lid = caller_party.lid.to_s.presence
+    phones = Whatsapp::Session::PhoneMatch.variants(caller_party.phone)
+    return false if lid.nil? && phones.empty?
+
+    Channel::Whatsapp.where(provider: 'native').where.not(id: inbox.channel_id).any? do |channel|
+      paired_as?(channel, lid, phones)
+    end
   end
 
   # The callee picked up. Meta tells the two halves of that apart, the tunnel coming up and
@@ -122,6 +132,14 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   PENDING_TTL = 1.day.to_i
 
   private
+
+  # Whether a native channel is paired as the account named by this LID or phone.
+  def paired_as?(channel, lid, phones)
+    paired = channel.provider_connection.to_h
+    return true if lid && lid == paired['lid'].to_s
+
+    phones.include?(Whatsapp::Session::PhoneMatch.digits(paired['phone_number'].presence || channel.phone_number))
+  end
 
   def model = Whatsapp::Session::Model
 

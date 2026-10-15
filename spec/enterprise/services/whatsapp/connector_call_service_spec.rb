@@ -183,21 +183,48 @@ RSpec.describe Whatsapp::ConnectorCallService do
   end
 
   # Two native inboxes of one installation calling each other see the same WhatsApp call id
-  # on both legs, and a call id is unique per provider across the installation. The leg that
-  # arrives second is not the agents' to answer here: it rings on the phone and is the line.
-  describe 'an offer whose call id is the other leg of a call placed from this installation' do
-    it 'is the activity line, not an error, when another inbox already recorded the call' do
-      other = create(:channel_whatsapp, account: account, provider: 'native', phone_number: '+5541977776666',
-                                        validate_provider_config: false, sync_templates: false).inbox
-      Call.create!(account: account, inbox: other, conversation: create(:conversation, inbox: other, account: account),
-                   contact: create(:contact, account: account), provider: :whatsapp, direction: :outgoing,
-                   status: 'ringing', provider_call_id: 'CALLLEG1')
+  # on both legs, and a call id is unique per provider across the installation. The leg
+  # that arrives is not the agents' to answer here, whichever leg was recorded first: the
+  # dialling side records its call only once the destination rings, so the offer can come
+  # before it. It rings on the phone and is the line, and the dialling side records freely.
+  describe 'an offer placed by another native inbox of this installation' do
+    let!(:other) do
+      create(:channel_whatsapp, account: create(:account), provider: 'native', phone_number: '+5511988887777',
+                                validate_provider_config: false, sync_templates: false).tap do |ch|
+        ch.update!(provider_connection: { 'connection' => 'open', 'phone_number' => '5511988887777' })
+      end.inbox
+    end
 
+    it 'is the activity line before the dialling inbox recorded its call' do
       expect(offer('CALLLEG1')).to eq(:handled)
 
-      expect(Call.where(provider_call_id: 'CALLLEG1').pluck(:inbox_id)).to eq([other.id])
+      expect(Call.where(provider_call_id: 'CALLLEG1')).to be_empty
       expect(events_named('voice_call.incoming')).to be_empty
       expect(call_lines.count).to eq(1)
+    end
+
+    it 'is the activity line after the dialling inbox recorded its call' do
+      Call.create!(account: other.account, inbox: other, conversation: create(:conversation, inbox: other, account: other.account),
+                   contact: create(:contact, account: other.account), provider: :whatsapp, direction: :outgoing,
+                   status: 'ringing', provider_call_id: 'CALLLEG2')
+
+      expect(offer('CALLLEG2')).to eq(:handled)
+
+      expect(Call.where(provider_call_id: 'CALLLEG2').pluck(:inbox_id)).to eq([other.id])
+      expect(call_lines.count).to eq(1)
+    end
+
+    context 'when the offer names the caller by LID only' do
+      let(:caller_party) { model::Party.new(lid: '182736451928374', push_name: 'Ana Souza') }
+
+      it 'is found by the LID the other inbox paired with' do
+        other.channel.update!(provider_connection: { 'connection' => 'open', 'lid' => '182736451928374' })
+
+        expect(offer('CALLLEG3')).to eq(:handled)
+
+        expect(Call.where(provider_call_id: 'CALLLEG3')).to be_empty
+        expect(call_lines.count).to eq(1)
+      end
     end
   end
 
