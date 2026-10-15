@@ -21,7 +21,12 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   around do |example|
-    with_modified_env(WHATSAPP_CONNECTOR_REDIS_PREFIX: prefix, WHATSAPP_CONNECTOR_EVENT_SHARDS: '4') { example.run }
+    with_modified_env(WHATSAPP_CONNECTOR_REDIS_PREFIX: prefix, WHATSAPP_CONNECTOR_EVENT_SHARDS: '4') do
+      # What a running connector has published. The examples about a connector that is not
+      # there yet take it away.
+      redis.hset("#{prefix}meta", 'event_shards', '4')
+      example.run
+    end
     supervisor.stop
     keys = redis.keys("#{prefix}*")
     redis.del(*keys) if keys.any?
@@ -44,7 +49,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   it 'stops at its fair share once a peer shows up' do
-    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [] }.to_json, ex: 15)
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([])
 
     supervisor.tick
 
@@ -75,7 +80,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     supervisor.tick
     expect(supervisor.workers.size).to eq(4)
 
-    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [] }.to_json, ex: 15)
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([])
     supervisor.tick
 
     # Without this the first consumer to start would hold every shard forever: the
@@ -111,6 +116,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # share, so a consumer holding them would stay full of dead streams and never claim the
   # live ones.
   it 'takes nothing from a previous topology that has been drained' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.hset("#{prefix}meta", 'event_shards', '2')
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
@@ -129,11 +135,11 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   it 'frees a shard for a peer that has none' do
     redis.set("#{prefix}events:0:lease", 'consumer-2', ex: 30)
     redis.set("#{prefix}events:1:lease", 'consumer-2', ex: 30)
-    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [0, 1] }.to_json, ex: 15)
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([0, 1])
     supervisor.tick
     expect(supervisor.workers.keys).to eq([2, 3])
 
-    redis.set("#{prefix}consumer:consumer-3", { 'shards' => [] }.to_json, ex: 15)
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-3').announce([])
     supervisor.tick
 
     expect(supervisor.workers.keys).to eq([2])
@@ -145,6 +151,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # cursor past what the older one has not reached, so the retired stream goes first and
   # alone.
   it 'reads only the retired shards until they are empty' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
     redis.hset("#{prefix}meta", 'event_shards', '2')
@@ -158,6 +165,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # The connector may have been publishing more shards than this installation was ever
   # configured for, so the local setting cannot bound the search for retired streams.
   it 'finds a retired shard above anything it was configured for' do
+    redis.set(described_class::Consumer.topology_key, 12)
     redis.xadd("#{prefix}events:11", { 'v' => '1' })
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
@@ -168,13 +176,33 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
 
   # Written to before any consumer created the group: answering "nothing here" would
   # mean nobody ever creates it and the events sit on the stream for good.
+  #
+  # The connector only creates a stream once a session lands on it, so the retired stream
+  # with work can sit above one that never existed.
   it 'counts a retired stream with no consumer group as work' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
 
     expect(supervisor.workers.keys).to eq([3])
+  end
+
+  # The consumers that read the previous topology are what tell the next ones how far up
+  # to look once the connector has re-sharded.
+  it 'finds the shards a re-shard retired from the topology a predecessor read' do
+    supervisor.tick
+    supervisor.stop
+    successor = described_class.new(consumer_id: 'consumer-2', worker_class: worker_class)
+    redis.xadd("#{prefix}events:3", { 'v' => '1' })
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+
+    successor.tick
+
+    expect(successor.workers.keys).to eq([3])
+  ensure
+    successor&.stop
   end
 
   # MAXLEN trimming and XDEL take away entries the group was never handed, so its cursor
@@ -189,6 +217,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     redis.xreadgroup(described_class::Consumer::GROUP, 'someone', stream, '>', count: 1)
     redis.xack(stream, described_class::Consumer::GROUP, handed)
     redis.xdel(stream, trimmed)
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.hset("#{prefix}meta", 'event_shards', '2')
 
     supervisor.tick
@@ -197,6 +226,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   end
 
   it 'lets a drained retired shard go' do
+    redis.set(described_class::Consumer.topology_key, 4)
     redis.xadd("#{prefix}events:3", { 'v' => '1' })
     redis.xgroup(:create, "#{prefix}events:3", described_class::Consumer::GROUP, '0', mkstream: true)
     redis.xreadgroup(described_class::Consumer::GROUP, 'someone', "#{prefix}events:3", '>')
@@ -209,19 +239,59 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
     expect(supervisor.workers.keys).to eq([0, 1])
   end
 
-  # Consumers and the connector start in whatever order the container manager feels like.
-  # A consumer that boots first has nothing but its local setting to go on, and taking
-  # that for the connector's word would make the connector's first real announcement look
-  # like a re-shard and stop the consumer for good, on an ordinary deploy.
-  it 'does not mistake the connector\'s first word for a re-shard' do
+  # Every Sidekiq process runs a consumer by default, including on installations that
+  # never run a connector. Until one has published its shard count there is nothing to
+  # read, so the consumer leaves no trace: no heartbeat, no lease, no stream.
+  it 'does nothing until a connector has published its shard count' do
+    redis.hdel("#{prefix}meta", 'event_shards')
+
     supervisor.tick
-    expect(supervisor.workers.keys).to eq([0, 1, 2, 3])
+
+    expect(supervisor.workers).to be_empty
+    expect(redis.keys("#{prefix}*")).to be_empty
+  end
+
+  # Plug and play: the connector coming up is all it takes, with no setting to change and
+  # no restart. The count it publishes is also the one read, not the local setting.
+  it 'starts reading on its own once the connector publishes its shard count' do
+    redis.hdel("#{prefix}meta", 'event_shards')
+    supervisor.tick
 
     redis.hset("#{prefix}meta", 'event_shards', '2')
     supervisor.tick
     supervisor.tick
 
     expect(supervisor.workers.keys).to eq([0, 1])
+  end
+
+  # The count can go away under a running consumer: a re-shard starts by clearing it, and
+  # so does anything that empties the Redis. Going idle then would stop renewing the
+  # leases of workers that are still reading, and a peer would take those shards and read
+  # them alongside.
+  it 'keeps renewing its leases when the published count goes away' do
+    supervisor.tick
+    redis.expire("#{prefix}events:0:lease", 1)
+
+    redis.hdel("#{prefix}meta", 'event_shards')
+    supervisor.tick
+
+    expect(redis.ttl("#{prefix}events:0:lease")).to be > 1
+  end
+
+  # The consumers' whole steady state, on the Redis the installation shares: peers to
+  # count, a retired stream to look for. Walking the keyspace for either cost a production
+  # Redis 72% of its CPU.
+  it 'never walks the keyspace' do
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([])
+    redis.set(described_class::Consumer.topology_key, 3)
+    redis.xadd("#{prefix}events:2", { 'v' => '1' })
+    redis.hset("#{prefix}meta", 'event_shards', '2')
+    allow_any_instance_of(Redis).to receive(:scan).and_raise('walked the keyspace') # rubocop:disable RSpec/AnyInstance
+    allow_any_instance_of(Redis).to receive(:keys).and_raise('walked the keyspace') # rubocop:disable RSpec/AnyInstance
+
+    supervisor.tick
+
+    expect(supervisor.workers.keys).to eq([2])
   end
 
   # Re-sharding while running reorders the sessions that moved, and no amount of draining
@@ -319,7 +389,7 @@ RSpec.describe Whatsapp::Connector::Consumer::Supervisor, :redis_streams do
   # another one down with it, until nothing was reading at all.
   it 'stops giving shards up once it is down to its share' do
     supervisor.tick
-    redis.set("#{prefix}consumer:consumer-2", { 'shards' => [] }.to_json, ex: 15)
+    Whatsapp::Connector::Consumer::Registry.new(redis, 'consumer-2').announce([])
     stuck = supervisor.workers[3]
     allow(stuck).to receive(:stop) # its thread outlives the rebalance that dropped it
 
