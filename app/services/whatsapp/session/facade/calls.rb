@@ -111,13 +111,28 @@ module Whatsapp::Session::Facade::Calls
   #   LID (the number behind it) and as a number (one it pairs with a LID). Digits it knows
   #   one way are dialled that way; digits it knows both ways, to two different phones,
   #   are refused rather than guessed, and so are digits it knows neither way, because the
-  #   digits of a LID dialled as a number can be a stranger's phone.
+  #   digits of a LID dialled as a number can be a stranger's phone;
+  # - digits it knows neither way can still be a LID it has not paired yet, because the
+  #   connector learns a pair from what reaches it. WhatsApp itself is then asked about the
+  #   contact's own number, and that number is dialled only when WhatsApp puts it behind
+  #   the very LID the thread is on.
   def callee_address(recipient, contact)
     recipient = recipient.to_s.delete('+')
     return model::Address.phone(recipient) if contact&.phone_number == "+#{recipient}"
 
-    model::Address.phone(connector_number(recipient)) ||
+    model::Address.phone(connector_number(recipient) || number_behind(recipient, contact)) ||
       raise(Whatsapp::Session::Errors::InvalidPayload, 'no phone number to call this conversation on')
+  end
+
+  # The check goes to WhatsApp rather than to the store, so it is given what the budget can
+  # spare once the call.start has its window, and not the rest of the budget.
+  def number_behind(lid, contact)
+    digits = contact&.phone_number.to_s.delete('+')
+    return if digits.blank?
+
+    timeout = dial_time_left(CALL_START_MIN_WINDOW + Whatsapp::Connector::Client::DEADLINE_MARGIN + 1) - CALL_START_MIN_WINDOW
+    check = backend.check_numbers(model::Commands::ContactCheck.new(phones: [digits]), timeout: timeout).first
+    check.phone.presence if check&.exists? && check.address == model::Address.lid(lid)
   end
 
   def connector_number(recipient)

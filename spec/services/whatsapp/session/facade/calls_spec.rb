@@ -268,6 +268,107 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(backend.commands_of('call.start')).to be_empty
     end
 
+    # The store holds the pairs this account has met, and a thread on a LID can predate them.
+    # WhatsApp itself answers the contact's number with the LID it is behind, and the number
+    # is dialled only when that is the LID the thread is on.
+    describe 'a LID the connector has not paired yet' do
+      let(:unpaired) { '998877665544332' }
+
+      before do
+        contact.update!(phone_number: '+5521988880000')
+        create(:contact_inbox, contact: contact, inbox: channel.inbox, source_id: unpaired)
+      end
+
+      def check_answers(exists: true, phone: '5521988880000', address: model::Address.lid('998877665544332'))
+        allow(backend).to receive(:check_numbers).and_wrap_original do |original, command, **kwargs|
+          original.call(command, **kwargs)
+          [model::NumberCheck.new(phone: phone, exists: exists, address: address)]
+        end
+      end
+
+      it 'dials the contact\'s number when WhatsApp puts it behind the LID the thread is on' do
+        check_answers
+
+        facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact)
+
+        expect(backend.commands_of('contact.check').map(&:to_h)).to eq([{ 'phones' => ['5521988880000'] }])
+        expect(backend.last_command.to_h).to eq('to' => { 'kind' => 'phone', 'id' => '5521988880000' }, 'sdp' => 'SDP-OFFER')
+      end
+
+      it 'dials the number WhatsApp answered with, not the one the contact carries' do
+        check_answers(phone: '552188880000')
+
+        facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact)
+
+        expect(backend.last_command.to.id).to eq('552188880000')
+      end
+
+      {
+        'puts the number behind another LID' => { address: Whatsapp::Session::Model::Address.lid('111122223333444') },
+        'says the number is not on WhatsApp' => { exists: false },
+        'names no LID for the number' => { address: Whatsapp::Session::Model::Address.phone('5521988880000') }
+      }.each do |what, answer|
+        it "refuses without dialling when WhatsApp #{what}" do
+          check_answers(**answer)
+
+          expect { facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact) }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+          expect(backend.commands_of('call.start')).to be_empty
+        end
+      end
+
+      it 'refuses without asking when the contact has no number' do
+        contact.update!(phone_number: nil)
+
+        expect { facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact) }.to raise_error(Whatsapp::Session::Errors::InvalidPayload)
+        expect(backend.commands_of('contact.check')).to be_empty
+        expect(backend.commands_of('call.start')).to be_empty
+      end
+
+      it 'refuses without dialling when the check fails' do
+        allow(backend).to receive(:check_numbers).and_raise(Whatsapp::Session::Errors::Timeout, 'contact.check timed out')
+
+        expect { facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact) }.to raise_error(Whatsapp::Session::Errors::Timeout)
+        expect(backend.commands_of('call.start')).to be_empty
+      end
+
+      it 'does not ask when the connector already pairs the LID' do
+        facade.initiate_call('182736451928374', 'SDP-OFFER', contact: contact)
+
+        expect(backend.commands_of('contact.check')).to be_empty
+        expect(backend.last_command.to.id).to eq('5541999990000')
+      end
+
+      it 'gives the check only what the budget can spare past the call.start window' do
+        given = nil
+        allow(backend).to receive(:check_numbers).and_wrap_original do |original, command, **kwargs|
+          given = kwargs[:timeout]
+          original.call(command, **kwargs)
+          [model::NumberCheck.new(phone: '5521988880000', exists: true, address: model::Address.lid(unpaired))]
+        end
+
+        facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact)
+
+        expect(given).to be_a(Integer).and(be > Whatsapp::Connector::Client::DEADLINE_MARGIN)
+        expect(given).to be <= described_class::CALL_INITIATION_BUDGET - described_class::CALL_START_MIN_WINDOW
+      end
+
+      it 'still has the call.start window after a check that took all it was given' do
+        clock = [0.0]
+        allow(Process).to receive(:clock_gettime).and_call_original
+        allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC) { clock.first }
+        allow(backend).to receive(:check_numbers).and_wrap_original do |original, command, **kwargs|
+          clock[0] += kwargs.fetch(:timeout)
+          original.call(command, **kwargs)
+          [model::NumberCheck.new(phone: '5521988880000', exists: true, address: model::Address.lid(unpaired))]
+        end
+
+        facade.initiate_call(unpaired, 'SDP-OFFER', contact: contact)
+
+        expect(backend.last_command.to.id).to eq('5521988880000')
+        expect(clock.first).to be <= described_class::CALL_INITIATION_BUDGET - described_class::CALL_START_MIN_WINDOW
+      end
+    end
+
     # The same offer is the same request retried; a new click is a new offer.
     it 'keys the call on its offer' do
       facade.initiate_call('5541999990000', 'SDP-OFFER-1')

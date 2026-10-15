@@ -122,6 +122,13 @@ RSpec.describe Whatsapp::Session::Backends::Connector::Backend do
       .with(an_instance_of(model::Commands::ContactCheck), timeout: be <= 5)
   end
 
+  # A dial asks inside its own budget and hands over what the check may have of it.
+  it 'gives a number check the time its caller names' do
+    backend.check_numbers(model::Commands::ContactCheck.new(phones: ['5541999990000']), timeout: 3)
+
+    expect(client).to have_received(:call).with(an_instance_of(model::Commands::ContactCheck), timeout: 3)
+  end
+
   # The connector answers `history.request` with `null` once the phone was asked, and
   # refuses one with no anchor; the answer itself comes back as `history.sync`.
   it 'carries a history request to the session and waits for the connector to take it' do
