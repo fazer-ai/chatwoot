@@ -209,6 +209,10 @@ const buildPeerConnection = iceServers => {
 // does. The recording is uploaded, the session released and the card removed, once,
 // however many of these and the broadcast arrive.
 const letGoOfCall = (callId, placedSid) => {
+  // Kept before the teardown, as an end broadcast keeps it: a dial still applying its
+  // answer returns this call afterwards, and must not have it added back as ringing.
+  // eslint-disable-next-line no-use-before-define
+  noteEarlyOutboundOutcome(callId, 'ended');
   WhatsappCallsAPI.terminate(callId).catch(() => {});
   // eslint-disable-next-line no-use-before-define
   return handleWhatsappRemoteEnd(callId)

@@ -203,6 +203,31 @@ describe('useWhatsappCallSession, a call whose transport is lost', () => {
     expect(takeEarlyOutboundEnd(42)).toBe('ended');
   });
 
+  // The transport failing while the dial still applies a buffered answer is an end too, and
+  // the end broadcast may be what was lost: the call the dial returns must not be added
+  // back as ringing.
+  it('keeps the end of a transport that failed while the dial was being answered', async () => {
+    let answered;
+    WhatsappCallsAPI.initiate.mockImplementation(async () => {
+      await applyOutboundAnswer(42, 'v=0\r\n');
+      peers.at(-1).setRemoteDescription = () =>
+        new Promise(resolve => {
+          answered = resolve;
+        });
+      return { id: 42, call_id: 'CALLOUT1' };
+    });
+    const session = useWhatsappCallSession();
+    const dialing = session.initiateOutboundCall({ conversationId: 1 });
+    await vi.waitFor(() => expect(answered).toBeDefined());
+
+    peers.at(-1).fail();
+    await vi.waitFor(() => expect(hasActiveWhatsappCall()).toBe(false));
+    answered();
+    await dialing;
+
+    expect(takeEarlyOutboundEnd(42)).toBe('ended');
+  });
+
   // Asked for by the broadcast and by the store adding the call whose end it kept.
   it('ends a call asked to end twice once, the second waiting for the first', async () => {
     WhatsappCallsAPI.initiate.mockResolvedValue({
