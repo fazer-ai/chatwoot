@@ -1003,12 +1003,41 @@ RSpec.describe Channel::Whatsapp do
       create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
     end
 
-    it 'does not bump the inbox timestamp (avoids invalidating the account inbox cache)' do
+    # The dashboard keeps the inbox list in IndexedDB and fetches it again only when the
+    # account's inbox key moves. A browser that missed the live event (a closed tab, a
+    # sleeping laptop, a cable that reconnected) went on showing a dropped session as
+    # connected, because a connection change never moved the key (#856).
+    def inbox_key = channel.inbox.account.reload.cache_keys[:inbox]
+
+    it 'moves the account inbox key when the connection changes' do
+      channel.update_provider_connection!(connection: 'open')
+      before = travel(1.second) { inbox_key }
+
+      travel(2.seconds) { channel.update_provider_connection!(connection: 'close') }
+
+      expect(inbox_key).not_to eq(before)
+    end
+
+    it 'moves the account inbox key when the connection is cleared' do
+      channel.update_provider_connection!(connection: 'open')
+      before = travel(1.second) { inbox_key }
+
+      travel(2.seconds) { channel.update_provider_connection!({}) }
+
+      expect(inbox_key).not_to eq(before)
+    end
+
+    # A new QR arrives every few seconds while a phone is pairing; touching the inbox for
+    # each one would invalidate every agent's cached inbox list for nothing.
+    it 'leaves the inbox alone when only the rest of the connection changes' do
+      channel.update_provider_connection!(connection: 'connecting', qr_data_url: 'qr-1')
       inbox = channel.inbox
+      before = travel(1.second) { inbox_key }
 
       expect do
-        channel.update_provider_connection!(connection: 'open')
+        travel(2.seconds) { channel.update_provider_connection!(connection: 'connecting', qr_data_url: 'qr-2') }
       end.not_to(change { inbox.reload.updated_at })
+      expect(inbox_key).to eq(before)
     end
 
     it 'persists the new connection status' do
@@ -1019,13 +1048,17 @@ RSpec.describe Channel::Whatsapp do
 
     it 'pushes a targeted event through the sync dispatcher only' do
       sync_dispatcher = Rails.configuration.dispatcher.sync_dispatcher
-      expect(sync_dispatcher).to receive(:dispatch).with(
+      # A change of `connection` also moves the account's inbox key, which announces itself
+      # with its own event; this one is about the targeted push.
+      allow(sync_dispatcher).to receive(:dispatch)
+
+      channel.update_provider_connection!(connection: 'open')
+
+      expect(sync_dispatcher).to have_received(:dispatch).with(
         Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED,
         anything,
         hash_including(inbox: channel.inbox, provider_connection: { 'connection' => 'open' })
-      )
-
-      channel.update_provider_connection!(connection: 'open')
+      ).once
     end
 
     it 'does not push or save when the connection status is unchanged' do
