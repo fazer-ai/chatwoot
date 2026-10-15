@@ -118,7 +118,9 @@ class Whatsapp::Connector::Consumer::ShardMap
   # that never re-sharded the range is empty and this is one round trip.
   #
   # The range comes from the largest count any consumer has read here, which each of them
-  # records as it goes, and not from looking for the pattern: a SCAN for a pattern walks
+  # records as it goes (and which the deploy that introduced the record seeded from the
+  # streams already there, Migration::WhatsappConnectorTopologyJob), and not from looking
+  # for the pattern: a SCAN for a pattern walks
   # every key in the Redis the installation shares, and this runs on every tick. Nor can
   # it stop at the first stream that is missing, because the connector writes a stream
   # only once a session lands on it, so a retired stream with work can sit above one that
