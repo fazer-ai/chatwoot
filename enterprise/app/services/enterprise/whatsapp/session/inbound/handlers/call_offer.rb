@@ -11,7 +11,10 @@ module Enterprise::Whatsapp::Session::Inbound::Handlers::CallOffer
     return unless channel.voice_enabled? && channel.inbound_calls_enabled?
     return if payload.sdp.blank? || payload.video
 
-    Whatsapp::ConnectorCallService.new(inbox: inbox, contact_inbox: contact_inbox).offer(payload)
+    service = Whatsapp::ConnectorCallService.new(inbox: inbox, contact_inbox: contact_inbox)
+    return if service.other_leg?(payload.call_id)
+
+    service.offer(payload)
     :handled
   end
 end

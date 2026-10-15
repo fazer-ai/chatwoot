@@ -182,6 +182,25 @@ RSpec.describe Whatsapp::ConnectorCallService do
     end
   end
 
+  # Two native inboxes of one installation calling each other see the same WhatsApp call id
+  # on both legs, and a call id is unique per provider across the installation. The leg that
+  # arrives second is not the agents' to answer here: it rings on the phone and is the line.
+  describe 'an offer whose call id is the other leg of a call placed from this installation' do
+    it 'is the activity line, not an error, when another inbox already recorded the call' do
+      other = create(:channel_whatsapp, account: account, provider: 'native', phone_number: '+5541977776666',
+                                        validate_provider_config: false, sync_templates: false).inbox
+      Call.create!(account: account, inbox: other, conversation: create(:conversation, inbox: other, account: account),
+                   contact: create(:contact, account: account), provider: :whatsapp, direction: :outgoing,
+                   status: 'ringing', provider_call_id: 'CALLLEG1')
+
+      expect(offer('CALLLEG1')).to eq(:handled)
+
+      expect(Call.where(provider_call_id: 'CALLLEG1').pluck(:inbox_id)).to eq([other.id])
+      expect(events_named('voice_call.incoming')).to be_empty
+      expect(call_lines.count).to eq(1)
+    end
+  end
+
   describe 'an offer the browser cannot answer' do
     it 'is the activity line it always was when it carries no sdp' do
       expect(offer('CALLX9', sdp: nil)).to eq(:handled)

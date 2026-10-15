@@ -27,6 +27,14 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     create_inbound_call(id: payload.call_id, session: { sdp_type: 'offer', sdp: payload.sdp })
   end
 
+  # Two native inboxes of one installation calling each other see one WhatsApp call id on
+  # both legs, and a call id is unique per provider across the installation. The leg that
+  # arrives second, when the other inbox already recorded the call, is left to ring on the
+  # phone and filed as the activity line instead of being refused by the unique index.
+  def other_leg?(call_id)
+    Call.whatsapp.where(provider_call_id: call_id).where.not(inbox_id: inbox.id).exists?
+  end
+
   # The callee picked up. Meta tells the two halves of that apart, the tunnel coming up and
   # the pickup, and the connector reports them as one event, so both broadcasts go out.
   #
