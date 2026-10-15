@@ -124,7 +124,7 @@ class Whatsapp::Session::Backends::Fake < Whatsapp::Session::Backend # rubocop:d
     true
   end
 
-  def check_numbers(command)
+  def check_numbers(command, **)
     record(command)
     command.phones.map { |phone| model::NumberCheck.new(phone: phone, exists: true, address: model::Address.phone(phone)) }
   end

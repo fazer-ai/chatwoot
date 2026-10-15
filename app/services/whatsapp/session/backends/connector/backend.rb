@@ -341,9 +341,10 @@ class Whatsapp::Session::Backends::Connector::Backend < Whatsapp::Session::Backe
 
   # Asked from inside a request, whose caller falls back to the typed number when the
   # check fails, so the check gives up long before the request does (#838). On the RPC
-  # default it waited 20 s, past the request's own limit, and the fallback never ran.
-  def check_numbers(command)
-    Array(client.call(command, timeout: NUMBER_CHECK_TIMEOUT)).map { |check| model::NumberCheck.from_h(check) }
+  # default it waited 20 s, past the request's own limit, and the fallback never ran. A
+  # dial asks inside its own budget and says how much of it the check may have.
+  def check_numbers(command, timeout: NUMBER_CHECK_TIMEOUT)
+    Array(client.call(command, timeout: timeout)).map { |check| model::NumberCheck.from_h(check) }
   end
 
   def profile_picture_url(command)
