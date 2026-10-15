@@ -39,11 +39,14 @@ class Api::V1::Accounts::Conversations::AttachmentsController < Api::V1::Account
     render json: { error: "Metadata size exceeds maximum allowed (#{MAX_META_SIZE / 1024}KB)" }, status: :unprocessable_entity
   end
 
-  # The transcription is text wherever it is read, the call's included: a `false` or a
-  # number stored here would come back as the string "false" or "42".
+  # `meta` is an object, and the transcription in it is text wherever it is read, the
+  # call's included: a `false` or a number stored there would come back as the string
+  # "false" or "42". Anything else is refused before a write, rather than half-applied.
   def validate_transcribed_text
-    return unless params[:meta].respond_to?(:key?) && params[:meta].key?(:transcribed_text)
-    return if params[:meta][:transcribed_text].is_a?(String)
+    meta = params[:meta]
+    return if meta.nil?
+    return render json: { error: 'meta must be an object' }, status: :unprocessable_entity unless meta.is_a?(ActionController::Parameters)
+    return if !meta.key?(:transcribed_text) || meta[:transcribed_text].is_a?(String)
 
     render json: { error: 'transcribed_text must be a string' }, status: :unprocessable_entity
   end
