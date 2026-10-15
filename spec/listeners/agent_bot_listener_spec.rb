@@ -273,8 +273,9 @@ describe AgentBotListener do
     end
     let(:whatsapp_inbox) { channel.inbox }
     let(:connection) { { 'connection' => 'close', 'qr_data_url' => 'data:image/png;base64,QR', 'error' => 'logged out' } }
+    let(:changed_at) { Time.zone.parse('2026-10-15T12:34:56.123456Z') }
     let(:event) do
-      Events::Base.new('inbox.provider_connection_updated', Time.zone.now,
+      Events::Base.new('inbox.provider_connection_updated', changed_at,
                        inbox: whatsapp_inbox, provider_connection: connection, previous_connection: 'open')
     end
     let(:payload) do
@@ -283,7 +284,8 @@ describe AgentBotListener do
         account: { id: account.id },
         inbox: { id: whatsapp_inbox.id, name: whatsapp_inbox.name, channel_type: 'Channel::Whatsapp', provider: 'baileys' },
         provider_connection: { connection: 'close' },
-        previous_connection: 'open'
+        previous_connection: 'open',
+        changed_at: '2026-10-15T12:34:56.123456Z'
       }
     end
 
@@ -326,7 +328,7 @@ describe AgentBotListener do
 
       expect(AgentBots::WebhookJob).to have_received(:perform_later).once
       expect(AgentBots::WebhookJob).to have_received(:perform_later).with(
-        agent_bot.outgoing_url, payload.merge(provider_connection: { connection: 'close' }),
+        agent_bot.outgoing_url, payload.merge(changed_at: match(/\A\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z\z/)),
         :agent_bot_webhook, secret: agent_bot.secret, delivery_id: instance_of(String)
       )
     end
