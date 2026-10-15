@@ -50,6 +50,13 @@ module Whatsapp::Session::Errors
 
   class NotPaired < ProviderUnavailable
     CODE = 'not_paired'.freeze
+
+    # A phone that was logged out stays that way until somebody scans the QR again, so no
+    # retry can answer differently. Still a ProviderUnavailable, because the UI says the
+    # same thing about it; only the send stops waiting four attempts to say so (#855).
+    def retryable?
+      false
+    end
   end
 
   class OwnedElsewhere < ProviderUnavailable
