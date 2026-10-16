@@ -1435,8 +1435,9 @@ describe Whatsapp::Providers::WhatsappBaileysService do
             headers: {}
           )
 
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
-          .to_return(status: 200)
+        reconnect = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+        whatsapp_channel.update_provider_connection!(connection: 'open')
 
         allow(Rails.logger).to receive(:error)
 
@@ -1445,6 +1446,9 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         end.to raise_error(Whatsapp::Providers::WhatsappBaileysService::ProviderUnavailableError)
 
         expect(Rails.logger).to have_received(:error).with('error message')
+        # A failed number lookup is "unknown", not a dropped session (fazer-ai/chatwoot#877).
+        expect(whatsapp_channel.reload.provider_connection['connection']).to eq('open')
+        expect(reconnect).not_to have_been_requested
       end
     end
   end

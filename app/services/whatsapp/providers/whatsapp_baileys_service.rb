@@ -1302,6 +1302,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
   end
 
+  # `on_whatsapp` is left out on purpose: it is a read whose every caller treats a failure as
+  # "unknown" (the contact builder, the compose form's warning, the no-WhatsApp recheck), so a
+  # 500 on one number lookup must not mark a working session 'close' and show the agent a
+  # disconnected inbox. A connection that is really down is caught by the connection check.
   with_error_handling :setup_channel_provider,
                       :send_message,
                       :toggle_typing_status,
@@ -1312,7 +1316,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :received_messages,
                       :group_metadata,
                       :sync_group,
-                      :on_whatsapp,
                       :delete_message,
                       :edit_message,
                       :group_leave,
