@@ -55,6 +55,19 @@ RSpec.describe Article do
         expect(article.errors[:content]).to include('is too long (maximum is 65535 characters)')
       end
     end
+
+    context 'when it validates draft_content length' do
+      it 'valid above the generic text column limit' do
+        article.draft_content = 'a' * 30_000
+        expect(article.valid?).to be true
+      end
+
+      it 'invalid when crossed the limit' do
+        article.draft_content = 'a' * 65_536
+        article.valid?
+        expect(article.errors[:draft_content]).to include('is too long (maximum is 65535 characters)')
+      end
+    end
   end
 
   describe 'add_locale_to_article' do
