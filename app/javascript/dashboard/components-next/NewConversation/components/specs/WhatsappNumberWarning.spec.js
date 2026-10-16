@@ -1,3 +1,4 @@
+import { reactive } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import ContactAPI from 'dashboard/api/contacts';
 import InboxesAPI from 'dashboard/api/inboxes';
@@ -109,6 +110,25 @@ describe('WhatsappNumberWarning', () => {
     await flushPromises();
 
     expect(InboxesAPI.onWhatsapp).not.toHaveBeenCalled();
+  });
+
+  // A correction made with the form open keeps the contact and the inbox, and changes what
+  // is being asked, even when it lands on the same contact object.
+  it('asks again when the contact phone is corrected', async () => {
+    InboxesAPI.onWhatsapp
+      .mockResolvedValueOnce({ data: { exists: false } })
+      .mockResolvedValueOnce({ data: { exists: true } });
+    const selectedContact = reactive({ id: 7, phone_number: '+558588246590' });
+
+    const wrapper = mountWarning({ selectedContact });
+    await flushPromises();
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+
+    selectedContact.phone_number = '+5585999999999';
+    await flushPromises();
+
+    expect(InboxesAPI.onWhatsapp).toHaveBeenLastCalledWith(2, '+5585999999999');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 
   // The agent switched contacts while the first lookup was still out: its late "no" belongs

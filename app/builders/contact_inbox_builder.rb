@@ -38,6 +38,7 @@ class ContactInboxBuilder
     old_source_id_candidate = @contact.phone_number.delete('+')
 
     @looked_up_phone = @contact.phone_number
+    @flags_before = @contact.contact_inboxes.where(inbox: @inbox).pluck(:id, :whatsapp_missing_checked_at).to_h
     @whatsapp_answer = number_check.lookup(@looked_up_phone)
     canonical_phone = @whatsapp_answer&.phone
     return if canonical_phone.blank? || canonical_phone == @contact.phone_number
@@ -55,7 +56,7 @@ class ContactInboxBuilder
 
     return contact_inbox.clear_whatsapp_missing! if @whatsapp_answer.exists
 
-    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone)
+    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone, flag_before: @flags_before[contact_inbox.id])
   end
 
   def generate_source_id

@@ -74,11 +74,15 @@ class ContactInbox < ApplicationRecord
   # nobody, not even the paired phone. Cleared by a later lookup that finds the number, by
   # anything the contact sends, and by a delivery receipt.
   #
-  # Marks only while the contact still has the phone that was looked up: a correction that
-  # landed while the provider was answering wins over an answer about the old number.
-  def mark_whatsapp_missing_for!(phone)
+  # Marks only if nothing moved while the provider was answering: the contact still has the
+  # phone that was looked up, and the flag still holds what it held before asking. A phone
+  # correction, a reply or a live receipt in between outranks an answer about the past.
+  def mark_whatsapp_missing_for!(phone, flag_before:)
     contact.with_lock do
-      update!(whatsapp_missing_checked_at: Time.current) if contact.phone_number == phone
+      lock!
+      next unless contact.phone_number == phone && whatsapp_missing_checked_at == flag_before
+
+      update!(whatsapp_missing_checked_at: Time.current)
     end
   end
 

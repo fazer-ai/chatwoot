@@ -438,6 +438,19 @@ describe ContactInboxBuilder do
         expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
       end
 
+      it 'does not restore a flag a reply cleared while WhatsApp answered' do
+        flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',
+                                         whatsapp_missing_checked_at: 2.days.ago)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+          ContactInbox.find(flagged.id).clear_whatsapp_missing!
+          { 'jid' => canonical_jid, 'exists' => false }
+        end
+
+        described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678', validate_whatsapp_phone: true).perform
+
+        expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
       # A later conversation asks again, so a number that registered since stops warning.
       it 'clears an earlier flag when WhatsApp now knows the number' do
         flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',

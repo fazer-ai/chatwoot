@@ -28,7 +28,13 @@ const resolvePhone = async contact => {
 // the send either way: the agent may know something the lookup does not.
 let lookupId = 0;
 watch(
-  () => [props.targetInbox?.id, props.selectedContact?.id],
+  // The phone is part of what is being asked: a correction made with the form open has to
+  // drop the old answer and ask about the new number.
+  () => [
+    props.targetInbox?.id,
+    props.selectedContact?.id,
+    props.selectedContact?.phoneNumber || props.selectedContact?.phone_number,
+  ],
   async () => {
     lookupId += 1;
     const currentLookup = lookupId;
