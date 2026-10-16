@@ -80,11 +80,24 @@ class ContactInbox < ApplicationRecord
   #
   # The flag comparison alone cannot see evidence that arrived while nothing was flagged (the
   # clear had no row to touch), so the threads are read too.
+  #
+  # Evidence can still land between that read and the commit, when Message's clear finds no
+  # flag to touch and takes no lock. Each side therefore writes before it reads the other:
+  # Message records its evidence before clearing, and this reads the evidence again after the
+  # flag is committed, so at least one of them sees the other.
   def mark_whatsapp_missing_for!(phone, flag_before:, asked_at:)
-    with_whatsapp_answer_guard(phone, flag_before) do
+    marked_at = with_whatsapp_answer_guard(phone, flag_before) do
       next if whatsapp_presence_since?(asked_at)
 
       update!(whatsapp_missing_checked_at: Time.current)
+      whatsapp_missing_checked_at
+    end
+    return if marked_at.nil?
+
+    # After the real commit, also when a caller wraps this in its own transaction: until then
+    # Message's clear cannot see the flag either.
+    ActiveRecord.after_all_transactions_commit do
+      clear_whatsapp_missing_for!(phone, flag_before: marked_at) if whatsapp_presence_since?(asked_at)
     end
   end
 

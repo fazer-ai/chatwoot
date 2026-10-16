@@ -175,6 +175,38 @@ RSpec.describe ContactInbox do
     end
   end
 
+  describe '#mark_whatsapp_missing_for!' do
+    let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, source_id: '558588246590') }
+    let(:conversation) do
+      create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+    end
+
+    # The reply's clear ran while nothing was flagged yet, and the evidence read came first.
+    it 'drops the flag when a reply lands between reading the evidence and committing it' do
+      phone = contact_inbox.contact.phone_number
+      asked_at = 1.minute.ago
+      reads = 0
+      allow(contact_inbox).to receive(:whatsapp_presence_since?).and_wrap_original do |original, time|
+        reads += 1
+        next false if reads == 1
+
+        original.call(time)
+      end
+      create(:message, conversation: conversation, inbox: channel.inbox, account: conversation.account, message_type: :incoming)
+
+      contact_inbox.mark_whatsapp_missing_for!(phone, flag_before: nil, asked_at: asked_at)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
+    it 'keeps the flag when no evidence arrives' do
+      contact_inbox.mark_whatsapp_missing_for!(contact_inbox.contact.phone_number, flag_before: nil, asked_at: 1.minute.ago)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+  end
+
   describe '#whatsapp_presence_since?' do
     let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
     let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, source_id: '558588246590') }
