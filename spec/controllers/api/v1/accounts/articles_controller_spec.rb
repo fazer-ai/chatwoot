@@ -244,10 +244,19 @@ RSpec.describe 'Api::V1::Accounts::Articles', type: :request do
         expect(article.draft_content).to eq('Draft body')
       end
 
+      it 'stages a draft as long as the published content limit allows' do
+        put "/api/v1/accounts/#{account.id}/portals/#{portal.slug}/articles/#{article.id}",
+            params: { article: { draft_content: 'a' * 30_000 } },
+            headers: admin.create_new_auth_token
+
+        expect(response).to have_http_status(:success)
+        expect(article.reload.draft_content.length).to eq(30_000)
+      end
+
       it 'rejects an over-length draft without persisting it' do
         expect do
           put "/api/v1/accounts/#{account.id}/portals/#{portal.slug}/articles/#{article.id}",
-              params: { article: { draft_content: 'a' * 20_001 } },
+              params: { article: { draft_content: 'a' * 65_536 } },
               headers: admin.create_new_auth_token
         end.not_to(change { article.reload.draft_content })
 

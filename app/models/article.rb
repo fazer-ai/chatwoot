@@ -64,6 +64,7 @@ class Article < ApplicationRecord
   validates :author_id, presence: true
   validates :title, presence: true
   validates :content, presence: { if: :published? }, length: { maximum: 65_535 }
+  validates :draft_content, length: { maximum: 65_535 }
   validates :slug, exclusion: { in: RESERVED_SLUGS }
 
   # ensuring that the position is always set correctly
