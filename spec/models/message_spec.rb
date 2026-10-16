@@ -1509,4 +1509,43 @@ RSpec.describe Message do
       expect(conversation.reload.waiting_since).to be_nil
     end
   end
+
+  # A "no WhatsApp" flag is only a lookup's answer; the contact replying, or their phone
+  # acknowledging a message, is proof the number exists (fazer-ai/chatwoot#877).
+  describe 'clearing the no-WhatsApp flag' do
+    let(:channel) do
+      create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
+    end
+    let(:contact_inbox) do
+      create(:contact_inbox, inbox: channel.inbox, source_id: '558588246590', whatsapp_missing_checked_at: 1.hour.ago)
+    end
+    let(:conversation) do
+      create(:conversation, account: channel.account, inbox: channel.inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox)
+    end
+
+    it 'clears it when the contact sends something' do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
+    it 'clears it when an outgoing message is delivered' do
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
+                                 message_type: :outgoing, status: :sent)
+
+      message.update!(status: :delivered)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
+    # The server's acknowledgement is exactly what a number with no account still gets.
+    it 'keeps it while outgoing messages are only sent' do
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
+                                 message_type: :outgoing, status: :sent)
+
+      message.update!(content: 'edited')
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+  end
 end

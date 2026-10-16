@@ -209,6 +209,7 @@ Rails.application.routes.draw do
               get :attachments
               get :inbox_assistant
               post :sync_history
+              post :recheck_whatsapp_number
               get :reporting_events if ChatwootApp.enterprise?
             end
           end

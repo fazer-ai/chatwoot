@@ -107,7 +107,8 @@
     },
     "HEADER": {
       "WHATSAPP_CALL_GROUP_UNSUPPORTED": "WhatsApp calls cannot be placed to a group"
-    }
+    },
+    "WHATSAPP_NUMBER_MISSING_BANNER": "This number had no WhatsApp when checked on {date}. Messages sent to it are not delivered."
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

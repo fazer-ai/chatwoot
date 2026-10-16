@@ -15,6 +15,7 @@ import MessageList from 'next/message/MessageList.vue';
 import ConversationLabelSuggestion from './conversation/LabelSuggestion.vue';
 import ContactConversationLink from './ContactConversationLink.vue';
 import Banner from 'dashboard/components/ui/Banner.vue';
+import WhatsappNumberMissingBanner from './WhatsappNumberMissingBanner.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import ResizableEditorWrapper from './ResizableEditorWrapper.vue';
 import ReferralBubble from 'dashboard/components-next/Conversation/ReferralBubble.vue';
@@ -63,6 +64,7 @@ export default {
     MessageList,
     ReplyBox,
     Banner,
+    WhatsappNumberMissingBanner,
     ConversationLabelSuggestion,
     ContactConversationLink,
     Spinner,
@@ -964,6 +966,7 @@ export default {
             isAdmin ? onOpenLinkDeviceModal() : onSetupProviderConnection()
           "
         />
+        <WhatsappNumberMissingBanner :conversation="currentChat" />
         <Banner
           v-if="showReachoutRestriction"
           color-scheme="alert"

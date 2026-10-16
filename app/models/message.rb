@@ -180,6 +180,8 @@ class Message < ApplicationRecord
   after_create_commit :execute_after_create_commit_callbacks
 
   after_update_commit :dispatch_update_event
+  # One registration: Rails keeps only the last of two commit callbacks naming the same method.
+  after_commit :clear_whatsapp_missing_flag, on: [:create, :update], if: :proves_whatsapp_presence?
   after_commit :reindex_for_search, if: :should_index?, on: [:create, :update]
 
   def channel_token
@@ -438,6 +440,20 @@ class Message < ApplicationRecord
     send_reply
     execute_message_template_hooks
     update_contact_activity
+  end
+
+  # Anything the contact sends, and any receipt from their phone, proves the number has
+  # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning. One UPDATE that
+  # touches no row in the usual case, instead of a read per message.
+  def clear_whatsapp_missing_flag
+    return unless inbox.channel_type == 'Channel::Whatsapp'
+
+    ContactInbox.where(id: conversation.contact_inbox_id).where.not(whatsapp_missing_checked_at: nil)
+                .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
+  end
+
+  def proves_whatsapp_presence?
+    incoming? || (outgoing? && saved_change_to_status? && (delivered? || read?))
   end
 
   def update_contact_activity

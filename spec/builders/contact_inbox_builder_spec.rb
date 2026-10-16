@@ -416,6 +416,44 @@ describe ContactInboxBuilder do
         expect(contact_inbox.source_id).to eq(contact.phone_number.delete('+'))
       end
 
+      it 'flags the contact inbox when WhatsApp says the number has no account' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => canonical_jid, 'exists' => false })
+
+        freeze_time do
+          contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
+
+          expect(contact_inbox.reload.whatsapp_missing_checked_at).to eq(Time.current)
+        end
+      end
+
+      # A later conversation asks again, so a number that registered since stops warning.
+      it 'clears an earlier flag when WhatsApp now knows the number' do
+        flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',
+                                         whatsapp_missing_checked_at: 2.days.ago)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => '5511912345678@s.whatsapp.net', 'exists' => true })
+
+        contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678',
+                                            validate_whatsapp_phone: true).perform
+
+        expect(contact_inbox.id).to eq(flagged.id)
+        expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
+      # An error is "unknown", not "no": the flag keeps what the last real answer said.
+      it 'leaves an earlier flag alone when the lookup fails' do
+        checked_at = 2.days.ago.change(usec: 0)
+        flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',
+                                         whatsapp_missing_checked_at: checked_at)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_raise(StandardError, 'baileys boom')
+
+        described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678', validate_whatsapp_phone: true).perform
+
+        expect(flagged.reload.whatsapp_missing_checked_at).to eq(checked_at)
+      end
+
       it 'does not call on_whatsapp when validate_whatsapp_phone is not requested' do
         expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
 

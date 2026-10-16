@@ -11,6 +11,7 @@
 #  contact_id    :bigint
 #  inbox_id      :bigint
 #  source_id     :text             not null
+#  whatsapp_missing_checked_at :datetime
 #
 # Indexes
 #
@@ -54,6 +55,27 @@ class ContactInbox < ApplicationRecord
 
   def current_conversation
     conversations.last
+  end
+
+  # How long a "no WhatsApp" answer is trusted before opening the conversation asks again. A
+  # number can register at any time, and the warning itself discourages the one action, a
+  # send, whose delivery receipt would otherwise clear it.
+  WHATSAPP_MISSING_RECHECK_AFTER = 6.hours
+
+  # Set when the inbox's session answered that this number has no WhatsApp account, which is
+  # the one state where an outgoing message gets the server's single check and then reaches
+  # nobody, not even the paired phone. Cleared by a later lookup that finds the number, by
+  # anything the contact sends, and by a delivery receipt.
+  def mark_whatsapp_missing! = update!(whatsapp_missing_checked_at: Time.current)
+
+  def clear_whatsapp_missing!
+    return if whatsapp_missing_checked_at.nil?
+
+    update!(whatsapp_missing_checked_at: nil)
+  end
+
+  def whatsapp_missing_recheck_due?
+    whatsapp_missing_checked_at.present? && whatsapp_missing_checked_at <= WHATSAPP_MISSING_RECHECK_AFTER.ago
   end
 
   # Whether this number has left the WhatsApp group this contact is.

@@ -107,7 +107,8 @@
     },
     "HEADER": {
       "WHATSAPP_CALL_GROUP_UNSUPPORTED": "Não é possível ligar para um grupo pelo WhatsApp"
-    }
+    },
+    "WHATSAPP_NUMBER_MISSING_BANNER": "Este número não tinha WhatsApp na verificação de {date}. Mensagens enviadas para ele não são entregues."
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

@@ -31,7 +31,10 @@
   },
   "COMPOSE_NEW_CONVERSATION": {
     "TAB_CONVERSATION": "Conversa",
-    "TAB_GROUP": "Grupo"
+    "TAB_GROUP": "Grupo",
+    "FORM": {
+      "WHATSAPP_NUMBER_MISSING": "Este número não tem WhatsApp. As mensagens não serão entregues."
+    }
   },
   "CONTACT_PANEL": {
     "OPEN_IN_AGENTS": "Abrir no fazer.ai agents"
