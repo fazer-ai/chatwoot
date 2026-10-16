@@ -443,15 +443,14 @@ class Message < ApplicationRecord
   end
 
   # Anything the contact sends, and any receipt from their phone, proves the number has
-  # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning. Only evidence
-  # newer than that lookup counts: a history import replays old traffic, and a number can
-  # lose its account after years of conversation. One UPDATE that touches no row in the
-  # usual case, instead of a read per message.
+  # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning, as long as the
+  # evidence is newer than that lookup. One UPDATE that touches no row in the usual case,
+  # instead of a read per message.
   def clear_whatsapp_missing_flag
     return unless inbox.channel_type == 'Channel::Whatsapp'
 
     cleared = ContactInbox.where(id: conversation.contact_inbox_id)
-                          .where(whatsapp_missing_checked_at: ...whatsapp_sent_at)
+                          .where(whatsapp_missing_checked_at: ...whatsapp_evidence_at)
                           .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
     # update_all skips the contact inbox's own commit callback, so the rare clear tells the
     # dashboard itself, from a fresh row: the loaded association still holds the old date,
@@ -459,9 +458,18 @@ class Message < ApplicationRecord
     ContactInbox.find(conversation.contact_inbox_id).broadcast_whatsapp_missing_change if cleared.positive?
   end
 
+  # An incoming message counts when it is written. An outgoing one counts only when a
+  # receipt moves it to delivered or read as it happens: an echo of a send from the paired
+  # phone is born delivered without any receipt, and an import replays receipts from the past.
   def proves_whatsapp_presence?
-    incoming? || (outgoing? && saved_change_to_status? && (delivered? || read?))
+    return incoming? if previously_new_record?
+
+    outgoing? && saved_change_to_status? && (delivered? || read?) && !Import::SilentWrite.on?
   end
+
+  # A message is as old as WhatsApp says it is, which for an imported one is long before the
+  # row was written. A receipt is as old as its arrival, whenever the message was sent.
+  def whatsapp_evidence_at = incoming? ? whatsapp_sent_at : Time.current
 
   # When WhatsApp says the message happened, which for an imported one is long before the
   # row was written.

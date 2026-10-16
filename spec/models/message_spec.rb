@@ -1567,6 +1567,34 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
     end
 
+    # A send from the paired phone comes back as an echo born delivered, with no receipt.
+    it 'keeps it when an echo of a send from the phone is born delivered' do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :outgoing,
+                       status: :delivered)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
+    # A receipt is evidence about now, whenever the message was sent.
+    it 'clears it when a live receipt arrives for a message sent before the check' do
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
+                                 message_type: :outgoing, status: :sent,
+                                 content_attributes: { external_created_at: 2.days.ago.to_i })
+
+      message.update!(status: :delivered)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
+    it 'keeps it when an import replays a receipt' do
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
+                                 message_type: :outgoing, status: :sent)
+
+      Import::SilentWrite.wrap { message.update!(status: :delivered) }
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
     # The server's acknowledgement is exactly what a number with no account still gets.
     it 'keeps it while outgoing messages are only sent' do
       message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,

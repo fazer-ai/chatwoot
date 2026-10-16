@@ -58,15 +58,13 @@ describe('WhatsappNumberMissingBanner', () => {
     expect(ConversationAPI.recheckWhatsappNumber).not.toHaveBeenCalled();
   });
 
-  it('hides as soon as the contact writes, before any reload', async () => {
+  it('hides as soon as the server pushes the cleared flag', async () => {
     const wrapper = mountBanner({ whatsapp_missing_checked_at: hoursAgo(1) });
     await wrapper.setProps({
       conversation: {
         id: 144873,
-        whatsapp_missing_checked_at: hoursAgo(1),
-        messages: [
-          { message_type: 0, status: 'sent', created_at: hoursAgo(0) },
-        ],
+        whatsapp_missing_checked_at: null,
+        messages: [],
       },
     });
 
