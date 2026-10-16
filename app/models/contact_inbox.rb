@@ -88,8 +88,15 @@ class ContactInbox < ApplicationRecord
     update!(whatsapp_missing_checked_at: nil)
   end
 
+  # The dashboard orders conversation snapshots by updated_at and keeps an equal one, so the
+  # version moves first: an older snapshot still carrying the previous flag cannot put it
+  # back. update_column, because the flag is not the conversation's own change and its
+  # update callbacks have nothing to do here.
   def broadcast_whatsapp_missing_change
-    conversations.find_each(&:dispatch_conversation_updated_event)
+    conversations.find_each do |conversation|
+      conversation.update_column(:updated_at, Time.current) # rubocop:disable Rails/SkipsModelValidations
+      conversation.dispatch_conversation_updated_event
+    end
   end
 
   def whatsapp_missing_recheck_due?

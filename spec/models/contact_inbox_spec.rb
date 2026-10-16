@@ -156,6 +156,15 @@ RSpec.describe ContactInbox do
         .with(Events::Types::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation))
     end
 
+    # An older snapshot with an equal updated_at would be kept by the dashboard and bring the
+    # warning back.
+    it 'moves the conversation version forward with the change' do
+      conversation = create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+      conversation.update_column(:updated_at, 1.day.ago) # rubocop:disable Rails/SkipsModelValidations
+
+      expect { contact_inbox.clear_whatsapp_missing! }.to(change { conversation.reload.updated_at })
+    end
+
     it 'is forgotten when a merge moves the row under another contact' do
       base = create(:contact, account: contact_inbox.contact.account, phone_number: '+5585933334444')
 
