@@ -8,8 +8,23 @@
 class Whatsapp::NumberRecheckService
   pattr_initialize [:conversation!]
 
+  # Above the 90 s a Baileys lookup may take, so the claim outlives the call it guards.
+  LOCK_TIMEOUT = 100.seconds
+
   def perform
     return unless contact_inbox&.whatsapp_missing_recheck_due?
+
+    # Two agents opening the same stale conversation enqueue two jobs. Only one asks the
+    # provider; the other leaves, and the date cannot serve as the claim because a failed
+    # lookup has to leave it untouched.
+    Redis::LockManager.new.with_lock("whatsapp_number_recheck:#{contact_inbox.id}", LOCK_TIMEOUT) { recheck }
+  end
+
+  private
+
+  def recheck
+    # Re-read under the claim: a worker that held it before may have answered already.
+    return unless contact_inbox.reload.whatsapp_missing_recheck_due?
     return if contact_inbox.contact.phone_number.blank?
     return unless number_check.answerable?
 
@@ -20,8 +35,6 @@ class Whatsapp::NumberRecheckService
     answer.exists ? found(answer.phone) : contact_inbox.mark_whatsapp_missing!
     conversation.reload.dispatch_conversation_updated_event
   end
-
-  private
 
   def contact_inbox
     @contact_inbox ||= conversation.contact_inbox

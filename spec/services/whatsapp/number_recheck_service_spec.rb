@@ -73,6 +73,27 @@ describe Whatsapp::NumberRecheckService do
     perform
   end
 
+  # Two agents opening the same stale conversation enqueue two jobs; one lookup is enough.
+  it 'leaves the lookup to the worker that already holds the claim' do
+    Redis::LockManager.new.lock("whatsapp_number_recheck:#{contact_inbox.id}", 60)
+    expect_any_instance_of(Channel::Whatsapp).not_to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+
+    perform
+
+    expect(contact_inbox.reload.whatsapp_missing_checked_at).to eq(checked_at)
+  end
+
+  it 'does not ask again when the worker before it already answered' do
+    answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true })
+    service = described_class.new(conversation: conversation)
+    service.send(:contact_inbox) # memoized with the stale date, as a queued job would hold it
+    ContactInbox.find(contact_inbox.id).update!(whatsapp_missing_checked_at: 1.minute.ago) # the other worker
+
+    service.perform
+
+    expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+  end
+
   it 'tells the dashboard what changed' do
     answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true })
     allow(Rails.configuration.dispatcher).to receive(:dispatch)

@@ -128,4 +128,30 @@ RSpec.describe ContactInbox do
       end
     end
   end
+
+  # The "no WhatsApp" answer belongs to the phone that was looked up (fazer-ai/chatwoot#877).
+  describe 'no-WhatsApp answer and the phone it was about' do
+    let(:contact_inbox) { create(:contact_inbox, whatsapp_missing_checked_at: 1.hour.ago) }
+
+    it 'is forgotten when the contact phone is corrected' do
+      contact_inbox.contact.update!(phone_number: '+5585911112222')
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
+    it 'survives edits that leave the phone alone' do
+      contact_inbox.contact.update!(name: 'Renamed')
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
+    it 'is forgotten when a merge moves the row under another contact' do
+      base = create(:contact, account: contact_inbox.contact.account, phone_number: '+5585933334444')
+
+      ContactMergeAction.new(account: base.account, base_contact: base, mergee_contact: contact_inbox.contact).perform
+
+      expect(contact_inbox.reload.contact_id).to eq(base.id)
+      expect(contact_inbox.whatsapp_missing_checked_at).to be_nil
+    end
+  end
 end

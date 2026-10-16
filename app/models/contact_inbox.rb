@@ -35,6 +35,10 @@ class ContactInbox < ApplicationRecord
 
   has_many :conversations, dependent: :destroy_async
 
+  # A merge moves this row under a contact with its own phone, and a session inbox sends to
+  # the contact's phone: the "no WhatsApp" answer was about the old one.
+  before_update -> { self.whatsapp_missing_checked_at = nil }, if: :will_save_change_to_contact_id?
+
   # contact_inboxes that are not associated with any conversation
   scope :stale_without_conversations, lambda { |time_period|
     left_joins(:conversations)
