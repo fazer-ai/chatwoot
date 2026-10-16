@@ -81,12 +81,26 @@ class ContactInbox < ApplicationRecord
   # The flag comparison alone cannot see evidence that arrived while nothing was flagged (the
   # clear had no row to touch), so the threads are read too.
   def mark_whatsapp_missing_for!(phone, flag_before:, asked_at:)
-    contact.with_lock do
-      lock!
-      next unless contact.phone_number == phone && whatsapp_missing_checked_at == flag_before
+    with_whatsapp_answer_guard(phone, flag_before) do
       next if whatsapp_presence_since?(asked_at)
 
       update!(whatsapp_missing_checked_at: Time.current)
+    end
+  end
+
+  # A "yes" goes through the same guard: an answer about a phone the contact no longer has
+  # must not clear the "no" a newer lookup left for the current one.
+  def clear_whatsapp_missing_for!(phone, flag_before:)
+    with_whatsapp_answer_guard(phone, flag_before) { clear_whatsapp_missing! }
+  end
+
+  # The contact's row lock is what a phone correction waits on; with_lock reloads both rows.
+  def with_whatsapp_answer_guard(phone, flag_before)
+    contact.with_lock do
+      lock!
+      next unless contact.phone_number == phone && whatsapp_missing_checked_at == flag_before
+
+      yield
     end
   end
 
@@ -105,10 +119,13 @@ class ContactInbox < ApplicationRecord
 
   # Whether the contact wrote, or a live receipt came back, since the given moment. The same
   # evidence Message counts when it clears the flag: an incoming message by the time WhatsApp
-  # says it was sent, so an import of older history written now does not count.
+  # says it was sent, so an import of older history written now does not count. WhatsApp
+  # stamps whole seconds, so the rows are read from the start of the second asked in.
   def whatsapp_presence_since?(time)
     whatsapp_receipt_since?(time) ||
-      Message.incoming.where(conversation_id: conversations.select(:id), created_at: time..).any? { |message| message.whatsapp_sent_at >= time }
+      Message.incoming.where(conversation_id: conversations.select(:id), created_at: time.change(usec: 0)..).any? do |message|
+        message.whatsapp_sent_at >= time
+      end
   end
 
   def whatsapp_receipt_since?(time)

@@ -220,6 +220,17 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
     end
 
+    # WhatsApp stamps whole seconds, so a reply in the second the lookup started may be later.
+    it 'counts a reply stamped in the second the question was asked' do
+      asked = Time.current.change(usec: 400_000)
+      travel_to(asked + 0.4.seconds) do
+        create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account, message_type: :incoming,
+                         content_attributes: { external_created_at: asked.to_i })
+      end
+
+      expect(contact_inbox.whatsapp_presence_since?(asked)).to be(true)
+    end
+
     # Written now, sent a year ago: history says nothing about the number today.
     it 'does not count an imported message sent before the question' do
       create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account, message_type: :incoming,

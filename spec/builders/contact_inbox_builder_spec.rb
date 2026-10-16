@@ -479,6 +479,35 @@ describe ContactInboxBuilder do
         expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
       end
 
+      # The "yes" was about the old phone; the "no" a newer lookup left is about the current one.
+      it 'does not clear a newer flag for a phone corrected while WhatsApp answered' do
+        flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678')
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+          Contact.find(contact.id).update!(phone_number: '+5511900000000')
+          ContactInbox.find(flagged.id).update!(whatsapp_missing_checked_at: 1.minute.ago)
+          { 'jid' => '5511912345678@s.whatsapp.net', 'exists' => true }
+        end
+
+        described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678', validate_whatsapp_phone: true).perform
+
+        expect(flagged.reload.whatsapp_missing_checked_at).to be_present
+      end
+
+      # The merged-into contact's own thread was flagged for the canonical phone, which the
+      # answer has just found.
+      it 'clears the flag of the contact a merge hands the answer to' do
+        existing_contact = create(:contact, phone_number: canonical_phone, account: account)
+        flagged = create(:contact_inbox, contact: existing_contact, inbox: baileys_inbox, source_id: canonical_phone.delete('+'),
+                                         whatsapp_missing_checked_at: 2.days.ago)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => canonical_jid, 'exists' => true })
+
+        contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
+
+        expect(contact_inbox.id).to eq(flagged.id)
+        expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
       # An error is "unknown", not "no": the flag keeps what the last real answer said.
       it 'leaves an earlier flag alone when the lookup fails' do
         checked_at = 2.days.ago.change(usec: 0)

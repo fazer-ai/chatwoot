@@ -1556,6 +1556,16 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    it 'clears it for a reply stamped in the second the flag was set' do
+      flagged_at = Time.current.change(usec: 400_000)
+      contact_inbox.update!(whatsapp_missing_checked_at: flagged_at)
+
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming,
+                       content_attributes: { external_created_at: flagged_at.to_i })
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
     # A history import replays old traffic: it predates the lookup and proves nothing now.
     it 'keeps it when the incoming message predates the check' do
       create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming,

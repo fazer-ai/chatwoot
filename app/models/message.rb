@@ -393,10 +393,12 @@ class Message < ApplicationRecord
   end
 
   # When WhatsApp says the message happened, which for an imported one is long before the
-  # row was written.
+  # row was written. WhatsApp stamps whole seconds, so this is the end of that second: a reply
+  # stamped in the second a lookup started may have been sent after it, and a reply proves the
+  # number either way, so the tie goes to presence.
   def whatsapp_sent_at
     seconds = content_attributes&.dig('external_created_at').presence
-    seconds ? Time.zone.at(seconds.to_i) : created_at
+    (seconds ? Time.zone.at(seconds.to_i) : created_at).change(usec: 999_999)
   end
 
   private
