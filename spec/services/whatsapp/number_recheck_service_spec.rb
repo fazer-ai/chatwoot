@@ -129,6 +129,22 @@ describe Whatsapp::NumberRecheckService do
     expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
   end
 
+  # The payload is what moves the banner, so the last one has to carry the cleared flag, also
+  # when the answer moved the contact to the canonical phone.
+  it 'tells the dashboard the flag is gone when the answer aligns the phone' do
+    answer({ 'jid' => '558588246590@s.whatsapp.net', 'exists' => true })
+    conversation
+    payloads = []
+    allow(Rails.configuration.dispatcher).to receive(:dispatch) do |event, _time, data|
+      payloads << data[:conversation].push_event_data if event == Events::Types::CONVERSATION_UPDATED
+    end
+
+    perform
+
+    expect(payloads).not_to be_empty
+    expect(payloads.last).to include(id: conversation.display_id, whatsapp_missing_checked_at: nil)
+  end
+
   it 'tells the dashboard what changed' do
     answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true })
     allow(Rails.configuration.dispatcher).to receive(:dispatch)

@@ -68,7 +68,10 @@ class Whatsapp::NumberRecheckService
   # one then stays where it was rather than breaking the unique index.
   #
   # The answer is about the phone the contact now holds, so every thread of that contact in
-  # this inbox stops warning, including those of the contact a merge handed this one to.
+  # this inbox stops warning, including those of the contact a merge handed this one to. This
+  # thread's own row is cleared through the instance that may have just moved its address:
+  # inside one transaction Rails runs commit callbacks only for the first instance saved per
+  # row, so a second instance's clear would never reach the dashboard.
   def found(canonical_phone)
     if canonical_phone.present?
       old_source_id = contact_inbox.contact.phone_number.delete('+')
@@ -76,7 +79,12 @@ class Whatsapp::NumberRecheckService
       contact_inbox.reload
       move_source_id(old_source_id, canonical_phone.delete('+'))
     end
-    contact_inbox.contact.contact_inboxes.where(inbox_id: contact_inbox.inbox_id).find_each(&:clear_whatsapp_missing!)
+    contact_inbox.clear_whatsapp_missing!
+    sibling_threads.find_each(&:clear_whatsapp_missing!)
+  end
+
+  def sibling_threads
+    contact_inbox.contact.contact_inboxes.where(inbox_id: contact_inbox.inbox_id).where.not(id: contact_inbox.id)
   end
 
   def move_source_id(old_source_id, new_source_id)
