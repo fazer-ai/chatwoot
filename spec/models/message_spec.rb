@@ -1566,6 +1566,16 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    # It may have gone to the phone the contact had before; the recheck asks about this one.
+    it 'keeps it when the receipt answers a message sent before the check' do
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
+                                 message_type: :outgoing, status: :sent, created_at: 2.hours.ago)
+
+      message.update!(status: :delivered)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
     # A history import replays old traffic: it predates the lookup and proves nothing now.
     it 'keeps it when the incoming message predates the check' do
       create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming,

@@ -66,6 +66,9 @@ class Whatsapp::NumberRecheckService
   # canonical phone, and the address this thread sends to follows it when it was derived from
   # the old phone. Another contact inbox already holding the canonical address keeps it; this
   # one then stays where it was rather than breaking the unique index.
+  #
+  # The answer is about the phone the contact now holds, so every thread of that contact in
+  # this inbox stops warning, including those of the contact a merge handed this one to.
   def found(canonical_phone)
     if canonical_phone.present?
       old_source_id = contact_inbox.contact.phone_number.delete('+')
@@ -73,7 +76,7 @@ class Whatsapp::NumberRecheckService
       contact_inbox.reload
       move_source_id(old_source_id, canonical_phone.delete('+'))
     end
-    contact_inbox.clear_whatsapp_missing!
+    contact_inbox.contact.contact_inboxes.where(inbox_id: contact_inbox.inbox_id).find_each(&:clear_whatsapp_missing!)
   end
 
   def move_source_id(old_source_id, new_source_id)

@@ -65,10 +65,17 @@ class ContactInboxBuilder
   def record_whatsapp_presence(contact_inbox)
     return if @whatsapp_answer.nil?
 
-    flag_before = @flags_before[contact_inbox.id]
-    return contact_inbox.clear_whatsapp_missing_for!(@looked_up_phone, flag_before: flag_before) if @whatsapp_answer.exists
+    return clear_answered_threads(contact_inbox) if @whatsapp_answer.exists
 
-    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone, flag_before: flag_before, asked_at: @asked_at)
+    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone, flag_before: @flags_before[contact_inbox.id], asked_at: @asked_at)
+  end
+
+  # A "yes" is about the phone, so every thread of the contact in this inbox stops warning,
+  # not only the one this conversation uses.
+  def clear_answered_threads(contact_inbox)
+    ContactInbox.where(id: @flags_before.keys | [contact_inbox.id]).find_each do |thread|
+      thread.clear_whatsapp_missing_for!(@looked_up_phone, flag_before: @flags_before[thread.id])
+    end
   end
 
   def generate_source_id

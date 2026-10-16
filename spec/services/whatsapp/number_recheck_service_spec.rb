@@ -48,6 +48,18 @@ describe Whatsapp::NumberRecheckService do
     expect(contact_inbox.whatsapp_missing_checked_at).to be_nil
   end
 
+  # The canonical phone belonged to another contact, whose own thread here warned about it.
+  it 'clears the thread of the contact a merge hands the answer to' do
+    existing = create(:contact, account: account, phone_number: '+558588246590')
+    theirs = create(:contact_inbox, contact: existing, inbox: channel.inbox, source_id: '558588246590', whatsapp_missing_checked_at: checked_at)
+    answer({ 'jid' => '558588246590@s.whatsapp.net', 'exists' => true })
+
+    perform
+
+    expect(contact_inbox.reload.contact_id).to eq(existing.id)
+    expect(theirs.reload.whatsapp_missing_checked_at).to be_nil
+  end
+
   it 'moves the check date forward when the number still has no WhatsApp' do
     answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => false })
 

@@ -118,22 +118,37 @@ class ContactInbox < ApplicationRecord
   end
 
   # How long a live receipt stays where a pending lookup can see it: well past the 90 s a
-  # Baileys lookup may take.
+  # Baileys lookup may take, counted from the receipt.
   WHATSAPP_RECEIPT_MEMORY = 10.minutes
 
   # Called by Message for a receipt that proves presence, after it filtered out echoes born
   # delivered and receipts replayed by an import. The rows cannot tell those apart afterwards
-  # (both are delivered with a fresh updated_at), so the receipt is kept here instead. Plain
-  # SET: every writer stores its own Time.current, so a racing overwrite moves the time by
-  # milliseconds, never back past a lookup.
-  def self.remember_whatsapp_receipt(id, at = Time.current)
-    Redis::Alfred.set(format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id), at.to_f, ex: WHATSAPP_RECEIPT_MEMORY.to_i)
+  # (both are delivered with a fresh updated_at), so the receipt is kept here instead, by when
+  # the answered message was sent. Receipts arrive out of order, so only a newer send moves it.
+  def self.remember_whatsapp_receipt(id, sent_at)
+    key = format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id)
+    Redis::Alfred.with do |conn|
+      # WATCH/MULTI aborts the write if another receipt moved the key in between; then read again.
+      3.times do
+        stored = conn.watch(key) do
+          seen = conn.get(key)
+          if seen.present? && seen.to_f >= sent_at.to_f
+            conn.unwatch
+            next :kept
+          end
+
+          conn.multi { |transaction| transaction.set(key, sent_at.to_f, ex: WHATSAPP_RECEIPT_MEMORY.to_i) }
+        end
+        break if stored
+      end
+    end
   end
 
-  # Whether the contact wrote, or a live receipt came back, since the given moment. The same
-  # evidence Message counts when it clears the flag: an incoming message by the time WhatsApp
-  # says it was sent, so an import of older history written now does not count. WhatsApp
-  # stamps whole seconds, so the rows are read from the start of the second asked in.
+  # Whether the contact wrote, or a live receipt came back for a message sent, since the given
+  # moment. The same evidence Message counts when it clears the flag: an incoming message by
+  # the time WhatsApp says it was sent, so an import of older history written now does not
+  # count. WhatsApp stamps whole seconds, so the rows are read from the start of the second
+  # asked in.
   def whatsapp_presence_since?(time)
     whatsapp_receipt_since?(time) ||
       Message.incoming.where(conversation_id: conversations.select(:id), created_at: time.change(usec: 0)..).any? do |message|

@@ -232,6 +232,24 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.whatsapp_presence_since?(1.second.from_now)).to be(false)
     end
 
+    it 'does not count a receipt for a message sent before the question' do
+      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
+                       message_type: :outgoing, status: :sent, created_at: 2.minutes.ago).update!(status: :delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
+    end
+
+    # Receipts come back out of order; an older send answered later must not hide a newer one.
+    it 'keeps the newest send a receipt answered' do
+      newer = outgoing_message(:sent)
+      older = create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
+                               message_type: :outgoing, status: :sent, created_at: 2.minutes.ago)
+      newer.update!(status: :delivered)
+      older.update!(status: :delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
+    end
+
     # A send from the paired phone comes back born delivered: nobody's phone answered it.
     it 'does not count an echo' do
       outgoing_message(:delivered)

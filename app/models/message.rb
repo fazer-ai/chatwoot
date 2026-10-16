@@ -460,7 +460,7 @@ class Message < ApplicationRecord
 
     # A lookup still waiting on the provider has no flag here to clear, so the receipt is
     # also left where that lookup will read it before writing its "no".
-    ContactInbox.remember_whatsapp_receipt(conversation.contact_inbox_id) if outgoing?
+    ContactInbox.remember_whatsapp_receipt(conversation.contact_inbox_id, created_at) if outgoing?
     cleared = ContactInbox.where(id: conversation.contact_inbox_id)
                           .where(whatsapp_missing_checked_at: ...whatsapp_evidence_at)
                           .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
@@ -483,8 +483,11 @@ class Message < ApplicationRecord
   end
 
   # A message is as old as WhatsApp says it is, which for an imported one is long before the
-  # row was written. A receipt is as old as its arrival, whenever the message was sent.
-  def whatsapp_evidence_at = incoming? ? whatsapp_sent_at : Time.current
+  # row was written. A receipt is as old as the message it answers: only one sent after the
+  # lookup surely went to the phone that lookup asked about, since a phone change wipes the
+  # flag and a send to a number with no account never gets a receipt. A late receipt for an
+  # older message is left to the recheck.
+  def whatsapp_evidence_at = incoming? ? whatsapp_sent_at : created_at
 
   def update_contact_activity
     sender.update!(last_activity_at: DateTime.now) if sender.is_a?(Contact)

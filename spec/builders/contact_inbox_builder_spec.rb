@@ -508,6 +508,17 @@ describe ContactInboxBuilder do
         expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
       end
 
+      it 'clears the other threads of the contact in the inbox when WhatsApp knows the number' do
+        other = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '551191234567842',
+                                       whatsapp_missing_checked_at: 2.days.ago)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_return({ 'jid' => '5511912345678@s.whatsapp.net', 'exists' => true })
+
+        described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678', validate_whatsapp_phone: true).perform
+
+        expect(other.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
       # An error is "unknown", not "no": the flag keeps what the last real answer said.
       it 'leaves an earlier flag alone when the lookup fails' do
         checked_at = 2.days.ago.change(usec: 0)
