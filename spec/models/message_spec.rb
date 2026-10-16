@@ -1532,6 +1532,7 @@ RSpec.describe Message do
     # The payload is what moves the banner, so it has to carry the cleared value, not the one
     # still held by the loaded association.
     it 'tells the dashboard when a reply clears it, with the cleared value' do
+      conversation.update!(status: :resolved) # the reply reopens it, which broadcasts again
       conversation.contact_inbox # loaded with the old date, as a request would hold it
       payloads = []
       allow(Rails.configuration.dispatcher).to receive(:dispatch) do |event, _time, data|
@@ -1540,7 +1541,10 @@ RSpec.describe Message do
 
       create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming)
 
-      expect(payloads).to include(hash_including(id: conversation.display_id, whatsapp_missing_checked_at: nil))
+      # Every payload after the clear, the message's own reopen and activity included, has to
+      # carry it: the last one is what the dashboard keeps.
+      expect(payloads).not_to be_empty
+      expect(payloads.last).to include(id: conversation.display_id, whatsapp_missing_checked_at: nil)
     end
 
     it 'clears it when an outgoing message is delivered' do

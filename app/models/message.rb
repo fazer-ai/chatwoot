@@ -452,10 +452,13 @@ class Message < ApplicationRecord
     cleared = ContactInbox.where(id: conversation.contact_inbox_id)
                           .where(whatsapp_missing_checked_at: ...whatsapp_evidence_at)
                           .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
+    return unless cleared.positive?
+
     # update_all skips the contact inbox's own commit callback, so the rare clear tells the
-    # dashboard itself, from a fresh row: the loaded association still holds the old date,
-    # and the conversations it reaches would serialize that.
-    ContactInbox.find(conversation.contact_inbox_id).broadcast_whatsapp_missing_change if cleared.positive?
+    # dashboard itself. From a reloaded association, on this conversation itself: the loaded
+    # one still holds the old date, and this message's own callbacks broadcast the
+    # conversation again right after (reopening it, waiting_since) with a newer version.
+    conversation.reload_contact_inbox.broadcast_whatsapp_missing_change
   end
 
   # An incoming message counts when it is written. An outgoing one counts only when a
