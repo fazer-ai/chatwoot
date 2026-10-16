@@ -7,13 +7,28 @@ import {
 
 const CHECKED_AT = 1792170600;
 
-const outgoing = status => ({ message_type: 1, status });
+const AFTER = CHECKED_AT + 60;
+const BEFORE = CHECKED_AT - 86400;
+
+const outgoing = (status, createdAt = AFTER) => ({
+  message_type: 1,
+  status,
+  created_at: createdAt,
+});
+const incoming = (createdAt = AFTER) => ({
+  message_type: 0,
+  status: 'sent',
+  created_at: createdAt,
+});
 
 describe('whatsappMissingCheckedAt', () => {
   it('answers the check date while nothing proves the number exists', () => {
     const conversation = {
       whatsapp_missing_checked_at: CHECKED_AT,
-      messages: [outgoing('sent'), { message_type: 2, status: 'sent' }],
+      messages: [
+        outgoing('sent'),
+        { message_type: 2, status: 'sent', created_at: AFTER },
+      ],
     };
 
     expect(whatsappMissingCheckedAt(conversation)).toBe(CHECKED_AT);
@@ -22,7 +37,7 @@ describe('whatsappMissingCheckedAt', () => {
   it('answers null when the contact has written', () => {
     const conversation = {
       whatsapp_missing_checked_at: CHECKED_AT,
-      messages: [outgoing('sent'), { message_type: 0, status: 'sent' }],
+      messages: [outgoing('sent'), incoming()],
     };
 
     expect(whatsappMissingCheckedAt(conversation)).toBeNull();
@@ -39,6 +54,31 @@ describe('whatsappMissingCheckedAt', () => {
       expect(whatsappMissingCheckedAt(conversation)).toBeNull();
     }
   );
+
+  // An imported history replays old traffic, and a number can lose its account after
+  // years of conversation: only what is newer than the lookup overrides it.
+  it('keeps the date when the only evidence predates the check', () => {
+    const conversation = {
+      whatsapp_missing_checked_at: CHECKED_AT,
+      messages: [incoming(BEFORE), outgoing('delivered', BEFORE)],
+    };
+
+    expect(whatsappMissingCheckedAt(conversation)).toBe(CHECKED_AT);
+  });
+
+  it('reads the WhatsApp time of an imported message, not when it was stored', () => {
+    const conversation = {
+      whatsapp_missing_checked_at: CHECKED_AT,
+      messages: [
+        {
+          ...incoming(AFTER),
+          content_attributes: { external_created_at: BEFORE },
+        },
+      ],
+    };
+
+    expect(whatsappMissingCheckedAt(conversation)).toBe(CHECKED_AT);
+  });
 
   it('answers null when the conversation was never flagged', () => {
     expect(

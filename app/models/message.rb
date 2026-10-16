@@ -443,17 +443,27 @@ class Message < ApplicationRecord
   end
 
   # Anything the contact sends, and any receipt from their phone, proves the number has
-  # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning. One UPDATE that
-  # touches no row in the usual case, instead of a read per message.
+  # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning. Only evidence
+  # newer than that lookup counts: a history import replays old traffic, and a number can
+  # lose its account after years of conversation. One UPDATE that touches no row in the
+  # usual case, instead of a read per message.
   def clear_whatsapp_missing_flag
     return unless inbox.channel_type == 'Channel::Whatsapp'
 
-    ContactInbox.where(id: conversation.contact_inbox_id).where.not(whatsapp_missing_checked_at: nil)
+    ContactInbox.where(id: conversation.contact_inbox_id)
+                .where(whatsapp_missing_checked_at: ...whatsapp_sent_at)
                 .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
   end
 
   def proves_whatsapp_presence?
     incoming? || (outgoing? && saved_change_to_status? && (delivered? || read?))
+  end
+
+  # When WhatsApp says the message happened, which for an imported one is long before the
+  # row was written.
+  def whatsapp_sent_at
+    seconds = content_attributes&.dig('external_created_at').presence
+    seconds ? Time.zone.at(seconds.to_i) : created_at
   end
 
   def update_contact_activity

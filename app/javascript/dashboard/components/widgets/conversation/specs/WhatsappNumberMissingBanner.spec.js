@@ -64,7 +64,9 @@ describe('WhatsappNumberMissingBanner', () => {
       conversation: {
         id: 144873,
         whatsapp_missing_checked_at: hoursAgo(1),
-        messages: [{ message_type: 0, status: 'sent' }],
+        messages: [
+          { message_type: 0, status: 'sent', created_at: hoursAgo(0) },
+        ],
       },
     });
 

@@ -1538,6 +1538,21 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    # A history import replays old traffic: it predates the lookup and proves nothing now.
+    it 'keeps it when the incoming message predates the check' do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming,
+                       content_attributes: { external_created_at: 2.days.ago.to_i })
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
+    it 'keeps it when an old outgoing message is imported already delivered' do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :outgoing,
+                       status: :delivered, content_attributes: { external_created_at: 2.days.ago.to_i })
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
+    end
+
     # The server's acknowledgement is exactly what a number with no account still gets.
     it 'keeps it while outgoing messages are only sent' do
       message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
