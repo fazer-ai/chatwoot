@@ -282,8 +282,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
   # corrected it says nothing about the new one, and keeping it would warn about the new
   # number with the old number's answer and hold off the recheck for hours.
   def forget_whatsapp_missing_answers
-    contact_inboxes.where.not(whatsapp_missing_checked_at: nil)
-                   .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
+    contact_inboxes.where.not(whatsapp_missing_checked_at: nil).find_each(&:clear_whatsapp_missing!)
   end
 end
 Contact.include_mod_with('Concerns::Contact')

@@ -25,15 +25,30 @@ class Whatsapp::NumberRecheckService
   def recheck
     # Re-read under the claim: a worker that held it before may have answered already.
     return unless contact_inbox.reload.whatsapp_missing_recheck_due?
-    return if contact_inbox.contact.phone_number.blank?
     return unless number_check.answerable?
 
-    answer = number_check.lookup(contact_inbox.contact.phone_number)
+    flag_before = contact_inbox.whatsapp_missing_checked_at
+    phone = contact_inbox.contact.phone_number
+    return if phone.blank?
+
+    answer = number_check.lookup(phone)
     # No answer is not a "no": the flag and its date stay as the last real answer left them.
     return if answer.nil?
 
-    answer.exists ? found(answer.phone) : contact_inbox.mark_whatsapp_missing!
-    conversation.reload.dispatch_conversation_updated_event
+    apply(answer, phone, flag_before)
+  end
+
+  # The claim only keeps other rechecks out. A phone correction or a message from the contact
+  # may have landed while the provider was answering, and either one outranks an answer about
+  # what was true before it, so the answer is written only if both still read as they did.
+  # The contact's row lock is what a phone correction waits on.
+  def apply(answer, phone, flag_before)
+    contact_inbox.contact.with_lock do
+      contact_inbox.lock!
+      next unless contact_inbox.contact.phone_number == phone && contact_inbox.whatsapp_missing_checked_at == flag_before
+
+      answer.exists ? found(answer.phone) : contact_inbox.update!(whatsapp_missing_checked_at: Time.current)
+    end
   end
 
   def contact_inbox

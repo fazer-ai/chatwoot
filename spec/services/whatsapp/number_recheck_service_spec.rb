@@ -94,6 +94,29 @@ describe Whatsapp::NumberRecheckService do
     expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
   end
 
+  # The claim keeps other rechecks out, not the writers that outrank a stale answer.
+  it 'does not apply the answer when the phone was corrected during the lookup' do
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+      Contact.find(contact.id).update!(phone_number: '+5585911112222')
+      { 'jid' => '5585988246590@s.whatsapp.net', 'exists' => false }
+    end
+
+    perform
+
+    expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+  end
+
+  it 'does not restore the flag a message from the contact cleared during the lookup' do
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+      create(:message, conversation: conversation, inbox: channel.inbox, account: account, message_type: :incoming)
+      { 'jid' => '5585988246590@s.whatsapp.net', 'exists' => false }
+    end
+
+    perform
+
+    expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+  end
+
   it 'tells the dashboard what changed' do
     answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true })
     allow(Rails.configuration.dispatcher).to receive(:dispatch)

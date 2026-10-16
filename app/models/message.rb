@@ -450,9 +450,12 @@ class Message < ApplicationRecord
   def clear_whatsapp_missing_flag
     return unless inbox.channel_type == 'Channel::Whatsapp'
 
-    ContactInbox.where(id: conversation.contact_inbox_id)
-                .where(whatsapp_missing_checked_at: ...whatsapp_sent_at)
-                .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
+    cleared = ContactInbox.where(id: conversation.contact_inbox_id)
+                          .where(whatsapp_missing_checked_at: ...whatsapp_sent_at)
+                          .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
+    # update_all skips the contact inbox's own commit callback, so the rare clear tells the
+    # dashboard itself.
+    conversation.contact_inbox.broadcast_whatsapp_missing_change if cleared.positive?
   end
 
   def proves_whatsapp_presence?

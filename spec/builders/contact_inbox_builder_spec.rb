@@ -427,6 +427,17 @@ describe ContactInboxBuilder do
         end
       end
 
+      it 'does not flag a number that was corrected while WhatsApp answered' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+          Contact.find(contact.id).update!(phone_number: '+5511900000000')
+          { 'jid' => canonical_jid, 'exists' => false }
+        end
+
+        contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
+
+        expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
       # A later conversation asks again, so a number that registered since stops warning.
       it 'clears an earlier flag when WhatsApp now knows the number' do
         flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',

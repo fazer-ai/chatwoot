@@ -38,6 +38,9 @@ class ContactInbox < ApplicationRecord
   # A merge moves this row under a contact with its own phone, and a session inbox sends to
   # the contact's phone: the "no WhatsApp" answer was about the old one.
   before_update -> { self.whatsapp_missing_checked_at = nil }, if: :will_save_change_to_contact_id?
+  # Every write of the flag goes through update!, so this is the one place the dashboard hears
+  # about it, whoever wrote it: a lookup, a phone correction, a merge.
+  after_update_commit :broadcast_whatsapp_missing_change, if: :saved_change_to_whatsapp_missing_checked_at?
 
   # contact_inboxes that are not associated with any conversation
   scope :stale_without_conversations, lambda { |time_period|
@@ -70,12 +73,23 @@ class ContactInbox < ApplicationRecord
   # the one state where an outgoing message gets the server's single check and then reaches
   # nobody, not even the paired phone. Cleared by a later lookup that finds the number, by
   # anything the contact sends, and by a delivery receipt.
-  def mark_whatsapp_missing! = update!(whatsapp_missing_checked_at: Time.current)
+  #
+  # Marks only while the contact still has the phone that was looked up: a correction that
+  # landed while the provider was answering wins over an answer about the old number.
+  def mark_whatsapp_missing_for!(phone)
+    contact.with_lock do
+      update!(whatsapp_missing_checked_at: Time.current) if contact.phone_number == phone
+    end
+  end
 
   def clear_whatsapp_missing!
     return if whatsapp_missing_checked_at.nil?
 
     update!(whatsapp_missing_checked_at: nil)
+  end
+
+  def broadcast_whatsapp_missing_change
+    conversations.find_each(&:dispatch_conversation_updated_event)
   end
 
   def whatsapp_missing_recheck_due?

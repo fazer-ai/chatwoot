@@ -1529,6 +1529,15 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    it 'tells the dashboard when a reply clears it' do
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming)
+
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Events::Types::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation))
+    end
+
     it 'clears it when an outgoing message is delivered' do
       message = create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account,
                                  message_type: :outgoing, status: :sent)

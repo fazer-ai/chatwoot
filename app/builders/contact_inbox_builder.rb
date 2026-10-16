@@ -37,7 +37,8 @@ class ContactInboxBuilder
 
     old_source_id_candidate = @contact.phone_number.delete('+')
 
-    @whatsapp_answer = number_check.lookup(@contact.phone_number)
+    @looked_up_phone = @contact.phone_number
+    @whatsapp_answer = number_check.lookup(@looked_up_phone)
     canonical_phone = @whatsapp_answer&.phone
     return if canonical_phone.blank? || canonical_phone == @contact.phone_number
 
@@ -52,7 +53,9 @@ class ContactInboxBuilder
   def record_whatsapp_presence(contact_inbox)
     return if @whatsapp_answer.nil?
 
-    @whatsapp_answer.exists ? contact_inbox.clear_whatsapp_missing! : contact_inbox.mark_whatsapp_missing!
+    return contact_inbox.clear_whatsapp_missing! if @whatsapp_answer.exists
+
+    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone)
   end
 
   def generate_source_id

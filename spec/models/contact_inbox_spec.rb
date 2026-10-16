@@ -145,6 +145,17 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
     end
 
+    # The banner reads the conversation, and a contact update only reaches the contacts store.
+    it 'tells the dashboard about the conversations it changed' do
+      conversation = create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+      contact_inbox.contact.update!(phone_number: '+5585911112222')
+
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Events::Types::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation))
+    end
+
     it 'is forgotten when a merge moves the row under another contact' do
       base = create(:contact, account: contact_inbox.contact.account, phone_number: '+5585933334444')
 
