@@ -176,23 +176,61 @@ RSpec.describe ContactInbox do
   end
 
   describe '#whatsapp_presence_since?' do
-    let(:contact_inbox) { create(:contact_inbox) }
+    let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
+    let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, source_id: '558588246590') }
     let(:conversation) do
       create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
     end
     let(:asked_at) { 1.minute.ago }
 
-    it 'sees a receipt that came back after the question' do
+    def outgoing_message(status)
       create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
-                       message_type: :outgoing, status: :delivered)
+                       message_type: :outgoing, status: status)
+    end
+
+    it 'sees a receipt that came back after the question' do
+      outgoing_message(:sent).update!(status: :delivered)
 
       expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
     end
 
+    it 'does not count a receipt older than the question' do
+      outgoing_message(:sent).update!(status: :delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(1.second.from_now)).to be(false)
+    end
+
+    # A send from the paired phone comes back born delivered: nobody's phone answered it.
+    it 'does not count an echo' do
+      outgoing_message(:delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
+    end
+
+    it 'does not count a receipt replayed by an import' do
+      message = outgoing_message(:sent)
+      Import::SilentWrite.wrap { message.update!(status: :delivered) }
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
+    end
+
+    it 'sees a message the contact sent after the question' do
+      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account, message_type: :incoming)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
+    end
+
+    # Written now, sent a year ago: history says nothing about the number today.
+    it 'does not count an imported message sent before the question' do
+      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account, message_type: :incoming,
+                       content_attributes: { external_created_at: 1.year.ago.to_i })
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
+    end
+
     # The server's acknowledgement is exactly what a number with no account still gets.
     it 'does not count a message that was only sent' do
-      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
-                       message_type: :outgoing, status: :sent)
+      outgoing_message(:sent)
 
       expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
     end

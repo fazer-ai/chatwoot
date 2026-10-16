@@ -90,10 +90,30 @@ class ContactInbox < ApplicationRecord
     end
   end
 
-  # Whether the contact wrote, or a receipt came back, since the given moment.
+  # How long a live receipt stays where a pending lookup can see it: well past the 90 s a
+  # Baileys lookup may take.
+  WHATSAPP_RECEIPT_MEMORY = 10.minutes
+
+  # Called by Message for a receipt that proves presence, after it filtered out echoes born
+  # delivered and receipts replayed by an import. The rows cannot tell those apart afterwards
+  # (both are delivered with a fresh updated_at), so the receipt is kept here instead. Plain
+  # SET: every writer stores its own Time.current, so a racing overwrite moves the time by
+  # milliseconds, never back past a lookup.
+  def self.remember_whatsapp_receipt(id, at = Time.current)
+    Redis::Alfred.set(format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id), at.to_f, ex: WHATSAPP_RECEIPT_MEMORY.to_i)
+  end
+
+  # Whether the contact wrote, or a live receipt came back, since the given moment. The same
+  # evidence Message counts when it clears the flag: an incoming message by the time WhatsApp
+  # says it was sent, so an import of older history written now does not count.
   def whatsapp_presence_since?(time)
-    recent = Message.where(conversation_id: conversations.select(:id), updated_at: time..)
-    recent.incoming.or(recent.outgoing.where(status: %i[delivered read])).exists?
+    whatsapp_receipt_since?(time) ||
+      Message.incoming.where(conversation_id: conversations.select(:id), created_at: time..).any? { |message| message.whatsapp_sent_at >= time }
+  end
+
+  def whatsapp_receipt_since?(time)
+    seen = Redis::Alfred.get(format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id))
+    seen.present? && seen.to_f >= time.to_f
   end
 
   def clear_whatsapp_missing!

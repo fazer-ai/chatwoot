@@ -392,6 +392,13 @@ class Message < ApplicationRecord
     send_recovered_event if showing_recovered_body?
   end
 
+  # When WhatsApp says the message happened, which for an imported one is long before the
+  # row was written.
+  def whatsapp_sent_at
+    seconds = content_attributes&.dig('external_created_at').presence
+    seconds ? Time.zone.at(seconds.to_i) : created_at
+  end
+
   private
 
   def prevent_message_flooding
@@ -449,6 +456,9 @@ class Message < ApplicationRecord
   def clear_whatsapp_missing_flag
     return unless inbox.channel_type == 'Channel::Whatsapp'
 
+    # A lookup still waiting on the provider has no flag here to clear, so the receipt is
+    # also left where that lookup will read it before writing its "no".
+    ContactInbox.remember_whatsapp_receipt(conversation.contact_inbox_id) if outgoing?
     cleared = ContactInbox.where(id: conversation.contact_inbox_id)
                           .where(whatsapp_missing_checked_at: ...whatsapp_evidence_at)
                           .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
@@ -473,13 +483,6 @@ class Message < ApplicationRecord
   # A message is as old as WhatsApp says it is, which for an imported one is long before the
   # row was written. A receipt is as old as its arrival, whenever the message was sent.
   def whatsapp_evidence_at = incoming? ? whatsapp_sent_at : Time.current
-
-  # When WhatsApp says the message happened, which for an imported one is long before the
-  # row was written.
-  def whatsapp_sent_at
-    seconds = content_attributes&.dig('external_created_at').presence
-    seconds ? Time.zone.at(seconds.to_i) : created_at
-  end
 
   def update_contact_activity
     sender.update!(last_activity_at: DateTime.now) if sender.is_a?(Contact)
