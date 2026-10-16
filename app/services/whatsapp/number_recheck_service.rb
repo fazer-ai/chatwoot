@@ -31,23 +31,26 @@ class Whatsapp::NumberRecheckService
     phone = contact_inbox.contact.phone_number
     return if phone.blank?
 
+    asked_at = Time.current
     answer = number_check.lookup(phone)
     # No answer is not a "no": the flag and its date stay as the last real answer left them.
     return if answer.nil?
+    return contact_inbox.mark_whatsapp_missing_for!(phone, flag_before: flag_before, asked_at: asked_at) unless answer.exists
 
-    apply(answer, phone, flag_before)
+    found_under_lock(answer.phone, phone, flag_before)
   end
 
-  # The claim only keeps other rechecks out. A phone correction or a message from the contact
-  # may have landed while the provider was answering, and either one outranks an answer about
-  # what was true before it, so the answer is written only if both still read as they did.
-  # The contact's row lock is what a phone correction waits on.
-  def apply(answer, phone, flag_before)
+  # The claim only keeps other rechecks out. A phone correction may have landed while the
+  # provider was answering, so the alignment runs only if the contact still has the phone that
+  # was looked up and the flag still holds what was read before asking. The contact's row lock
+  # is what a phone correction waits on. A "no" goes through the same guard, plus the evidence
+  # check, in ContactInbox#mark_whatsapp_missing_for!.
+  def found_under_lock(canonical_phone, phone, flag_before)
     contact_inbox.contact.with_lock do
       contact_inbox.lock!
       next unless contact_inbox.contact.phone_number == phone && contact_inbox.whatsapp_missing_checked_at == flag_before
 
-      answer.exists ? found(answer.phone) : contact_inbox.update!(whatsapp_missing_checked_at: Time.current)
+      found(canonical_phone)
     end
   end
 

@@ -77,13 +77,23 @@ class ContactInbox < ApplicationRecord
   # Marks only if nothing moved while the provider was answering: the contact still has the
   # phone that was looked up, and the flag still holds what it held before asking. A phone
   # correction, a reply or a live receipt in between outranks an answer about the past.
-  def mark_whatsapp_missing_for!(phone, flag_before:)
+  #
+  # The flag comparison alone cannot see evidence that arrived while nothing was flagged (the
+  # clear had no row to touch), so the threads are read too.
+  def mark_whatsapp_missing_for!(phone, flag_before:, asked_at:)
     contact.with_lock do
       lock!
       next unless contact.phone_number == phone && whatsapp_missing_checked_at == flag_before
+      next if whatsapp_presence_since?(asked_at)
 
       update!(whatsapp_missing_checked_at: Time.current)
     end
+  end
+
+  # Whether the contact wrote, or a receipt came back, since the given moment.
+  def whatsapp_presence_since?(time)
+    recent = Message.where(conversation_id: conversations.select(:id), updated_at: time..)
+    recent.incoming.or(recent.outgoing.where(status: %i[delivered read])).exists?
   end
 
   def clear_whatsapp_missing!

@@ -174,4 +174,27 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.whatsapp_missing_checked_at).to be_nil
     end
   end
+
+  describe '#whatsapp_presence_since?' do
+    let(:contact_inbox) { create(:contact_inbox) }
+    let(:conversation) do
+      create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+    end
+    let(:asked_at) { 1.minute.ago }
+
+    it 'sees a receipt that came back after the question' do
+      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
+                       message_type: :outgoing, status: :delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
+    end
+
+    # The server's acknowledgement is exactly what a number with no account still gets.
+    it 'does not count a message that was only sent' do
+      create(:message, conversation: conversation, inbox: contact_inbox.inbox, account: conversation.account,
+                       message_type: :outgoing, status: :sent)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(false)
+    end
+  end
 end

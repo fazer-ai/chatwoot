@@ -451,6 +451,20 @@ describe ContactInboxBuilder do
         expect(flagged.reload.whatsapp_missing_checked_at).to be_nil
       end
 
+      # Nothing was flagged, so the reply had no flag to clear: the threads are what show it.
+      it 'does not flag a number the contact wrote from while WhatsApp answered' do
+        unflagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678')
+        conversation = create(:conversation, account: account, inbox: baileys_inbox, contact: contact, contact_inbox: unflagged)
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+          create(:message, conversation: conversation, inbox: baileys_inbox, account: account, message_type: :incoming)
+          { 'jid' => canonical_jid, 'exists' => false }
+        end
+
+        described_class.new(contact: contact, inbox: baileys_inbox, source_id: '5511912345678', validate_whatsapp_phone: true).perform
+
+        expect(unflagged.reload.whatsapp_missing_checked_at).to be_nil
+      end
+
       # A later conversation asks again, so a number that registered since stops warning.
       it 'clears an earlier flag when WhatsApp now knows the number' do
         flagged = create(:contact_inbox, contact: contact, inbox: baileys_inbox, source_id: '5511912345678',
