@@ -50,6 +50,26 @@ describe('WhatsappNumberMissingBanner', () => {
     expect(wrapper.find('.banner').exists()).toBe(true);
   });
 
+  // Every update replaces the conversation object; only a new id or date is a reason to ask.
+  it('does not ask again when an unrelated update replaces the conversation', async () => {
+    ConversationAPI.recheckWhatsappNumber.mockRejectedValue(new Error('500'));
+    const checkedAt = hoursAgo(48);
+    const wrapper = mountBanner({ whatsapp_missing_checked_at: checkedAt });
+    await flushPromises();
+
+    await wrapper.setProps({
+      conversation: {
+        id: 144873,
+        status: 'pending',
+        whatsapp_missing_checked_at: checkedAt,
+        messages: [],
+      },
+    });
+    await flushPromises();
+
+    expect(ConversationAPI.recheckWhatsappNumber).toHaveBeenCalledTimes(1);
+  });
+
   it('shows nothing and asks nothing for a number not flagged', async () => {
     const wrapper = mountBanner({ whatsapp_missing_checked_at: null });
     await flushPromises();

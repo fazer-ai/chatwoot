@@ -2522,6 +2522,18 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(response).to have_http_status(:ok)
       end
 
+      it 'passes an advisory lookup on to the provider' do
+        service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, on_whatsapp: { 'exists' => false })
+        allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new).with(whatsapp_channel: channel).and_return(service_double)
+
+        post "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}/on_whatsapp",
+             headers: admin.create_new_auth_token,
+             params: { phone_number: '+123456789', advisory: true },
+             as: :json
+
+        expect(service_double).to have_received(:on_whatsapp).with('+123456789', advisory: true)
+      end
+
       it 'calls on_whatsapp when supported and returns default response on no response from provider' do
         service_double = instance_double(Whatsapp::Providers::WhatsappBaileysService, on_whatsapp: nil)
         allow(Whatsapp::Providers::WhatsappBaileysService).to receive(:new)

@@ -41,10 +41,12 @@ class Inboxes extends CacheEnabledApiClient {
   }
 
   // Whether WhatsApp knows this phone, asked through the inbox's paired session.
-  // Answers `{ jid, exists }`.
+  // Answers `{ jid, exists }`. Advisory: the server gives up early rather than hold the
+  // request, since the caller only shows a hint.
   onWhatsapp(inboxId, phoneNumber) {
     return axios.post(`${this.url}/${inboxId}/on_whatsapp`, {
       phone_number: phoneNumber,
+      advisory: true,
     });
   }
 

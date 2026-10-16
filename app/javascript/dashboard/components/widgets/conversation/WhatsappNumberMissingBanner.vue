@@ -27,9 +27,11 @@ const message = computed(() =>
 
 // Opening the conversation is when a stale answer matters, so that is when it is asked
 // again. The answer comes back as a conversation update; a failure leaves the banner as
-// it was, which is the right reading of "unknown".
+// it was, which is the right reading of "unknown". Two sources rather than one getter
+// returning an array: every update replaces the conversation object, and a fresh array
+// would ask again on each one while the provider keeps failing.
 watch(
-  () => [props.conversation.id, checkedAt.value],
+  [() => props.conversation.id, checkedAt],
   () => {
     if (!isWhatsappMissingRecheckDue(checkedAt.value)) return;
     ConversationAPI.recheckWhatsappNumber(props.conversation.id).catch(

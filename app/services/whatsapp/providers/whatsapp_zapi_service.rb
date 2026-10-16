@@ -180,7 +180,8 @@ class Whatsapp::Providers::WhatsappZapiService < Whatsapp::Providers::BaseServic
     process_response(response)
   end
 
-  def on_whatsapp(phone_number)
+  # Takes `advisory:` like the other providers and has no longer ceiling to shorten.
+  def on_whatsapp(phone_number, **)
     response = HTTParty.get(
       "#{api_instance_path_with_token}/phone-exists/#{phone_number.delete('+')}",
       headers: api_headers,

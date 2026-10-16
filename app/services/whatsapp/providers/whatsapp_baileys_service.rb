@@ -601,7 +601,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response.parsed_response&.deep_symbolize_keys
   end
 
-  def on_whatsapp(recipient_id)
+  # `advisory` is a lookup whose caller only shows a hint and treats silence as "I do not know",
+  # such as the compose warning: it gets the short ceiling, so a wedged socket does not hold a
+  # web thread for the provider's full 90 s.
+  def on_whatsapp(recipient_id, advisory: false)
     @recipient_id = recipient_id
 
     response = HTTParty.post(
@@ -610,7 +613,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         jids: [remote_jid]
       }.to_json,
-      **BAILEYS_REQUEST_OPTIONS
+      **(advisory ? BAILEYS_SHORT_REQUEST_OPTIONS : BAILEYS_REQUEST_OPTIONS)
     )
 
     raise ProviderUnavailableError unless process_response(response)
