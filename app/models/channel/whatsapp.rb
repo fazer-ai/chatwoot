@@ -169,7 +169,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     normalized = provider_connection.deep_stringify_keys
     return if normalized == self.provider_connection
 
-    connection_changed = normalized['connection'] != self.provider_connection['connection']
+    previous_connection = self.provider_connection['connection']
+    connection_changed = normalized['connection'] != previous_connection
     assign_attributes(provider_connection: normalized)
     # NOTE: Skip `validate_provider_config?` check.
     # The change goes to clients through a targeted `inbox.provider_connection_updated`
@@ -185,7 +186,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     else
       Inbox.no_touching { save!(validate: false) }
     end
-    broadcast_provider_connection_updated
+    broadcast_provider_connection_updated(previous_connection)
   end
 
   # Proactive (REST poll) / push update of just the reach-out lock. Unlike the connection.update
@@ -542,13 +543,15 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   # Pushes the connection status to the account's agents over the websocket without
   # going through the full dispatcher, which would always enqueue an EventDispatcherJob
-  # (wasteful for such a high-frequency event). Sync-only keeps it cheap.
-  def broadcast_provider_connection_updated
+  # (wasteful for such a high-frequency event). Sync-only keeps it cheap. The previous
+  # `connection` travels with it so AgentBotListener can tell the rare change of state from
+  # the QR/error/epoch churn without reading anything.
+  def broadcast_provider_connection_updated(previous_connection)
     return if inbox.blank?
 
     Rails.configuration.dispatcher.sync_dispatcher.dispatch(
       Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED, Time.zone.now,
-      inbox: inbox, provider_connection: provider_connection
+      inbox: inbox, provider_connection: provider_connection, previous_connection: previous_connection
     )
   end
 

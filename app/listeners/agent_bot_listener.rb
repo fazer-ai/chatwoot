@@ -46,6 +46,28 @@ class AgentBotListener < BaseListener
     deliver(contact_inbox.inbox, nil, payload)
   end
 
+  # Only a change of `connection` reaches the bots: the same event also fires for every new QR,
+  # error and epoch while pairing. The payload is the agent half of provider_connection; the QR
+  # and the error grant access to the WhatsApp account and stay admin-only. `changed_at` is when
+  # the write happened, which is what orders two changes whose deliveries arrive out of order
+  # (a retry is signed when it is sent, so the signature timestamp cannot).
+  def inbox_provider_connection_updated(event)
+    inbox = event.data[:inbox]
+    provider_connection = event.data[:provider_connection] || {}
+    previous_connection = event.data[:previous_connection]
+    return if provider_connection['connection'] == previous_connection
+
+    payload = {
+      event: __method__.to_s,
+      account: { id: inbox.account_id },
+      inbox: { id: inbox.id, name: inbox.name, channel_type: inbox.channel_type, provider: inbox.channel.provider },
+      provider_connection: inbox.channel.provider_connection_agent_data(provider_connection),
+      previous_connection: previous_connection,
+      changed_at: event.timestamp.utc.iso8601(6)
+    }
+    deliver(inbox, nil, payload)
+  end
+
   private
 
   # The responders first (the conversation's own bot and the inbox's), then the observers the
