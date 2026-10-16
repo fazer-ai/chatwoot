@@ -454,8 +454,9 @@ class Message < ApplicationRecord
                           .where(whatsapp_missing_checked_at: ...whatsapp_sent_at)
                           .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
     # update_all skips the contact inbox's own commit callback, so the rare clear tells the
-    # dashboard itself.
-    conversation.contact_inbox.broadcast_whatsapp_missing_change if cleared.positive?
+    # dashboard itself, from a fresh row: the loaded association still holds the old date,
+    # and the conversations it reaches would serialize that.
+    ContactInbox.find(conversation.contact_inbox_id).broadcast_whatsapp_missing_change if cleared.positive?
   end
 
   def proves_whatsapp_presence?

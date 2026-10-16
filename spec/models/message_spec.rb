@@ -1529,13 +1529,18 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
-    it 'tells the dashboard when a reply clears it' do
-      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+    # The payload is what moves the banner, so it has to carry the cleared value, not the one
+    # still held by the loaded association.
+    it 'tells the dashboard when a reply clears it, with the cleared value' do
+      conversation.contact_inbox # loaded with the old date, as a request would hold it
+      payloads = []
+      allow(Rails.configuration.dispatcher).to receive(:dispatch) do |event, _time, data|
+        payloads << data[:conversation].push_event_data if event == Events::Types::CONVERSATION_UPDATED
+      end
 
       create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming)
 
-      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
-        .with(Events::Types::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation))
+      expect(payloads).to include(hash_including(id: conversation.display_id, whatsapp_missing_checked_at: nil))
     end
 
     it 'clears it when an outgoing message is delivered' do
