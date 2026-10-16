@@ -1,7 +1,11 @@
 import { mount, flushPromises } from '@vue/test-utils';
+import ContactAPI from 'dashboard/api/contacts';
 import InboxesAPI from 'dashboard/api/inboxes';
 import WhatsappNumberWarning from '../WhatsappNumberWarning.vue';
 
+vi.mock('dashboard/api/contacts', () => ({
+  default: { show: vi.fn() },
+}));
 vi.mock('dashboard/api/inboxes', () => ({
   default: { onWhatsapp: vi.fn() },
 }));
@@ -81,7 +85,26 @@ describe('WhatsappNumberWarning', () => {
     expect(InboxesAPI.onWhatsapp).toHaveBeenCalledWith(2, '+558588246590');
   });
 
+  // Picked from a name search, the contact reaches the form without its phone.
+  it('reads the phone off the contact record when the form does not carry it', async () => {
+    answer(false);
+    ContactAPI.show.mockResolvedValue({
+      data: { payload: { id: 7, phone_number: '+558588246590' } },
+    });
+
+    const wrapper = mountWarning({ selectedContact: { id: 7, name: 'Jose' } });
+    await flushPromises();
+
+    expect(ContactAPI.show).toHaveBeenCalledWith(7);
+    expect(InboxesAPI.onWhatsapp).toHaveBeenCalledWith(2, '+558588246590');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+  });
+
   it('does not ask about a contact without a phone', async () => {
+    ContactAPI.show.mockResolvedValue({
+      data: { payload: { id: 7, email: 'a@b.c', phone_number: null } },
+    });
+
     mountWarning({ selectedContact: { id: 7, email: 'a@b.c' } });
     await flushPromises();
 

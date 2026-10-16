@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ContactAPI from 'dashboard/api/contacts';
 import InboxesAPI from 'dashboard/api/inboxes';
 import { canCheckWhatsappNumber } from 'dashboard/helper/whatsappNumberMissing';
 
@@ -13,31 +14,36 @@ const { t } = useI18n();
 
 const isMissing = ref(false);
 
-// The search results are camelCased and the contact opened from its own page is not.
-const phoneNumber = computed(
-  () =>
-    props.selectedContact?.phoneNumber ||
-    props.selectedContact?.phone_number ||
-    ''
-);
+// The contact picked from a name search reaches the form without its phone (TagInput keeps
+// it only for a phone search), and the one opened from its own page is snake_cased.
+const resolvePhone = async contact => {
+  const known = contact?.phoneNumber || contact?.phone_number;
+  if (known || !contact?.id) return known || '';
+
+  const { data } = await ContactAPI.show(contact.id);
+  return data?.payload?.phone_number || '';
+};
 
 // Only an explicit "no" warns. A failed or slow lookup is "unknown", and it never blocks
 // the send either way: the agent may know something the lookup does not.
 let lookupId = 0;
 watch(
-  () => [props.targetInbox?.id, phoneNumber.value],
+  () => [props.targetInbox?.id, props.selectedContact?.id],
   async () => {
     lookupId += 1;
     const currentLookup = lookupId;
     isMissing.value = false;
-    if (!phoneNumber.value || !canCheckWhatsappNumber(props.targetInbox)) {
+    if (!props.selectedContact || !canCheckWhatsappNumber(props.targetInbox)) {
       return;
     }
 
     try {
+      const phoneNumber = await resolvePhone(props.selectedContact);
+      if (!phoneNumber || currentLookup !== lookupId) return;
+
       const { data } = await InboxesAPI.onWhatsapp(
         props.targetInbox.id,
-        phoneNumber.value
+        phoneNumber
       );
       if (currentLookup === lookupId) isMissing.value = data?.exists === false;
     } catch {

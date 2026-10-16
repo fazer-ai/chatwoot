@@ -2,16 +2,16 @@
 #
 # Table name: contact_inboxes
 #
-#  id            :bigint           not null, primary key
-#  group_left_at :datetime
-#  hmac_verified :boolean          default(FALSE)
-#  pubsub_token  :string
-#  created_at    :datetime         not null
-#  updated_at    :datetime         not null
-#  contact_id    :bigint
-#  inbox_id      :bigint
-#  source_id     :text             not null
+#  id                          :bigint           not null, primary key
+#  group_left_at               :datetime
+#  hmac_verified               :boolean          default(FALSE)
+#  pubsub_token                :string
 #  whatsapp_missing_checked_at :datetime
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  contact_id                  :bigint
+#  inbox_id                    :bigint
+#  source_id                   :text             not null
 #
 # Indexes
 #
