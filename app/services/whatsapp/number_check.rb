@@ -26,9 +26,9 @@ class Whatsapp::NumberCheck
   end
 
   # nil when there is no answer: the provider failed, timed out or cannot check numbers.
-  # Callers treat that as "unknown", never as "no".
-  def lookup(phone_number)
-    response = inbox.channel.on_whatsapp(phone_number)
+  # Callers treat that as "unknown", never as "no". `deadline` as in the providers' on_whatsapp.
+  def lookup(phone_number, deadline: :provider)
+    response = inbox.channel.on_whatsapp(phone_number, deadline: deadline)
     return unless response.is_a?(Hash)
     return Answer.new(exists: false) unless response['exists']
 

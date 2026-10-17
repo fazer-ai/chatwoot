@@ -2531,7 +2531,7 @@ RSpec.describe 'Inboxes API', type: :request do
              params: { phone_number: '+123456789', advisory: true },
              as: :json
 
-        expect(service_double).to have_received(:on_whatsapp).with('+123456789', advisory: true)
+        expect(service_double).to have_received(:on_whatsapp).with('+123456789', deadline: :hint)
       end
 
       it 'calls on_whatsapp when supported and returns default response on no response from provider' do

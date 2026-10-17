@@ -42,4 +42,19 @@ module Whatsapp::BaileysRequestOptions
   # recorded as open with nothing to correct it later, and the import answered the operator
   # "try again" for an import that may have completed (fazer-ai/chatwoot#600).
   BAILEYS_SHORT_REQUEST_OPTIONS = { timeout: 10, max_retries: 0 }.freeze
+
+  # A lookup a web request waits on: the number check that starts a conversation. rack-timeout
+  # cuts that request at RACK_TIMEOUT_SERVICE_TIMEOUT (15 s unless an installation sets it) with a
+  # Thread#raise nothing downstream can rescue, and the full 90 s turned a wedged socket into a
+  # 500 with no conversation created (fazer-ai/chatwoot#880). Three quarters of the cut leaves the
+  # rest of the request room to answer and treat silence as "unknown"; never more than the full
+  # ceiling. Measured on one installation with a 60 s cut, the slowest real answer took 18.5 s,
+  # under the 45 s this gives there.
+  def self.in_request_timeout(rack_timeout)
+    seconds = rack_timeout.to_f
+    seconds = 15.0 unless seconds.positive?
+    [(seconds * 0.75).floor, BAILEYS_REQUEST_OPTIONS[:timeout]].min
+  end
+
+  BAILEYS_IN_REQUEST_OPTIONS = { timeout: in_request_timeout(ENV.fetch('RACK_TIMEOUT_SERVICE_TIMEOUT', nil)), max_retries: 0 }.freeze
 end

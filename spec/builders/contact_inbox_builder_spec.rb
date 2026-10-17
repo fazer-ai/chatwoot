@@ -343,7 +343,7 @@ describe ContactInboxBuilder do
 
       it 'updates the contact phone when on_whatsapp returns a different canonical jid' do
         allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
-          .with(contact.phone_number)
+          .with(contact.phone_number, deadline: :request)
           .and_return({ 'jid' => canonical_jid, 'exists' => true })
 
         contact_inbox = described_class.new(
@@ -402,6 +402,30 @@ describe ContactInboxBuilder do
         expect do
           described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
         end.not_to(change { contact.reload.phone_number })
+      end
+
+      # The builder answers a web request, and rack-timeout cuts that request from outside: the
+      # lookup has to give up first, so the conversation is still created.
+      it 'asks within the deadline of a web request' do
+        deadlines = []
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do |_channel, _phone, **options| # rubocop:disable RSpec/AnyInstance
+          deadlines << options[:deadline]
+          { 'jid' => canonical_jid, 'exists' => true }
+        end
+
+        described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
+
+        expect(deadlines).to eq([:request])
+      end
+
+      it 'creates the contact inbox with the typed phone when the lookup times out' do
+        allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) # rubocop:disable RSpec/AnyInstance
+          .and_raise(Net::ReadTimeout)
+
+        contact_inbox = described_class.new(contact: contact, inbox: baileys_inbox, validate_whatsapp_phone: true).perform
+
+        expect(contact_inbox.source_id).to eq(contact.phone_number.delete('+'))
+        expect(contact_inbox.whatsapp_missing_checked_at).to be_nil
       end
 
       it 'swallows provider errors and proceeds with the original phone' do
