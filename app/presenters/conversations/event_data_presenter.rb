@@ -66,6 +66,7 @@ class Conversations::EventDataPresenter < SimpleDelegator
       waiting_since: waiting_since.to_i,
       **push_timestamps,
       **group_left_data,
+      **whatsapp_missing_data,
       **redirect_origin_data
     }
   end
@@ -79,6 +80,13 @@ class Conversations::EventDataPresenter < SimpleDelegator
     return {} unless group_type_group?
 
     { group_left: contact_inbox&.group_left? }
+  end
+
+  # Same field, on the same terms, as the conversation partial: see the comment there.
+  def whatsapp_missing_data
+    return {} unless inbox&.whatsapp?
+
+    { whatsapp_missing_checked_at: contact_inbox&.whatsapp_missing_checked_at&.to_i }
   end
 
   # The WhatsApp entry conversation this widget thread was redirected from, as its display_id (the

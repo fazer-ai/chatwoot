@@ -299,6 +299,15 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
+  # Asked by the dashboard when it opens a conversation whose number was flagged as having no
+  # WhatsApp. Only a flag older than the recheck window goes back to the provider, so opening
+  # the same conversation again and again costs one lookup per window, not one per open. The
+  # answer arrives as a conversation update.
+  def recheck_whatsapp_number
+    Whatsapp::NumberRecheckJob.perform_later(@conversation) if @conversation.contact_inbox&.whatsapp_missing_recheck_due?
+    head :accepted
+  end
+
   def destroy
     authorize @conversation, :destroy?
     ::Conversations::DeleteService.new(conversation: @conversation, user: Current.user, ip: request.ip).perform

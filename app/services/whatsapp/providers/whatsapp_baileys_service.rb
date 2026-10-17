@@ -601,7 +601,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response.parsed_response&.deep_symbolize_keys
   end
 
-  def on_whatsapp(recipient_id)
+  # `advisory` is a lookup whose caller only shows a hint and treats silence as "I do not know",
+  # such as the compose warning: it gets the short ceiling, so a wedged socket does not hold a
+  # web thread for the provider's full 90 s.
+  def on_whatsapp(recipient_id, advisory: false)
     @recipient_id = recipient_id
 
     response = HTTParty.post(
@@ -610,7 +613,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       body: {
         jids: [remote_jid]
       }.to_json,
-      **BAILEYS_REQUEST_OPTIONS
+      **(advisory ? BAILEYS_SHORT_REQUEST_OPTIONS : BAILEYS_REQUEST_OPTIONS)
     )
 
     raise ProviderUnavailableError unless process_response(response)
@@ -1302,6 +1305,10 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     end
   end
 
+  # `on_whatsapp` is left out on purpose: it is a read whose every caller treats a failure as
+  # "unknown" (the contact builder, the compose form's warning, the no-WhatsApp recheck), so a
+  # 500 on one number lookup must not mark a working session 'close' and show the agent a
+  # disconnected inbox. A connection that is really down is caught by the connection check.
   with_error_handling :setup_channel_provider,
                       :send_message,
                       :toggle_typing_status,
@@ -1312,7 +1319,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
                       :received_messages,
                       :group_metadata,
                       :sync_group,
-                      :on_whatsapp,
                       :delete_message,
                       :edit_message,
                       :group_leave,

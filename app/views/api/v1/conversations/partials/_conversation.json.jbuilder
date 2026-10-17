@@ -88,6 +88,9 @@ json.group_type conversation.group_type
 # `contact_inbox` is preloaded for the list, but the question is meaningless anywhere
 # else and an always-false field on every conversation is noise.
 json.group_left conversation.contact_inbox&.group_left? if conversation.group_type_group?
+# When this number's session last answered that it has no WhatsApp account, which is what the
+# conversation warns about. Only WhatsApp inboxes carry it; nil once the number is known to exist.
+json.whatsapp_missing_checked_at conversation.contact_inbox&.whatsapp_missing_checked_at&.to_i if conversation.inbox.whatsapp?
 json.priority conversation.priority
 json.waiting_since conversation.waiting_since.to_i.to_i
 sla_applicable = conversation.account.feature_enabled?('sla') && (!conversation.respond_to?(:sla_applicable?) || conversation.sla_applicable?)

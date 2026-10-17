@@ -42,6 +42,18 @@ describe('#InboxesAPI', () => {
       expect(axiosMock.get).toHaveBeenCalledWith('/api/v1/inboxes/2/campaigns');
     });
 
+    // The compose warning only shows a hint, so the server must give up early.
+    it('#onWhatsapp asks as an advisory lookup', () => {
+      inboxesAPI.onWhatsapp(2, '+5585988246590');
+      expect(axiosMock.post).toHaveBeenCalledWith(
+        '/api/v1/inboxes/2/on_whatsapp',
+        {
+          phone_number: '+5585988246590',
+          advisory: true,
+        }
+      );
+    });
+
     it('#deleteInboxAvatar', () => {
       inboxesAPI.deleteInboxAvatar(2);
       expect(axiosMock.delete).toHaveBeenCalledWith('/api/v1/inboxes/2/avatar');

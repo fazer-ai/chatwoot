@@ -191,7 +191,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
       render json: { error: 'Channel does not support whatsapp check' }, status: :unprocessable_entity and return
     end
 
-    response = channel.on_whatsapp(phone_number)
+    response = channel.on_whatsapp(phone_number, advisory: ActiveModel::Type::Boolean.new.cast(params[:advisory]) || false)
 
     render json: response, status: :ok
   end

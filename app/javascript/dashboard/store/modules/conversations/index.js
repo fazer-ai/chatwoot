@@ -364,10 +364,12 @@ export const mutations = {
       // unconditionally — heuristics on `last_non_activity_message` miss the
       // case where newer non-reaction messages exist after the reacted target.
       // `history_exhausted` only drops the "load older messages" control at the
-      // top of the thread, where the agent who asked is reading.
+      // top of the thread, where the agent who asked is reading. `whatsapp_missing` only
+      // moves the no-WhatsApp banner.
       const isReactionUpdate = [
         'reaction_toggle',
         'history_exhausted',
+        'whatsapp_missing',
       ].includes(eventMetadata?.source);
       if (_state.selectedChatId === conversation.id && !isReactionUpdate) {
         emitter.emit(BUS_EVENTS.SCROLL_TO_MESSAGE);

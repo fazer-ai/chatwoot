@@ -189,4 +189,22 @@ RSpec.describe Conversations::EventDataPresenter do
       expect(snippet).not_to include('<')
     end
   end
+
+  # The cable copy is what moves the banner after a recheck, so it has to carry the field the
+  # REST partial carries, on the same terms.
+  describe '#push_data whatsapp_missing_checked_at' do
+    it 'carries the date a WhatsApp number was found to have no account' do
+      channel = create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false)
+      checked_at = 2.days.ago.change(usec: 0)
+      contact_inbox = create(:contact_inbox, inbox: channel.inbox, whatsapp_missing_checked_at: checked_at)
+      whatsapp_conversation = create(:conversation, account: channel.account, inbox: channel.inbox,
+                                                    contact: contact_inbox.contact, contact_inbox: contact_inbox)
+
+      expect(described_class.new(whatsapp_conversation).push_data[:whatsapp_missing_checked_at]).to eq(checked_at.to_i)
+    end
+
+    it 'leaves it out of conversations that are not on WhatsApp' do
+      expect(presenter.push_data).not_to have_key(:whatsapp_missing_checked_at)
+    end
+  end
 end

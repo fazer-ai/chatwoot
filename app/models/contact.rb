@@ -72,6 +72,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
   before_validation :prepare_contact_attributes
   after_create_commit :dispatch_create_event, :ip_lookup
   after_update_commit :dispatch_update_event
+  after_update_commit :forget_whatsapp_missing_answers, if: :saved_change_to_phone_number?
   after_destroy_commit :dispatch_destroy_event
   before_save :sync_contact_attributes
 
@@ -275,6 +276,13 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       Time.zone.now,
       contact_data: push_event_data.merge(account_id: account_id)
     )
+  end
+
+  # A "no WhatsApp" answer is about the number that was looked up. Once the phone is
+  # corrected it says nothing about the new one, and keeping it would warn about the new
+  # number with the old number's answer and hold off the recheck for hours.
+  def forget_whatsapp_missing_answers
+    contact_inboxes.where.not(whatsapp_missing_checked_at: nil).find_each(&:clear_whatsapp_missing!)
   end
 end
 Contact.include_mod_with('Concerns::Contact')

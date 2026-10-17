@@ -5,9 +5,13 @@ class ContactInboxBuilder
   pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false, validate_whatsapp_phone: false }]
 
   def perform
-    normalize_phone_for_whatsapp! if validate_whatsapp_phone && whatsapp_session_inbox? && session_can_answer?
+    normalize_phone_for_whatsapp! if validate_whatsapp_phone && whatsapp_session_inbox? && number_check.answerable?
     @source_id ||= generate_source_id
-    create_contact_inbox if source_id.present?
+    return if source_id.blank?
+
+    contact_inbox = create_contact_inbox
+    record_whatsapp_presence(contact_inbox)
+    contact_inbox
   end
 
   private
@@ -21,58 +25,56 @@ class ContactInboxBuilder
     @inbox.channel.session_provider? || @inbox.channel.provider == 'baileys'
   end
 
-  # A session inbox answers the number check through its paired session, so with the
-  # session not open (never paired, dropped, still connecting) nobody can answer: the check
-  # would only wait out its timeout before falling back to the typed number anyway, and
-  # long enough to take the request down with it (#838). Baileys reports its connection
-  # elsewhere and keeps its own HTTP timeout, so it is left as it was.
-  def session_can_answer?
-    channel = @inbox.channel
-    return true unless channel.session_provider?
-
-    channel.provider_connection.to_h['connection'] == 'open'
+  def number_check
+    @number_check ||= Whatsapp::NumberCheck.new(inbox: @inbox)
   end
 
-  # WhatsApp matches the canonical phone for an account, but a paired session requires
-  # the exact number registered there. For Brazilian mobile numbers the leading
-  # "9" may or may not be present in the user-typed value; sending to the wrong
-  # variant fails silently. Use on_whatsapp to resolve the canonical number and
-  # align the contact (and source_id) with what the paired session expects.
-  # Provider lookup errors are swallowed; write/merge errors must surface so the
-  # caller sees inconsistent state.
+  # Resolve the canonical number and align the contact (and source_id) with what the paired
+  # session expects. Provider lookup errors are swallowed; write/merge errors must surface so
+  # the caller sees inconsistent state.
   def normalize_phone_for_whatsapp!
     return if @contact.phone_number.blank?
 
     old_source_id_candidate = @contact.phone_number.delete('+')
 
-    canonical_phone = fetch_canonical_whatsapp_phone
+    @looked_up_phone = @contact.phone_number
+    @flags_before = whatsapp_flags(@contact)
+    @asked_at = Time.current
+    @whatsapp_answer = number_check.lookup(@looked_up_phone)
+    canonical_phone = @whatsapp_answer&.phone
     return if canonical_phone.blank? || canonical_phone == @contact.phone_number
 
-    apply_canonical_phone(canonical_phone)
+    @contact = number_check.align_contact(@contact, canonical_phone)
+    @looked_up_phone = canonical_phone
+    # A merge hands the answer to another contact, whose flags this request has not read yet.
+    # Read now, after the lookup, they are what the alignment applies the answer to.
+    @flags_before = whatsapp_flags(@contact)
 
     @source_id = canonical_phone.delete('+') if @source_id == old_source_id_candidate
   end
 
-  def fetch_canonical_whatsapp_phone
-    response = @inbox.channel.on_whatsapp(@contact.phone_number)
-    return unless response.is_a?(Hash) && response['exists']
-
-    jid_digits = response['jid'].to_s.split('@').first
-    return if jid_digits.blank?
-
-    "+#{jid_digits}"
-  rescue StandardError => e
-    Rails.logger.warn("[WHATSAPP] phone normalization via on_whatsapp failed (ignored): #{e.class.name}: #{e.message}")
-    nil
+  def whatsapp_flags(contact)
+    contact.contact_inboxes.where(inbox: @inbox).pluck(:id, :whatsapp_missing_checked_at).to_h
   end
 
-  def apply_canonical_phone(canonical_phone)
-    existing = @inbox.account.contacts.where.not(id: @contact.id).find_by(phone_number: canonical_phone)
+  # Every conversation started here asks afresh, so the answer replaces whatever an earlier
+  # one left on the contact inbox: the conversation warns while it says "no WhatsApp", and a
+  # number that registered since stops warning. No answer changes nothing, and either answer
+  # is dropped if the phone or the flag moved while the provider was answering. A "yes" that
+  # aligned the contact is about the canonical phone it now holds.
+  def record_whatsapp_presence(contact_inbox)
+    return if @whatsapp_answer.nil?
 
-    if existing
-      @contact = ContactMergeAction.new(account: @inbox.account, base_contact: existing, mergee_contact: @contact).perform
-    else
-      @contact.update!(phone_number: canonical_phone)
+    return clear_answered_threads(contact_inbox) if @whatsapp_answer.exists
+
+    contact_inbox.mark_whatsapp_missing_for!(@looked_up_phone, flag_before: @flags_before[contact_inbox.id], asked_at: @asked_at)
+  end
+
+  # A "yes" is about the phone, so every thread of the contact in this inbox stops warning,
+  # not only the one this conversation uses.
+  def clear_answered_threads(contact_inbox)
+    ContactInbox.where(id: @flags_before.keys | [contact_inbox.id]).find_each do |thread|
+      thread.clear_whatsapp_missing_for!(@looked_up_phone, flag_before: @flags_before[thread.id])
     end
   end
 
