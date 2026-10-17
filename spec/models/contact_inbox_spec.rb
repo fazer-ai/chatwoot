@@ -213,6 +213,16 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    # Writing it only to undo it would flash the banner on every open thread.
+    it 'does not write the flag at all when the evidence is already there' do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: conversation.account, message_type: :incoming)
+      allow(contact_inbox).to receive(:broadcast_whatsapp_missing_change)
+
+      contact_inbox.mark_whatsapp_missing_for!(contact_inbox.contact.phone_number, flag_before: nil, asked_at: 1.minute.ago)
+
+      expect(contact_inbox).not_to have_received(:broadcast_whatsapp_missing_change)
+    end
+
     it 'keeps the flag when no evidence arrives' do
       contact_inbox.mark_whatsapp_missing_for!(contact_inbox.contact.phone_number, flag_before: nil, asked_at: 1.minute.ago)
 

@@ -96,13 +96,18 @@ describe Whatsapp::NumberRecheckService do
   end
 
   it 'does not ask again when the worker before it already answered' do
-    answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true })
+    asked = 0
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+      asked += 1
+      { 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true }
+    end
     service = described_class.new(conversation: conversation)
     service.send(:contact_inbox) # memoized with the stale date, as a queued job would hold it
     ContactInbox.find(contact_inbox.id).update!(whatsapp_missing_checked_at: 1.minute.ago) # the other worker
 
     service.perform
 
+    expect(asked).to eq(0)
     expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
   end
 
@@ -116,6 +121,30 @@ describe Whatsapp::NumberRecheckService do
     perform
 
     expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+  end
+
+  # A "yes" about the old phone must not move the contact back off the corrected one.
+  it 'does not align the contact to an answer about a phone corrected during the lookup' do
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+      Contact.find(contact.id).update!(phone_number: '+5585911112222')
+      { 'jid' => '558588246590@s.whatsapp.net', 'exists' => true }
+    end
+
+    perform
+
+    expect(contact.reload.phone_number).to eq('+5585911112222')
+  end
+
+  # Another lookup answered while this one waited; the newer answer stands.
+  it 'does not clear a flag a newer lookup wrote during this one' do
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do # rubocop:disable RSpec/AnyInstance
+      ContactInbox.find(contact_inbox.id).update!(whatsapp_missing_checked_at: 1.minute.ago)
+      { 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true }
+    end
+
+    perform
+
+    expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
   end
 
   it 'does not restore the flag a message from the contact cleared during the lookup' do
