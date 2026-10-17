@@ -207,6 +207,21 @@ RSpec.describe ContactInbox do
     end
   end
 
+  describe '#broadcast_whatsapp_missing_change' do
+    # No message arrived, so the open thread must not jump to the bottom.
+    it 'tags the update as a banner-only change' do
+      contact_inbox = create(:contact_inbox)
+      conversation = create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+      allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+      contact_inbox.broadcast_whatsapp_missing_change
+
+      metadata = { source: 'whatsapp_missing' }
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(Events::Types::CONVERSATION_UPDATED, anything, hash_including(conversation: conversation, broadcast_metadata: metadata))
+    end
+  end
+
   describe '#whatsapp_presence_since?' do
     let(:channel) { create(:channel_whatsapp, provider: 'baileys', validate_provider_config: false, sync_templates: false) }
     let(:contact_inbox) { create(:contact_inbox, inbox: channel.inbox, source_id: '558588246590') }
@@ -279,6 +294,23 @@ RSpec.describe ContactInbox do
       end
 
       expect(contact_inbox.whatsapp_presence_since?(asked)).to be(true)
+    end
+
+    it 'sees a reply on another thread of the contact in the inbox' do
+      sibling = create(:contact_inbox, contact: contact_inbox.contact, inbox: contact_inbox.inbox, source_id: '123456789012345')
+      other = create(:conversation, contact: sibling.contact, contact_inbox: sibling, inbox: sibling.inbox)
+      create(:message, conversation: other, inbox: sibling.inbox, account: other.account, message_type: :incoming)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
+    end
+
+    it 'sees a receipt on another thread of the contact in the inbox' do
+      sibling = create(:contact_inbox, contact: contact_inbox.contact, inbox: contact_inbox.inbox, source_id: '123456789012345')
+      other = create(:conversation, contact: sibling.contact, contact_inbox: sibling, inbox: sibling.inbox)
+      create(:message, conversation: other, inbox: sibling.inbox, account: other.account, message_type: :outgoing, status: :sent)
+        .update!(status: :delivered)
+
+      expect(contact_inbox.whatsapp_presence_since?(asked_at)).to be(true)
     end
 
     # Written now, sent a year ago: history says nothing about the number today.

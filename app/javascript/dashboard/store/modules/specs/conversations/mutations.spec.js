@@ -269,6 +269,20 @@ describe('#mutations', () => {
       expect(emitter.emit).not.toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
     });
 
+    it('skips SCROLL_TO_MESSAGE when only the no-WhatsApp banner changed', () => {
+      const state = {
+        allConversations: [{ id: 1, updated_at: 1 }],
+        selectedChatId: 1,
+      };
+      mutations[types.UPDATE_CONVERSATION](state, {
+        id: 1,
+        updated_at: 2,
+        whatsapp_missing_checked_at: null,
+        event_metadata: { source: 'whatsapp_missing' },
+      });
+      expect(emitter.emit).not.toHaveBeenCalledWith('SCROLL_TO_MESSAGE');
+    });
+
     it('update message if it exist in the store', () => {
       global.bus = { $emit: vi.fn() };
       const state = {

@@ -453,24 +453,27 @@ class Message < ApplicationRecord
 
   # Anything the contact sends, and any receipt from their phone, proves the number has
   # WhatsApp, so a "no WhatsApp" flag left by an earlier lookup stops warning, as long as the
-  # evidence is newer than that lookup. One UPDATE that touches no row in the usual case,
-  # instead of a read per message.
+  # evidence is newer than that lookup. On every thread of the contact in this inbox, since
+  # the flag is about the phone and a contact can hold more than one (phone and LID). One read
+  # that finds nothing in the usual case.
   def clear_whatsapp_missing_flag
     return unless inbox.channel_type == 'Channel::Whatsapp'
 
     # A lookup still waiting on the provider has no flag here to clear, so the receipt is
     # also left where that lookup will read it before writing its "no".
-    ContactInbox.remember_whatsapp_receipt(conversation.contact_inbox_id, created_at) if outgoing?
-    cleared = ContactInbox.where(id: conversation.contact_inbox_id)
+    ContactInbox.remember_whatsapp_receipt(inbox_id, conversation.contact_id, created_at) if outgoing?
+    flagged = ContactInbox.where(inbox_id: inbox_id, contact_id: conversation.contact_id)
                           .where(whatsapp_missing_checked_at: ...whatsapp_evidence_at)
-                          .update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
-    return unless cleared.positive?
+    ids = flagged.pluck(:id)
+    return if ids.empty?
 
+    flagged.where(id: ids).update_all(whatsapp_missing_checked_at: nil) # rubocop:disable Rails/SkipsModelValidations
     # update_all skips the contact inbox's own commit callback, so the rare clear tells the
-    # dashboard itself. From a reloaded association, on this conversation itself: the loaded
-    # one still holds the old date, and this message's own callbacks broadcast the
-    # conversation again right after (reopening it, waiting_since) with a newer version.
-    conversation.reload_contact_inbox.broadcast_whatsapp_missing_change
+    # dashboard itself. This conversation's loaded association still holds the old date, and
+    # this message's own callbacks broadcast it again right after (reopening it,
+    # waiting_since), so it is reloaded first.
+    conversation.reload_contact_inbox
+    ContactInbox.where(id: ids).find_each(&:broadcast_whatsapp_missing_change)
   end
 
   # An incoming message counts when it is written. An outgoing one counts only when a

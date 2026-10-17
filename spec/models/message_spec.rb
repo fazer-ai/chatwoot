@@ -1576,6 +1576,16 @@ RSpec.describe Message do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_present
     end
 
+    # The flag is about the phone; the contact's other thread here (a LID one) warns about it too.
+    it 'clears it on the contact\'s other threads in the inbox' do
+      sibling = create(:contact_inbox, contact: contact_inbox.contact, inbox: channel.inbox, source_id: '123456789012345',
+                                       whatsapp_missing_checked_at: 1.hour.ago)
+
+      create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming)
+
+      expect(sibling.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
     # A history import replays old traffic: it predates the lookup and proves nothing now.
     it 'keeps it when the incoming message predates the check' do
       create(:message, conversation: conversation, inbox: channel.inbox, account: channel.account, message_type: :incoming,

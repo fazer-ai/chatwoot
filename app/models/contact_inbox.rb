@@ -125,8 +125,8 @@ class ContactInbox < ApplicationRecord
   # delivered and receipts replayed by an import. The rows cannot tell those apart afterwards
   # (both are delivered with a fresh updated_at), so the receipt is kept here instead, by when
   # the answered message was sent. Receipts arrive out of order, so only a newer send moves it.
-  def self.remember_whatsapp_receipt(id, sent_at)
-    key = format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id)
+  def self.remember_whatsapp_receipt(inbox_id, contact_id, sent_at)
+    key = whatsapp_receipt_key(inbox_id, contact_id)
     Redis::Alfred.with do |conn|
       # WATCH/MULTI aborts the write if another receipt moved the key in between; then read again.
       3.times do
@@ -151,13 +151,20 @@ class ContactInbox < ApplicationRecord
   # asked in.
   def whatsapp_presence_since?(time)
     whatsapp_receipt_since?(time) ||
-      Message.incoming.where(conversation_id: conversations.select(:id), created_at: time.change(usec: 0)..).any? do |message|
+      Message.incoming.where(conversation_id: Conversation.where(inbox_id: inbox_id, contact_id: contact_id).select(:id),
+                             created_at: time.change(usec: 0)..).any? do |message|
         message.whatsapp_sent_at >= time
       end
   end
 
+  # Per contact and inbox, like the flag's clearing: a receipt on any of the contact's threads
+  # here proves the phone.
+  def self.whatsapp_receipt_key(inbox_id, contact_id)
+    format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, inbox_id: inbox_id, contact_id: contact_id)
+  end
+
   def whatsapp_receipt_since?(time)
-    seen = Redis::Alfred.get(format(Redis::Alfred::WHATSAPP_RECEIPT_SEEN, contact_inbox_id: id))
+    seen = Redis::Alfred.get(self.class.whatsapp_receipt_key(inbox_id, contact_id))
     seen.present? && seen.to_f >= time.to_f
   end
 
@@ -174,7 +181,8 @@ class ContactInbox < ApplicationRecord
   def broadcast_whatsapp_missing_change
     conversations.find_each do |conversation|
       conversation.update_column(:updated_at, Time.current) # rubocop:disable Rails/SkipsModelValidations
-      conversation.dispatch_conversation_updated_event
+      # Tagged so the open thread does not jump to the bottom: no message arrived.
+      conversation.dispatch_conversation_updated_event(broadcast_metadata: { source: 'whatsapp_missing' })
     end
   end
 
