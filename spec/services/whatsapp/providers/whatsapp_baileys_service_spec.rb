@@ -1371,16 +1371,19 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     it 'waits as long as the caller can afford' do
       stub_request(:post, request_path).to_return(status: 200, headers: { 'Content-Type' => 'application/json' },
                                                   body: { data: [] }.to_json)
-      allow(HTTParty).to receive(:post).and_call_original
-      in_request = Whatsapp::BaileysRequestOptions::BAILEYS_IN_REQUEST_OPTIONS[:timeout]
+      timeouts = []
+      allow(HTTParty).to receive(:post).and_wrap_original do |original, url, **options|
+        timeouts << options[:timeout]
+        original.call(url, **options)
+      end
 
       service.on_whatsapp(phone_number, deadline: :hint)
       service.on_whatsapp(phone_number, deadline: :request)
       service.on_whatsapp(phone_number)
 
-      expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: 10)).once
-      expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: in_request)).once
-      expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: 90)).once
+      # In call order, so an installation whose rack-timeout puts the in-request ceiling at the
+      # full one still reads each call as its own.
+      expect(timeouts).to eq([10, Whatsapp::BaileysRequestOptions::BAILEYS_IN_REQUEST_OPTIONS[:timeout], 90])
     end
 
     context 'when response is successful' do
