@@ -200,6 +200,19 @@ RSpec.describe ContactInbox do
       expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
     end
 
+    # Sent while the provider was answering, delivered after the "no" was written.
+    it 'yields to a receipt for a message sent during the lookup that arrives afterwards' do
+      asked_at = 1.minute.ago
+      message = create(:message, conversation: conversation, inbox: channel.inbox, account: conversation.account,
+                                 message_type: :outgoing, status: :sent, created_at: 30.seconds.ago)
+      Redis::Alfred.delete(described_class.whatsapp_receipt_key(contact_inbox.inbox_id, contact_inbox.contact_id))
+
+      contact_inbox.mark_whatsapp_missing_for!(contact_inbox.contact.phone_number, flag_before: nil, asked_at: asked_at)
+      message.update!(status: :delivered)
+
+      expect(contact_inbox.reload.whatsapp_missing_checked_at).to be_nil
+    end
+
     it 'keeps the flag when no evidence arrives' do
       contact_inbox.mark_whatsapp_missing_for!(contact_inbox.contact.phone_number, flag_before: nil, asked_at: 1.minute.ago)
 

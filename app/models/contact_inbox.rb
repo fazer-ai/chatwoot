@@ -89,7 +89,9 @@ class ContactInbox < ApplicationRecord
     marked_at = with_whatsapp_answer_guard(phone, flag_before) do
       next if whatsapp_presence_since?(asked_at)
 
-      update!(whatsapp_missing_checked_at: Time.current)
+      # The moment of the question, not of the answer: evidence for anything sent from then on
+      # outranks this "no", including a receipt that only arrives after it was written.
+      update!(whatsapp_missing_checked_at: asked_at)
       whatsapp_missing_checked_at
     end
     return if marked_at.nil?
