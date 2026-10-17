@@ -601,19 +601,20 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response.parsed_response&.deep_symbolize_keys
   end
 
-  # `advisory` is a lookup whose caller only shows a hint and treats silence as "I do not know",
-  # such as the compose warning: it gets the short ceiling, so a wedged socket does not hold a
-  # web thread for the provider's full 90 s. One call per ceiling, each naming its own, so the
-  # fences in baileys_request_options_spec and request_ceilings_spec read which one is in force.
-  def on_whatsapp(recipient_id, advisory: false)
+  # `deadline` is how long the caller can afford to wait: `:hint` for a lookup that only shows a
+  # hint and treats silence as "I do not know" (the compose warning), `:request` for one a web
+  # request waits on (starting a conversation), `:provider` for a job that can wait as long as
+  # the provider may take (the recheck). One call per ceiling, each naming its own, so the fences
+  # in baileys_request_options_spec and request_ceilings_spec read which one is in force.
+  def on_whatsapp(recipient_id, deadline: :provider)
     @recipient_id = recipient_id
     url = "#{provider_url}/connections/#{whatsapp_channel.phone_number}/on-whatsapp"
     body = { jids: [remote_jid] }.to_json
 
-    response = if advisory
-                 HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_SHORT_REQUEST_OPTIONS)
-               else
-                 HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_REQUEST_OPTIONS)
+    response = case deadline
+               when :hint then HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_SHORT_REQUEST_OPTIONS)
+               when :request then HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_IN_REQUEST_OPTIONS)
+               else HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_REQUEST_OPTIONS)
                end
 
     raise ProviderUnavailableError unless process_response(response)

@@ -206,7 +206,7 @@ class Whatsapp::Session::Facade
   # inbox's source id), so answering with a LID renames the contact after an opaque
   # internal id and then addresses it at `<lid>@s.whatsapp.net`, which reaches nobody.
   #
-  # Takes `advisory:` like Baileys; each backend's number check already has a short ceiling of
+  # Takes `deadline:` like Baileys; each backend's number check already has a short ceiling of
   # its own.
   def on_whatsapp(recipient_id, **)
     digits = recipient_id.to_s.split('@').first.to_s.delete('+')

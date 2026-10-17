@@ -40,7 +40,9 @@ class ContactInboxBuilder
     @looked_up_phone = @contact.phone_number
     @flags_before = whatsapp_flags(@contact)
     @asked_at = Time.current
-    @whatsapp_answer = number_check.lookup(@looked_up_phone)
+    # A web request waits on this, and rack-timeout cuts it from outside: the lookup gives up
+    # first, and the conversation is created with the typed phone.
+    @whatsapp_answer = number_check.lookup(@looked_up_phone, deadline: :request)
     canonical_phone = @whatsapp_answer&.phone
     return if canonical_phone.blank? || canonical_phone == @contact.phone_number
 

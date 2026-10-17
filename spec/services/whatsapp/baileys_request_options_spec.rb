@@ -55,14 +55,15 @@ describe Whatsapp::BaileysRequestOptions do
     expect(described_class::BAILEYS_REQUEST_OPTIONS[:timeout]).to be > 75
   end
 
-  it 'leaves no call to the provider without one of the two ceilings' do
-    unguarded = calls.reject { |call| call.include?('BAILEYS_REQUEST_OPTIONS') || call.include?('BAILEYS_SHORT_REQUEST_OPTIONS') }
+  it 'leaves no call to the provider without one of the ceilings' do
+    ceilings = %w[BAILEYS_REQUEST_OPTIONS BAILEYS_SHORT_REQUEST_OPTIONS BAILEYS_IN_REQUEST_OPTIONS]
+    unguarded = calls.reject { |call| ceilings.any? { |ceiling| call.include?(ceiling) } }
 
     expect(unguarded.map { |call| call.lines.first(2).map(&:strip).join(' ') }).to be_empty
   end
 
-  it 'refuses a call that names both ceilings, because then neither is the one in force' do
-    both = calls.select { |call| call.include?('**BAILEYS_REQUEST_OPTIONS') && call.include?('BAILEYS_SHORT_REQUEST_OPTIONS') }
+  it 'refuses a call that names two ceilings, because then neither is the one in force' do
+    both = calls.select { |call| call.scan(/BAILEYS_(?:SHORT_|IN_)?REQUEST_OPTIONS/).uniq.size > 1 }
 
     expect(both).to be_empty
   end
@@ -78,7 +79,7 @@ describe Whatsapp::BaileysRequestOptions do
   it 'reads every call in the file, so an empty result cannot pass as a clean one' do
     # The checks above all answer "none", and they answer "none" for zero calls too. This is the
     # canary: it fails the day the scanner stops seeing the file, instead of reporting it clean.
-    expect(calls.size).to eq(35)
+    expect(calls.size).to eq(36)
   end
 
   # The split is the substance of this fence, not a detail: the short ceiling is the one that
@@ -91,6 +92,33 @@ describe Whatsapp::BaileysRequestOptions do
     # The sixth is the advisory branch of `on_whatsapp`: the compose warning only shows a hint,
     # while the builder and the recheck job, which act on the answer, keep the full ceiling.
     expect(short).to eq(6)
+  end
+
+  # The one call that answers a web request while it waits: the number lookup that starts a
+  # conversation. Anything else moving here is a call that starts giving up early.
+  it 'keeps the in-request ceiling on the lookup that answers a web request alone' do
+    in_request = calls.select { |call| call.include?('BAILEYS_IN_REQUEST_OPTIONS') }
+
+    expect(in_request.size).to eq(1)
+    expect(source[/  def on_whatsapp\b.*?\n  end\n/m]).to include(in_request.first)
+  end
+
+  # rack-timeout cuts the request with a Thread#raise nothing downstream can rescue, so the lookup
+  # has to give up first and leave the rest of the request room to answer. 15 s is the gem's
+  # default; an installation may raise it, and the lookup then waits longer, never past the full
+  # ceiling.
+  it 'gives a lookup inside a web request three quarters of the cut rack-timeout makes' do
+    expect(described_class.in_request_timeout(nil)).to eq(11)
+    expect(described_class.in_request_timeout('15')).to eq(11)
+    expect(described_class.in_request_timeout('60')).to eq(45)
+    expect(described_class.in_request_timeout('300')).to eq(90)
+    expect(described_class.in_request_timeout('0')).to eq(11)
+  end
+
+  it 'reads the cut from the environment rack-timeout reads it from' do
+    expected = described_class.in_request_timeout(ENV.fetch('RACK_TIMEOUT_SERVICE_TIMEOUT', nil))
+
+    expect(described_class::BAILEYS_IN_REQUEST_OPTIONS).to eq(timeout: expected, max_retries: 0)
   end
 
   # Named rather than counted, because the rule for this side is about the caller and not about

@@ -395,10 +395,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     provider_service.received_messages(recipient_id, messages)
   end
 
-  def on_whatsapp(phone_number, advisory: false)
+  def on_whatsapp(phone_number, deadline: :provider)
     return unless provider_service.respond_to?(:on_whatsapp)
 
-    provider_service.on_whatsapp(phone_number, advisory: advisory)
+    provider_service.on_whatsapp(phone_number, deadline: deadline)
   end
 
   def delete_message(message, conversation:)

@@ -1366,15 +1366,20 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     let(:phone_number) { '+123456789' }
 
     # A hint for the compose warning: a wedged socket must not hold the web thread for 90 s.
-    it 'gives up at the short ceiling when the lookup is advisory' do
+    # A hint gives up first, a lookup inside a web request gives up before the request is cut, and
+    # the background recheck waits as long as the provider may take.
+    it 'waits as long as the caller can afford' do
       stub_request(:post, request_path).to_return(status: 200, headers: { 'Content-Type' => 'application/json' },
                                                   body: { data: [] }.to_json)
       allow(HTTParty).to receive(:post).and_call_original
+      in_request = Whatsapp::BaileysRequestOptions::BAILEYS_IN_REQUEST_OPTIONS[:timeout]
 
-      service.on_whatsapp(phone_number, advisory: true)
+      service.on_whatsapp(phone_number, deadline: :hint)
+      service.on_whatsapp(phone_number, deadline: :request)
       service.on_whatsapp(phone_number)
 
       expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: 10)).once
+      expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: in_request)).once
       expect(HTTParty).to have_received(:post).with(request_path, hash_including(timeout: 90)).once
     end
 

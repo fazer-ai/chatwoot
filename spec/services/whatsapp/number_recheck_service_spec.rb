@@ -60,6 +60,19 @@ describe Whatsapp::NumberRecheckService do
     expect(theirs.reload.whatsapp_missing_checked_at).to be_nil
   end
 
+  # A job, outside rack-timeout: it waits as long as the provider may take.
+  it 'asks with the provider\'s full deadline' do
+    deadlines = []
+    allow_any_instance_of(Channel::Whatsapp).to receive(:on_whatsapp) do |_channel, _phone, **options| # rubocop:disable RSpec/AnyInstance
+      deadlines << options.fetch(:deadline, :provider)
+      { 'jid' => '5585988246590@s.whatsapp.net', 'exists' => true }
+    end
+
+    perform
+
+    expect(deadlines).to eq([:provider])
+  end
+
   it 'moves the check date forward when the number still has no WhatsApp' do
     answer({ 'jid' => '5585988246590@s.whatsapp.net', 'exists' => false })
 
