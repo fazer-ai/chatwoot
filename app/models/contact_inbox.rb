@@ -183,8 +183,12 @@ class ContactInbox < ApplicationRecord
   def broadcast_whatsapp_missing_change
     conversations.find_each do |conversation|
       conversation.update_column(:updated_at, Time.current) # rubocop:disable Rails/SkipsModelValidations
-      # Tagged so the open thread does not jump to the bottom: no message arrived.
-      conversation.dispatch_conversation_updated_event(broadcast_metadata: { source: 'whatsapp_missing' })
+      # For the dashboard alone: announcing reaches the cable push and nothing else, so no
+      # automation, bot or webhook takes a number lookup for a conversation update. Tagged so
+      # the open thread does not jump to the bottom: no message arrived.
+      Import::SilentWrite.wrap(announce: true) do
+        conversation.dispatch_conversation_updated_event(broadcast_metadata: { source: 'whatsapp_missing' })
+      end
     end
   end
 

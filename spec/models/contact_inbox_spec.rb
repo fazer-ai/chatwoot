@@ -231,6 +231,20 @@ RSpec.describe ContactInbox do
   end
 
   describe '#broadcast_whatsapp_missing_change' do
+    # A lookup is not a conversation update: automations and bots must not act on it.
+    it 'reaches the dashboard and nothing else' do
+      contact_inbox = create(:contact_inbox)
+      create(:conversation, contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: contact_inbox.inbox)
+      levels = []
+      allow(Rails.configuration.dispatcher).to receive(:dispatch) do
+        levels << [Import::SilentWrite.on?, Import::SilentWrite.announce?, Import::SilentWrite.archive?]
+      end
+
+      contact_inbox.broadcast_whatsapp_missing_change
+
+      expect(levels).to eq([[true, true, false]])
+    end
+
     # No message arrived, so the open thread must not jump to the bottom.
     it 'tags the update as a banner-only change' do
       contact_inbox = create(:contact_inbox)
