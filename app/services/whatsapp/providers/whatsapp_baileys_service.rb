@@ -603,18 +603,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
   # `advisory` is a lookup whose caller only shows a hint and treats silence as "I do not know",
   # such as the compose warning: it gets the short ceiling, so a wedged socket does not hold a
-  # web thread for the provider's full 90 s.
+  # web thread for the provider's full 90 s. One call per ceiling, each naming its own, so the
+  # fences in baileys_request_options_spec and request_ceilings_spec read which one is in force.
   def on_whatsapp(recipient_id, advisory: false)
     @recipient_id = recipient_id
+    url = "#{provider_url}/connections/#{whatsapp_channel.phone_number}/on-whatsapp"
+    body = { jids: [remote_jid] }.to_json
 
-    response = HTTParty.post(
-      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/on-whatsapp",
-      headers: api_headers,
-      body: {
-        jids: [remote_jid]
-      }.to_json,
-      **(advisory ? BAILEYS_SHORT_REQUEST_OPTIONS : BAILEYS_REQUEST_OPTIONS)
-    )
+    response = if advisory
+                 HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_SHORT_REQUEST_OPTIONS)
+               else
+                 HTTParty.post(url, headers: api_headers, body: body, **BAILEYS_REQUEST_OPTIONS)
+               end
 
     raise ProviderUnavailableError unless process_response(response)
 

@@ -78,7 +78,7 @@ describe Whatsapp::BaileysRequestOptions do
   it 'reads every call in the file, so an empty result cannot pass as a clean one' do
     # The checks above all answer "none", and they answer "none" for zero calls too. This is the
     # canary: it fails the day the scanner stops seeing the file, instead of reporting it clean.
-    expect(calls.size).to eq(34)
+    expect(calls.size).to eq(35)
   end
 
   # The split is the substance of this fence, not a detail: the short ceiling is the one that
@@ -88,7 +88,9 @@ describe Whatsapp::BaileysRequestOptions do
   it 'keeps the short ceiling on the calls that chose to give up before the provider does' do
     short = calls.count { |call| call.include?('BAILEYS_SHORT_REQUEST_OPTIONS') }
 
-    expect(short).to eq(5)
+    # The sixth is the advisory branch of `on_whatsapp`: the compose warning only shows a hint,
+    # while the builder and the recheck job, which act on the answer, keep the full ceiling.
+    expect(short).to eq(6)
   end
 
   # Named rather than counted, because the rule for this side is about the caller and not about
