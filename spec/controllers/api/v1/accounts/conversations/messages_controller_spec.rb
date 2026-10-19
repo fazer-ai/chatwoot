@@ -62,7 +62,8 @@ RSpec.describe 'Conversation Messages API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response).to have_http_status(:service_unavailable)
+        expect(response.headers['Retry-After']).to match(/\A[1-9]\d*\z/)
         expect(response.parsed_body['error']).to eq(I18n.t('errors.database.query_canceled'))
         expect(response.parsed_body['error']).not_to include('PG::QueryCanceled')
       end
@@ -252,6 +253,19 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(response).to have_http_status(:success)
         expect(response).to conform_schema(200)
         expect(JSON.parse(response.body, symbolize_names: true)[:meta][:contact][:id]).to eq(conversation.contact_id)
+      end
+
+      it 'answers a canceled database query as a retryable failure' do
+        allow(MessageFinder).to receive(:new)
+          .and_raise(ActiveRecord::QueryCanceled, 'PG::QueryCanceled: ERROR: canceling statement due to statement timeout')
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:service_unavailable)
+        expect(response.headers['Retry-After']).to match(/\A[1-9]\d*\z/)
+        expect(response.parsed_body['error']).to eq(I18n.t('errors.database.query_canceled'))
       end
     end
   end
