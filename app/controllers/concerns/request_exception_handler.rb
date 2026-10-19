@@ -7,6 +7,12 @@ module RequestExceptionHandler
     'canceling statement due to statement timeout'
   ].freeze
 
+  # A statement timeout is the database being busy, not the request being wrong: the same request
+  # can succeed seconds later. Answered 503 so a client retries it instead of reading a refusal, and
+  # so it does not read "nothing was written" into it either, since an `after_commit` callback can
+  # time out after the row is saved.
+  QUERY_CANCELED_RETRY_AFTER_SECONDS = 5
+
   included do
     rescue_from ActiveRecord::RecordInvalid, with: :render_record_invalid
     rescue_from CustomExceptions::Inbox::LimitExceeded,
@@ -64,7 +70,7 @@ module RequestExceptionHandler
     render_could_not_create_error(e.message)
   rescue ActiveRecord::QueryCanceled => e
     log_handled_error(e)
-    render_could_not_create_error(database_query_canceled_message)
+    render_query_canceled
   ensure
     # to address the thread variable leak issues in Puma/Thin webserver
     Current.reset
@@ -78,8 +84,17 @@ module RequestExceptionHandler
     render json: { error: message }, status: :not_found
   end
 
+  # Also reached with a timeout's message by every action that rescues StandardError, so the
+  # timeout is told apart here rather than at each of them.
   def render_could_not_create_error(error)
-    render json: { error: sanitized_error_message(error) }, status: :unprocessable_entity
+    return render_query_canceled if database_query_canceled_message?(error)
+
+    render json: { error: error }, status: :unprocessable_entity
+  end
+
+  def render_query_canceled
+    response.headers['Retry-After'] = QUERY_CANCELED_RETRY_AFTER_SECONDS.to_s
+    render json: { error: database_query_canceled_message }, status: :service_unavailable
   end
 
   def render_payment_required(message)
@@ -105,12 +120,6 @@ module RequestExceptionHandler
 
   def log_handled_error(exception)
     logger.info("Handled error: #{exception.inspect}")
-  end
-
-  def sanitized_error_message(message)
-    return database_query_canceled_message if database_query_canceled_message?(message)
-
-    message
   end
 
   def database_query_canceled_message?(message)
