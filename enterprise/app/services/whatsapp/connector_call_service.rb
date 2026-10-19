@@ -214,7 +214,8 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
       update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice'))
       # The expiry scheduled with the offer may have run while the voice agent had the call.
       schedule_expiry(call)
-      broadcast_incoming(call, call.meta['sdp_offer'])
+      # One offered without a browser's half rings on the phone only.
+      broadcast_incoming(call, call.meta['sdp_offer']) if call.meta['sdp_offer'].present?
     end
   end
 

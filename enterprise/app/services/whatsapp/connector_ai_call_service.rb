@@ -21,7 +21,8 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
   private
 
   # A failure the connector answered before the answer was recorded is this call not taken by
-  # the voice agent, and the agents are rung for it as if none was set. Answered under the
+  # the voice agent, and the agents are rung for it as if none was set, when it was offered with
+  # a browser's half to answer it with. Answered under the
   # call's lock, read afresh: the call's message offers to join it while it rings, and a call
   # somebody joined or that ended meanwhile is not the voice agent's. Taken, it is announced the
   # way an agent's answer is, which drops the ringing card that message put on every screen.
@@ -35,6 +36,6 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
       call.broadcast_voice_call_event(:accepted)
       true
     end
-    super unless answered
+    super unless answered || sdp_offer.blank?
   end
 end

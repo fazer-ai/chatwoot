@@ -34,8 +34,8 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     Whatsapp::Session::Inbound::Dispatcher.dispatch(Channel::Whatsapp.find(channel.id), model::Event.build(payload))
   end
 
-  def offer(call_id)
-    dispatch(model::Events::CallOffer.new(call_id: call_id, from: caller_party, video: false, timestamp: 1_755_440_000_123, sdp: sdp_offer))
+  def offer(call_id, sdp: sdp_offer)
+    dispatch(model::Events::CallOffer.new(call_id: call_id, from: caller_party, video: false, timestamp: 1_755_440_000_123, sdp: sdp))
   end
 
   def accepts = backend.commands_of('call.accept')
@@ -150,6 +150,24 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     expect(events).to include('voice_call.incoming')
   end
 
+  # The connector offers a call without `sdp` when it could not build the browser's half,
+  # and a stream needs none.
+  it 'answers a call offered without a browser\'s half' do
+    expect(offer('CALLAI1', sdp: nil)).to eq(:handled)
+
+    expect(accepts.map(&:call_id)).to eq(['CALLAI1'])
+    expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('in_progress')
+  end
+
+  it 'leaves a call offered without a browser\'s half as the activity line with the voice agent off' do
+    channel.update!(provider_config: channel.provider_config.merge('ai_voice' => { 'enabled' => false, 'stream_url' => stream_base }))
+
+    offer('CALLAI1', sdp: nil)
+
+    expect(Call.where(provider_call_id: 'CALLAI1')).to be_empty
+    expect(accepts).to be_empty
+  end
+
   it 'rings the agents for a stored URL nobody switched on' do
     channel.update!(provider_config: channel.provider_config.merge('ai_voice' => { 'stream_url' => stream_base }))
 
@@ -196,6 +214,17 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
       call = Call.find_by!(provider_call_id: 'CALLAI1')
 
       expect { failed('CALLAI1') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob).with(call.id)
+    end
+
+    # Nobody can join it from the browser, so it is left ringing on the phone.
+    it 'does not ring the agents for a call offered without a browser\'s half' do
+      offer('CALLAI1', sdp: nil)
+
+      failed('CALLAI1')
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'ringing', started_at: nil)
+      expect(events).not_to include('voice_call.incoming')
+      expect(backend.commands_of('call.reject')).to be_empty
     end
 
     it 'ends the call handed back as unanswered when the caller hangs up' do
