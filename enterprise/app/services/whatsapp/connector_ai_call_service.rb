@@ -20,6 +20,11 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
 
   private
 
+  # Recorded as the voice agent's from the start: its ringing message would otherwise put a card
+  # on the agents' screens for the moment before the voice agent answers. Taken off when the call
+  # is handed to them.
+  def recorded_meta = { 'voice_agent' => true }
+
   # A failure the connector answered before the answer was recorded is this call not taken by
   # the voice agent, and the agents are rung for it as if none was set, when it was offered with
   # a browser's half to answer it with. Answered under the
@@ -38,7 +43,9 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
       true
     end
     return if answered
+    return give_up_unanswerable(call) if sdp_offer.blank?
 
-    sdp_offer.present? ? super : give_up_unanswerable(call)
+    call.with_lock { update_call!(call, 'ringing', meta: call.meta.except('voice_agent')) }
+    super
   end
 end

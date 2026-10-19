@@ -215,7 +215,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
       next unless call.in_progress? && call.meta['ai_voice']
       next give_up_unanswerable(call) if call.meta['sdp_offer'].blank?
 
-      update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice'))
+      update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice', 'voice_agent'))
       # The expiry scheduled with the offer may have run while the voice agent had the call.
       schedule_expiry(call)
       broadcast_incoming(call, call.meta['sdp_offer'])
@@ -228,6 +228,9 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   def give_up_unanswerable(call)
     finalize_terminate(call, nil, 'accept_failed')
   end
+
+  # What the call is recorded with besides the offer, before anybody is rung for it.
+  def recorded_meta = {}
 
   def schedule_expiry(call, wait: RING_EXPIRY)
     Whatsapp::ConnectorCallExpireJob.set(wait: wait).perform_later(call.id)
@@ -283,6 +286,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # the same conversation, not a second one.
   def build_inbound_call(payload, sdp_offer)
     extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers, 'caller_address' => @caller&.to_h }
+                 .merge(recorded_meta)
     conversation = Whatsapp::Session::Inbound::ConversationFinder.new(
       inbox: inbox, contact: @contact_inbox.contact, contact_inbox: @contact_inbox
     ).perform

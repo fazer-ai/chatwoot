@@ -55,6 +55,19 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     expect(backend.commands_of('call.reject')).to be_empty
   end
 
+  # The call is recorded ringing before the voice agent answers it, and its message would put a
+  # card on the agents' screens for that moment.
+  it 'records the call as the voice agent\'s from its first message' do
+    recorded = nil
+    allow(Voice::InboundCallBuilder).to receive(:perform!).and_wrap_original do |original, **kwargs|
+      original.call(**kwargs).tap { |call| recorded = call.message.push_event_data[:call] }
+    end
+
+    offer('CALLAI1')
+
+    expect(recorded).to include(status: 'ringing', voice_agent: true)
+  end
+
   # The call's ringing message put a card on the agents' screens; an answer takes it down.
   it 'announces the call as answered to the account' do
     offer('CALLAI1')
@@ -200,8 +213,8 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
 
       call = Call.find_by!(provider_call_id: 'CALLAI1')
       expect(call).to have_attributes(status: 'ringing', started_at: nil)
-      expect(call.meta.slice('rung', 'ai_voice')).to eq('rung' => true)
-      expect(call.conversation.additional_attributes['call_status']).to eq(call.display_status)
+      expect(call.meta.slice('rung', 'ai_voice', 'voice_agent')).to eq('rung' => true)
+      expect(call.message.reload.push_event_data[:call]).to include(status: 'ringing', voice_agent: false)
       incoming = broadcasts.find { |_, payload| payload[:event] == 'voice_call.incoming' }
       expect(incoming.first).to eq(agent.pubsub_token)
       expect(incoming.last[:data]).to include(call_id: 'CALLAI1', sdp_offer: sdp_offer)
@@ -303,6 +316,7 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
 
       call = Call.find_by!(provider_call_id: 'CALLAI1')
       expect(call).to have_attributes(status: 'ringing', started_at: nil)
+      expect(call.meta).not_to include('voice_agent')
       expect(events).to include('voice_call.incoming')
     end
 
