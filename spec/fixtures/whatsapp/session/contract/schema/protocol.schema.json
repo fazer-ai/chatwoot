@@ -1091,13 +1091,22 @@
       "required": ["call_id", "from"],
       "additionalProperties": true
     },
+    "call_media_stream": {
+      "type": "object",
+      "description": "A media server that carries a call's voice instead of a browser: the connector dials this WebSocket and exchanges 16 kHz mono PCM with it in JSON text frames (start, answered, media, stop one way; media, clear, hangup the other).",
+      "properties": { "url": { "type": "string", "minLength": 1 } },
+      "required": ["url"],
+      "additionalProperties": true
+    },
     "command_call_accept": {
       "type": "object",
       "properties": {
         "call_id": { "type": "string" },
-        "sdp": { "type": "string", "description": "The browser's WebRTC answer to the sdp of the call.offer." }
+        "sdp": { "type": "string", "description": "The browser's WebRTC answer to the sdp of the call.offer." },
+        "stream": { "$ref": "#/definitions/call_media_stream" }
       },
-      "required": ["call_id", "sdp"],
+      "required": ["call_id"],
+      "anyOf": [{ "required": ["sdp"] }, { "required": ["stream"] }],
       "additionalProperties": true
     },
     "command_call_start": {

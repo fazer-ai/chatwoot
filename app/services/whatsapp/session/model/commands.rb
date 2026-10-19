@@ -278,8 +278,9 @@ module Whatsapp::Session::Model::Commands
     coerce from: Address
   end
 
-  # The browser's WebRTC answer to a call the connector offered with an `sdp`.
-  class CallAccept < Data.define(:call_id, :sdp)
+  # The browser's WebRTC answer to a call the connector offered with an `sdp`, or the media
+  # `stream` ({'url' => 'wss://...'}) a voice agent takes the call over instead.
+  class CallAccept < Data.define(:call_id, :sdp, :stream)
     include Serializable
     wire_type 'call.accept'
   end

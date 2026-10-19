@@ -128,9 +128,13 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # A refusal that could not go out for now is raised, so the stream delivers the failure
   # again, and the call closed by it is refused again then; one the connector will never
   # take is given up on.
+  #
+  # A voice agent's stream the connector could not open leaves the call ringing as well, and
+  # nobody was rung for it: the agents are, instead of closing it.
   def accept_failed(call_id)
     call = find_call(call_id)
     return if call.nil? || (call.terminal? && call.end_reason != 'accept_failed')
+    return hand_to_agents(call) if call.meta['ai_voice']
 
     finalize_terminate(call, nil, 'accept_failed')
     inbox.channel.provider_service.reject_call(call_id)
@@ -197,6 +201,15 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
       next if call.meta['rung']
 
       update_conversation(call)
+      broadcast_incoming(call, call.meta['sdp_offer'])
+    end
+  end
+
+  def hand_to_agents(call)
+    call.with_lock do
+      next unless call.in_progress? && call.meta['ai_voice']
+
+      update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice'))
       broadcast_incoming(call, call.meta['sdp_offer'])
     end
   end

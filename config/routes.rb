@@ -351,6 +351,7 @@ Rails.application.routes.draw do
               end
               collection do
                 post :initiate
+                patch :ai_voice, to: 'whatsapp_ai_voice#update'
               end
             end
           end

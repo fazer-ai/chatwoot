@@ -1,0 +1,221 @@
+require 'rails_helper'
+
+# An inbox whose calls a voice agent takes: the offer is filed as a Call and answered with the
+# agent's media stream instead of ringing the agents' screens, and handed back to them when the
+# stream does not open.
+RSpec.describe Whatsapp::ConnectorAiCallService do
+  let(:account) { create(:account) }
+  let(:channel) do
+    create(:channel_whatsapp, account: account, provider: 'native', phone_number: '+5541988887777',
+                              validate_provider_config: false, sync_templates: false)
+  end
+  let(:inbox) { channel.inbox }
+  let(:backend) { Whatsapp::Session::Backends::Fake.new(channel) }
+  let(:model) { Whatsapp::Session::Model }
+  # The call command registry lives in Redis, which outlives an example.
+  let(:command_suffix) { SecureRandom.hex(4) }
+  let(:caller_party) { model::Party.new(phone: '5511988887777', lid: '182736451928374', push_name: 'Ana Souza') }
+  let(:sdp_offer) { "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n" }
+  let(:broadcasts) { [] }
+  let(:agent) { create(:user, account: account, role: :agent) }
+  let(:stream_base) { 'wss://agents.example.com/api/v1/voice/stream/route-token?k=secret' }
+
+  before do
+    account.enable_features!('channel_voice')
+    channel.update!(provider_config: channel.provider_config.merge(
+      'calling_enabled' => true, 'ai_voice' => { 'enabled' => true, 'stream_url' => stream_base }
+    ))
+    create(:inbox_member, user: agent, inbox: inbox)
+    allow(Whatsapp::Session::Registry).to receive(:backend_for).and_return(backend)
+    allow(ActionCable.server).to receive(:broadcast) { |stream, payload| broadcasts << [stream, payload] }
+  end
+
+  def dispatch(payload)
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(Channel::Whatsapp.find(channel.id), model::Event.build(payload))
+  end
+
+  def offer(call_id)
+    dispatch(model::Events::CallOffer.new(call_id: call_id, from: caller_party, video: false, timestamp: 1_755_440_000_123, sdp: sdp_offer))
+  end
+
+  def accepts = backend.commands_of('call.accept')
+
+  def events = broadcasts.map(&:last).pluck(:event)
+
+  def query_of(url) = URI.decode_www_form(URI.parse(url).query).to_h
+
+  it 'answers the call with the voice agent instead of ringing the agents' do
+    expect(offer('CALLAI1')).to eq(:handled)
+
+    call = Call.find_by!(provider_call_id: 'CALLAI1')
+    expect(call).to have_attributes(status: 'in_progress', direction: 'incoming', accepted_by_agent_id: nil)
+    expect(call.started_at).to be_present
+    expect(call.meta).to include('ai_voice' => true)
+    expect(events).not_to include('voice_call.incoming')
+    expect(backend.commands_of('call.reject')).to be_empty
+  end
+
+  it 'answers with the stored stream URL, naming the call and its thread' do
+    offer('CALLAI1')
+    call = Call.find_by!(provider_call_id: 'CALLAI1')
+
+    expect(accepts.size).to eq(1)
+    expect(accepts.first.sdp).to be_nil
+    url = accepts.first.stream['url']
+    expect(url).to start_with('wss://agents.example.com/api/v1/voice/stream/route-token?')
+    expect(url.count('?')).to eq(1)
+    expect(query_of(url)).to eq('k' => 'secret', 'account_id' => account.id.to_s, 'inbox_id' => inbox.id.to_s,
+                                'conversation_id' => call.conversation.display_id.to_s, 'direction' => 'inbound',
+                                'call_id' => 'CALLAI1')
+  end
+
+  it 'puts the call on the thread as answered' do
+    offer('CALLAI1')
+
+    call = Call.find_by!(provider_call_id: 'CALLAI1')
+    expect(call.conversation.additional_attributes['call_status']).to eq(call.display_status)
+    expect(call.message).to be_present
+  end
+
+  # Whoever the conversation is with, the voice agent takes the call: a person who wants to
+  # talk calls the contact.
+  it 'answers whatever state the contact\'s conversation is in' do
+    offer('CALLAI1')
+    conversation = Call.find_by!(provider_call_id: 'CALLAI1').conversation
+
+    conversation.update!(assignee: agent)
+    offer('CALLAI2')
+    conversation.update!(status: :resolved)
+    offer('CALLAI3')
+
+    expect(accepts.map(&:call_id)).to eq(%w[CALLAI1 CALLAI2 CALLAI3])
+    expect(Call.where(provider_call_id: %w[CALLAI1 CALLAI2 CALLAI3]).pluck(:status).uniq).to eq(['in_progress'])
+    expect(events).not_to include('voice_call.incoming')
+  end
+
+  # The design before this one derived the stream from the inbox's Agent Bot: a bot pointing at
+  # fazer.ai agents is not a voice agent, and one that is not does not stand in its way.
+  it 'takes the stream from the inbox, whatever agent bot it has' do
+    bot = create(:agent_bot, account: account, outgoing_url: 'https://agents.example.com/api/v1/chatwoot/webhook/tok-bot')
+    create(:agent_bot_inbox, inbox: inbox, agent_bot: bot)
+
+    offer('CALLAI1')
+    channel.update!(provider_config: channel.provider_config.merge('ai_voice' => { 'enabled' => false }))
+    offer('CALLAI2')
+
+    expect(accepts.map(&:call_id)).to eq(['CALLAI1'])
+    expect(accepts.first.stream['url']).to start_with('wss://agents.example.com/api/v1/voice/stream/route-token?')
+    expect(Call.find_by!(provider_call_id: 'CALLAI2').status).to eq('ringing')
+  end
+
+  it 'answers a redelivered offer once' do
+    offer('CALLAI1')
+    offer('CALLAI1')
+
+    expect(Call.where(provider_call_id: 'CALLAI1').count).to eq(1)
+    expect(accepts.size).to eq(1)
+  end
+
+  it 'rings the agents as before once the voice agent is switched off' do
+    channel.update!(provider_config: channel.provider_config.merge('ai_voice' => { 'enabled' => false, 'stream_url' => stream_base }))
+
+    offer('CALLAI2')
+
+    expect(Call.find_by!(provider_call_id: 'CALLAI2').status).to eq('ringing')
+    expect(accepts).to be_empty
+    expect(events).to include('voice_call.incoming')
+  end
+
+  # The connector answers `invalid_payload` when it cannot open the stream, and the call goes
+  # on ringing on the caller's phone: the agents are rung for it, as if no voice agent was set.
+  describe 'a stream the connector could not open' do
+    before do
+      allow(backend).to receive(:accept_call).and_wrap_original do |original, command|
+        original.call(command)
+        "cmd-ai-#{command.call_id}-#{command_suffix}"
+      end
+    end
+
+    def failed(call_id)
+      dispatch(model::Events::CommandFailed.new(command_id: "cmd-ai-#{call_id}-#{command_suffix}", command_type: 'call.accept',
+                                                message_id: nil,
+                                                error: model::WireError.new(code: 'invalid_payload', message: 'stream unreachable')))
+    end
+
+    it 'puts the call back to ringing for the agents, without refusing it' do
+      offer('CALLAI1')
+
+      expect(failed('CALLAI1')).to eq(:handled)
+
+      call = Call.find_by!(provider_call_id: 'CALLAI1')
+      expect(call).to have_attributes(status: 'ringing', started_at: nil)
+      expect(call.meta.slice('rung', 'ai_voice')).to eq('rung' => true)
+      expect(call.conversation.additional_attributes['call_status']).to eq(call.display_status)
+      incoming = broadcasts.find { |_, payload| payload[:event] == 'voice_call.incoming' }
+      expect(incoming.first).to eq(agent.pubsub_token)
+      expect(incoming.last[:data]).to include(call_id: 'CALLAI1', sdp_offer: sdp_offer)
+      expect(backend.commands_of('call.reject')).to be_empty
+    end
+
+    it 'ends the call handed back as unanswered when the caller hangs up' do
+      offer('CALLAI1')
+      failed('CALLAI1')
+
+      dispatch(model::Events::CallTerminate.new(call_id: 'CALLAI1', from: caller_party, reason: 'hangup'))
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('no_answer')
+    end
+
+    it 'rings the agents once for the failure delivered again' do
+      offer('CALLAI1')
+      failed('CALLAI1')
+      failed('CALLAI1')
+
+      expect(events.count('voice_call.incoming')).to eq(1)
+    end
+
+    it 'leaves alone a call that ended before the failure arrived' do
+      offer('CALLAI1')
+      dispatch(model::Events::CallTerminate.new(call_id: 'CALLAI1', from: caller_party, reason: 'hangup'))
+
+      failed('CALLAI1')
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').status).not_to eq('ringing')
+      expect(events).not_to include('voice_call.incoming')
+    end
+
+    # The failure read before the request that published the answer wrote down its call.
+    it 'rings the agents at once for a failure that arrived before the answer was recorded' do
+      failed('CALLAI1')
+
+      offer('CALLAI1')
+
+      call = Call.find_by!(provider_call_id: 'CALLAI1')
+      expect(call).to have_attributes(status: 'ringing', started_at: nil)
+      expect(events).to include('voice_call.incoming')
+    end
+
+    it 'still closes as failed a browser answer that fails on an inbox with a voice agent' do
+      call = Call.create!(account: account, inbox: inbox, conversation: create(:conversation, inbox: inbox, account: account),
+                          contact: create(:contact, account: account), provider: :whatsapp, direction: :incoming,
+                          status: 'in_progress', provider_call_id: 'CALLBR1', started_at: Time.current, meta: {})
+      Whatsapp::Session::CallCommands.remember("cmd-ai-CALLBR1-#{command_suffix}", 'CALLBR1')
+
+      failed('CALLBR1')
+
+      expect(call.reload.status).to eq('failed')
+    end
+  end
+
+  # The stream that ended is the voice agent's doing or the socket's, and the record says which.
+  it 'keeps the connector\'s reason for how the voice agent\'s call ended' do
+    offer('CALLAI1')
+    offer('CALLAI2')
+
+    dispatch(model::Events::CallTerminate.new(call_id: 'CALLAI1', from: nil, reason: 'stream_hangup'))
+    dispatch(model::Events::CallTerminate.new(call_id: 'CALLAI2', from: nil, reason: 'stream_lost'))
+
+    expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'completed', end_reason: 'stream_hangup')
+    expect(Call.find_by!(provider_call_id: 'CALLAI2')).to have_attributes(status: 'completed', end_reason: 'stream_lost')
+  end
+end

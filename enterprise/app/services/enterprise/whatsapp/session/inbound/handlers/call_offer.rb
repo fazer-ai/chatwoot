@@ -11,7 +11,9 @@ module Enterprise::Whatsapp::Session::Inbound::Handlers::CallOffer
     return unless channel.voice_enabled? && channel.inbound_calls_enabled?
     return if payload.sdp.blank? || payload.video
 
-    service = Whatsapp::ConnectorCallService.new(inbox: inbox, contact_inbox: contact_inbox)
+    # An inbox with a voice agent answers with it instead of ringing the agents.
+    service_class = channel.ai_voice_stream_url ? Whatsapp::ConnectorAiCallService : Whatsapp::ConnectorCallService
+    service = service_class.new(inbox: inbox, contact_inbox: contact_inbox)
     return if service.internal_call?(payload.from, payload.call_id)
 
     service.offer(payload)
