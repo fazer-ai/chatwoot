@@ -10,6 +10,9 @@
 class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # Past what WhatsApp rings an unanswered call, with room for a late end to arrive first.
   RING_EXPIRY = 2.minutes
+  # Past the longest a voice agent keeps a call (fazer.ai agents caps it at an hour), with room
+  # for a late end to arrive first.
+  VOICE_AGENT_CALL_EXPIRY = 70.minutes
 
   def initialize(inbox:, contact_inbox: nil)
     super(inbox: inbox, params: {})
@@ -50,10 +53,10 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # instance go without its call.terminate reaching the client, and before the agent answers
   # there is no peer connection in the browser whose failure would say so. WhatsApp stops
   # ringing well within RING_EXPIRY, so a call still ringing past it is over. Run from
-  # Whatsapp::ConnectorCallExpireJob.
+  # Whatsapp::ConnectorCallExpireJob, which also ends a voice agent's call whose end was lost.
   def expire_unanswered(call)
     call.with_lock do
-      next unless call.ringing?
+      next expire_voice_agent_call(call) unless call.ringing?
 
       finalize_terminate(call, nil, 'unanswered')
     end
@@ -226,8 +229,17 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     finalize_terminate(call, nil, 'accept_failed')
   end
 
-  def schedule_expiry(call)
-    Whatsapp::ConnectorCallExpireJob.set(wait: RING_EXPIRY).perform_later(call.id)
+  def schedule_expiry(call, wait: RING_EXPIRY)
+    Whatsapp::ConnectorCallExpireJob.set(wait: wait).perform_later(call.id)
+  end
+
+  # A call the voice agent took has no browser either, whose peer connection closing would say
+  # it is over when its end is lost; one still going past the longest a voice agent keeps a call
+  # is over.
+  def expire_voice_agent_call(call)
+    return unless call.in_progress? && call.meta['ai_voice'] && call.started_at <= VOICE_AGENT_CALL_EXPIRY.ago
+
+    finalize_terminate(call, (Time.current - call.started_at).to_i, 'expired')
   end
 
   def apply_kept_pickup(call)

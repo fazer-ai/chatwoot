@@ -34,6 +34,7 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
 
       update_call!(call, 'in_progress', started_at: Time.current, meta: call.meta.merge('rung' => true, 'ai_voice' => true))
       call.broadcast_voice_call_event(:accepted)
+      schedule_expiry(call, wait: VOICE_AGENT_CALL_EXPIRY)
       true
     end
     return if answered

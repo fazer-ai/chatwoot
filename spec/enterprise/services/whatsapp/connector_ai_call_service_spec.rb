@@ -318,6 +318,38 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     end
   end
 
+  # The connector may lose a call's end along with the instance that carried it, and no browser
+  # would notice: a call still going past the longest a voice agent keeps one is ended here.
+  describe 'a voice agent\'s call whose end never arrived' do
+    def expire(call_id) = Whatsapp::ConnectorCallExpireJob.perform_now(Call.find_by!(provider_call_id: call_id).id)
+
+    it 'schedules its expiry past the longest a voice agent keeps a call' do
+      expect { offer('CALLAI1') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob)
+        .with(kind_of(Integer)).at(a_value_within(5.seconds).of(70.minutes.from_now))
+    end
+
+    it 'ends it once that long has passed' do
+      offer('CALLAI1')
+
+      travel 70.minutes + 1.second do
+        expire('CALLAI1')
+      end
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'completed', end_reason: 'expired')
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').duration_seconds).to be >= 4200
+    end
+
+    it 'leaves it alone before then' do
+      offer('CALLAI1')
+
+      travel 69.minutes do
+        expire('CALLAI1')
+      end
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('in_progress')
+    end
+  end
+
   # The stream that ended is the voice agent's doing or the socket's, and the record says which.
   it 'keeps the connector\'s reason for how the voice agent\'s call ended' do
     offer('CALLAI1')
