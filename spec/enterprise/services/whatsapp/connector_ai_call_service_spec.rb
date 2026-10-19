@@ -216,13 +216,23 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
       expect { failed('CALLAI1') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob).with(call.id)
     end
 
-    # Nobody can join it from the browser, so it is left ringing on the phone.
-    it 'does not ring the agents for a call offered without a browser\'s half' do
+    # Nobody can join it from the browser: it is closed here and goes on ringing on the phone.
+    it 'closes, without refusing, a call offered without a browser\'s half' do
       offer('CALLAI1', sdp: nil)
 
       failed('CALLAI1')
 
-      expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'ringing', started_at: nil)
+      expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'failed', end_reason: 'accept_failed')
+      expect(events).not_to include('voice_call.incoming')
+      expect(backend.commands_of('call.reject')).to be_empty
+    end
+
+    it 'closes, without refusing, one whose failure arrived before the answer was recorded' do
+      failed('CALLAI1')
+
+      offer('CALLAI1', sdp: nil)
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(status: 'failed', end_reason: 'accept_failed')
       expect(events).not_to include('voice_call.incoming')
       expect(backend.commands_of('call.reject')).to be_empty
     end

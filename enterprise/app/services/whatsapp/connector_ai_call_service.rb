@@ -36,6 +36,8 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
       call.broadcast_voice_call_event(:accepted)
       true
     end
-    super unless answered || sdp_offer.blank?
+    return if answered
+
+    sdp_offer.present? ? super : give_up_unanswerable(call)
   end
 end

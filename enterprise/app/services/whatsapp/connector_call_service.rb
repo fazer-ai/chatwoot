@@ -210,13 +210,20 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   def hand_to_agents(call)
     call.with_lock do
       next unless call.in_progress? && call.meta['ai_voice']
+      next give_up_unanswerable(call) if call.meta['sdp_offer'].blank?
 
       update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice'))
       # The expiry scheduled with the offer may have run while the voice agent had the call.
       schedule_expiry(call)
-      # One offered without a browser's half rings on the phone only.
-      broadcast_incoming(call, call.meta['sdp_offer']) if call.meta['sdp_offer'].present?
+      broadcast_incoming(call, call.meta['sdp_offer'])
     end
+  end
+
+  # A call offered without a browser's half, that the voice agent did not take: nobody here can
+  # join it, and a ringing record would put a card on every screen that cannot answer it. It is
+  # closed here and not refused, so it goes on ringing on the phone.
+  def give_up_unanswerable(call)
+    finalize_terminate(call, nil, 'accept_failed')
   end
 
   def schedule_expiry(call)
