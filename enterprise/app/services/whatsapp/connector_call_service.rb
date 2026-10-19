@@ -10,6 +10,9 @@
 class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # Past what WhatsApp rings an unanswered call, with room for a late end to arrive first.
   RING_EXPIRY = 2.minutes
+  # Past the longest a voice agent keeps a call (fazer.ai agents caps it at an hour), with room
+  # for a late end to arrive first.
+  VOICE_AGENT_CALL_EXPIRY = 70.minutes
 
   def initialize(inbox:, contact_inbox: nil)
     super(inbox: inbox, params: {})
@@ -50,10 +53,10 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # instance go without its call.terminate reaching the client, and before the agent answers
   # there is no peer connection in the browser whose failure would say so. WhatsApp stops
   # ringing well within RING_EXPIRY, so a call still ringing past it is over. Run from
-  # Whatsapp::ConnectorCallExpireJob.
+  # Whatsapp::ConnectorCallExpireJob, which also ends a voice agent's call whose end was lost.
   def expire_unanswered(call)
     call.with_lock do
-      next unless call.ringing?
+      next expire_voice_agent_call(call) unless call.ringing?
 
       finalize_terminate(call, nil, 'unanswered')
     end
@@ -128,9 +131,15 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # A refusal that could not go out for now is raised, so the stream delivers the failure
   # again, and the call closed by it is refused again then; one the connector will never
   # take is given up on.
-  def accept_failed(call_id)
+  #
+  # A voice agent's stream the connector could not open leaves the call ringing as well, and
+  # nobody was rung for it: the agents are, instead of closing it. Told apart by the command,
+  # not by the call, so the same failure delivered again after the agents were rung finds
+  # nothing left to do rather than closing the call they were rung for.
+  def accept_failed(call_id, stream: false)
     call = find_call(call_id)
     return if call.nil? || (call.terminal? && call.end_reason != 'accept_failed')
+    return hand_to_agents(call) if stream
 
     finalize_terminate(call, nil, 'accept_failed')
     inbox.channel.provider_service.reject_call(call_id)
@@ -201,8 +210,39 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
     end
   end
 
-  def schedule_expiry(call)
-    Whatsapp::ConnectorCallExpireJob.set(wait: RING_EXPIRY).perform_later(call.id)
+  def hand_to_agents(call)
+    call.with_lock do
+      next unless call.in_progress? && call.meta['ai_voice']
+      next give_up_unanswerable(call) if call.meta['sdp_offer'].blank?
+
+      update_call!(call, 'ringing', started_at: nil, meta: call.meta.except('ai_voice', 'voice_agent'))
+      # The expiry scheduled with the offer may have run while the voice agent had the call.
+      schedule_expiry(call)
+      broadcast_incoming(call, call.meta['sdp_offer'])
+    end
+  end
+
+  # A call offered without a browser's half, that the voice agent did not take: nobody here can
+  # join it, and a ringing record would put a card on every screen that cannot answer it. It is
+  # closed here and not refused, so it goes on ringing on the phone.
+  def give_up_unanswerable(call)
+    finalize_terminate(call, nil, 'accept_failed')
+  end
+
+  # What the call is recorded with besides the offer, before anybody is rung for it.
+  def recorded_meta = {}
+
+  def schedule_expiry(call, wait: RING_EXPIRY)
+    Whatsapp::ConnectorCallExpireJob.set(wait: wait).perform_later(call.id)
+  end
+
+  # A call the voice agent took has no browser either, whose peer connection closing would say
+  # it is over when its end is lost; one still going past the longest a voice agent keeps a call
+  # is over.
+  def expire_voice_agent_call(call)
+    return unless call.in_progress? && call.meta['ai_voice'] && call.started_at <= VOICE_AGENT_CALL_EXPIRY.ago
+
+    finalize_terminate(call, (Time.current - call.started_at).to_i, 'expired')
   end
 
   def apply_kept_pickup(call)
@@ -246,6 +286,7 @@ class Whatsapp::ConnectorCallService < Whatsapp::IncomingCallService
   # the same conversation, not a second one.
   def build_inbound_call(payload, sdp_offer)
     extra_meta = { 'sdp_offer' => sdp_offer, 'ice_servers' => Call.default_ice_servers, 'caller_address' => @caller&.to_h }
+                 .merge(recorded_meta)
     conversation = Whatsapp::Session::Inbound::ConversationFinder.new(
       inbox: inbox, contact: @contact_inbox.contact, contact_inbox: @contact_inbox
     ).perform

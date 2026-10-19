@@ -84,9 +84,21 @@ RSpec.describe Whatsapp::Session::Facade::Calls do
       expect(facade.terminate_call('CALLX6')).to be(true)
 
       expect(Whatsapp::Session::CallCommands.failed("cmd-reject-1-#{command_suffix}").to_h).to eq(
-        call_id: 'CALLX4', from: { 'kind' => 'lid', 'id' => '182736451928374' }, attempt: 2
+        call_id: 'CALLX4', from: { 'kind' => 'lid', 'id' => '182736451928374' }, attempt: 2, stream: false
       )
-      expect(Whatsapp::Session::CallCommands.failed("cmd-terminate-1-#{command_suffix}").to_h).to eq(call_id: 'CALLX6', from: nil, attempt: 0)
+      expect(Whatsapp::Session::CallCommands.failed("cmd-terminate-1-#{command_suffix}").to_h).to eq(call_id: 'CALLX6', from: nil, attempt: 0,
+                                                                                                     stream: false)
+    end
+
+    # A voice agent's answer that fails hands the call to the agents, and a browser's closes it.
+    it 'remembers whether an answer was a voice agent\'s stream' do
+      allow(backend).to receive(:accept_call).and_return("cmd-accept-s-#{command_suffix}", "cmd-accept-b-#{command_suffix}")
+
+      facade.accept_call('CALLX7', nil, stream_url: 'wss://agents.example.com/api/v1/voice/stream/tok')
+      facade.accept_call('CALLX8', 'SDP-ANSWER')
+
+      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-s-#{command_suffix}").stream).to be(true)
+      expect(Whatsapp::Session::CallCommands.failed("cmd-accept-b-#{command_suffix}").stream).to be(false)
     end
 
     it 'answers that a hang-up failed when its failure was read first' do

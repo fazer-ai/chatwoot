@@ -16,7 +16,7 @@ module Enterprise::Whatsapp::Session::Inbound::Handlers::CommandFailed
     # Let go only once the failure is applied: one that did not apply is applied again
     # when the stream delivers it again.
     if type == 'call.accept'
-      Whatsapp::ConnectorCallService.new(inbox: inbox).accept_failed(command.call_id)
+      Whatsapp::ConnectorCallService.new(inbox: inbox).accept_failed(command.call_id, stream: command.stream)
     else
       Whatsapp::CallCommandRetryJob.consider(inbox, type, payload.error, command)
     end

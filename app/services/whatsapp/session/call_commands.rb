@@ -15,13 +15,14 @@ module Whatsapp::Session::CallCommands
   FAILED = 'failed'.freeze
 
   # What was written down about one command: `from` only for a refusal, `attempt` counting
-  # from 0 for the first time it went out.
-  Remembered = Data.define(:call_id, :from, :attempt)
+  # from 0 for the first time it went out, and `stream` for an answer a voice agent's media
+  # stream was to carry.
+  Remembered = Data.define(:call_id, :from, :attempt, :stream)
 
   # The publishing side. Answers false when the failure was read first: the command did
   # not go through, and the caller says so instead of reporting it carried out.
-  def self.remember(command_id, call_id, from: nil, attempt: 0)
-    return true if claim(command_id, { call_id: call_id, from: from&.to_h, attempt: attempt }.compact.to_json)
+  def self.remember(command_id, call_id, from: nil, attempt: 0, stream: false)
+    return true if claim(command_id, { call_id: call_id, from: from&.to_h, attempt: attempt, stream: (true if stream) }.compact.to_json)
 
     Redis::Alfred.get(key(command_id)) != FAILED
   end
@@ -36,7 +37,7 @@ module Whatsapp::Session::CallCommands
     return if value.nil? || value == FAILED
 
     fields = JSON.parse(value)
-    Remembered.new(call_id: fields['call_id'], from: fields['from'], attempt: fields['attempt'].to_i)
+    Remembered.new(call_id: fields['call_id'], from: fields['from'], attempt: fields['attempt'].to_i, stream: fields['stream'] == true)
   end
 
   # The failure was applied to its call, so a redelivery of it has nothing left to do.

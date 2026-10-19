@@ -27,10 +27,12 @@ module Whatsapp::Session::Facade::Calls
   # `command.failed` naming this command and not the call. The command is remembered
   # against the call for as long as such a failure could take to come back, and a failure
   # that came back already is this call failing, the way the Cloud service answers false.
-  def accept_call(call_id, sdp_answer)
+  # A voice agent answers with the URL of its media stream instead of a browser's answer.
+  def accept_call(call_id, sdp_answer, stream_url: nil)
     calls_supported!
-    command_id = backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer))
-    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id)
+    stream = stream_url && { 'url' => stream_url }
+    command_id = backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer, stream: stream))
+    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id, stream: stream.present?)
   end
 
   # The connector refuses a call by naming who placed it. A call refused as it arrives is

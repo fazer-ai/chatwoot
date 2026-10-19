@@ -157,7 +157,8 @@ class Call < ApplicationRecord
       from_number: from_number,
       to_number: to_number,
       recording_url: recording_url,
-      transcript: transcript
+      transcript: transcript,
+      voice_agent: meta&.dig('voice_agent') == true
     }
   end
 end

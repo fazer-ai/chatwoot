@@ -79,6 +79,29 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       account.feature_enabled?('channel_voice')
   end
 
+  # Where a voice agent takes this inbox's calls: the connector carries the call's voice to this
+  # WebSocket instead of to an agent's browser. Nil when no voice agent answers them. Both halves
+  # are written by fazer.ai agents (Api::V1::Accounts::WhatsappAiVoiceController).
+  def ai_voice_stream_url
+    config = provider_config['ai_voice']
+    return unless config.is_a?(Hash) && config['enabled'] == true
+
+    config['stream_url'].presence
+  end
+
+  # Writes the switch, and the URL when one is given, without touching the rest of
+  # provider_config. Saved without validations, as the calling toggles are, so the provider's
+  # credential re-check cannot refuse it; and saved, not written past the callbacks, so the
+  # inbox cache is invalidated: a dashboard holding the old provider_config would write it back
+  # whole on its next settings save.
+  def update_ai_voice!(enabled:, stream_url: nil)
+    current = provider_config['ai_voice'].is_a?(Hash) ? provider_config['ai_voice'] : {}
+    current = current.merge('enabled' => enabled)
+    current['stream_url'] = stream_url if stream_url.present?
+    self.provider_config = provider_config.merge('ai_voice' => current)
+    save!(validate: false)
+  end
+
   # Mutes only the incoming side of calling; default on, so only an explicit false disables inbound.
   def inbound_calls_enabled?
     provider_config['inbound_calls_enabled'] != false
