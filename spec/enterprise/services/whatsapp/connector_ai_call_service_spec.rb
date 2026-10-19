@@ -55,6 +55,15 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     expect(backend.commands_of('call.reject')).to be_empty
   end
 
+  # The call's ringing message put a card on the agents' screens; an answer takes it down.
+  it 'announces the call as answered to the account' do
+    offer('CALLAI1')
+
+    accepted = broadcasts.select { |_, payload| payload[:event] == 'voice_call.accepted' }
+    expect(accepted.map(&:first)).to eq(["account_#{account.id}"])
+    expect(accepted.first.last[:data]).to include(call_id: 'CALLAI1', provider: 'whatsapp')
+  end
+
   # The call's message offers to join it while it rings, so somebody can take it first.
   it 'leaves to the agent a call joined before the voice agent answers' do
     allow(described_class).to receive(:stream_url).and_wrap_original do |original, *args, **kwargs|
