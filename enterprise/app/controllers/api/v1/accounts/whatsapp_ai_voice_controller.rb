@@ -5,7 +5,7 @@ class Api::V1::Accounts::WhatsappAiVoiceController < Api::V1::Accounts::BaseCont
   STREAM_SCHEMES = %w[ws wss].freeze
 
   before_action :check_admin_authorization?
-  before_action :set_channel, :ensure_stream_url
+  before_action :set_channel, :ensure_enabled, :ensure_stream_url
 
   def update
     @channel.update_ai_voice!(enabled: enabled?, stream_url: stream_url)
@@ -21,6 +21,10 @@ class Api::V1::Accounts::WhatsappAiVoiceController < Api::V1::Accounts::BaseCont
     render_unprocessable('Voice agents answer WhatsApp calls through the connector only')
   end
 
+  def ensure_enabled
+    render_unprocessable('enabled must be true or false') unless [true, false].include?(params[:enabled])
+  end
+
   # A voice agent switched on needs somewhere to stream to, given now or kept from before.
   def ensure_stream_url
     return render_unprocessable('stream_url must be a ws:// or wss:// URL') if stream_url && !websocket_url?(stream_url)
@@ -29,7 +33,7 @@ class Api::V1::Accounts::WhatsappAiVoiceController < Api::V1::Accounts::BaseCont
     render_unprocessable('stream_url is required to switch a voice agent on')
   end
 
-  def enabled? = ActiveModel::Type::Boolean.new.cast(params.require(:enabled))
+  def enabled? = params[:enabled]
 
   def stream_url = params[:stream_url].presence
 

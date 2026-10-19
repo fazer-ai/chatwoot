@@ -90,13 +90,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   # Writes the switch, and the URL when one is given, without touching the rest of
-  # provider_config: a save through the inbox API replaces the whole hash, and validates the
-  # provider's credentials.
+  # provider_config. Saved without validations, as the calling toggles are, so the provider's
+  # credential re-check cannot refuse it; and saved, not written past the callbacks, so the
+  # inbox cache is invalidated: a dashboard holding the old provider_config would write it back
+  # whole on its next settings save.
   def update_ai_voice!(enabled:, stream_url: nil)
     current = provider_config['ai_voice'].is_a?(Hash) ? provider_config['ai_voice'] : {}
     current = current.merge('enabled' => enabled)
     current['stream_url'] = stream_url if stream_url.present?
-    update_columns(provider_config: provider_config.merge('ai_voice' => current), updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+    self.provider_config = provider_config.merge('ai_voice' => current)
+    save!(validate: false)
   end
 
   # Mutes only the incoming side of calling; default on, so only an explicit false disables inbound.

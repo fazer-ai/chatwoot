@@ -82,6 +82,28 @@ RSpec.describe 'WhatsApp voice agent switch', type: :request do
     expect(config).to eq(before_config)
   end
 
+  it 'refuses an enabled that is not a JSON boolean, writing nothing' do
+    switch(enabled: true, stream_url: stream_url)
+    before_config = config
+
+    ['disabled', 'false', 2, nil, { value: false }].each do |value|
+      switch(enabled: value, stream_url: "#{stream_url}x")
+
+      expect(response).to have_http_status(:unprocessable_entity), value.inspect
+    end
+    expect(config).to eq(before_config)
+  end
+
+  # A dashboard holding the old provider_config writes it back whole on its next settings save.
+  it 'invalidates the account inbox cache' do
+    allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original
+
+    switch(enabled: true, stream_url: stream_url)
+
+    invalidated = [Events::Types::ACCOUNT_CACHE_INVALIDATED, anything, hash_including(account: account)]
+    expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(*invalidated).at_least(:once)
+  end
+
   it 'refuses an agent who is not an administrator' do
     switch(as: agent, enabled: true, stream_url: stream_url)
 
