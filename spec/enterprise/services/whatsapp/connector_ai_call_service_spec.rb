@@ -55,6 +55,21 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     expect(backend.commands_of('call.reject')).to be_empty
   end
 
+  # The call's message offers to join it while it rings, so somebody can take it first.
+  it 'leaves to the agent a call joined before the voice agent answers' do
+    allow(described_class).to receive(:stream_url).and_wrap_original do |original, *args, **kwargs|
+      Call.find(kwargs[:call].id).update!(status: 'in_progress', accepted_by_agent_id: agent.id)
+      original.call(*args, **kwargs)
+    end
+
+    offer('CALLAI1')
+
+    expect(accepts).to be_empty
+    expect(Call.find_by!(provider_call_id: 'CALLAI1')).to have_attributes(accepted_by_agent_id: agent.id)
+    expect(Call.find_by!(provider_call_id: 'CALLAI1').meta).not_to include('ai_voice')
+    expect(events).not_to include('voice_call.incoming')
+  end
+
   it 'answers with the stored stream URL, naming the call and its thread' do
     offer('CALLAI1')
     call = Call.find_by!(provider_call_id: 'CALLAI1')
@@ -166,6 +181,14 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
       expect(backend.commands_of('call.reject')).to be_empty
     end
 
+    # The expiry scheduled with the offer may have run while the voice agent had the call.
+    it 'schedules the ring expiry again for the call handed back' do
+      offer('CALLAI1')
+      call = Call.find_by!(provider_call_id: 'CALLAI1')
+
+      expect { failed('CALLAI1') }.to have_enqueued_job(Whatsapp::ConnectorCallExpireJob).with(call.id)
+    end
+
     it 'ends the call handed back as unanswered when the caller hangs up' do
       offer('CALLAI1')
       failed('CALLAI1')
@@ -195,6 +218,23 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
       expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('ringing')
       expect(events.count('voice_call.incoming')).to eq(1)
       expect(backend.commands_of('call.reject')).to be_empty
+    end
+
+    # Ended between the failure finding the call and taking its lock.
+    it 'does not ring for a call that ended while the failure was being applied' do
+      offer('CALLAI1')
+      allow(Whatsapp::ConnectorCallService).to receive(:new).and_wrap_original do |original, **kwargs|
+        original.call(**kwargs).tap do |service|
+          allow(service).to receive(:find_call).and_wrap_original do |find, *args|
+            find.call(*args).tap { |found| Call.find(found.id).update!(status: 'completed') }
+          end
+        end
+      end
+
+      failed('CALLAI1')
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('completed')
+      expect(events).not_to include('voice_call.incoming')
     end
 
     it 'leaves alone a call that ended before the failure arrived' do

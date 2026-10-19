@@ -131,11 +131,14 @@ RSpec.describe 'WhatsApp voice agent switch', type: :request do
   end
 
   it 'refuses an inbox that does not carry calls through the connector' do
-    other = create(:inbox, account: account)
+    cloud = create(:channel_whatsapp, provider: 'whatsapp_cloud', account: account, validate_provider_config: false, sync_templates: false)
 
-    patch "/api/v1/accounts/#{account.id}/whatsapp_calls/ai_voice",
-          params: { inbox_id: other.id, enabled: true, stream_url: stream_url }, headers: admin.create_new_auth_token, as: :json
+    [create(:inbox, account: account), cloud.inbox].each do |other|
+      patch "/api/v1/accounts/#{account.id}/whatsapp_calls/ai_voice",
+            params: { inbox_id: other.id, enabled: true, stream_url: stream_url }, headers: admin.create_new_auth_token, as: :json
 
-    expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+    expect(cloud.reload.provider_config).not_to have_key('ai_voice')
   end
 end

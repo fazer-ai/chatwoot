@@ -21,13 +21,18 @@ class Whatsapp::ConnectorAiCallService < Whatsapp::ConnectorCallService
   private
 
   # A failure the connector answered before the answer was recorded is this call not taken by
-  # the voice agent, and the agents are rung for it as if none was set.
+  # the voice agent, and the agents are rung for it as if none was set. Answered under the
+  # call's lock, read afresh: the call's message offers to join it while it rings, and a call
+  # somebody joined or that ended meanwhile is not the voice agent's.
   def broadcast_incoming(call, sdp_offer)
     url = self.class.stream_url(inbox.channel.ai_voice_stream_url, call: call, direction: 'inbound')
-    return super unless inbox.channel.provider_service.accept_call(call.provider_call_id, nil, stream_url: url)
+    answered = call.with_lock do
+      next true unless call.ringing?
+      next false unless inbox.channel.provider_service.accept_call(call.provider_call_id, nil, stream_url: url)
 
-    call.with_lock do
       update_call!(call, 'in_progress', started_at: Time.current, meta: call.meta.merge('rung' => true, 'ai_voice' => true))
+      true
     end
+    super unless answered
   end
 end
