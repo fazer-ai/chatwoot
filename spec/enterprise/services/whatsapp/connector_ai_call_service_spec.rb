@@ -126,6 +126,15 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
     expect(events).to include('voice_call.incoming')
   end
 
+  it 'rings the agents for a stored URL nobody switched on' do
+    channel.update!(provider_config: channel.provider_config.merge('ai_voice' => { 'stream_url' => stream_base }))
+
+    offer('CALLAI2')
+
+    expect(accepts).to be_empty
+    expect(events).to include('voice_call.incoming')
+  end
+
   # The connector answers `invalid_payload` when it cannot open the stream, and the call goes
   # on ringing on the caller's phone: the agents are rung for it, as if no voice agent was set.
   describe 'a stream the connector could not open' do
@@ -172,6 +181,20 @@ RSpec.describe Whatsapp::ConnectorAiCallService do
       failed('CALLAI1')
 
       expect(events.count('voice_call.incoming')).to eq(1)
+    end
+
+    # Handed to the agents, and the failure delivered again because letting go of it failed.
+    it 'does not close the call handed to the agents on the failure delivered again' do
+      offer('CALLAI1')
+      allow(Whatsapp::Session::CallCommands).to receive(:settled).and_raise(Redis::CannotConnectError, 'down')
+      expect { failed('CALLAI1') }.to raise_error(Redis::CannotConnectError)
+      allow(Whatsapp::Session::CallCommands).to receive(:settled).and_call_original
+
+      expect(failed('CALLAI1')).to eq(:handled)
+
+      expect(Call.find_by!(provider_call_id: 'CALLAI1').status).to eq('ringing')
+      expect(events.count('voice_call.incoming')).to eq(1)
+      expect(backend.commands_of('call.reject')).to be_empty
     end
 
     it 'leaves alone a call that ended before the failure arrived' do

@@ -32,7 +32,7 @@ module Whatsapp::Session::Facade::Calls
     calls_supported!
     stream = stream_url && { 'url' => stream_url }
     command_id = backend.accept_call(model::Commands::CallAccept.new(call_id: call_id, sdp: sdp_answer, stream: stream))
-    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id)
+    command_id.blank? || Whatsapp::Session::CallCommands.remember(command_id, call_id, stream: stream.present?)
   end
 
   # The connector refuses a call by naming who placed it. A call refused as it arrives is
