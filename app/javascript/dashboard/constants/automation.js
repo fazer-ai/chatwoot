@@ -7,7 +7,8 @@ export const MESSAGE_LEVEL_EVENTS = ['message_created', 'message_edited'];
 // The triggers whose conditions the account's own custom attributes are appended to, which is a
 // question about the subject the trigger asks about rather than about the trigger itself: every
 // message-level event, plus the conversation events that offer conversation-shaped conditions.
-// `conversation_resolved` is deliberately absent, as it has been since upstream wrote this pass.
+// `conversation_resolved` and `monitor_matched` joined upstream's list in 4.19.0; without them the
+// form crashed when switching to those triggers.
 //
 // Named here, and read by both the pass and its spec, so that adding a trigger is one edit in one
 // place and the spec cannot fall behind the list it is asserting over. #667
@@ -16,13 +17,15 @@ export const CUSTOM_ATTRIBUTE_EVENTS = [
   'conversation_created',
   'conversation_updated',
   'conversation_opened',
+  'conversation_resolved',
+  'monitor_matched',
 ];
 
 export const DEFAULT_MESSAGE_CREATED_CONDITION = [
   {
     attribute_key: 'message_type',
     filter_operator: 'equal_to',
-    values: '',
+    values: {},
     query_operator: 'and',
     custom_attribute_type: '',
   },
@@ -32,7 +35,7 @@ export const DEFAULT_CONVERSATION_CONDITION = [
   {
     attribute_key: 'browser_language',
     filter_operator: 'equal_to',
-    values: '',
+    values: {},
     query_operator: 'and',
     custom_attribute_type: '',
   },

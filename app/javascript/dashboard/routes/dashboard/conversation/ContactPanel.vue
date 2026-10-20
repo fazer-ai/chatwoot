@@ -28,6 +28,7 @@ import ShopifyOrdersList from 'dashboard/components/widgets/conversation/Shopify
 import SidebarActionsHeader from 'dashboard/components-next/SidebarActionsHeader.vue';
 import LinearIssuesList from 'dashboard/components/widgets/conversation/linear/IssuesList.vue';
 import LinearSetupCTA from 'dashboard/components/widgets/conversation/linear/LinearSetupCTA.vue';
+import StripeCustomer from 'dashboard/components/widgets/conversation/StripeCustomer.vue';
 
 const props = defineProps({
   conversationId: {
@@ -80,6 +81,10 @@ const isLinearConnected = computed(
 );
 
 const store = useStore();
+const stripeIntegration = useFunctionGetter(
+  'integrations/getIntegration',
+  'stripe'
+);
 const currentChat = useMapGetter('getSelectedChat');
 const conversationId = computed(() => props.conversationId);
 const conversationMetadataGetter = useMapGetter(
@@ -180,8 +185,7 @@ onMounted(() => {
   getContactDetails();
   triggerGroupSync();
   store.dispatch('attributes/get', 0);
-  // Load integrations to ensure linear integration state is available
-  store.dispatch('integrations/get', 'linear');
+  store.dispatch('integrations/get');
 });
 </script>
 
@@ -288,9 +292,6 @@ onMounted(() => {
                 attribute-type="contact_attribute"
                 attribute-from="conversation_contact_panel"
                 :contact-id="contact.id"
-                :empty-state-message="
-                  $t('CONVERSATION_CUSTOM_ATTRIBUTES.NO_RECORDS_FOUND')
-                "
               />
             </AccordionItem>
           </div>
@@ -362,6 +363,28 @@ onMounted(() => {
               "
             >
               <ShopifyOrdersList :contact-id="contactId" />
+            </AccordionItem>
+          </div>
+          <div
+            v-else-if="
+              element.name === 'stripe_customer' &&
+              isCloudFeatureEnabled(FEATURE_FLAGS.STRIPE) &&
+              stripeIntegration.enabled
+            "
+          >
+            <AccordionItem
+              :title="$t('STRIPE_INTEGRATION.TITLE')"
+              :is-open="isContactSidebarItemOpen('is_stripe_customer_open')"
+              compact
+              @toggle="
+                value => toggleSidebarUIState('is_stripe_customer_open', value)
+              "
+            >
+              <StripeCustomer
+                v-if="isContactSidebarItemOpen('is_stripe_customer_open')"
+                :conversation-id="conversationId"
+                :contact-email="contact.email"
+              />
             </AccordionItem>
           </div>
           <div v-else-if="element.name === 'contact_notes'">

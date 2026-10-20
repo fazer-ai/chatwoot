@@ -50,9 +50,20 @@ describe('fazer.ai translation overlay', () => {
   // leaves some of their strings in English. An upstream sync that adds another one fails here, so
   // it gets translated in overrides.json instead of reaching the picker in English.
   it('leaves no automation string in English in pt_BR or es', () => {
+    // "Monitor" is the same word in both languages and "Captain" is a product name.
     const sameAsEnglish = {
-      pt_BR: ['ATTRIBUTES.STATUS', 'SENDER_TYPES.AGENT_BOT'],
-      es: ['TOGGLE.CANCEL_LABEL', 'SENDER_TYPES.AGENT_BOT'],
+      pt_BR: [
+        'ATTRIBUTES.STATUS',
+        'SENDER_TYPES.AGENT_BOT',
+        'ADD.FORM.MONITOR.LABEL',
+        'ATTRIBUTES.CAPTAIN',
+      ],
+      es: [
+        'TOGGLE.CANCEL_LABEL',
+        'SENDER_TYPES.AGENT_BOT',
+        'ADD.FORM.MONITOR.LABEL',
+        'ATTRIBUTES.CAPTAIN',
+      ],
     };
     const flatten = (tree, prefix = '') =>
       Object.entries(tree).flatMap(([key, value]) =>

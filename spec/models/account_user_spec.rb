@@ -19,7 +19,8 @@ RSpec.describe AccountUser do
     it 'turns on push for internal chat mentions and direct messages' do
       setting = account_user.user.notification_settings.first
 
-      expect(setting.selected_push_flags).to contain_exactly(
+      # Enterprise also turns on push_voice_call_missed, so only the flags this default owns are asserted.
+      expect(setting.selected_push_flags).to include(
         :push_conversation_assignment, :push_internal_chat_mention, :push_internal_chat_new_message
       )
     end

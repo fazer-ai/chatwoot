@@ -16,6 +16,7 @@ Layout/LineLength:
 Metrics/ClassLength:
   Max: 175
   Exclude:
+    - 'app/builders/messages/message_builder.rb'
     - 'app/models/message.rb'
     - 'app/models/conversation.rb'
     - 'app/models/inbox.rb'
@@ -378,4 +379,5 @@ Rails/SaveBang:
     - Stripe::Customer
     - Stripe::Invoice
     - Stripe::InvoiceItem
+    - Shopify::PendingInstallation
     - FactoryBot

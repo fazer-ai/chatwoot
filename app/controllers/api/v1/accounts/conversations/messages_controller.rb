@@ -33,8 +33,10 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     message.with_lock do
       # The reserved provider id survives the wipe: a send still in flight is what this delete races
       # with, and dropping the reservation would leave its echo unmatchable — the deleted content
-      # would come back as a fresh incoming-looking message.
-      deleted_attributes = { deleted: true, pending_source_id: message.pending_source_id }.compact
+      # would come back as a fresh incoming-looking message. The forward marker survives too, so
+      # replies to a deleted forward stay out of this conversation.
+      deleted_attributes = message.content_attributes.slice('forwarded_message_id')
+                                  .merge(deleted: true, pending_source_id: message.pending_source_id).compact
       message.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: deleted_attributes)
       message.attachments.destroy_all
       reached_provider = message.source_id.present?
@@ -54,16 +56,13 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   def translate
     return head :ok if already_translated_content_available?
 
-    translated_content = Integrations::GoogleTranslate::ProcessorService.new(
-      message: message,
-      target_language: permitted_params[:target_language]
-    ).perform
+    translated_content = translate_message
 
     if translated_content.present?
       translations = {}
       translations[permitted_params[:target_language]] = translated_content
       translations = message.translations.merge!(translations) if message.translations.present?
-      message.update!(translations: translations)
+      message.update!(translations: translations, translation_provider: translation_provider)
     end
 
     render json: { content: translated_content }
@@ -96,6 +95,15 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   private
 
+  def translation_provider
+    'google_translate'
+  end
+
+  def translate_message
+    hook = Current.account.hooks.find_by(app_id: 'google_translate')
+    Integrations::GoogleTranslate::ProcessorService.new(hook: hook).translate_message(message, permitted_params[:target_language]) if hook
+  end
+
   def message
     @message ||= @conversation.messages.find(permitted_params[:id])
   end
@@ -104,12 +112,16 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message_finder ||= MessageFinder.new(@conversation, params)
   end
 
-  # A pending contact-info request keeps its marker across the retry: the eligibility check reads it,
-  # and a bare retry would send the interactive message with no record of what it is.
+  # A retry clears the failure, not what the message is. A pending contact-info request keeps the marker
+  # the eligibility check reads, and a bare retry would send the interactive message with no record of
+  # what it is. An email keeps its recipients, its subject and the forward it carries: without them the
+  # resend would go to the contact as a plain reply.
+  RETRY_KEPT_CONTENT_ATTRIBUTES = %w[forwarded_message_id to_emails cc_emails bcc_emails email].freeze
+
   def retry_content_attributes
     return message.content_attributes if message.content_attributes.dig('whatsapp_contact_info', 'type') == 'request'
 
-    {}
+    message.content_attributes.slice(*RETRY_KEPT_CONTENT_ATTRIBUTES)
   end
 
   def permitted_params

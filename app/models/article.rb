@@ -28,6 +28,7 @@
 #  index_articles_on_account_id             (account_id)
 #  index_articles_on_associated_article_id  (associated_article_id)
 #  index_articles_on_author_id              (author_id)
+#  index_articles_on_category_id            (category_id)
 #  index_articles_on_portal_id              (portal_id)
 #  index_articles_on_slug                   (slug) UNIQUE
 #  index_articles_on_status                 (status)
@@ -66,6 +67,7 @@ class Article < ApplicationRecord
   validates :content, presence: { if: :published? }, length: { maximum: 65_535 }
   validates :draft_content, length: { maximum: 65_535 }
   validates :slug, exclusion: { in: RESERVED_SLUGS }
+  validates :slug, uniqueness: true, format: { with: /\A[a-zA-Z0-9_-]+\z/ }, if: :will_save_change_to_slug?
 
   # ensuring that the position is always set correctly
   before_create :add_position_to_article
@@ -127,6 +129,17 @@ class Article < ApplicationRecord
   # Make sure we always associate the parent's associated id to avoid the deeper associations od articles.
   def self.find_root_article_id(article)
     article.associated_article_id || article.id
+  end
+
+  def translation_family
+    root_id = associated_article_id || id
+    articles = portal.articles
+
+    articles.where(id: root_id).or(articles.where(associated_article_id: root_id))
+  end
+
+  def public_locale
+    category.present? ? category.locale : locale
   end
 
   def draft!

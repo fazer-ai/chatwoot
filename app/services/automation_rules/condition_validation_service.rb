@@ -40,6 +40,10 @@ class AutomationRules::ConditionValidationService
     # standard key that happens to share the name -- its operators are a different set.
     return custom_attribute_present?(key, attribute_model) if attribute_model.present?
 
+    if key == Captain::AutomationConditionService::ATTRIBUTE_KEY
+      return Captain::AutomationConditionService::OPERATORS.include?(condition['filter_operator'])
+    end
+
     standard_filter = @conversation_filters[key] || @contact_filters[key] || @message_filters[key]
     return operation_valid?(condition, standard_filter) if standard_filter
 

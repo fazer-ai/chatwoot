@@ -9,7 +9,7 @@ vi.mock('dashboard/composables/useInbox', () => ({
     isAFacebookInbox: computed(() => false),
     isAnInstagramChannel: computed(() => false),
     isATiktokChannel: computed(() => false),
-    isAWhatsAppChannel: computed(() => true),
+    isAWhatsAppCloudChannel: computed(() => false),
   }),
 }));
 
@@ -31,7 +31,7 @@ const mountUnsupported = contentAttributes => {
     messages: {
       en: {
         CONVERSATION: {
-          UNSUPPORTED_MESSAGE_WHATSAPP: 'This message is not supported.',
+          UNSUPPORTED_MESSAGE: 'This message is not supported.',
           MASKED_MESSAGE_WHATSAPP:
             'WhatsApp does not deliver verification codes to linked devices.',
         },

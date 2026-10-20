@@ -52,8 +52,8 @@ export default {
     },
   },
   watch: {
-    show(value) {
-      if (!value) this.selectedWaTemplate = null;
+    inboxId() {
+      this.selectedWaTemplate = null;
     },
     requestContactInfoOnly() {
       this.selectedWaTemplate = null;

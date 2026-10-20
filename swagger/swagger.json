@@ -29,6 +29,9 @@
         "description": "Create an Account",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -81,6 +84,9 @@
         "description": "Get the details of an account",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -125,6 +131,9 @@
         "summary": "Update an account",
         "description": "Update an account's attributes",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -171,6 +180,9 @@
         "description": "Delete an Account",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -216,6 +228,9 @@
         "description": "List all account users",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -250,6 +265,9 @@
         "summary": "Create an Account User",
         "description": "Create an Account User",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -310,6 +328,9 @@
         "description": "Delete an Account User",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -350,6 +371,9 @@
         "description": "List all agent bots available",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -388,6 +412,9 @@
         "summary": "Create an Agent Bot",
         "description": "Create an agent bot",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -441,6 +468,9 @@
         "description": "Get the details of an agent bot",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -485,6 +515,9 @@
         "summary": "Update an agent bot",
         "description": "Update an agent bot's attributes",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -531,6 +564,9 @@
         "description": "Delete an AgentBot",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -570,6 +606,9 @@
         "summary": "Create a User",
         "description": "Create a User",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -623,6 +662,9 @@
         "description": "Get the details of an user",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -667,6 +709,9 @@
         "summary": "Update a user",
         "description": "Update a user's attributes",
         "security": [
+          {
+            "platformAppBearerAuth": []
+          },
           {
             "platformAppApiKey": []
           }
@@ -713,6 +758,9 @@
         "description": "Delete a User",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -758,6 +806,9 @@
         "description": "Get the sso link of a user",
         "security": [
           {
+            "platformAppBearerAuth": []
+          },
+          {
             "platformAppApiKey": []
           }
         ],
@@ -797,6 +848,85 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/platform/api/v1/users/{id}/token": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/platform_user_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "post-user-token",
+        "summary": "Get User Access Token",
+        "description": "Get the access token of a user",
+        "security": [
+          {
+            "platformAppBearerAuth": []
+          },
+          {
+            "platformAppApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "Access token of the user"
+                    },
+                    "expiry": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Expiry timestamp"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "User ID"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "User's full name"
+                        },
+                        "display_name": {
+                          "type": "string",
+                          "description": "User's display name"
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "User's email address"
+                        },
+                        "pubsub_token": {
+                          "type": "string",
+                          "description": "User's pubsub token"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "The given user does not exist"
           }
         }
       }
@@ -1497,6 +1627,9 @@
         "description": "Get the details of the current account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -1546,6 +1679,9 @@
         "summary": "Update account",
         "description": "Update account details, settings, and custom attributes",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -1628,6 +1764,9 @@
         "summary": "List Audit Logs in Account",
         "description": "Get Details of Audit Log entries for an Account. This endpoint is only available in Enterprise editions and requires the audit_logs feature to be enabled.",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -1773,6 +1912,9 @@
         "description": "List all agent bots available for the current account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -1811,6 +1953,9 @@
         "summary": "Create an Agent Bot",
         "description": "Create an agent bot in the account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -1867,6 +2012,9 @@
         "description": "Get the details of an agent bot in the account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -1911,6 +2059,9 @@
         "summary": "Update an agent bot",
         "description": "Update an agent bot's attributes",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -1957,6 +2108,9 @@
         "description": "Delete an AgentBot from the account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2002,6 +2156,9 @@
         "description": "Get Details of Agents in an Account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2040,6 +2197,9 @@
         "summary": "Add a New Agent",
         "description": "Add a new Agent to Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2092,6 +2252,9 @@
         "summary": "Update Agent in Account",
         "description": "Update an Agent in Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2159,6 +2322,9 @@
         "description": "Remove an Agent from Account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2215,6 +2381,9 @@
         "description": "Get Details of Canned Responses in an Account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2253,6 +2422,9 @@
         "summary": "Add a New Canned Response",
         "description": "Add a new Canned Response to Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2305,6 +2477,9 @@
         "summary": "Update Canned Response in Account",
         "description": "Update a Canned Response in Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2371,6 +2546,9 @@
         "summary": "Remove a Canned Response from Account",
         "description": "Remove a Canned Response from Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2443,6 +2621,9 @@
         "description": "Get details of custom attributes in an Account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2481,6 +2662,9 @@
         "summary": "Add a new custom attribute",
         "description": "Add a new custom attribute to account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2542,6 +2726,9 @@
         "summary": "Get a custom attribute details",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2601,6 +2788,9 @@
         "summary": "Update custom attribute in Account",
         "description": "Update a custom attribute in account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2668,6 +2858,9 @@
         "description": "Remove a custom attribute from account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2722,6 +2915,9 @@
         "summary": "List Contacts",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2767,6 +2963,9 @@
         "description": "Create a new Contact",
         "summary": "Create Contact",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2833,6 +3032,9 @@
         "summary": "Show Contact",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -2877,6 +3079,9 @@
         "operationId": "contactUpdate",
         "summary": "Update Contact",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2932,6 +3137,9 @@
         "operationId": "contactDelete",
         "summary": "Delete Contact",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -2999,6 +3207,9 @@
         ],
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -3060,6 +3271,9 @@
         "description": "Lists all the labels of a contact",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -3104,6 +3318,9 @@
         "summary": "Add Labels",
         "description": "Add labels to a contact. Note that this API would overwrite the existing list of labels associated to the conversation.",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -3178,6 +3395,9 @@
         "summary": "Search Contacts",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -3234,6 +3454,9 @@
         "summary": "Contact Filter",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -3281,6 +3504,11 @@
                             "type": "string"
                           },
                           "description": "array of the attribute values to filter"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "description": "IANA timezone for created_at and last_activity_at date comparisons, including days_before. Omit to retain UTC behavior. Date-only custom attributes are not converted.",
+                          "example": "America/Sao_Paulo"
                         },
                         "query_operator": {
                           "type": "string",
@@ -3364,6 +3592,9 @@
         ],
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -3434,6 +3665,9 @@
         "description": "Get List of contactable Inboxes",
         "summary": "Get Contactable Inboxes",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -4590,6 +4824,9 @@
         "summary": "Merge Contacts",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -4687,6 +4924,9 @@
         "description": "Get details of automation rules in an Account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -4721,6 +4961,9 @@
         "summary": "Add a new automation rule",
         "description": "Add a new automation rule to account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -4782,6 +5025,9 @@
         "summary": "Get a automation rule details",
         "description": "Get the details of a automation rule in the account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -4876,6 +5122,9 @@
         "description": "Update a automation rule in account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -4942,6 +5191,9 @@
         "description": "Remove a automation rule from account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -4998,6 +5250,9 @@
         "description": "Add a new portal to account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5047,6 +5302,9 @@
         ],
         "description": "Get details of portals in an Account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -5133,6 +5391,119 @@
           "$ref": "#/components/parameters/portal_id"
         }
       ],
+      "get": {
+        "tags": [
+          "Help Center"
+        ],
+        "operationId": "get-details-of-a-single-portal",
+        "summary": "Get a portal details",
+        "description": "Get the details of a portal in the account",
+        "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "userApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/account_id"
+          },
+          {
+            "$ref": "#/components/parameters/portal_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/portal_item"
+                },
+                "example": {
+                  "id": 123,
+                  "archived": false,
+                  "color": "#1F93FF",
+                  "config": {
+                    "allowed_locales": [
+                      {
+                        "code": "en",
+                        "articles_count": 32,
+                        "categories_count": 9
+                      }
+                    ]
+                  },
+                  "custom_domain": "chatwoot.help",
+                  "header_text": "Handbook",
+                  "homepage_link": "https://www.chatwoot.com",
+                  "name": "Handbook",
+                  "slug": "handbook",
+                  "page_title": "Handbook",
+                  "account_id": 123,
+                  "inbox": {
+                    "id": 123,
+                    "name": "Chatwoot",
+                    "website_url": "chatwoot.com",
+                    "channel_type": "Channel::WebWidget",
+                    "avatar_url": "https://example.com/avatar.png",
+                    "widget_color": "#1F93FF",
+                    "website_token": "4cWzuf9i9jxN9tbnv8K9STKU",
+                    "enable_auto_assignment": true,
+                    "web_widget_script": "<script>...</script>",
+                    "welcome_title": "Hi there ! 🙌🏼",
+                    "welcome_tagline": "We make it simple to connect with us.",
+                    "greeting_enabled": true,
+                    "greeting_message": "Hey there 👋, Thank you for reaching out to us.",
+                    "channel_id": 123,
+                    "working_hours_enabled": true,
+                    "enable_email_collect": true,
+                    "csat_survey_enabled": true,
+                    "timezone": "America/Los_Angeles",
+                    "business_name": "Chatwoot",
+                    "hmac_mandatory": true
+                  },
+                  "logo": {
+                    "id": 123,
+                    "portal_id": 123,
+                    "file_type": "image/png",
+                    "account_id": 123,
+                    "file_url": "https://example.com/logo.png",
+                    "blob_id": 123,
+                    "filename": "square.png"
+                  },
+                  "meta": {
+                    "all_articles_count": 32,
+                    "categories_count": 9,
+                    "default_locale": "en"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The given portal ID does not exist in the account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "Help Center"
@@ -5141,6 +5512,9 @@
         "summary": "Update a portal",
         "description": "Update a portal to account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -5274,6 +5648,9 @@
         "description": "Add a new category to portal",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5329,6 +5706,9 @@
         "description": "Add a new article to portal",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5380,6 +5760,9 @@
         "description": "Get open, unassigned and all Conversation counts",
         "summary": "Get Conversation Counts",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -5492,6 +5875,9 @@
         "summary": "Conversations List",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5600,6 +5986,12 @@
         "summary": "Create New Conversation",
         "description": "Creating a conversation in chatwoot requires a source id. \n\n Learn more about source_id: https://www.chatwoot.com/hc/user-guide/articles/1677839703-how-to-create-an-api-channel-inbox#send-messages-to-the-api-channel",
         "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
           {
             "userApiKey": []
           },
@@ -5725,6 +6117,9 @@
         "summary": "Conversations Filter",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5790,6 +6185,11 @@
                             "type": "string"
                           },
                           "description": "array of the attribute values to filter"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "description": "IANA timezone for created_at and last_activity_at date comparisons, including days_before. Omit to retain UTC behavior. Date-only custom attributes are not converted.",
+                          "example": "America/Sao_Paulo"
                         },
                         "query_operator": {
                           "type": "string",
@@ -5866,6 +6266,12 @@
         "summary": "Conversation Details",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -5911,6 +6317,12 @@
         "summary": "Update Conversation",
         "description": "Update Conversation Attributes",
         "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
           {
             "userApiKey": []
           },
@@ -6143,6 +6555,12 @@
         "description": "Toggle the status of a conversation. Pass `status` to explicitly set the\nconversation state. Use `snoozed` along with `snoozed_until` to snooze a\nconversation until a specific time. If `snoozed_until` is omitted, the\nconversation is snoozed until the next reply from the contact. Regardless\nof the value provided, snoozed conversations always reopen on the next\nreply from the contact.",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           },
           {
@@ -6292,6 +6710,12 @@
         "description": "Toggles the priority of conversation",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           },
           {
@@ -6388,6 +6812,12 @@
         "description": "Toggles the typing status for a conversation.",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           },
           {
@@ -6439,6 +6869,64 @@
           },
           "404": {
             "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/conversations/{conversation_id}/update_last_seen": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/conversation_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "conversationUpdateLastSeen",
+        "summary": "Update Last Seen",
+        "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Updates the last seen of the conversation so that conversations will have the bubbles in the agents screen",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/conversation_show"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contact not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -6553,6 +7041,12 @@
         "description": "Updates the custom attributes of a conversation",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -6642,6 +7136,9 @@
         "description": "Removes the given custom attribute keys from a conversation",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -6729,6 +7226,12 @@
         "description": "Assign a conversation to an agent or a team",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           },
           {
@@ -6808,6 +7311,12 @@
         "summary": "List Labels",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -6852,6 +7361,12 @@
         "operationId": "conversation-add-labels",
         "summary": "Add Labels",
         "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -6933,6 +7448,9 @@
         "operationId": "get-conversation-reporting-events",
         "summary": "Conversation Reporting Events",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -7287,6 +7805,9 @@
         "summary": "Get account branded email layout",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -7326,6 +7847,9 @@
         "operationId": "updateAccountBrandedEmailLayout",
         "summary": "Update account branded email layout",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -7390,6 +7914,9 @@
         "description": "List all inboxes available in the current account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -7448,6 +7975,9 @@
         "summary": "Create an inbox",
         "description": "You can create more than one website inbox in each account",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -7651,6 +8181,9 @@
         "summary": "Get an inbox",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -7709,6 +8242,9 @@
         "operationId": "updateInbox",
         "summary": "Update Inbox",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -7915,6 +8451,9 @@
         "summary": "List WhatsApp message templates",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8019,6 +8558,9 @@
         "description": "See if an agent bot is associated to the Inbox",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8078,6 +8620,9 @@
         "operationId": "updateAgentBot",
         "summary": "Add or remove agent bot",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -8162,6 +8707,9 @@
         "description": "Get Details of Agents in an Inbox",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8227,6 +8775,9 @@
         "summary": "Add a New Agent",
         "description": "Add a new Agent to Inbox",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -8323,6 +8874,9 @@
         "description": "All agents except the one passed in params will be removed",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8418,6 +8972,9 @@
         "description": "Remove an Agent from Inbox",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8499,6 +9056,9 @@
         "summary": "List all labels",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8542,6 +9102,9 @@
         "operationId": "create-a-label",
         "summary": "Create a label",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -8604,6 +9167,9 @@
         "summary": "Get a label",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8649,6 +9215,9 @@
         "summary": "Update a label",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -8693,6 +9262,9 @@
         "operationId": "delete-a-label",
         "summary": "Delete a label",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -8741,6 +9313,9 @@
         "operationId": "list-all-messages",
         "summary": "Get messages",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -8846,8 +9421,14 @@
         ],
         "operationId": "create-a-new-message-in-a-conversation",
         "summary": "Create New Message",
-        "description": "Create a new message in the conversation.\n\nUse `application/json` for text messages and `multipart/form-data` when the\nmessage includes file attachments.\n\n### Multipart attachment request\n\nSend files with the `attachments[]` form field. `curl -F` sets the\n`multipart/form-data` content type and boundary automatically.\n\n```bash\ncurl -X POST \"https://app.chatwoot.com/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages\" \\\n  -H \"api_access_token: <your-api-token>\" \\\n  -F \"content=Here is the screenshot\" \\\n  -F \"message_type=outgoing\" \\\n  -F \"private=false\" \\\n  -F \"attachments[]=@/path/to/screenshot.png\"\n```\n\n## WhatsApp Template Messages\n\nFor WhatsApp channels, you can send structured template messages using the `template_params` field. \nTemplates must be pre-approved in WhatsApp Business Manager.\n\nBy default, `content` is treated as the already-rendered transcript text for\ncompatibility with existing API and mobile clients. To submit the original\ntemplate body instead, set `template_params.content_mode` to `raw_template`;\nChatwoot will substitute `processed_params.body` before saving the transcript.\n\n### Example Templates\n\n**Text with Image Header:**\n```json\n{\n  \"content\": \"Hi your order 121212 is confirmed. Please wait for further updates\",\n  \"template_params\": {\n    \"name\": \"order_confirmation\",\n    \"category\": \"MARKETING\",\n    \"language\": \"en\",\n    \"processed_params\": {\n      \"body\": {\n        \"1\": \"121212\"\n      },\n      \"header\": {\n        \"media_url\": \"https://picsum.photos/200/300\",\n        \"media_type\": \"image\"\n      }\n    }\n  }\n}\n```\n\n**Text with Copy Code Button:**\n```json\n{\n  \"content\": \"Special offer! Get 30% off your next purchase. Use the code below\",\n  \"template_params\": {\n    \"name\": \"discount_coupon\",\n    \"category\": \"MARKETING\",\n    \"language\": \"en\",\n    \"processed_params\": {\n      \"body\": {\n        \"discount_percentage\": \"30\"\n      },\n      \"buttons\": [{\n        \"type\": \"copy_code\",\n        \"parameter\": \"SAVE20\"\n      }]\n    }\n  }\n}\n```\n",
+        "description": "Create a new message in the conversation.\n\nUse `application/json` for text messages and `multipart/form-data` when the\nmessage includes file attachments.\n\n### Multipart attachment request\n\nSend files with the `attachments[]` form field. `curl -F` sets the\n`multipart/form-data` content type and boundary automatically.\n\n```bash\ncurl -X POST \"https://app.chatwoot.com/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages\" \\\n  -H \"Authorization: Bearer <your-api-token>\" \\\n  -F \"content=Here is the screenshot\" \\\n  -F \"message_type=outgoing\" \\\n  -F \"private=false\" \\\n  -F \"attachments[]=@/path/to/screenshot.png\"\n```\n\n## WhatsApp Template Messages\n\nFor WhatsApp channels, you can send structured template messages using the `template_params` field. \nTemplates must be pre-approved in WhatsApp Business Manager.\n\nBy default, `content` is treated as the already-rendered transcript text for\ncompatibility with existing API and mobile clients. To submit the original\ntemplate body instead, set `template_params.content_mode` to `raw_template`;\nChatwoot will substitute `processed_params.body` before saving the transcript.\n\n### Example Templates\n\n**Text with Image Header:**\n```json\n{\n  \"content\": \"Hi your order 121212 is confirmed. Please wait for further updates\",\n  \"template_params\": {\n    \"name\": \"order_confirmation\",\n    \"category\": \"MARKETING\",\n    \"language\": \"en\",\n    \"processed_params\": {\n      \"body\": {\n        \"1\": \"121212\"\n      },\n      \"header\": {\n        \"media_url\": \"https://picsum.photos/200/300\",\n        \"media_type\": \"image\"\n      }\n    }\n  }\n}\n```\n\n**Text with Copy Code Button:**\n```json\n{\n  \"content\": \"Special offer! Get 30% off your next purchase. Use the code below\",\n  \"template_params\": {\n    \"name\": \"discount_coupon\",\n    \"category\": \"MARKETING\",\n    \"language\": \"en\",\n    \"processed_params\": {\n      \"body\": {\n        \"discount_percentage\": \"30\"\n      },\n      \"buttons\": [{\n        \"type\": \"copy_code\",\n        \"parameter\": \"SAVE20\"\n      }]\n    }\n  }\n}\n```\n",
         "security": [
+          {
+            "userBearerAuth": []
+          },
+          {
+            "agentBotBearerAuth": []
+          },
           {
             "userApiKey": []
           },
@@ -9006,6 +9587,9 @@
         "summary": "Update message status",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9097,6 +9681,9 @@
         "summary": "Delete a message",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9141,6 +9728,9 @@
         "operationId": "get-details-of-all-integrations",
         "summary": "List all the Integrations",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9199,6 +9789,9 @@
         "description": "Create an integration hook",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9250,6 +9843,9 @@
         "summary": "Update an Integration Hook",
         "description": "Update an Integration Hook",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9304,6 +9900,9 @@
         "description": "Delete an Integration Hook",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9352,6 +9951,9 @@
         "description": "Get the user profile details",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9386,6 +9988,9 @@
         "summary": "Update user profile",
         "description": "Update the user profile details",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9514,6 +10119,9 @@
         "summary": "List all teams",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9552,6 +10160,9 @@
         "operationId": "create-a-team",
         "summary": "Create a team",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9613,6 +10224,9 @@
         "summary": "Get a team details",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9658,6 +10272,9 @@
         "summary": "Update a team",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9702,6 +10319,9 @@
         "operationId": "delete-a-team",
         "summary": "Delete a team",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9751,6 +10371,9 @@
         "summary": "List Agents in Team",
         "description": "Get Details of Agents in an Team",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9808,6 +10431,9 @@
         "summary": "Add a New Agent",
         "description": "Add a new Agent to Team",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -9893,6 +10519,9 @@
         "description": "All agents except the one passed in params will be removed",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -9976,6 +10605,9 @@
         "summary": "Remove an Agent from Team",
         "description": "Remove an Agent from Team",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10068,6 +10700,9 @@
         "description": "List all custom filters in a category of a user",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10111,6 +10746,9 @@
           }
         ],
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10167,6 +10805,9 @@
         "description": "Get the details of a custom filter in the account",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10210,6 +10851,9 @@
         "operationId": "update-a-custom-filter",
         "summary": "Update a custom filter",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10256,6 +10900,9 @@
         "summary": "Delete a custom filter",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10301,6 +10948,9 @@
         "summary": "List all webhooks",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10339,6 +10989,9 @@
         "operationId": "create-a-webhook",
         "summary": "Add a webhook",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10400,6 +11053,9 @@
         "summary": "Update a webhook object",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10450,6 +11106,9 @@
         "summary": "Delete a webhook",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10494,6 +11153,9 @@
         "operationId": "get-account-reporting-events",
         "summary": "Account Reporting Events",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10612,6 +11274,9 @@
         "summary": "Get Account reports",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10703,6 +11368,9 @@
         "summary": "Get Account reports summary",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10766,6 +11434,9 @@
         "operationId": "get-account-conversation-metrics",
         "summary": "Account Conversation Metrics",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10851,6 +11522,9 @@
         "summary": "Agent Conversation Metrics",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -10922,6 +11596,9 @@
         "operationId": "get-channel-summary-report",
         "summary": "Get conversation statistics grouped by channel type",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -10999,6 +11676,9 @@
         "summary": "Get conversation statistics grouped by inbox",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -11064,6 +11744,9 @@
         "operationId": "get-agent-summary-report",
         "summary": "Get conversation statistics grouped by agent",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -11131,6 +11814,9 @@
         "summary": "Get conversation statistics grouped by team",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -11188,6 +11874,9 @@
         "operationId": "get-first-response-time-distribution",
         "summary": "Get first response time distribution by channel",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -11269,6 +11958,9 @@
         "summary": "Get inbox-label matrix report",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -11326,6 +12018,9 @@
         "operationId": "get-outgoing-messages-count",
         "summary": "Get outgoing messages count grouped by entity",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -13663,6 +14358,9 @@
         "summary": "List campaigns",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -13696,6 +14394,9 @@
         "operationId": "create-campaign",
         "summary": "Create a campaign",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -13817,6 +14518,9 @@
         "summary": "Get a campaign",
         "security": [
           {
+            "userBearerAuth": []
+          },
+          {
             "userApiKey": []
           }
         ],
@@ -13847,6 +14551,9 @@
         "operationId": "update-campaign",
         "summary": "Update a campaign",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -13891,6 +14598,9 @@
         "operationId": "delete-campaign",
         "summary": "Delete a campaign",
         "security": [
+          {
+            "userBearerAuth": []
+          },
           {
             "userApiKey": []
           }
@@ -15875,6 +16585,14 @@
           "allow_auto_assign": {
             "type": "boolean",
             "description": "If this setting is turned on, the system would automatically assign the conversation to an agent in the team while assigning the conversation to a team"
+          },
+          "icon": {
+            "type": "string",
+            "description": "An emoji or icon shown next to the team"
+          },
+          "icon_color": {
+            "type": "string",
+            "description": "The color used for the team icon"
           },
           "account_id": {
             "type": "number",
@@ -19895,6 +20613,16 @@
             "type": "boolean",
             "description": "If this setting is turned on, the system would automatically assign the conversation to an agent in the team while assigning the conversation to a team",
             "example": true
+          },
+          "icon": {
+            "type": "string",
+            "description": "An emoji or icon shown next to the team",
+            "example": "🚀"
+          },
+          "icon_color": {
+            "type": "string",
+            "description": "The color used for the team icon",
+            "example": "#6C5CE7"
           }
         }
       },
@@ -22984,23 +23712,38 @@
       }
     },
     "securitySchemes": {
+      "userBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authenticate with `Authorization: Bearer <token>` using a user API token from **Profile Settings**. Available in Chatwoot `v4.19.0` and later."
+      },
+      "agentBotBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authenticate with `Authorization: Bearer <token>` using an agent bot token from **Settings → Agent Bots**. Available in Chatwoot `v4.19.0` and later."
+      },
+      "platformAppBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Authenticate with `Authorization: Bearer <token>` using a platform app token from **Super Admin**. Available in Chatwoot `v4.19.0` and later."
+      },
       "userApiKey": {
         "type": "apiKey",
         "in": "header",
         "name": "api_access_token",
-        "description": "This token can be obtained by visiting the profile page or via rails console. Provides access to  endpoints based on the user permissions levels. This token can be saved by an external system when user is created via API, to perform activities on behalf of the user."
+        "description": "Find your API token in **Profile Settings**. The `api_access_token` header remains supported, but will be deprecated in a future release. For new integrations, use Bearer authentication."
       },
       "agentBotApiKey": {
         "type": "apiKey",
         "in": "header",
         "name": "api_access_token",
-        "description": "This token should be provided by system admin or obtained via rails console. This token can be used to build bot integrations and can only access limited apis."
+        "description": "Find your agent bot token in **Settings → Agent Bots**. For new integrations, use Bearer authentication in Chatwoot `v4.19.0` and later. Agent bot tokens can access only bot-permitted APIs."
       },
       "platformAppApiKey": {
         "type": "apiKey",
         "in": "header",
         "name": "api_access_token",
-        "description": "This token can be obtained by the system admin after creating a platformApp. This token should be used to provision agent bots, accounts, users and their roles."
+        "description": "Create a platform app in **Super Admin** to get its token. For new integrations, use Bearer authentication in Chatwoot `v4.19.0` and later. Platform app tokens can provision agent bots, accounts, users, and roles."
       }
     }
   },

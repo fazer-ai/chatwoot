@@ -136,13 +136,43 @@ class User < ApplicationRecord
   end
 
   def send_devise_notification(notification, *)
-    # accounts.first only means something when there is one of them. For a user in several
-    # workspaces it is whichever row the database returns, and that arbitrary pick decides both
-    # the language and the brand of a personal credential email -- an email change confirmed
-    # from the profile screen would go out dressed as a workspace the person did not act in.
-    account = Current.account || (accounts.one? ? accounts.first : nil)
-    devise_mailer.with(account: account).send(notification, self, *).deliver_later
+    mailer_params = { account: devise_mail_account }
+    mailer_params[:redirect_url] = @confirmation_redirect_url if notification == :confirmation_instructions && @confirmation_redirect_url.present?
+    devise_mailer.with(**mailer_params).send(notification, self, *).deliver_later
   end
+
+  # accounts.first only means something when there is one of them. For a user in several
+  # workspaces it is whichever row the database returns, and that arbitrary pick decides both
+  # the language and the brand of a personal credential email -- an email change confirmed
+  # from the profile screen would go out dressed as a workspace the person did not act in.
+  def devise_mail_account
+    Current.account || (accounts.one? ? accounts.first : nil)
+  end
+  private :devise_mail_account
+
+  def send_confirmation_instructions_with_redirect(redirect_url:)
+    @confirmation_redirect_url = redirect_url
+    send_confirmation_instructions
+  ensure
+    @confirmation_redirect_url = nil
+  end
+
+  def send_reset_password_instructions(redirect_url: nil, sso_account_id: nil)
+    @reset_password_account_id = sso_account_id
+    @reset_password_redirect_url = redirect_url
+    super()
+  ensure
+    @reset_password_account_id = nil
+    @reset_password_redirect_url = nil
+  end
+
+  def send_reset_password_instructions_notification(token)
+    devise_mailer
+      .with(account: devise_mail_account, redirect_url: @reset_password_redirect_url, sso_account_id: @reset_password_account_id)
+      .reset_password_instructions(self, token)
+      .deliver_later
+  end
+  private :send_reset_password_instructions_notification
 
   def set_password_and_uid
     self.uid = email
@@ -206,6 +236,14 @@ class User < ApplicationRecord
 
   def mfa_feature_available?
     Chatwoot.mfa_enabled?
+  end
+
+  def mfa_enforced?
+    mfa_feature_available? && accounts.any?(&:enforce_mfa?)
+  end
+
+  def mfa_enforcement_pending?
+    !mfa_enabled? && mfa_enforced?
   end
 
   # Workaround for Devise 4.9.x race condition vulnerability (GHSA-57hq-95w6-v4fc).
