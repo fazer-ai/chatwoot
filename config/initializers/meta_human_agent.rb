@@ -1,22 +1,18 @@
 # Meta grants the Human Agent feature so that *a person* can answer a contact up to seven days
 # after their last message; a reply sent by anything else belongs in the 24-hour window, as an
-# ordinary response. Upstream stamps `tag: HUMAN_AGENT` on every outgoing Messenger and Instagram
-# message once the installation flag is on, without looking at who wrote it, so an agent bot's
-# reply goes out under a person's seal. That is use outside the approved case, and the penalty
-# lands on the app that holds the feature, not on the message. Here nearly every inbox has a bot
-# bound to it, so that is the default path rather than an edge case.
+# ordinary response. Since v4.19.0 upstream only stamps `tag: HUMAN_AGENT` on a reply a User wrote
+# outside that window (Facebook::HumanAgentTagHelpers), which is the rule the fork used to enforce
+# here with a guard of its own.
 #
-# Two halves:
-#   * the seal goes out only when `Message#sender` is a User;
-#   * Meta's refusal for a closed window, which a bot will now meet whenever it answers past 24
-#     hours, is persisted as a sentence the agent can act on, in the account's language, instead
-#     of "10 - (#10) This message is sent outside of allowed window. Learn more about...".
+# What is left is the other half: Meta's refusal for a closed window, which a bot meets whenever it
+# answers past 24 hours, is persisted as a sentence the agent can act on, in the account's language,
+# instead of "10 - (#10) This message is sent outside of allowed window. Learn more about...".
 #
 # Declared here instead of as autoloaded classes, and for the reason import_guards.rb gives: a
 # reloadable module handed to `prepend` is a new object after every reload, so the ancestor chain
 # would grow one copy per edit in development. Prepended rather than edited into the services:
-# all four targets are files the upstream sync rewrites, and a guard clause inside them is a
-# conflict on every merge.
+# the targets are files the upstream sync rewrites, and a guard clause inside them is a conflict
+# on every merge.
 module MetaHumanAgent
   WINDOW_CLOSED_CODE = 10
   # 2018278 on Messenger, 2534022 on Instagram. Meta documents neither; both come from
@@ -66,33 +62,6 @@ module MetaHumanAgent
     end
   end
 
-  # Both Instagram services. With the flag off upstream returns the params untouched, so that is
-  # exactly what a non-human sender gets. Prepended on each concrete service rather than on
-  # Instagram::BaseSendService: both define this method themselves, and a module on the base
-  # would sit behind them in the ancestor chain and never run.
-  module InstagramTagGuard
-    private
-
-    def merge_human_agent_tag(params)
-      return super if MetaHumanAgent.human_sender?(message)
-
-      params
-    end
-  end
-
-  # Messenger names the type in both branches, and its flag-off branch is RESPONSE, so that is
-  # what a non-human sender gets here.
-  module FacebookTagGuard
-    private
-
-    def merge_human_agent_tag(params)
-      return super if MetaHumanAgent.human_sender?(message)
-
-      params[:messaging_type] = 'RESPONSE'
-      params
-    end
-  end
-
   # The refusal arrives as a parsed body on this path, which is why the interception sits on the
   # method that turns it into text. Everything that is not this refusal goes to `super`, so a
   # token error still carries Meta's own wording and still trips `channel.authorization_error!`.
@@ -139,9 +108,6 @@ module MetaHumanAgent
 end
 
 Rails.application.config.to_prepare do
-  Facebook::SendOnFacebookService.prepend(MetaHumanAgent::FacebookTagGuard)
   Facebook::SendOnFacebookService.prepend(MetaHumanAgent::FacebookWindowError)
-  Instagram::SendOnInstagramService.prepend(MetaHumanAgent::InstagramTagGuard)
-  Instagram::Messenger::SendOnInstagramService.prepend(MetaHumanAgent::InstagramTagGuard)
   Instagram::BaseSendService.prepend(MetaHumanAgent::InstagramWindowError)
 end

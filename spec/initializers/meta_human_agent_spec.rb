@@ -36,7 +36,21 @@ describe 'MetaHumanAgent' do
     let(:sealed) { { messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT' } }
 
     context 'when the installation holds the human agent feature' do
-      before { human_agent_feature(true) }
+      # The seal is for a reply past the 24-hour window, so the contact last wrote before it.
+      before do
+        human_agent_feature(true)
+        create(:message, message_type: :incoming, conversation: conversation, inbox: inbox, account: account,
+                         created_at: 25.hours.ago)
+      end
+
+      it 'does not seal an agent reply while the 24-hour window is still open' do
+        create(:message, message_type: :incoming, conversation: conversation, inbox: inbox, account: account)
+        message.update!(sender: agent)
+
+        service.perform
+
+        expect(bodies.last).not_to include(sealed)
+      end
 
       it 'seals the reply an agent wrote' do
         message.update!(sender: agent)
@@ -321,16 +335,8 @@ describe 'MetaHumanAgent' do
   end
 
   describe 'the wiring' do
-    it 'sits in front of each concrete Instagram service, which is where the seal is decided' do
-      [Instagram::SendOnInstagramService, Instagram::Messenger::SendOnInstagramService].each do |klass|
-        expect(klass.ancestors.index(MetaHumanAgent::InstagramTagGuard)).to be < klass.ancestors.index(klass)
-        expect(klass.private_method_defined?(:merge_human_agent_tag)).to be(true)
-      end
-    end
-
-    it 'sits in front of the Messenger service for both the seal and the refusal' do
+    it 'sits in front of the Messenger service for the refusal' do
       ancestors = Facebook::SendOnFacebookService.ancestors
-      expect(ancestors.index(MetaHumanAgent::FacebookTagGuard)).to be < ancestors.index(Facebook::SendOnFacebookService)
       expect(ancestors.index(MetaHumanAgent::FacebookWindowError)).to be < ancestors.index(Facebook::SendOnFacebookService)
       expect(Facebook::SendOnFacebookService.private_method_defined?(:deliver_message)).to be(true)
     end
