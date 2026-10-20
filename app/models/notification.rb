@@ -45,7 +45,9 @@ class Notification < ApplicationRecord
     sla_missed_next_response: 7,
     sla_missed_resolution: 8,
     internal_chat_mention: 9,
-    internal_chat_new_message: 10
+    internal_chat_new_message: 10,
+    # Upstream ships this as 9, which the fork already holds for internal chat.
+    voice_call_missed: 11
   }.freeze
 
   # Internal chat notifications don't have email mailers/templates yet, so email
@@ -240,3 +242,5 @@ class Notification < ApplicationRecord
     }
   end
 end
+
+Notification.prepend_mod_with('Notification')

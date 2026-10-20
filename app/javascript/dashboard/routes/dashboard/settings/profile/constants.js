@@ -45,6 +45,10 @@ export const NOTIFICATION_TYPES = [
     value: 'internal_chat_new_message',
     pushOnly: true,
   },
+  {
+    label: 'PROFILE_SETTINGS.FORM.NOTIFICATIONS.TYPES.VOICE_CALL_MISSED',
+    value: 'voice_call_missed',
+  },
 ];
 
 export const EVENT_TYPES = {

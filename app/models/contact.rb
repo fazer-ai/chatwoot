@@ -75,6 +75,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
   after_update_commit :forget_whatsapp_missing_answers, if: :saved_change_to_phone_number?
   after_destroy_commit :dispatch_destroy_event
   before_save :sync_contact_attributes
+  include ContactCompanyAssociation
 
   enum contact_type: { visitor: 0, lead: 1, customer: 2 }
   enum group_type: { individual: 0, group: 1 }, _prefix: true
@@ -92,16 +93,6 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       Arel::Nodes::SqlLiteral.new(
         sanitize_sql_for_order("\"contacts\".\"created_at\" #{direction}
           NULLS LAST")
-      )
-    )
-  }
-  scope :order_on_company_name, lambda { |direction|
-    order(
-      Arel::Nodes::SqlLiteral.new(
-        sanitize_sql_for_order(
-          "\"contacts\".\"additional_attributes\"->>'company_name' #{direction}
-          NULLS LAST"
-        )
       )
     )
   }
@@ -182,6 +173,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       phone_number: phone_number,
       thumbnail: avatar_url,
       blocked: blocked,
+      contact_type: contact_type,
       type: 'contact',
       updated_at: updated_at&.floor(6).to_f
     }
@@ -202,6 +194,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
       phone_number: phone_number,
       thumbnail: avatar_url,
       blocked: blocked,
+      contact_type: contact_type,
       updated_at: updated_at&.floor(6).to_f
     }
   end

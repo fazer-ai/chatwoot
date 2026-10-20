@@ -4,6 +4,7 @@ import { useStore } from 'vuex';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
+import { isAIAssigneeType } from 'dashboard/helper/agentHelper';
 import wootConstants from 'dashboard/constants/globals';
 
 import Banner from 'dashboard/components/ui/Banner.vue';
@@ -27,81 +28,53 @@ const currentUser = useMapGetter('getCurrentUser');
 
 const assignedAgent = computed(() => currentChat.value?.meta?.assignee);
 
-const assignAgent = agent =>
-  store.dispatch('assignAgent', {
-    conversationId: currentChat.value?.id,
-    assignee: agent,
-  });
-
-const hasMessage = computed(() => props.message !== '');
-const isUserTyping = computed(() => hasMessage.value && !props.isOnPrivateNote);
-const isUnassigned = computed(() => !assignedAgent.value);
-const isAssignedToOtherAgent = computed(
-  () => assignedAgent.value?.id !== currentUser.value?.id
-);
-
-const showSelfAssignBanner = computed(() => {
-  return (
-    isUserTyping.value && (isUnassigned.value || isAssignedToOtherAgent.value)
-  );
-});
-
-const isPendingConversation = computed(
-  () => currentChat.value?.status === wootConstants.STATUS_TYPE.PENDING
-);
-
-const isAgentBotOwned = computed(
-  () => currentChat.value?.meta?.assignee_type === 'AgentBot'
-);
-
-const showBotHandoffBanner = computed(() => {
-  return isPendingConversation.value && isAgentBotOwned.value;
-});
-
-const botAssigneeName = computed(() => {
-  if (isAgentBotOwned.value && assignedAgent.value?.name) {
-    return assignedAgent.value.name;
-  }
-
-  return t('CONVERSATION.BOT_HANDOFF_FALLBACK_ASSIGNEE');
-});
-
-const selfAssignConversation = async () => {
+// The store action owns the optimistic write and its rollback, and a rejected
+// claim (an inbox with `prevent_assignment_takeover` answers 409) rolls back.
+const selfAssignConversation = async conversationId => {
   const { avatar_url, ...rest } = currentUser.value || {};
-  await assignAgent({ ...rest, thumbnail: avatar_url });
+  await store.dispatch('assignAgent', {
+    conversationId,
+    assignee: { ...rest, thumbnail: avatar_url },
+    assigneeType: 'User',
+  });
 };
 
-const needsAssignmentToCurrentUser = computed(() => {
-  return isUnassigned.value || isAssignedToOtherAgent.value;
-});
+const showSelfAssignBanner = computed(
+  () =>
+    props.message !== '' &&
+    !props.isOnPrivateNote &&
+    (!assignedAgent.value || assignedAgent.value.id !== currentUser.value?.id)
+);
+
+const showBotHandoffBanner = computed(
+  () =>
+    currentChat.value?.status === wootConstants.STATUS_TYPE.PENDING &&
+    isAIAssigneeType(currentChat.value?.meta?.assignee_type)
+);
+
+const botAssigneeName = computed(
+  () =>
+    assignedAgent.value?.name || t('CONVERSATION.BOT_HANDOFF_FALLBACK_ASSIGNEE')
+);
 
 const onClickSelfAssign = async () => {
   try {
-    await selfAssignConversation();
+    await selfAssignConversation(currentChat.value.id);
     useAlert(t('CONVERSATION.CHANGE_AGENT'));
   } catch (error) {
     useAssignmentError(error, t('CONVERSATION.CHANGE_AGENT_FAILED'));
   }
 };
 
-const reopenConversation = async () => {
-  await store.dispatch('toggleStatus', {
-    conversationId: currentChat.value?.id,
-    status: 'open',
-  });
-};
-
 const onClickBotHandoff = async () => {
+  const conversationId = currentChat.value.id;
   try {
-    const shouldAssignToCurrentUser =
-      isAgentBotOwned.value || needsAssignmentToCurrentUser.value;
-
-    await reopenConversation();
-
-    if (shouldAssignToCurrentUser) {
-      await selfAssignConversation();
-    }
-
+    await selfAssignConversation(conversationId);
+    store.commit('CHANGE_CONVERSATION_STATUS', {
+      conversationId,
+      status: 'open',
+      snoozedUntil: null,
+    });
     useAlert(t('CONVERSATION.BOT_HANDOFF_SUCCESS'));
   } catch (error) {
     useAssignmentError(error, t('CONVERSATION.BOT_HANDOFF_ERROR'));

@@ -1,9 +1,11 @@
 import { computed, ref, unref } from 'vue';
 import { useStore } from 'vuex';
-import { useAlert, useAssignmentError } from 'dashboard/composables';
+import { useAlert, useAssignmentError, useTrack } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useMapGetter } from 'dashboard/composables/store.js';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
+import { resolvesConversation } from 'dashboard/composables/useMacroExecution';
+import { CONVERSATION_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
 import wootConstants from 'dashboard/constants/globals';
 
 export function useBulkActions() {
@@ -233,6 +235,40 @@ export function useBulkActions() {
     }
   }
 
+  async function onExecuteMacro(macro) {
+    const conversationIds = selectedConversations.value;
+    const count = conversationIds.length;
+    const hasMissingRequiredAttributes =
+      resolvesConversation(macro) &&
+      conversationIds.some(id => {
+        const conversation = store.getters.getConversationById(id);
+        return conversation
+          ? checkMissingAttributes(conversation.custom_attributes || {})
+              .hasMissing
+          : false;
+      });
+
+    try {
+      await store.dispatch('macros/execute', {
+        macroId: macro.id,
+        conversationIds,
+      });
+      useTrack(CONVERSATION_EVENTS.EXECUTED_A_MACRO);
+      store.dispatch('bulkActions/clearSelectedConversationIds');
+      useAlert(
+        hasMissingRequiredAttributes
+          ? t(
+              'BULK_ACTION.MACROS.QUEUED_WITH_MISSING_ATTRIBUTES',
+              { count },
+              count
+            )
+          : t('BULK_ACTION.MACROS.QUEUED', { count }, count)
+      );
+    } catch (err) {
+      useAlert(t('MACROS.ERROR'));
+    }
+  }
+
   return {
     selectedConversations,
     selectedInboxes,
@@ -246,5 +282,6 @@ export function useBulkActions() {
     onRemoveLabels,
     onAssignTeamsForBulk,
     onUpdateConversations,
+    onExecuteMacro,
   };
 }
