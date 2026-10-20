@@ -2,18 +2,35 @@
 
 ## Brand configuration
 
-Export environment variables and run rake task with `bundle exec rails branding:update`.
+Set the variables in the environment of every Rails and Sidekiq container (the `environment:` block of your `docker-compose.yml`, or the equivalent in Coolify, Portainer or Easypanel), keep them there, and run `bundle exec rails branding:update` when the container starts, for example in a `post_start` hook.
 
 > [!IMPORTANT]
 > Unset environment variables are reset to default values.
 
+```yaml
+environment:
+  INSTALLATION_NAME: "Chatwoot fazer.ai"
+  BRAND_NAME: "My Company"
+  LOGO_THUMBNAIL: "https://fazer.ai/logo-thumbnail.svg"
+  LOGO: "https://fazer.ai/logo.svg"
+```
+
+The rake task copies the variables into the database, and the database is what the Community Edition image reads, so on that image a one-off run works too:
+
 ```bash
 INSTALLATION_NAME="Chatwoot fazer.ai" \
 BRAND_NAME="My Company" \
-LOGO_THUMBNAIL="https://fazer.ai/logo-thumbnail.svg" \
-LOGO="https://fazer.ai/logo.svg" \
 bundle exec rails branding:update
 ```
+
+### On the Pro image
+
+The Pro image ships `enterprise/`, and on an installation whose Chatwoot plan is `community` the Enterprise plan reconciliation (`Internal::ReconcilePlanConfigService`) puts every key in `enterprise/config/premium_installation_config.yml` back to its default. It runs whenever a Rails process boots and once a day, so a value that exists only in the database, such as one written by a one-off `branding:update` from a shell, is undone within minutes.
+
+The Pro image reads the branding variables from the process environment before the database (`GlobalConfig.branding_env_override`), which is what keeps the brand in place. Two consequences:
+
+- The variables have to be in the container environment, not just exported in a shell, and in every container that renders something branded: Rails for the dashboard and the login page, Sidekiq for emails.
+- A variable set to its default value is ignored and the database value is used, so leaving one at the default changes nothing.
 
 | Environment variable | Default Value                               | Description                                                           |
 | :--------------------| :------------------------------------------ | :-------------------------------------------------------------------- |
@@ -25,6 +42,7 @@ bundle exec rails branding:update
 | `BRAND_URL`          | `https://www.chatwoot.com`                  | The URL used in emails under the section “Powered By”.                |
 | `WIDGET_BRAND_URL`   | `https://www.chatwoot.com`                  | The URL used in the widget under the section “Powered By”.            |
 | `BRAND_NAME`         | `Chatwoot`                                  | The name used in emails and the widget.                               |
+| `BRAND_COLOR`        | `#1f93ff`                                   | The hex colour used in emails and for the PWA theme.                  |
 | `TERMS_URL`          | `https://www.chatwoot.com/terms-of-service` | The terms of service URL displayed on the Signup Page.                |
 | `PRIVACY_URL`        | `https://www.chatwoot.com/privacy-policy`   | The privacy policy URL displayed in the app.                          |
 | `DISPLAY_MANIFEST`   | `true`                                      | Display default Chatwoot metadata like favicons and upgrade warnings. |
