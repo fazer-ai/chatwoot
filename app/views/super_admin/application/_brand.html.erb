@@ -7,17 +7,22 @@
     nil
   end
   update_available = latest_version && Gem::Version.new(latest_version) > Gem::Version.new(version)
+  # The fork's build suffix ("-fazer-ai-pro.154") does not fit the sidebar, so only the base
+  # version shows here and the full one goes in the tooltip (and on the dashboard).
+  short_version = version[/\A[\d.]+/] || version
+  link_title = update_available ? t("super_admin.navigation.update_available", version: latest_version) : t("super_admin.navigation.release_notes")
 %>
 <div class="flex h-14 shrink-0 items-center gap-3">
   <%= link_to image_tag("/brand-assets/logo_thumbnail.svg", alt: "", class: "size-8"), super_admin_root_path, class: "shrink-0", tabindex: -1, aria: { hidden: true } %>
   <div class="min-w-0 whitespace-nowrap">
     <div class="flex items-baseline gap-1.5 leading-5">
       <%= link_to "Chatwoot", super_admin_root_path, class: "text-sm font-medium text-n-slate-12" %>
-      <%= link_to "https://github.com/chatwoot/chatwoot/releases/tag/v#{version}",
+      <%# The fork publishes CE and Pro notes on one public page; Pro's repository is private. %>
+      <%= link_to "https://fazer.ai/chatwoot-release-notes",
                   target: "_blank", rel: "noopener noreferrer",
-                  title: update_available ? t("super_admin.navigation.update_available", version: latest_version) : t("super_admin.navigation.release_notes"),
+                  title: "v#{version} · #{link_title}",
                   class: "inline-flex items-center gap-1 text-label-small tabular-nums text-n-slate-10 transition-colors hover:text-n-slate-12 hover:underline" do %>
-        v<%= version %>
+        v<%= short_version %>
         <% if update_available %>
           <span class="size-1.5 rounded-full bg-n-amber-9"></span>
         <% end %>
