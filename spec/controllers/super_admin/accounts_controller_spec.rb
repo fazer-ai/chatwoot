@@ -27,6 +27,16 @@ RSpec.describe 'Super Admin accounts API', type: :request do
 
   describe 'GET /super_admin/accounts/{account_id}' do
     context 'when it is an authenticated user' do
+      it 'shows the dashboard fields the redesigned page has no slot for' do
+        account.update!(hide_agent_all_tab: true)
+        sign_in(super_admin, scope: :super_admin)
+
+        get "/super_admin/accounts/#{account.id}"
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include('Hide agent unassigned tab', 'Hide agent all tab', 'Disable agent message deletion')
+      end
+
       it 'shows effective Captain model routing', if: ChatwootApp.enterprise? do
         account.update!(captain_models: { 'editor' => 'gpt-4.1', 'conversation_completion' => 'gpt-5.2' })
         sign_in(super_admin, scope: :super_admin)
