@@ -3,8 +3,11 @@
 
 <%
   fields = page.attributes(controller.action_name).values.flatten.index_by(&:name)
+  # General takes every field the other tabs do not claim, so a field a dashboard adds (the fork's
+  # agent tab and deletion toggles, Pro's own) shows up without being named here.
+  tabbed = %w[all_features manually_managed_features captain_models]
   tabs = [
-    { key: "general", label: t("super_admin.accounts.general"), attributes: fields.values_at("name", "locale", "status", "limits") },
+    { key: "general", label: t("super_admin.accounts.general"), attributes: fields.except(*tabbed).values },
     { key: "features", label: t("super_admin.features.title"), attributes: fields.values_at("all_features", "manually_managed_features") },
     { key: "captain-models", label: t("super_admin.accounts.captain_models"), attributes: fields.values_at("captain_models") }
   ].select { |tab| tab[:attributes].any? }
