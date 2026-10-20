@@ -6,6 +6,11 @@
   account = page.resource
   fields = page.attributes.values.flatten.index_by(&:name)
   users_count = fields["account_users"].data.size
+  # Fields named below have a slot of their own on this page; any other field
+  # the dashboard shows (the fork's agent tab and message deletion toggles)
+  # joins the profile instead of disappearing.
+  placed = %w[id name locale status created_at updated_at suspension_history conversations account_users
+              limits custom_attributes manually_managed_features all_features captain_models]
   tabs = [
     { key: "overview", label: t("super_admin.record.overview"), icon: "i-lucide-layout-list" },
     { key: "users", label: t("super_admin.accounts.users"), icon: "i-lucide-users", count: users_count },
@@ -35,7 +40,7 @@
 <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-tab-panel="overview" <%= "hidden" unless active == "overview" %>>
   <div class="space-y-6 pt-6">
     <%= render "card", title: t("super_admin.record.profile") do %>
-      <%= render "attributes", page: page, attributes: fields.values_at("id", "name", "locale", "status", "created_at", "updated_at") %>
+      <%= render "attributes", page: page, attributes: fields.values_at("id", "name", "locale", "status", "created_at", "updated_at") + fields.except(*placed).values %>
     <% end %>
 
     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[repeat(auto-fit,minmax(20rem,1fr))]">
