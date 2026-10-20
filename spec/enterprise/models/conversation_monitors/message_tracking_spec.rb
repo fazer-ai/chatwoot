@@ -5,6 +5,9 @@ RSpec.describe ConversationMonitors::MessageTracking do
   # Both connections must see committed setup while the message transaction remains open.
   self.use_transactional_tests = false
 
+  # Nothing rolls back here, so the audit rows this setup writes are deleted by hand,
+  # or the audit counts in specs that run later include them.
+  let!(:audit_floor) { Audited::Audit.maximum(:id) || 0 }
   let(:account) { create(:account) }
   let(:monitor) { create(:conversation_monitor, account: account, created_at: 3.days.ago, paused_at: 1.hour.ago) }
   let(:conversation) { create(:conversation, account: account, created_at: 1.day.ago) }
@@ -24,6 +27,7 @@ RSpec.describe ConversationMonitors::MessageTracking do
       account.destroy!
       users.each(&:destroy!)
     end
+    Audited::Audit.where(id: (audit_floor + 1)..).delete_all
   end
 
   %w[catch_up from_now].product(%i[incoming outgoing]).each do |mode, message_type|

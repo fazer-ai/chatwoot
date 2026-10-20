@@ -43,7 +43,8 @@ class Companies::EnrichmentService
       ENDPOINT,
       body: { type: 'by_domain', domain: @company.domain, timeoutOpts: { milliseconds: TIMEOUT_MS, behavior: 'return-partial' } }.to_json,
       headers: { 'Authorization' => "Bearer #{GlobalConfigService.load('CONTEXT_DEV_API_KEY', nil)}", 'Content-Type' => 'application/json' },
-      timeout: (TIMEOUT_MS / 1000) + 5
+      timeout: (TIMEOUT_MS / 1000) + 5,
+      max_retries: 0
     )
     return response.parsed_response['brand'] if response.success?
 

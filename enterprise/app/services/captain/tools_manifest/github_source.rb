@@ -60,7 +60,7 @@ class Captain::ToolsManifest::GithubSource
   # The body is streamed so an oversized file is abandoned at the manifest limit instead of loaded into memory.
   def get(url, headers = {})
     body = +''
-    response = HTTParty.get(url, headers: headers, timeout: REQUEST_TIMEOUT, stream_body: true) do |fragment|
+    response = HTTParty.get(url, headers: headers, timeout: REQUEST_TIMEOUT, max_retries: 0, stream_body: true) do |fragment|
       # Redirects stream their own fragments; only the final response's body is kept
       next unless fragment.code == 200
 
