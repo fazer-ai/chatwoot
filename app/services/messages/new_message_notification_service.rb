@@ -3,6 +3,9 @@ class Messages::NewMessageNotificationService
 
   def perform
     return unless message.notifiable?
+    # A bot writing on a human's conversation (a follow-up sent on their behalf) leaves them nothing to act on.
+    # Mentions in its notes still reach them through Messages::MentionService.
+    return if sender.is_a?(AgentBot)
 
     notify_conversation_assignee
     notify_participating_users
