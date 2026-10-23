@@ -464,13 +464,14 @@ RSpec.describe Message do
         expect(conversation.reload.ai_assignee).to eq(agent_bot)
       end
 
-      it 'keeps the person when an agent reopened the conversation in the meantime' do
+      it 'keeps the person and the open status when an agent reopened the conversation in the meantime' do
         conversation.resolved!
         Conversation.find(conversation.id).open!
 
         message.save!
 
-        expect(conversation.reload.assignee).to eq(person)
+        expect(conversation.reload).to be_open
+        expect(conversation.assignee).to eq(person)
         expect(conversation.ai_assignee).to be_nil
       end
     end
@@ -518,6 +519,20 @@ RSpec.describe Message do
       expect(conversation.reload).to be_pending
       expect(conversation.assignee).to be_nil
       expect(conversation.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'keeps it open with the person when a second customer message reopens a copy read before the first' do
+      inbox.update!(reopen_owner: :assignee)
+      conversation.resolved!
+      stale_copy = Conversation.find(conversation.id)
+      second = build(:message, message_type: :incoming, conversation: stale_copy, account: account, inbox: inbox)
+
+      message.save!
+      second.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+      expect(conversation.ai_assignee).to be_nil
     end
 
     context 'with a window of hours' do

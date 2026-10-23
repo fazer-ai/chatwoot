@@ -60,16 +60,20 @@ module ReopenAgentBotHandler
     self.ai_assignee = bot_inbox.agent_bot
   end
 
-  # Someone else changed the row first (another customer message that already handed it to the bot,
-  # an agent who reassigned or reopened it). This instance still holds what the message read, and
-  # the events of this save serialize it: take the owner the row has, and drop a status this save
-  # would only repeat, so a stale owner is neither announced nor written.
+  # Someone else changed the row first (another customer message that already reopened it, an agent
+  # who reassigned or reopened it). This instance still holds what the message read, and the events
+  # of this save serialize it: take the owner the row has and, when the row was already reopened, its
+  # status too, so a stale owner is neither announced nor written and a conversation kept open with
+  # its person (reopen_owner) or opened by an agent is not sent back to pending.
   def adopt_persisted_ownership(owner_id, persisted_status, ai_owner_id, ai_owner_type)
     self.assignee_id = owner_id
     self.assignee_agent_bot_id = ai_owner_id
     self.ai_assignee_type = ai_owner_type
     clear_attribute_changes(%i[assignee_id assignee_agent_bot_id ai_assignee_type])
-    clear_attribute_changes([:status]) if status == persisted_status
+    return unless %w[open pending].include?(persisted_status)
+
+    self.status = persisted_status
+    clear_attribute_changes([:status])
   end
 
   # Written in place of the bot-assignment line (AgentBotAssignment::BotAssignmentActivity), which

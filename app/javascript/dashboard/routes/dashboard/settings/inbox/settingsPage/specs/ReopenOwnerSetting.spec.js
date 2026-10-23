@@ -89,6 +89,20 @@ describe('ReopenOwnerSetting', () => {
     );
   });
 
+  it('shows the help, not the error, while the hours are still empty', async () => {
+    const wrapper = mountSetting({ id: 1, reopen_owner: 'agent_bot' });
+
+    await select(wrapper).setValue('assignee_within_window');
+
+    expect(wrapper.text()).toContain(
+      'INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_HELP'
+    );
+    expect(wrapper.text()).not.toContain(
+      'INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_ERROR'
+    );
+    expect(saveButton(wrapper).attributes('disabled')).toBeDefined();
+  });
+
   it('goes back to the saved setting when the server refuses the change', async () => {
     mockDispatch.mockRejectedValueOnce(new Error('422'));
     const wrapper = mountSetting({ id: 1, reopen_owner: 'agent_bot' });

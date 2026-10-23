@@ -59,9 +59,10 @@ const options = computed(() => [
 const isWindow = computed(() => owner.value === WINDOW);
 
 const hoursValue = computed(() => Number(hours.value));
+const hoursEmpty = computed(() => String(hours.value).trim() === '');
 const hoursValid = computed(
   () =>
-    String(hours.value).trim() !== '' &&
+    !hoursEmpty.value &&
     Number.isInteger(hoursValue.value) &&
     hoursValue.value >= 1 &&
     hoursValue.value <= MAX_WINDOW_HOURS
@@ -73,6 +74,9 @@ const hasChanges = computed(() => {
     isWindow.value && hoursValue.value !== props.inbox.reopen_owner_window_hours
   );
 });
+
+// An empty field is not an error yet: it is where the window starts.
+const showHoursError = computed(() => !hoursEmpty.value && !hoursValid.value);
 
 const canSave = computed(
   () =>
@@ -126,11 +130,11 @@ const save = async () => {
       :max="String(MAX_WINDOW_HOURS)"
       :label="$t('INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_LABEL')"
       :message="
-        hoursValid
-          ? $t('INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_HELP')
-          : $t('INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_ERROR')
+        showHoursError
+          ? $t('INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_ERROR')
+          : $t('INBOX_MGMT.ASSIGNMENT.REOPEN_OWNER.HOURS_HELP')
       "
-      :message-type="hoursValid ? 'info' : 'error'"
+      :message-type="showHoursError ? 'error' : 'info'"
       class="max-w-xs"
     />
 
