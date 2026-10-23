@@ -3,6 +3,7 @@
 # on a conversation's creation (Conversation#set_active_bot_conversation), instead of the
 # person who held it before the resolve: a conversation has one owner, and while a person
 # owns it the bot does not answer. The resolve already credited that person in the reports.
+# An inbox can keep it with the person instead (InboxReopenOwner).
 module ReopenAgentBotHandler
   extend ActiveSupport::Concern
 
@@ -35,8 +36,8 @@ module ReopenAgentBotHandler
     bot_inbox = inbox.agent_bot_inbox
     return unless bot_inbox&.active?
 
-    owner_id, persisted_status, ai_owner_id, ai_owner_type =
-      self.class.lock.where(id: id).pick(:assignee_id, :status, :assignee_agent_bot_id, :ai_assignee_type)
+    owner_id, persisted_status, ai_owner_id, ai_owner_type, resolved_at =
+      self.class.lock.where(id: id).pick(:assignee_id, :status, :assignee_agent_bot_id, :ai_assignee_type, :status_changed_at)
     unless persisted_status == 'resolved' && owner_id == judged[:assignee_id]
       return adopt_persisted_ownership(owner_id, persisted_status, ai_owner_id, ai_owner_type)
     end
@@ -44,7 +45,16 @@ module ReopenAgentBotHandler
     # it keeps getting the customer's messages.
     return if ai_owner_type.present?
 
-    # The team handler of this same save may have dropped the person already; its line says so.
+    keep_with_assignee_or_hand_to_agent_bot(bot_inbox, resolved_at)
+  end
+
+  # The inbox can keep it with the person (reopen_owner): it then opens rather than going pending, the
+  # status the bot answers, since a pending conversation a person owns is answered by nobody. The team
+  # handler of this same save may have dropped the person already; the bot takes it then, and that
+  # handler's line says so.
+  def keep_with_assignee_or_hand_to_agent_bot(bot_inbox, resolved_at)
+    return self.status = :open if assignee.present? && inbox.keeps_assignee_on_reopen?(resolved_at)
+
     @reopen_agent_bot_handoff = { assignee_name: assignee&.name, bot_name: bot_inbox.agent_bot.name }
     self.assignee = nil
     self.ai_assignee = bot_inbox.agent_bot

@@ -191,6 +191,18 @@
       "REOPEN_TEAM": {
         "TITLE": "Al reabrir, mantener al responsable solo si está en el equipo de la conversación",
         "DESCRIPTION": "Cuando el mensaje de un cliente reabre una conversación resuelta o pospuesta que tiene equipo, el responsable la conserva solo si es miembro de ese equipo. Si no, la conversación pasa a Sin asignar, con su equipo y etiquetas."
+      },
+      "REOPEN_OWNER": {
+        "TITLE": "Cuando el cliente escribe en una conversación que una persona resolvió",
+        "DESCRIPTION": "Se aplica a bandejas con un bot activo. Define quién se queda con la conversación cuando el mensaje del cliente la reabre.",
+        "OPTIONS": {
+          "AGENT_BOT": "Pasarla al bot",
+          "ASSIGNEE": "Mantenerla con la persona",
+          "ASSIGNEE_WITHIN_WINDOW": "Mantenerla con la persona si el cliente escribe dentro de un número de horas"
+        },
+        "HOURS_LABEL": "Horas después de resolverla",
+        "HOURS_HELP": "Pasado ese plazo, la conversación pasa al bot.",
+        "HOURS_ERROR": "Ingresa un número entero de horas entre 1 y 8760."
       }
     },
     "CSAT": {

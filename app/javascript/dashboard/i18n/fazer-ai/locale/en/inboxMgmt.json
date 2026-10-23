@@ -191,6 +191,18 @@
       "REOPEN_TEAM": {
         "TITLE": "Keep the assignee on reopen only if they are in the conversation's team",
         "DESCRIPTION": "When a customer's message reopens a resolved or snoozed conversation that has a team, the assignee keeps it only if they are a member of that team. Otherwise the conversation goes to Unassigned, keeping its team and labels."
+      },
+      "REOPEN_OWNER": {
+        "TITLE": "When the customer writes to a conversation a person resolved",
+        "DESCRIPTION": "Applies to inboxes with an active agent bot. Sets who owns the conversation when the customer's message reopens it.",
+        "OPTIONS": {
+          "AGENT_BOT": "Hand it to the agent bot",
+          "ASSIGNEE": "Keep it with the person",
+          "ASSIGNEE_WITHIN_WINDOW": "Keep it with the person if the customer writes within a number of hours"
+        },
+        "HOURS_LABEL": "Hours after the resolve",
+        "HOURS_HELP": "After that, the conversation goes to the agent bot.",
+        "HOURS_ERROR": "Enter a whole number of hours from 1 to 8760."
       }
     },
     "CSAT": {
