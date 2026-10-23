@@ -10,6 +10,7 @@ import {
 import { useEventListener } from '@vueuse/core';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
+import { LocalStorage } from 'shared/helpers/localStorage';
 
 const props = defineProps({
   containerHeight: { type: Number, default: 0 },
@@ -23,10 +24,15 @@ const MIN_MESSAGES_HEIGHT = 200;
 const EXPAND_RATIO = 0.5;
 const RESET_DELAY_MS = 120;
 const COLLAPSE_DISTANCE = 48;
+// The height the agent chose, kept per browser since it depends on the window
+const PREFERRED_HEIGHT_KEY = 'replyEditorHeight';
 
 const wrapperRef = useTemplateRef('wrapperRef');
 const surroundingHeight = ref(0);
-const editorHeight = ref(DEFAULT_HEIGHT);
+const preferredHeight = ref(
+  Number(LocalStorage.get(PREFERRED_HEIGHT_KEY)) || DEFAULT_HEIGHT
+);
+const editorHeight = ref(preferredHeight.value);
 const isResizing = ref(false);
 const startY = ref(0);
 const startHeight = ref(0);
@@ -54,6 +60,11 @@ const sizeBounds = computed(() => {
 const clampToBounds = val =>
   clamp(val, sizeBounds.value.min, sizeBounds.value.max);
 
+const savePreferredHeight = height => {
+  preferredHeight.value = height;
+  LocalStorage.set(PREFERRED_HEIGHT_KEY, height);
+};
+
 // The dragged height always comes back, content can only ask the editor to grow
 const appliedHeight = computed(() => {
   const requested = requestedHeight.value
@@ -62,12 +73,17 @@ const appliedHeight = computed(() => {
   return clampToBounds(Math.max(requested, editorHeight.value));
 });
 
-// Measure height of elements surrounding the editor (top panel, email fields, bottom panel)
+// Measure height of elements surrounding the editor (top panel, email fields, bottom panel).
+// The editor's own rendered height, not the applied one: a signature preview may stretch it.
 const measureSurroundingHeight = () => {
   if (wrapperRef.value) {
+    const editor = wrapperRef.value.querySelector(
+      '.resizable-editor-split, .resizable-editor-body'
+    );
     surroundingHeight.value = Math.max(
       0,
-      wrapperRef.value.offsetHeight - appliedHeight.value
+      wrapperRef.value.offsetHeight -
+        (editor?.offsetHeight ?? appliedHeight.value)
     );
   }
 };
@@ -103,11 +119,14 @@ const onResizeEnd = () => {
   isResizing.value = false;
   collapseProgress.value = 0;
   clearDragStyles();
+  savePreferredHeight(editorHeight.value);
 };
 
 const collapseEditor = () => {
-  onResizeEnd();
-  editorHeight.value = sizeBounds.value.default;
+  isResizing.value = false;
+  collapseProgress.value = 0;
+  clearDragStyles();
+  editorHeight.value = preferredHeight.value;
   emit('collapse');
 };
 
@@ -126,7 +145,7 @@ const onResizeMove = event => {
 
 const resetEditorHeight = () => {
   requestedHeight.value = 0;
-  editorHeight.value = sizeBounds.value.default;
+  editorHeight.value = preferredHeight.value;
 };
 
 const toggleEditorExpand = () => {
@@ -137,6 +156,7 @@ const toggleEditorExpand = () => {
   // If expanded is too close to default, use max so the toggle is always noticeable
   const target = expanded - defaultHeight < 100 ? max : expanded;
   editorHeight.value = isExpanded ? defaultHeight : target;
+  savePreferredHeight(editorHeight.value);
 };
 
 const handleMessageSent = () => {

@@ -1119,6 +1119,41 @@ defineExpose({ focusEditorInputField, insertMentionTrigger });
 <style lang="scss">
 @import '@chatwoot/prosemirror-schema/src/styles/base.scss';
 
+// The resizable reply box gives the editor a fixed height, and the signature preview sits next to
+// the text area inside it, so a tall signature spilled over the bottom bar and covered the send
+// button. With a preview, the editor may stretch past the dragged height, up to room for the
+// preview's cap plus 3rem of typing, so a signature fits even in a small box. The preview takes
+// what it needs up to that cap, which grows with the box, and scrolls past it; the text area
+// gets the rest and scrolls on its own. When something else shares the box (the quoted email,
+// the preview's margin), the preview is what gives way, so nothing spills over the bottom bar.
+.resizable-editor-wrapper .resizable-editor-split:has(> .signature-preview) {
+  --editor-applied-height: clamp(
+    var(--editor-min-allowed, 5rem),
+    var(--editor-height, 5rem),
+    var(--editor-max-allowed, 7.5rem)
+  );
+  --signature-preview-max: max(
+    10rem,
+    calc(var(--editor-applied-height) - 3rem)
+  );
+
+  height: auto;
+  min-height: var(--editor-applied-height);
+  max-height: calc(var(--signature-preview-max) + 3rem);
+
+  > .signature-preview {
+    @apply min-h-0 shrink overflow-y-auto;
+
+    max-height: var(--signature-preview-max);
+
+    // Only a reminder of what gets appended, so images show as thumbnails. The sent message
+    // keeps them at full size.
+    img {
+      @apply max-h-12 w-auto;
+    }
+  }
+}
+
 .signature-preview {
   @apply px-1 py-1 text-n-slate-10 text-sm select-none opacity-70 cursor-default;
 

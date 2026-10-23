@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import ResizableEditorWrapper from '../ResizableEditorWrapper.vue';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 vi.mock('@vueuse/core', () => ({
   useEventListener: (target, event, handler, options) =>
@@ -46,6 +48,7 @@ describe('ResizableEditorWrapper', () => {
   let wrapper;
 
   beforeEach(async () => {
+    window.localStorage.clear();
     wrapper = mountWrapper();
     await wrapper
       .find('.cursor-row-resize')
@@ -120,5 +123,39 @@ describe('ResizableEditorWrapper', () => {
 
     expect(wrapper.emitted('collapse')).toHaveLength(1);
     expect(editorHeight(wrapper)).toBe(DEFAULT_HEIGHT);
+  });
+
+  describe('the height the agent chose', () => {
+    it('comes back when the reply box is mounted again', async () => {
+      await dragBy(wrapper, -100);
+      await releaseDrag();
+      wrapper.unmount();
+
+      wrapper = mountWrapper();
+
+      expect(editorHeight(wrapper)).toBe(DEFAULT_HEIGHT + 100);
+    });
+
+    it('comes back after a message is sent', async () => {
+      await dragBy(wrapper, -100);
+      await releaseDrag();
+
+      vi.useFakeTimers();
+      emitter.emit(BUS_EVENTS.MESSAGE_SENT);
+      vi.runAllTimers();
+      vi.useRealTimers();
+      await nextTick();
+
+      expect(editorHeight(wrapper)).toBe(DEFAULT_HEIGHT + 100);
+    });
+
+    it('is not replaced by the height a collapse passes through', async () => {
+      await dragBy(wrapper, DEFAULT_HEIGHT - MIN_HEIGHT + COLLAPSE_DISTANCE);
+      wrapper.unmount();
+
+      wrapper = mountWrapper();
+
+      expect(editorHeight(wrapper)).toBe(DEFAULT_HEIGHT);
+    });
   });
 });
