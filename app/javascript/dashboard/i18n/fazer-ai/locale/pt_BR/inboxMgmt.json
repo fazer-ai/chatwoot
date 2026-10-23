@@ -191,6 +191,18 @@
       "REOPEN_TEAM": {
         "TITLE": "Na reabertura, manter o responsável só se ele estiver no time da conversa",
         "DESCRIPTION": "Quando a mensagem de um cliente reabre uma conversa resolvida ou adiada que tem time, o responsável continua com ela só se for membro desse time. Se não for, a conversa vai para Não atribuídas, com o time e as etiquetas de antes."
+      },
+      "REOPEN_OWNER": {
+        "TITLE": "Quando o cliente escreve numa conversa que uma pessoa resolveu",
+        "DESCRIPTION": "Vale para caixas com robô ativo. Define quem fica com a conversa quando a mensagem do cliente a reabre.",
+        "OPTIONS": {
+          "AGENT_BOT": "Passar para o robô",
+          "ASSIGNEE": "Manter com a pessoa",
+          "ASSIGNEE_WITHIN_WINDOW": "Manter com a pessoa se o cliente escrever dentro de algumas horas"
+        },
+        "HOURS_LABEL": "Horas depois da resolução",
+        "HOURS_HELP": "Depois desse prazo, a conversa passa para o robô.",
+        "HOURS_ERROR": "Informe um número inteiro de horas entre 1 e 8760."
       }
     },
     "CSAT": {

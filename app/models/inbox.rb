@@ -21,6 +21,8 @@
 #  name                                 :string           not null
 #  out_of_office_message                :string
 #  prevent_assignment_takeover          :boolean          default(FALSE), not null
+#  reopen_owner                         :integer          default(0), not null
+#  reopen_owner_window_hours            :integer
 #  sender_name_type                     :integer          default("friendly"), not null
 #  timezone                             :string           default("UTC")
 #  working_hours_enabled                :boolean          default(FALSE)
@@ -49,6 +51,7 @@ class Inbox < ApplicationRecord
   include InboxAgentAvailability
   include InboxBrandedEmailLayoutable
   include InboxBotStatus
+  include InboxReopenOwner
 
   # Not allowing characters:
   validates :name, presence: true

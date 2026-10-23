@@ -464,14 +464,112 @@ RSpec.describe Message do
         expect(conversation.reload.ai_assignee).to eq(agent_bot)
       end
 
-      it 'keeps the person when an agent reopened the conversation in the meantime' do
+      it 'keeps the person and the open status when an agent reopened the conversation in the meantime' do
         conversation.resolved!
         Conversation.find(conversation.id).open!
 
         message.save!
 
-        expect(conversation.reload.assignee).to eq(person)
+        expect(conversation.reload).to be_open
+        expect(conversation.assignee).to eq(person)
         expect(conversation.ai_assignee).to be_nil
+      end
+    end
+  end
+
+  describe 'keeping a reopened conversation with the person (reopen_owner)' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
+    let(:agent_bot) { create(:agent_bot, account: account) }
+    let(:person) { create(:user, account: account, role: :agent) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: person) }
+    let(:message) { build(:message, message_type: :incoming, conversation: conversation, account: account, inbox: inbox) }
+
+    before { create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot) }
+
+    it 'opens the conversation with the person, and hands nothing to the bot' do
+      inbox.update!(reopen_owner: :assignee)
+      conversation.resolved!
+
+      expect { message.save! }
+        .not_to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: a_string_matching(/wrote again/)))
+      conversation.reload
+      expect(conversation).to be_open
+      expect(conversation.assignee).to eq(person)
+      expect(conversation.ai_assignee).to be_nil
+    end
+
+    it 'hands a conversation resolved with no one assigned to the bot' do
+      inbox.update!(reopen_owner: :assignee)
+      conversation.update!(assignee: nil)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'hands it to the bot when the team setting dropped the person in the same reopen' do
+      team = create(:team, account: account)
+      inbox.update!(reopen_owner: :assignee, drop_assignee_outside_team_on_reopen: true)
+      conversation.update!(team: team)
+      conversation.resolved!
+      message.save!
+
+      expect(conversation.reload).to be_pending
+      expect(conversation.assignee).to be_nil
+      expect(conversation.ai_assignee).to eq(agent_bot)
+    end
+
+    it 'keeps it open with the person when a second customer message reopens a copy read before the first' do
+      inbox.update!(reopen_owner: :assignee)
+      conversation.resolved!
+      stale_copy = Conversation.find(conversation.id)
+      second = build(:message, message_type: :incoming, conversation: stale_copy, account: account, inbox: inbox)
+
+      message.save!
+      second.save!
+
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to eq(person)
+      expect(conversation.ai_assignee).to be_nil
+    end
+
+    context 'with a window of hours' do
+      before { inbox.update!(reopen_owner: :assignee_within_window, reopen_owner_window_hours: 2) }
+
+      it 'keeps the person when the customer writes inside the window' do
+        travel_to(1.hour.ago) { conversation.resolved! }
+        message.save!
+
+        expect(conversation.reload).to be_open
+        expect(conversation.assignee).to eq(person)
+      end
+
+      it 'hands it to the bot when the customer writes after the window' do
+        travel_to(3.hours.ago) { conversation.resolved! }
+        message.save!
+
+        expect(conversation.reload).to be_pending
+        expect(conversation.ai_assignee).to eq(agent_bot)
+      end
+
+      it 'counts from the latest resolve' do
+        travel_to(5.hours.ago) { conversation.resolved! }
+        travel_to(4.hours.ago) { conversation.open! }
+        travel_to(30.minutes.ago) { conversation.resolved! }
+        message.save!
+
+        expect(conversation.reload).to be_open
+        expect(conversation.assignee).to eq(person)
+      end
+
+      it 'hands it to the bot when the resolve time was never recorded' do
+        conversation.resolved!
+        conversation.update_column(:status_changed_at, nil) # rubocop:disable Rails/SkipsModelValidations
+        message.save!
+
+        expect(conversation.reload.ai_assignee).to eq(agent_bot)
       end
     end
   end

@@ -704,6 +704,44 @@ RSpec.describe 'Inboxes API', type: :request do
         end
       end
 
+      it 'sets who owns a reopened conversation and exposes it' do
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: 6 }, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to include('reopen_owner' => 'assignee_within_window', 'reopen_owner_window_hours' => 6)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { reopen_owner: 'assignee' }, as: :json
+
+        get "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}", headers: admin.create_new_auth_token, as: :json
+        expect(response.parsed_body['reopen_owner']).to eq('assignee')
+      end
+
+      it 'defaults to handing a reopened conversation to the agent bot' do
+        get "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}", headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body).to include('reopen_owner' => 'agent_bot', 'reopen_owner_window_hours' => nil)
+      end
+
+      it 'refuses an invalid reopen owner or window, without touching it' do
+        [
+          { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: 0 },
+          { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: -1 },
+          { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: 'abc' },
+          { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: '6' },
+          { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: Inbox::MAX_WINDOW_HOURS + 1 },
+          { reopen_owner: 'assignee_within_window' },
+          { reopen_owner: 'nobody' },
+          { reopen_owner: 1 }
+        ].each do |params|
+          patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}", headers: admin.create_new_auth_token, params: params, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity), "accepted #{params.inspect}"
+          expect(inbox.reload.reopen_owner).to eq('agent_bot')
+        end
+      end
+
       it 'updates api inbox when administrator' do
         api_channel = create(:channel_api, account: account)
         api_inbox = create(:inbox, channel: api_channel, account: account)
