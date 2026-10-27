@@ -96,6 +96,15 @@ describe Mail::ResendProvider do
                                        'References' => '<msg-0@example.com> <msg-1@example.com>')
     end
 
+    it 'leaves out an address it cannot parse and an empty one, and still sends' do
+      mail = Mail.new(from: 'a@example.com', to: 'b@example.com', subject: 's', body: '<p>x</p>',
+                      reply_to: 'Agent from Inbox <reply+abc123@>', bcc: '')
+
+      provider.deliver!(mail)
+
+      expect(payloads.sole.keys).not_to include('reply_to', 'bcc')
+    end
+
     it 'raises a DeliveryError with the API error message' do
       stub_request(:post, 'https://api.resend.com/emails')
         .to_return(status: 422, body: { statusCode: 422, name: 'validation_error', message: 'attachment too large' }.to_json,

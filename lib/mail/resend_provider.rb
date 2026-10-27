@@ -22,9 +22,9 @@ module Mail # rubocop:disable Style/ClassAndModuleChildren
       {
         from: mail.header[:from].to_s,
         to: mail.header[:to].to_s,
-        cc: mail[:cc]&.formatted,
-        bcc: mail[:bcc]&.formatted,
-        reply_to: mail[:reply_to]&.formatted,
+        cc: addresses(mail, :cc),
+        bcc: addresses(mail, :bcc),
+        reply_to: addresses(mail, :reply_to),
         subject: mail.header[:subject].to_s,
         **bodies(mail),
         headers: threading_headers(mail).presence,
@@ -36,6 +36,14 @@ module Mail # rubocop:disable Style/ClassAndModuleChildren
     def bodies(mail)
       html = mail.multipart? ? mail.html_part&.decoded : mail.decoded
       { html: html, text: mail.text_part&.decoded || sanitize_html(html.to_s) }
+    end
+
+    # An address the Mail gem cannot parse (the `reply+<uuid>@` an install with no inbound domain
+    # builds) is kept as an unstructured field. SMTP writes it out verbatim and the reply still
+    # goes; Resend would refuse the whole email over it, so it is left out instead.
+    def addresses(mail, name)
+      field = mail[name]&.field
+      field.formatted.presence if field.respond_to?(:formatted)
     end
 
     def threading_headers(mail)
