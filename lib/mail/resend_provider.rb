@@ -53,7 +53,8 @@ module Mail # rubocop:disable Style/ClassAndModuleChildren
     def attachment_payload(attachment)
       {
         filename: attachment.filename,
-        content: Base64.strict_encode64(attachment.decoded),
+        # The file's own bytes: `decoded` on a text part converts it to the part's charset.
+        content: Base64.strict_encode64(attachment.body.decoded),
         content_type: attachment.mime_type,
         content_id: (attachment.content_id.delete('<>') if attachment.inline?)
       }.compact

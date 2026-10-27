@@ -73,6 +73,16 @@ describe Mail::ResendProvider do
       end
     end
 
+    it 'sends a text attachment in its own charset, byte for byte' do
+      latin1 = "caf\xE9".b
+      mail = Mail.new(from: 'a@example.com', to: 'b@example.com', subject: 's', body: 'x')
+      mail.attachments['nota.txt'] = { mime_type: 'text/plain; charset=ISO-8859-1', content: latin1 }
+
+      provider.deliver!(Mail.new(mail.encoded))
+
+      expect(attachment_bytes(payloads.sole, 'nota.txt')).to eq(latin1)
+    end
+
     it 'passes reply-to, cc, bcc and the threading headers on' do
       mail = Mail.new do
         from 'suporte@example.com'
