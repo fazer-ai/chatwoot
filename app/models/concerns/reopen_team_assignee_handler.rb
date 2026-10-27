@@ -10,6 +10,10 @@ module ReopenTeamAssigneeHandler
     # Included before AssignmentHandler and AutoAssignmentHandler, so the takeover guard
     # and the legacy auto-assignment in this same save see the owner this settles.
     before_save :drop_assignee_outside_team, if: -> { @reopen_team_check_assignee_id }
+    # Inside the reopen's transaction, not after it: on assignment V2 the job that hands the
+    # conversation to a team member is queued the moment this commits, and its "Assigned to"
+    # line could otherwise be written before the line saying why the assignee went (#829).
+    after_save :create_reopen_team_unassignment_activity, if: -> { @reopen_team_reason_pending }
   end
 
   # Called by the customer's message right before the status save that reopens the
@@ -40,6 +44,7 @@ module ReopenTeamAssigneeHandler
     return if team.blank? || team.team_members.exists?(user_id: judged_id)
 
     @reopen_team_unassignment = { assignee_name: assignee.name, team_name: team.name }
+    @reopen_team_reason_pending = true
     self.assignee = nil
   end
 
@@ -48,10 +53,13 @@ module ReopenTeamAssigneeHandler
   end
 
   # Runs with no user and no executed_by (a customer message did it), which would make the
-  # generic activity path drop the line; the reason is the point of it anyway.
+  # generic activity path drop the line; the reason is the point of it anyway. The flag stays
+  # set until the after-commit activity path, which must not add a generic line for this drop.
+  # An agent bot taking the reopened conversation saves it again in the same transaction, so
+  # the line is written once.
   def create_reopen_team_unassignment_activity
+    @reopen_team_reason_pending = false
     content = I18n.t('conversations.activity.assignee.removed_not_in_conversation_team', **@reopen_team_unassignment, locale: account.locale)
-    @reopen_team_unassignment = nil
-    ::Conversations::ActivityMessageJob.perform_later(self, activity_message_params(content))
+    ::Conversations::ActivityMessageJob.perform_now(self, activity_message_params(content))
   end
 end

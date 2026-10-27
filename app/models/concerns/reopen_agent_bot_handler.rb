@@ -81,7 +81,8 @@ module ReopenAgentBotHandler
   def create_reopen_agent_bot_activity
     handoff = @reopen_agent_bot_handoff
     @reopen_agent_bot_handoff = nil
-    return create_reopen_team_unassignment_activity if reopen_team_unassignment?
+    # The team-unassignment line, written inside the save, is the only one.
+    return @reopen_team_unassignment = nil if reopen_team_unassignment?
     return if handoff[:assignee_name].blank?
 
     content = I18n.t('conversations.activity.assignee.handed_to_agent_bot_on_reopen', **handoff, locale: account.locale)

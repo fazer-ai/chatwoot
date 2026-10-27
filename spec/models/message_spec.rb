@@ -583,7 +583,15 @@ RSpec.describe Message do
     let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: outsider, team: team) }
     let(:message) { build(:message, message_type: :incoming, conversation: conversation, account: account, inbox: inbox) }
     let(:reason) { "Conversation unassigned from Bia because they are not a member of the conversation's team plantão" }
-    let(:unassignment_activity) { hash_including(content: a_string_matching(/unassigned/i)) }
+    # The reason line is written inside the reopen's save; every other activity line is queued.
+    let(:written_reason_lines) { -> { conversation.messages.activity.where(content: reason).count } }
+    let(:queued_activity_lines) do
+      lambda do
+        ActiveJob::Base.queue_adapter.enqueued_jobs
+                       .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
+                       .map { |job| job['arguments'].last['content'] }
+      end
+    end
 
     # The outsider took the conversation while in the team and left it afterwards (a vacation, say):
     # assigning a non-member to a conversation of the team is refused on its own.
@@ -630,29 +638,25 @@ RSpec.describe Message do
       conversation.resolved!
       Current.user = member
 
-      expect { message.save! }
-        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
-      activity_lines = ActiveJob::Base.queue_adapter.enqueued_jobs
-                                      .select { |job| job['job_class'] == 'Conversations::ActivityMessageJob' }
-                                      .map { |job| job['arguments'].last['content'] }
-      expect(activity_lines.grep(/assigned to|handed from/i)).to be_empty
+      expect { message.save! }.to change(&written_reason_lines).by(1)
+      expect(queued_activity_lines.call.grep(/assigned to|handed from|unassigned/i)).to be_empty
       expect(conversation.reload.ai_assignee).to be_present
     end
 
     it 'explains the unassignment in a single activity message' do
       conversation.resolved!
 
-      expect { message.save! }
-        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
-        .and have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity).exactly(:once)
+      expect { message.save! }.to change(&written_reason_lines).by(1)
+      expect(queued_activity_lines.call.grep(/unassigned/i)).to be_empty
     end
 
     it 'writes the activity message in the account locale' do
       account.update!(locale: 'pt_BR')
       conversation.resolved!
 
-      expect { message.save! }.to have_enqueued_job(Conversations::ActivityMessageJob)
-        .with(conversation, hash_including(content: 'Conversa desatribuída de Bia porque não é membro do time da conversa, plantão'))
+      message.save!
+
+      expect(conversation.messages.activity.pluck(:content)).to eq(['Conversa desatribuída de Bia porque não é membro do time da conversa, plantão'])
     end
 
     it 'keeps an assignee who is a member of the team' do
@@ -684,7 +688,8 @@ RSpec.describe Message do
       conversation.update!(assignee: nil)
       conversation.resolved!
 
-      expect { message.save! }.not_to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity)
+      expect { message.save! }.not_to change(&written_reason_lines)
+      expect(queued_activity_lines.call.grep(/unassigned/i)).to be_empty
       expect(conversation.reload.assignee).to be_nil
     end
 
@@ -726,8 +731,8 @@ RSpec.describe Message do
       Current.user = member
 
       # Nor is the activity signed by that agent: the reason is the only line.
-      expect { message.save! }
-        .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity).exactly(:once)
+      expect { message.save! }.to change(&written_reason_lines).by(1)
+      expect(queued_activity_lines.call.grep(/unassigned/i)).to be_empty
       expect(conversation.reload.assignee).to be_nil
     end
 
@@ -771,7 +776,8 @@ RSpec.describe Message do
         expect do
           message.save!
           second.save!
-        end.to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, unassignment_activity).exactly(:once)
+        end.to change(&written_reason_lines).by(1)
+        expect(queued_activity_lines.call.grep(/unassigned/i)).to be_empty
         expect(conversation.reload).to be_open
         expect(conversation.assignee).to be_nil
       end
@@ -797,9 +803,21 @@ RSpec.describe Message do
           .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
         conversation.resolved!
 
-        expect { message.save! }
-          .to have_enqueued_job(Conversations::ActivityMessageJob).with(conversation, hash_including(content: reason)).exactly(:once)
+        expect { message.save! }.to change(&written_reason_lines).by(1)
         expect(conversation.reload.assignee).to eq(member)
+      end
+
+      # An API inbox can post the customer's message with an agent token; the pick in the same save
+      # still gets its own line, after the reason.
+      it 'keeps the line of the pick made in the same save' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
+        conversation.resolved!
+        Current.user = create(:user, account: account, name: 'Caio')
+
+        message.save!
+
+        expect(queued_activity_lines.call.grep(/Assigned to Ana/)).to be_present
       end
 
       # The pick has to draw from the team the assignee was judged against: here the message read a team
@@ -847,6 +865,20 @@ RSpec.describe Message do
         service.perform_bulk_assignment
 
         expect(conversation.reload.assignee).to eq(member)
+      end
+
+      # The timeline reads top to bottom: why the conversation lost its assignee, then who got it.
+      # The assignment job is queued the moment the reopen commits and can write its line before
+      # the reopen's own after-commit work does, so the reason is written inside the reopen.
+      it 'has the reason line written before the assignment job can run' do
+        allow(OnlineStatusTracker).to receive(:get_available_users)
+          .and_return({ outsider.id.to_s => 'online', member.id.to_s => 'online' })
+        conversation.resolved!
+        message.save!
+
+        expect(conversation.messages.activity.pluck(:content)).to eq([reason])
+        perform_enqueued_jobs { service.perform_bulk_assignment }
+        expect(conversation.messages.activity.order(:id).pluck(:content)).to eq([reason, 'Assigned to Ana by Default Policy'])
       end
 
       # The bulk run loads its batch first and claims each row later: an agent picked from the

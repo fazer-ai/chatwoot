@@ -5,8 +5,9 @@ module AssigneeActivityMessageHandler
 
   def create_assignee_change_activity(user_name)
     if reopen_team_unassignment?
-      create_reopen_team_unassignment_activity
-      # The legacy auto-assignment can hand the reopened conversation to a team member in the same save.
+      # The reason line was written inside the save. The legacy auto-assignment can hand the
+      # reopened conversation to a team member in that same save.
+      @reopen_team_unassignment = nil
       return if assignee_id.blank?
     end
 
