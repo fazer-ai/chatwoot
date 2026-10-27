@@ -7,6 +7,10 @@
 # Prepended rather than edited in place: `Imap::ImapMailbox`, `MailboxHelper` and
 # `MailboxSanitizer` are upstream files, and every line changed there conflicts on each sync.
 module ImapOwnAddressReply
+  # Sweeps a mail citing an unknown thread is retried for, in case the customer mail it answers
+  # is still on its way in, before the fetch leaves it alone.
+  THREAD_ATTEMPTS = 3
+
   def process(mail, channel)
     return super unless own_address_reply?(mail, channel)
 
@@ -24,7 +28,10 @@ module ImapOwnAddressReply
       # Threaded by its headers only. The contact fallbacks upstream uses would make the
       # inbox its own customer, which is what opened conversations with the inbox address.
       @conversation = conversation_by_in_reply_to || find_conversation_by_reference_ids
-      next skip_unthreaded_mail if @conversation.nil?
+      next skip_own_mail('threads into no conversation', retry_later: threaded?) if @conversation.nil?
+      # A mail in the thread sent only to somebody else (a supplier) would become the latest
+      # email, and the reply box would address the next answer to them.
+      next skip_own_mail('does not reach the customer') unless reaches_the_customer?
 
       create_message
       add_attachments_to_message
@@ -33,18 +40,31 @@ module ImapOwnAddressReply
 
   private
 
-  def skip_unthreaded_mail
+  # Nothing is stored for a skipped mail, so the fetch would pick it up again on every sweep,
+  # and enough of them fill the per-sync cap ahead of new mail. It goes into the tracker the
+  # fetch already checks for deleted conversations, at once or after a few sweeps.
+  def skip_own_mail(reason, retry_later: false)
     message_id = sanitize_mailbox_value(@processed_mail.message_id)
-    Rails.logger.info("[IMAP] Skipping mail from the inbox's own address that threads into no conversation: " \
-                      "inbox #{@inbox.id} message_id #{message_id}")
-    # Nothing is stored for it, so the fetch picks it up again on every sweep, and enough of them
-    # fill the per-sync cap ahead of new mail. One with no threading headers at all never will
-    # thread, and goes into the tracker the fetch already checks for deleted conversations. One
-    # that cites messages Chatwoot does not have yet stays eligible: the customer mail it answers
-    # may still be on its way in.
-    return if in_reply_to.present? || @processed_mail.references.present?
+    Rails.logger.info("[IMAP] Skipping mail from the inbox's own address that #{reason}: inbox #{@inbox.id} message_id #{message_id}")
+    return if retry_later && retry_again?(message_id)
 
     Imap::DeletedMessageTracker.new(inbox: @inbox).record([message_id])
+  end
+
+  def threaded?
+    in_reply_to.present? || @processed_mail.references.present?
+  end
+
+  def retry_again?(message_id)
+    key = "IMAP_OWN_ADDRESS_THREAD_ATTEMPTS::#{@inbox.id}::#{Digest::SHA256.hexdigest(message_id)}"
+    attempts = Redis::Alfred.incr(key)
+    Redis::Alfred.expire(key, Imap::DeletedMessageTracker::TTL)
+    attempts < THREAD_ATTEMPTS
+  end
+
+  def reaches_the_customer?
+    customer = @conversation.contact.email.to_s
+    customer.present? && (Array(processed_mail.to) + Array(processed_mail.cc)).any? { |address| customer.casecmp?(address.to_s) }
   end
 
   # Written by the inbox (From; MailPresenter#original_sender prefers Reply-To, which says where
@@ -69,16 +89,6 @@ module ImapOwnAddressReply
     @message = @conversation.messages.new(sanitized_message_attributes(source_id))
     @message.instance_variable_set(:@liquid_content_processed, true)
     @message.save!
-  end
-
-  # A human reply the customer received. An automatic reply (a vacation responder on the mailbox)
-  # is nobody answering, and a mail in the thread sent only to somebody else (a supplier) answers
-  # nobody in the conversation.
-  def answers_the_customer?
-    return false if processed_mail.auto_reply?
-
-    customer = @conversation.contact.email.to_s
-    customer.present? && (Array(processed_mail.to) + Array(processed_mail.cc)).any? { |address| customer.casecmp?(address.to_s) }
   end
 
   def conversation_by_in_reply_to
@@ -109,7 +119,8 @@ module ImapOwnAddressReply
       to_emails: processed_mail.to,
       cc_emails: processed_mail.cc,
       bcc_emails: processed_mail.bcc,
-      external_echo: (true if answers_the_customer?)
+      # An automatic reply (a vacation responder on the mailbox) is nobody answering.
+      external_echo: (true unless processed_mail.auto_reply?)
     ).compact
   end
 end

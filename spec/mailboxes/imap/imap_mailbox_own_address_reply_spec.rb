@@ -65,13 +65,15 @@ RSpec.describe Imap::ImapMailbox do
     expect(conversation.reload.waiting_since).to be_present
   end
 
-  it 'does not take a mail in the thread sent only to somebody else for an answer to the customer' do
+  # Stored, it would be the latest email, and the reply box would address the next answer to the supplier.
+  it 'leaves out a mail in the thread sent only to somebody else' do
     conversation.update!(waiting_since: 1.hour.ago)
 
-    deliver(from: channel.email, to: 'supplier@example.com', in_reply_to: 'customer-1@example.com', message_id: 'own-10@example.com')
-
-    expect(conversation.messages.find_by(source_id: 'own-10@example.com').content_attributes).not_to have_key('external_echo')
+    expect do
+      deliver(from: channel.email, to: 'supplier@example.com', in_reply_to: 'customer-1@example.com', message_id: 'own-10@example.com')
+    end.not_to change(Message, :count)
     expect(conversation.reload.waiting_since).to be_present
+    expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-10@example.com')).to be(true)
   end
 
   # Liquid is for replies typed in Chatwoot; this mail already went out as written.
@@ -118,11 +120,18 @@ RSpec.describe Imap::ImapMailbox do
     expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-11@example.com')).to be(true)
   end
 
-  # The customer mail it answers may still be on its way in.
-  it 'leaves a mail citing a message Chatwoot does not have yet for the next sweep' do
-    deliver(from: channel.email, in_reply_to: 'not-yet@example.com', message_id: 'own-12@example.com')
+  # The customer mail it answers may still be on its way in, for a few sweeps.
+  it 'retries a mail citing a message Chatwoot does not have yet for a few sweeps, then leaves it' do
+    tracker = Imap::DeletedMessageTracker.new(inbox: inbox)
+    mail = create_inbound_email_from_mail(from: channel.email, to: 'customer@example.com', in_reply_to: 'not-yet@example.com',
+                                          message_id: 'own-12@example.com', subject: reply_subject, body: 'Pode sim.').mail
+    sweep = -> { described_class.new.process(mail, channel) }
 
-    expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-12@example.com')).to be(false)
+    (ImapOwnAddressReply::THREAD_ATTEMPTS - 1).times { sweep.call }
+    expect(tracker.deleted?('own-12@example.com')).to be(false)
+
+    sweep.call
+    expect(tracker.deleted?('own-12@example.com')).to be(true)
   end
 
   # Reply-To says where answers go, not who wrote the mail.
