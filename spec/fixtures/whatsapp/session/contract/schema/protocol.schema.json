@@ -214,7 +214,8 @@
       "type": "object",
       "properties": {
         "type": { "const": "unsupported" },
-        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "masked", "protocol", "empty"] }
+        "reason": { "enum": ["unknown_type", "undecryptable", "unavailable", "masked", "protocol", "empty"] },
+        "detail": { "type": "string", "minLength": 1 }
       },
       "required": ["type", "reason"],
       "additionalProperties": true

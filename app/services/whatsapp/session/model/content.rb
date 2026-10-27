@@ -116,11 +116,18 @@ module Whatsapp::Session::Model::Content
     end
   end
 
-  class Unsupported < Data.define(:reason)
+  # `detail` names what WhatsApp sent in the body's place: the protocol message's type for
+  # `protocol`, the message's arm for `unknown_type`. Absent for the other reasons, and from
+  # connectors older than 0.9.0.
+  class Unsupported < Data.define(:reason, :detail)
     include Serializable
     wire_type 'unsupported', embed: true
 
-    REASONS = %w[unknown_type undecryptable protocol empty].freeze
+    REASONS = %w[unknown_type undecryptable unavailable masked protocol empty].freeze
+
+    def initialize(reason:, detail: nil)
+      super
+    end
   end
 
   CLASSES = [Text, Media, Location, Contacts, Reaction, Rich, Unsupported].freeze

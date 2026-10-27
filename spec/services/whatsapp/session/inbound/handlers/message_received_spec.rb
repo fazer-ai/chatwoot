@@ -749,6 +749,28 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       expect(stored.content_attributes['unsupported_reason']).to eq('undecryptable')
     end
 
+    # What WhatsApp actually sent, which is what somebody investigating the placeholder in
+    # the database has to go on. Off the frames the connector ships, for both reasons that
+    # carry one.
+    it 'keeps the detail the connector names the placeholder with' do
+      %w[message_received_unsupported_detail message_received_unsupported_unknown_detail].each do |name|
+        frame = Whatsapp::SessionContract.fixture('events', name)
+
+        Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.from_frame(frame))
+
+        stored = inbox.messages.find_by(source_id: frame.dig('payload', 'message', 'id'))
+        expect(stored.content_attributes['unsupported_detail']).to eq(frame.dig('payload', 'message', 'content', 'detail'))
+      end
+    end
+
+    it 'writes no detail key when the connector named none' do
+      frame = Whatsapp::SessionContract.fixture('events', 'message_received_unsupported')
+
+      Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.from_frame(frame))
+
+      expect(inbox.messages.find_by(source_id: frame.dig('payload', 'message', 'id')).content_attributes).not_to have_key('unsupported_detail')
+    end
+
     # An edit can decrypt while the message it edits does not, so it lands on the
     # placeholder and is the first readable body that row has. The original body arriving
     # afterwards is stale next to an edit of it.

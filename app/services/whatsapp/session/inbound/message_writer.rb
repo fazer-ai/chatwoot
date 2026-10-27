@@ -267,8 +267,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   #
   # `unavailable` is here because it is the one that recovers on its own: WhatsApp answers
   # a companion device that way for a view-once photo and asks the primary phone to
-  # forward it. It is also not in `Content::Unsupported::REASONS`, which is a dead
-  # constant the connector has moved past -- #490 carries the sync.
+  # forward it.
   RECOVERABLE = %w[undecryptable unavailable].freeze
 
   # Only a placeholder is replaced, and only by something that is not one.

@@ -97,6 +97,8 @@ class Whatsapp::Session::Inbound::MessageAttributes
       # `is_unsupported` cannot: a media download that gave up raises the same flag on a
       # message that arrived perfectly well.
       unsupported_reason: (content.reason if content_type == 'unsupported'),
+      # What arrived in the body's place, for whoever investigates the placeholder later.
+      unsupported_detail: (content.detail if content_type == 'unsupported'),
       # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
       history_media: (true if imported && unfetchable_media?),
       pending_media: pending_media,
