@@ -60,6 +60,16 @@ module ImapOwnAddressReply
     @message.save!
   end
 
+  # A human reply the customer received. An automatic reply (a vacation responder on the mailbox)
+  # is nobody answering, and a mail in the thread sent only to somebody else (a supplier) answers
+  # nobody in the conversation.
+  def answers_the_customer?
+    return false if processed_mail.auto_reply?
+
+    customer = @conversation.contact.email.to_s
+    customer.present? && (Array(processed_mail.to) + Array(processed_mail.cc)).any? { |address| customer.casecmp?(address.to_s) }
+  end
+
   def conversation_by_in_reply_to
     return if in_reply_to.blank?
 
@@ -88,8 +98,7 @@ module ImapOwnAddressReply
       to_emails: processed_mail.to,
       cc_emails: processed_mail.cc,
       bcc_emails: processed_mail.bcc,
-      # An automatic reply (a vacation responder on the mailbox) is nobody answering.
-      external_echo: (true unless processed_mail.auto_reply?)
+      external_echo: (true if answers_the_customer?)
     ).compact
   end
 end

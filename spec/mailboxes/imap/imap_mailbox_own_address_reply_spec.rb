@@ -65,6 +65,15 @@ RSpec.describe Imap::ImapMailbox do
     expect(conversation.reload.waiting_since).to be_present
   end
 
+  it 'does not take a mail in the thread sent only to somebody else for an answer to the customer' do
+    conversation.update!(waiting_since: 1.hour.ago)
+
+    deliver(from: channel.email, to: 'supplier@example.com', in_reply_to: 'customer-1@example.com', message_id: 'own-10@example.com')
+
+    expect(conversation.messages.find_by(source_id: 'own-10@example.com').content_attributes).not_to have_key('external_echo')
+    expect(conversation.reload.waiting_since).to be_present
+  end
+
   # Liquid is for replies typed in Chatwoot; this mail already went out as written.
   it 'stores the text as sent, without rendering Liquid in it' do
     deliver(from: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'own-9@example.com', body: 'Use {{ contact.name }} no modelo.')
