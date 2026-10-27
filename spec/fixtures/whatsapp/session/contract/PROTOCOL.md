@@ -176,6 +176,8 @@ The event says the message was corrected into something this connector cannot sh
 is not a new body, and writing it over the one the client holds would blank a message
 that was readable.
 
+**An `unsupported` placeholder may name what arrived, in `detail`.** For `protocol` it is the name of the WhatsApp protocol message's type (`EPHEMERAL_SETTING`, `REMINDER_MESSAGE`), or `TYPE_<n>` for a type newer than the connector's own list. For `unknown_type` it is the name of the field the body arrived in (`pollCreationMessage`, `buttonsMessage`), the first one in WhatsApp's own declaration order when there are several, or `FIELD_<n>` for a field newer than the connector's own list. It is absent for every other reason. It is there for whoever investigates a placeholder later, and a client stores it as given: the names are WhatsApp's and change when WhatsApp's do, so nothing should branch on them (#415).
+
 **Which stream a command goes on is part of the contract, not a detail.** A connector
 reads `wa:cmd:<sid>` only for the sessions it is running, so a command addressed to a
 session nobody has adopted is delivered to no connector at all and is lost when the
