@@ -34,6 +34,8 @@ const mountUnsupported = contentAttributes => {
           UNSUPPORTED_MESSAGE: 'This message is not supported.',
           MASKED_MESSAGE_WHATSAPP:
             'WhatsApp does not deliver verification codes to linked devices.',
+          VIEW_ONCE_MESSAGE_WHATSAPP:
+            'WhatsApp does not deliver view-once messages to linked devices.',
         },
       },
     },
@@ -53,6 +55,14 @@ describe('Unsupported', () => {
 
     expect(wrapper.text()).toBe(
       'WhatsApp does not deliver verification codes to linked devices.'
+    );
+  });
+
+  it('names a view-once message instead of blaming an unknown type', () => {
+    const wrapper = mountUnsupported({ isUnsupported: true, isViewOnce: true });
+
+    expect(wrapper.text()).toBe(
+      'WhatsApp does not deliver view-once messages to linked devices.'
     );
   });
 

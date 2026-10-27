@@ -134,13 +134,14 @@ class Message < ApplicationRecord
   # [:pending_source_id] : Provider message id reserved before the send (Baileys), used to match the provider echo back to this row
   # [:edited_at] : Provider timestamp (ms) of the edit currently stored, so an edit that arrives out of order is refused
   # [:is_masked] : WhatsApp withheld the content from linked devices (verification codes); set alongside :is_unsupported
+  # [:is_view_once] : A view-once message, which WhatsApp does not deliver to linked devices; set alongside :is_unsupported
 
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :translation_failed, :translation_provider, :source_language,
                                          :in_reply_to_external_id, :is_unsupported, :data,
                                          :is_reaction, :is_edited, :previous_content, :zapi_args, :referral, :rich,
-                                         :deleted_by_contact, :pending_source_id, :edited_at, :is_masked], coder: JSON
+                                         :deleted_by_contact, :pending_source_id, :edited_at, :is_masked, :is_view_once], coder: JSON
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 

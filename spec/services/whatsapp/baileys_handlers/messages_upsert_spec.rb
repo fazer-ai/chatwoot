@@ -1528,6 +1528,65 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'view-once message handling' do
+    let(:phone) { '18668392077' }
+
+    after do
+      Redis::Alfred.scan_each(match: "MESSAGE_SOURCE_KEY::#{inbox.id}_*") { |key| Redis::Alfred.delete(key) }
+    end
+
+    def deliver(*entries)
+      params = { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert',
+                 data: { type: 'notify', messages: entries } }
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+    end
+
+    # WhatsApp does not deliver view-once content to linked devices, so Baileys forwards the
+    # key alone. Raising on it dead-lettered the job and the agent never learned it arrived.
+    it 'stores a content-less row flagged as view-once' do
+      entry = { key: { id: 'view_once_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false, isViewOnce: true },
+                messageTimestamp: timestamp, pushName: 'Ana' }
+
+      expect { deliver(entry) }.to change(inbox.messages, :count).by(1)
+
+      message = inbox.messages.find_by(source_id: 'view_once_1')
+      expect(message.content).to be_nil
+      expect(message).to be_incoming
+      expect(message.is_unsupported).to be(true)
+      expect(message.is_view_once).to be(true)
+    end
+
+    it 'stores one sent from the paired phone as outgoing' do
+      entry = { key: { id: 'view_once_2', remoteJid: "#{phone}@s.whatsapp.net", fromMe: true, isViewOnce: true },
+                messageTimestamp: timestamp, status: 2 }
+
+      deliver(entry)
+
+      message = inbox.messages.find_by(source_id: 'view_once_2')
+      expect(message).to be_outgoing
+      expect(message.is_view_once).to be(true)
+    end
+
+    # The batch is iterated, so an entry that raised also lost every entry after it.
+    it 'keeps processing the entries after it in the same payload' do
+      view_once = { key: { id: 'view_once_3', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false, isViewOnce: true },
+                    messageTimestamp: timestamp }
+      text = { key: { id: 'after_view_once', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false },
+               messageTimestamp: timestamp, message: { conversation: 'oi' } }
+
+      deliver(view_once, text)
+
+      expect(inbox.messages.find_by(source_id: 'after_view_once')&.content).to eq('oi')
+    end
+
+    it 'ignores an entry with no message that is not view-once, whether the key is absent or null' do
+      absent = { key: { id: 'no_message_1', remoteJid: "#{phone}@s.whatsapp.net", fromMe: false }, messageTimestamp: timestamp }
+      null = absent.merge(key: absent[:key].merge(id: 'no_message_2'), message: nil)
+
+      expect { deliver(absent, null) }.not_to change(Message, :count)
+    end
+  end
+
   describe 'location message handling' do
     let(:phone) { '5511912345678' }
     let(:lid) { '12345678' }
