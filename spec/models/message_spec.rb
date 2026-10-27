@@ -650,6 +650,17 @@ RSpec.describe Message do
       expect(queued_activity_lines.call.grep(/unassigned/i)).to be_empty
     end
 
+    # The reason line is written inside the reopen, so failing the flood limit there would undo the reopen.
+    it 'reopens and explains the drop when the customer message reaches the per-minute message limit' do
+      conversation.resolved!
+
+      with_modified_env CONVERSATION_MESSAGE_PER_MINUTE_LIMIT: (conversation.messages.count + 1).to_s do
+        expect { message.save! }.to change(&written_reason_lines).by(1)
+      end
+      expect(conversation.reload).to be_open
+      expect(conversation.assignee).to be_nil
+    end
+
     it 'writes the activity message in the account locale' do
       account.update!(locale: 'pt_BR')
       conversation.resolved!

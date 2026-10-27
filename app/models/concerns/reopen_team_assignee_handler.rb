@@ -60,6 +60,8 @@ module ReopenTeamAssigneeHandler
   def create_reopen_team_unassignment_activity
     @reopen_team_reason_pending = false
     content = I18n.t('conversations.activity.assignee.removed_not_in_conversation_team', **@reopen_team_unassignment, locale: account.locale)
-    ::Conversations::ActivityMessageJob.perform_now(self, activity_message_params(content))
+    # The customer's message that triggered this already counts toward the per-minute flood limit;
+    # failing here would roll the reopen back with it.
+    messages.create!(activity_message_params(content).merge(skip_message_flooding_validation: true))
   end
 end
