@@ -8,10 +8,7 @@
 # `MailboxSanitizer` are upstream files, and every line changed there conflicts on each sync.
 module ImapOwnAddressReply
   def process(mail, channel)
-    # The author is From. MailPresenter#original_sender prefers Reply-To, which says where answers
-    # should go, not who wrote the mail: a notification sent on the inbox's behalf by another
-    # system sets Reply-To to the inbox and is still mail from somebody else.
-    return super unless channel.email.casecmp?(Array(mail.from).first.to_s)
+    return super unless own_address_reply?(mail, channel)
 
     @inbound_mail = mail
     @channel = channel
@@ -39,6 +36,15 @@ module ImapOwnAddressReply
   end
 
   private
+
+  # Written by the inbox (From; MailPresenter#original_sender prefers Reply-To, which says where
+  # answers go, not who wrote it) and sent to somebody else. A contact form posts as the inbox
+  # to the inbox with the customer in Reply-To: that is the customer writing in, and goes the
+  # upstream way.
+  def own_address_reply?(mail, channel)
+    channel.email.casecmp?(Array(mail.from).first.to_s) &&
+      Array(mail.to).none? { |address| channel.email.casecmp?(address.to_s) }
+  end
 
   # The mail already went out as written. As an outgoing message it would go through the
   # Liquid rendering meant for replies typed in Chatwoot, and `{{ ... }}` in its text, or in

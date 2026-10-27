@@ -109,6 +109,17 @@ RSpec.describe Imap::ImapMailbox do
     expect(conversation.messages.find_by(source_id: 'cust-3@example.com')).to be_incoming
   end
 
+  # A contact form posts as the inbox, to the inbox, with the customer in Reply-To.
+  it 'keeps a contact form sent by the inbox to itself as the customer writing in' do
+    expect do
+      deliver(from: channel.email, to: channel.email, reply_to: 'lead@example.com', message_id: 'form-1@example.com')
+    end.to change(Conversation, :count).by(1)
+
+    form = Message.find_by(source_id: 'form-1@example.com')
+    expect(form).to be_incoming
+    expect(form.sender.email).to eq('lead@example.com')
+  end
+
   it 'keeps a customer reply that copies the inbox as incoming from the customer' do
     deliver(from: 'customer@example.com', cc: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'cust-2@example.com')
 
