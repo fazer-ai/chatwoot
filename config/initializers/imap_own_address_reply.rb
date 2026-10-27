@@ -24,11 +24,7 @@ module ImapOwnAddressReply
       # Threaded by its headers only. The contact fallbacks upstream uses would make the
       # inbox its own customer, which is what opened conversations with the inbox address.
       @conversation = conversation_by_in_reply_to || find_conversation_by_reference_ids
-      if @conversation.nil?
-        Rails.logger.info("[IMAP] Skipping mail from the inbox's own address that threads into no conversation: " \
-                          "inbox #{@inbox.id} message_id #{@processed_mail.message_id}")
-        next
-      end
+      next skip_unthreaded_mail if @conversation.nil?
 
       create_message
       add_attachments_to_message
@@ -37,13 +33,24 @@ module ImapOwnAddressReply
 
   private
 
+  def skip_unthreaded_mail
+    message_id = sanitize_mailbox_value(@processed_mail.message_id)
+    Rails.logger.info("[IMAP] Skipping mail from the inbox's own address that threads into no conversation: " \
+                      "inbox #{@inbox.id} message_id #{message_id}")
+    # Nothing is stored for it, so the fetch would pick it up again on every sweep, and enough
+    # of them fill the per-sync cap ahead of new mail. The tracker the fetch already checks for
+    # deleted conversations keeps it out for longer than the fetch window.
+    Imap::DeletedMessageTracker.new(inbox: @inbox).record([message_id])
+  end
+
   # Written by the inbox (From; MailPresenter#original_sender prefers Reply-To, which says where
-  # answers go, not who wrote it) and sent to somebody else. A contact form posts as the inbox
-  # to the inbox with the customer in Reply-To: that is the customer writing in, and goes the
-  # upstream way.
+  # answers go, not who wrote it), with answers coming back to the inbox. A contact form also
+  # posts as the inbox, whether to the inbox, to an alias or with the inbox in Cc, but with the
+  # customer in Reply-To: that is the customer writing in, and goes the upstream way.
   def own_address_reply?(mail, channel)
-    channel.email.casecmp?(Array(mail.from).first.to_s) &&
-      Array(mail.to).none? { |address| channel.email.casecmp?(address.to_s) }
+    inbox_address = ->(address) { channel.email.casecmp?(address.to_s) }
+
+    inbox_address.call(Array(mail.from).first) && Array(mail.reply_to).all?(&inbox_address)
   end
 
   # The mail already went out as written. As an outgoing message it would go through the

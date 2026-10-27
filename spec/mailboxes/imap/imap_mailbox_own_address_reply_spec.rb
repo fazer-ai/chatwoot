@@ -111,11 +111,30 @@ RSpec.describe Imap::ImapMailbox do
     end.to not_change(Conversation, :count).and(not_change(Contact, :count)).and(not_change(Message, :count))
   end
 
+  # Nothing is stored for it, so without a record the fetch would pick it up on every sweep.
+  it 'keeps the fetch from picking that mail up again' do
+    deliver(from: channel.email, in_reply_to: 'nowhere@example.com', message_id: 'own-11@example.com')
+
+    expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-11@example.com')).to be(true)
+  end
+
   # Reply-To says where answers go, not who wrote the mail.
   it 'keeps mail from somebody else with the inbox as Reply-To incoming' do
     deliver(from: 'customer@example.com', reply_to: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'cust-3@example.com')
 
     expect(conversation.messages.find_by(source_id: 'cust-3@example.com')).to be_incoming
+  end
+
+  it 'keeps a contact form sent to an alias with the inbox in Cc as the customer writing in' do
+    deliver(from: channel.email, to: 'sales@example.com', cc: channel.email, reply_to: 'lead2@example.com', message_id: 'form-2@example.com')
+
+    expect(Message.find_by(source_id: 'form-2@example.com')&.sender&.email).to eq('lead2@example.com')
+  end
+
+  it 'keeps a contact form sent through an alias of the inbox as the customer writing in' do
+    deliver(from: channel.email, to: 'contato@example.com', reply_to: 'lead3@example.com', message_id: 'form-3@example.com')
+
+    expect(Message.find_by(source_id: 'form-3@example.com')&.sender&.email).to eq('lead3@example.com')
   end
 
   # A contact form posts as the inbox, to the inbox, with the customer in Reply-To.
