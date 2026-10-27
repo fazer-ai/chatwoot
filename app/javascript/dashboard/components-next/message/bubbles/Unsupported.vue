@@ -18,11 +18,15 @@ const {
 } = useInbox(inboxId.value);
 
 const isMasked = computed(() => !!contentAttributes.value?.isMasked);
+const isViewOnce = computed(() => !!contentAttributes.value?.isViewOnce);
+// Both are WhatsApp withholding the content from linked devices, which no other copy explains.
+const isWithheld = computed(() => isMasked.value || isViewOnce.value);
 
 const unsupportedMessageKey = computed(() => {
   // WhatsApp withholds verification codes from linked devices: the row is empty
   // because the content never arrived, not because the type is unknown.
   if (isMasked.value) return 'CONVERSATION.MASKED_MESSAGE_WHATSAPP';
+  if (isViewOnce.value) return 'CONVERSATION.VIEW_ONCE_MESSAGE_WHATSAPP';
   if (isAFacebookInbox.value)
     return 'CONVERSATION.UNSUPPORTED_MESSAGE_FACEBOOK';
   if (isAnInstagramChannel.value)
@@ -35,7 +39,7 @@ const unsupportedMessageKey = computed(() => {
 <template>
   <BaseBubble class="px-4 py-3 text-sm" data-bubble-name="unsupported">
     <!-- The Coexistence copy names Meta; a paired-session provider falls back to the generic text. -->
-    <template v-if="isAWhatsAppCloudChannel && !isMasked">
+    <template v-if="isAWhatsAppCloudChannel && !isWithheld">
       <p class="m-0 font-semibold">
         {{ $t('CONVERSATION.UNSUPPORTED_MESSAGE_WHATSAPP_TITLE') }}
       </p>

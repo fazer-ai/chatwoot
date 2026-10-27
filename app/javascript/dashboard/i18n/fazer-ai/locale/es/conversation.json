@@ -28,6 +28,7 @@
     "CHANGE_TEAM_FAILED": "No se pudo cambiar el equipo",
     "MESSAGE_DELETED_BY_CONTACT": "Eliminado por el contacto",
     "MASKED_MESSAGE_WHATSAPP": "WhatsApp no entrega códigos de verificación a los dispositivos vinculados. Este mensaje solo se puede leer en el teléfono vinculado.",
+    "VIEW_ONCE_MESSAGE_WHATSAPP": "WhatsApp no entrega mensajes de visualización única a los dispositivos vinculados. Este mensaje solo se puede abrir en el teléfono vinculado.",
     "WHATSAPP": "WhatsApp",
     "CONTEXT_MENU": {
       "EDIT": {

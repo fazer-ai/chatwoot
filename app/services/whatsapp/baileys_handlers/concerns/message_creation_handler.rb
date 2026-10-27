@@ -172,7 +172,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
       content_attributes[:is_reaction] = true
     elsif reply_to_message_id
       content_attributes[:in_reply_to_external_id] = reply_to_message_id
-    elsif type.in?(%w[unsupported masked])
+    elsif type.in?(%w[unsupported masked view_once])
       add_contentless_attributes(content_attributes, type)
     end
 
@@ -184,13 +184,14 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     content_attributes
   end
 
-  # A row with nothing to render. Both kinds go through the unsupported bubble, which
+  # A row with nothing to render. All kinds go through the unsupported bubble, which
   # is what already strips the reply/reaction affordances an empty row must not offer;
-  # the masked flag only swaps the copy for one that names WhatsApp's masking instead
-  # of blaming a message type we failed to parse.
+  # the masked and view-once flags only swap the copy for one that names why WhatsApp
+  # withheld the content instead of blaming a message type we failed to parse.
   def add_contentless_attributes(content_attributes, type)
     content_attributes[:is_unsupported] = true
     content_attributes[:is_masked] = true if type == 'masked'
+    content_attributes[:is_view_once] = true if type == 'view_once'
   end
 
   # Persists the structured card payload. A rich shape with neither text/buttons
