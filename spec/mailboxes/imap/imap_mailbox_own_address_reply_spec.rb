@@ -37,6 +37,16 @@ RSpec.describe Imap::ImapMailbox do
     expect(reply.content_attributes.dig('email', 'from')).to eq([channel.email])
   end
 
+  # The reply box takes the next reply's recipients from the latest email, and quotes an
+  # outgoing one under the inbox's address read from `email.to`.
+  it 'stores the recipients the way an outgoing email has them' do
+    deliver(from: channel.email, cc: 'boss@example.com', in_reply_to: 'customer-1@example.com', message_id: 'own-7@example.com')
+
+    attributes = conversation.messages.find_by(source_id: 'own-7@example.com').content_attributes
+    expect(attributes).to include('to_emails' => ['customer@example.com'], 'cc_emails' => ['boss@example.com'])
+    expect(attributes['email']).not_to have_key('to')
+  end
+
   it 'counts as the human answer to a waiting conversation' do
     conversation.update!(waiting_since: 1.hour.ago)
 

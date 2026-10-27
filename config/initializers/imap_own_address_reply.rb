@@ -56,8 +56,20 @@ module ImapOwnAddressReply
     return super unless @own_address_reply
 
     attributes = super
-    attributes.merge(message_type: 'outgoing', sender: nil,
-                     content_attributes: attributes[:content_attributes].merge(external_echo: true))
+    attributes.merge(message_type: 'outgoing', sender: nil, content_attributes: outgoing_content_attributes(attributes[:content_attributes]))
+  end
+
+  # Recipients in the shape an outgoing email has, which is where the reply box takes the next
+  # reply's To/Cc/Bcc from. `email.to` goes: for an outgoing email the dashboard reads it as the
+  # inbox's own address when quoting, and here it holds the customer's.
+  def outgoing_content_attributes(content_attributes)
+    content_attributes.merge(
+      email: content_attributes[:email].except(:to),
+      to_emails: processed_mail.to,
+      cc_emails: processed_mail.cc,
+      bcc_emails: processed_mail.bcc,
+      external_echo: true
+    )
   end
 end
 
