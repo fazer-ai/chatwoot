@@ -8,7 +8,10 @@
 # `MailboxSanitizer` are upstream files, and every line changed there conflicts on each sync.
 module ImapOwnAddressReply
   def process(mail, channel)
-    return super unless channel.email.casecmp?(MailPresenter.new(mail, channel.account).original_sender.to_s)
+    # The author is From. MailPresenter#original_sender prefers Reply-To, which says where answers
+    # should go, not who wrote the mail: a notification sent on the inbox's behalf by another
+    # system sets Reply-To to the inbox and is still mail from somebody else.
+    return super unless channel.email.casecmp?(Array(mail.from).first.to_s)
 
     @inbound_mail = mail
     @channel = channel
@@ -44,13 +47,17 @@ module ImapOwnAddressReply
     message.conversation if message.present? && !message.forwarded?
   end
 
-  # Outgoing with no sender: nobody sent it through Chatwoot. The source id it keeps is what
-  # dedups the next fetch and what tells the send path the mail already left, so it is never
-  # sent to the customer a second time.
+  # Outgoing with no sender: nobody sent it through Chatwoot. `external_echo` is how the app
+  # already marks a human reply written outside it (WhatsApp Business, Instagram), so the reply
+  # clears the conversation's waiting time and counts as its human response. The source id it
+  # keeps is what dedups the next fetch and what tells the send path the mail already left, so
+  # it is never sent to the customer a second time.
   def sanitized_message_attributes(source_id)
     return super unless @own_address_reply
 
-    super.merge(message_type: 'outgoing', sender: nil)
+    attributes = super
+    attributes.merge(message_type: 'outgoing', sender: nil,
+                     content_attributes: attributes[:content_attributes].merge(external_echo: true))
   end
 end
 

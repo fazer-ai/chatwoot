@@ -37,6 +37,15 @@ RSpec.describe Imap::ImapMailbox do
     expect(reply.content_attributes.dig('email', 'from')).to eq([channel.email])
   end
 
+  it 'counts as the human answer to a waiting conversation' do
+    conversation.update!(waiting_since: 1.hour.ago)
+
+    deliver(from: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'own-6@example.com')
+
+    expect(conversation.messages.find_by(source_id: 'own-6@example.com').content_attributes['external_echo']).to be(true)
+    expect(conversation.reload.waiting_since).to be_nil
+  end
+
   it 'reads the inbox address case-insensitively' do
     deliver(from: channel.email.upcase, in_reply_to: 'customer-1@example.com', message_id: 'own-2@example.com')
 
@@ -65,6 +74,13 @@ RSpec.describe Imap::ImapMailbox do
     expect do
       deliver(from: channel.email, in_reply_to: 'nowhere@example.com', message_id: 'own-5@example.com')
     end.to not_change(Conversation, :count).and(not_change(Contact, :count)).and(not_change(Message, :count))
+  end
+
+  # Reply-To says where answers go, not who wrote the mail.
+  it 'keeps mail from somebody else with the inbox as Reply-To incoming' do
+    deliver(from: 'customer@example.com', reply_to: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'cust-3@example.com')
+
+    expect(conversation.messages.find_by(source_id: 'cust-3@example.com')).to be_incoming
   end
 
   it 'keeps a customer reply that copies the inbox as incoming from the customer' do
