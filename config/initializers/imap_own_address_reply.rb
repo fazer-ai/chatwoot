@@ -40,6 +40,20 @@ module ImapOwnAddressReply
 
   private
 
+  # The mail already went out as written. As an outgoing message it would go through the
+  # Liquid rendering meant for replies typed in Chatwoot, and `{{ ... }}` in its text, or in
+  # the customer's quoted text, would be evaluated and stored rewritten.
+  def create_message
+    return super unless @own_address_reply
+
+    source_id = sanitize_mailbox_value(processed_mail.message_id)
+    return if @conversation.messages.find_by(source_id: source_id).present?
+
+    @message = @conversation.messages.new(sanitized_message_attributes(source_id))
+    @message.instance_variable_set(:@liquid_content_processed, true)
+    @message.save!
+  end
+
   def conversation_by_in_reply_to
     return if in_reply_to.blank?
 
@@ -68,8 +82,9 @@ module ImapOwnAddressReply
       to_emails: processed_mail.to,
       cc_emails: processed_mail.cc,
       bcc_emails: processed_mail.bcc,
-      external_echo: true
-    )
+      # An automatic reply (a vacation responder on the mailbox) is nobody answering.
+      external_echo: (true unless processed_mail.auto_reply?)
+    ).compact
   end
 end
 

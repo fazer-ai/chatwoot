@@ -56,6 +56,22 @@ RSpec.describe Imap::ImapMailbox do
     expect(conversation.reload.waiting_since).to be_nil
   end
 
+  it 'does not take an automatic reply from the mailbox for a human answer' do
+    conversation.update!(waiting_since: 1.hour.ago)
+
+    deliver(from: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'own-8@example.com', auto_submitted: 'auto-replied')
+
+    expect(conversation.messages.find_by(source_id: 'own-8@example.com').content_attributes).not_to have_key('external_echo')
+    expect(conversation.reload.waiting_since).to be_present
+  end
+
+  # Liquid is for replies typed in Chatwoot; this mail already went out as written.
+  it 'stores the text as sent, without rendering Liquid in it' do
+    deliver(from: channel.email, in_reply_to: 'customer-1@example.com', message_id: 'own-9@example.com', body: 'Use {{ contact.name }} no modelo.')
+
+    expect(conversation.messages.find_by(source_id: 'own-9@example.com').content).to include('{{ contact.name }}')
+  end
+
   it 'reads the inbox address case-insensitively' do
     deliver(from: channel.email.upcase, in_reply_to: 'customer-1@example.com', message_id: 'own-2@example.com')
 
