@@ -115,6 +115,15 @@ describe Mail::ResendProvider do
       expect(payloads.sole.keys).not_to include('reply_to', 'bcc')
     end
 
+    # Mail::Message#deliver! reads the delivery method's settings once the email is out.
+    it 'delivers through Mail::Message#deliver! without raising after the send' do
+      mail = Mail.new(from: 'a@example.com', to: 'b@example.com', subject: 's', body: '<p>x</p>')
+      mail.delivery_method(described_class, {})
+
+      expect { mail.deliver! }.not_to raise_error
+      expect(payloads.size).to eq(1)
+    end
+
     it 'raises a DeliveryError with the API error message' do
       stub_request(:post, 'https://api.resend.com/emails')
         .to_return(status: 422, body: { statusCode: 422, name: 'validation_error', message: 'attachment too large' }.to_json,

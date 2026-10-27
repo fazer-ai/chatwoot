@@ -6,7 +6,13 @@ module Mail # rubocop:disable Style/ClassAndModuleChildren
     # through: without them a reply does not thread under the customer's mail.
     THREADING_HEADERS = %w[Message-ID In-Reply-To References].freeze
 
-    def initialize(_settings); end
+    # Mail::Message#deliver! reads `settings[:return_response]` after delivering, so a delivery
+    # method without it raises with the email already sent.
+    attr_accessor :settings
+
+    def initialize(settings)
+      @settings = settings
+    end
 
     def deliver!(mail)
       Resend::Emails.send(payload(mail))
