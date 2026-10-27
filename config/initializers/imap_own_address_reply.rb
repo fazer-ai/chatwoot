@@ -37,9 +37,13 @@ module ImapOwnAddressReply
     message_id = sanitize_mailbox_value(@processed_mail.message_id)
     Rails.logger.info("[IMAP] Skipping mail from the inbox's own address that threads into no conversation: " \
                       "inbox #{@inbox.id} message_id #{message_id}")
-    # Nothing is stored for it, so the fetch would pick it up again on every sweep, and enough
-    # of them fill the per-sync cap ahead of new mail. The tracker the fetch already checks for
-    # deleted conversations keeps it out for longer than the fetch window.
+    # Nothing is stored for it, so the fetch picks it up again on every sweep, and enough of them
+    # fill the per-sync cap ahead of new mail. One with no threading headers at all never will
+    # thread, and goes into the tracker the fetch already checks for deleted conversations. One
+    # that cites messages Chatwoot does not have yet stays eligible: the customer mail it answers
+    # may still be on its way in.
+    return if in_reply_to.present? || @processed_mail.references.present?
+
     Imap::DeletedMessageTracker.new(inbox: @inbox).record([message_id])
   end
 

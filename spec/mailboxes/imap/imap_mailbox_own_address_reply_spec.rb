@@ -112,10 +112,17 @@ RSpec.describe Imap::ImapMailbox do
   end
 
   # Nothing is stored for it, so without a record the fetch would pick it up on every sweep.
-  it 'keeps the fetch from picking that mail up again' do
-    deliver(from: channel.email, in_reply_to: 'nowhere@example.com', message_id: 'own-11@example.com')
+  it 'keeps the fetch from picking up again a mail with no thread headers' do
+    deliver(from: channel.email, message_id: 'own-11@example.com')
 
     expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-11@example.com')).to be(true)
+  end
+
+  # The customer mail it answers may still be on its way in.
+  it 'leaves a mail citing a message Chatwoot does not have yet for the next sweep' do
+    deliver(from: channel.email, in_reply_to: 'not-yet@example.com', message_id: 'own-12@example.com')
+
+    expect(Imap::DeletedMessageTracker.new(inbox: inbox).deleted?('own-12@example.com')).to be(false)
   end
 
   # Reply-To says where answers go, not who wrote the mail.
