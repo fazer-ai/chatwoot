@@ -108,6 +108,12 @@ const separatorOptions = computed(() => [
       'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.SIGNATURE_SEPARATOR.OPTIONS.HORIZONTAL_LINE'
     ),
   },
+  {
+    value: 'none',
+    label: t(
+      'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.SIGNATURE_SEPARATOR.OPTIONS.NONE'
+    ),
+  },
 ]);
 
 const sampleMessage = computed(
@@ -124,7 +130,9 @@ const messagePreview = computed(() => {
   if (!signature.value) return sampleMessage.value;
 
   const separator =
-    signatureSeparator.value === 'blank' ? '<p></p>' : '<p>--</p>';
+    { blank: '<p></p>', '--': '<p>--</p>', none: '' }[
+      signatureSeparator.value
+    ] ?? '<p></p>';
 
   if (signaturePosition.value === 'top') {
     return `${formattedSignature.value}${separator}${sampleMessage.value}`;
