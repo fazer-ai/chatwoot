@@ -414,6 +414,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(filed_in('3EB0SPAN3', '3EB0SPAN2')).to eq([second_thread])
       expect(latest_thread.messages.count).to eq(1)
     end
+
+    # The lock means one thread for the contact, history included: by date it would go to
+    # threads from before the lock was turned on.
+    it 'files everything in the last thread on an inbox locked to one conversation' do
+      inbox.update!(lock_to_single_conversation: true)
+
+      deliver(slice([40, 7].map { |days| historical("3EB0LOCK#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0LOCK40', '3EB0LOCK7')).to eq([latest_thread])
+    end
   end
 
   describe 'the name of a group' do

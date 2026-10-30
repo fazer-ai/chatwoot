@@ -93,8 +93,7 @@
       "BUTTON": "Cargar mensajes más antiguos",
       "HELP": "Pide al teléfono lo que vino antes. Tiene que estar encendido para responder, y se queda en silencio cuando ya envió este tramo.",
       "REQUESTED": "Le pedimos al teléfono los mensajes más antiguos. Aparecen aquí a medida que los envía.",
-      "REQUESTED_ELSEWHERE": "Le pedimos al teléfono los mensajes más antiguos. Van a una conversación anterior con este contacto (#{filedIn}), así que te llevamos allí.",
-      "REQUESTED_HIDDEN": "Le pedimos al teléfono los mensajes más antiguos. Van a una conversación anterior con este contacto que no tienes permiso para abrir.",
+      "REQUESTED_BY_DATE": "Le pedimos al teléfono los mensajes más antiguos. Cada uno va a la conversación de la fecha en que se envió, así que búscalos en las conversaciones anteriores de este contacto.",
       "ERROR": "No se pudieron pedir los mensajes más antiguos. Inténtalo de nuevo en un momento.",
       "EXHAUSTED": "No hay nada más antiguo aquí. El resto de esta conversación está solo en el teléfono."
     },

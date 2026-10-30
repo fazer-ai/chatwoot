@@ -93,8 +93,7 @@
       "BUTTON": "Load older messages",
       "HELP": "Asks the phone for what came before. It has to be awake to answer, and it stays quiet once it has already sent this stretch.",
       "REQUESTED": "Asked the phone for older messages. They appear here as it sends them.",
-      "REQUESTED_ELSEWHERE": "Asked the phone for older messages. They go to an earlier conversation with this contact (#{filedIn}), so we took you there.",
-      "REQUESTED_HIDDEN": "Asked the phone for older messages. They go to an earlier conversation with this contact that you don't have access to.",
+      "REQUESTED_BY_DATE": "Asked the phone for older messages. Each one goes to the conversation from the date it was sent, so look for them in this contact's previous conversations.",
       "ERROR": "Could not ask for older messages. Try again in a moment.",
       "EXHAUSTED": "There is nothing older here. The rest of this conversation is only on the phone."
     },

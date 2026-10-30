@@ -1981,21 +1981,6 @@ describe Whatsapp::Providers::WhatsappBaileysService do
       end
     end
 
-    # The answer is dated by WhatsApp's clock, so the thread it lands in is read off the
-    # same clock the request sends, not off when the anchor row was filed here.
-    describe '#history_thread' do
-      it 'names the thread opened before the anchor by the time WhatsApp gave it' do
-        older = create(:conversation, inbox: whatsapp_channel.inbox, account: whatsapp_channel.inbox.account, contact: contact,
-                                      created_at: 3.days.ago)
-        later = create(:conversation, inbox: whatsapp_channel.inbox, account: whatsapp_channel.inbox.account, contact: contact,
-                                      created_at: 1.day.ago)
-        create(:message, conversation: later, inbox: whatsapp_channel.inbox, source_id: 'LATE', created_at: 1.day.ago,
-                         content_attributes: { external_created_at: 2.days.ago.to_i })
-
-        expect(service.history_thread(contact)).to eq(older)
-      end
-    end
-
     describe '#request_history' do
       # WhatsApp can only walk backwards, so a request needs a message to walk back from.
       it 'asks the phone for what came before the oldest stored message' do

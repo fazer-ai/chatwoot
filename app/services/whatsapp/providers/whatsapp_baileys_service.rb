@@ -573,15 +573,6 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
-  # The thread the answer to `request_history(contact)` starts filing into: the one before
-  # the anchor the request pages back from (see ConversationFinder.history_thread), timed
-  # by the same clock the request sends, since that is the one the answer is dated by.
-  def history_thread(contact)
-    anchor = oldest_stored_message(contact)
-    anchor_at = Time.zone.at(history_anchor_timestamp(anchor) / 1000) if anchor
-    Whatsapp::Session::Inbound::ConversationFinder.history_thread(inbox: whatsapp_channel.inbox, contact: contact, anchor_at: anchor_at)
-  end
-
   def get_profile_pic(jid)
     response = HTTParty.get(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/profile-picture-url",

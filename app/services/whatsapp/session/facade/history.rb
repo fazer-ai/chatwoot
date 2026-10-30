@@ -33,16 +33,6 @@ module Whatsapp::Session::Facade::History
     true
   end
 
-  # The thread the answer to `request_history(contact)` starts filing into, read from the
-  # same anchor the request pages back from. Not always the contact's oldest thread: the
-  # anchor is the oldest *imported* message, or where a dropped archive ended, and an inbox
-  # can hold live threads older than either.
-  def history_thread(contact)
-    anchor = anchor_for(contact) if backend.class.history_needs_anchor?
-    anchor_at = Time.zone.at(anchor.timestamp / 1000.0) if anchor
-    Whatsapp::Session::Inbound::ConversationFinder.history_thread(inbox: channel.inbox, contact: contact, anchor_at: anchor_at)
-  end
-
   # Whether this inbox asked for the history the phone already has. Off unless the
   # operator turned it on: the phone answers with everything it has, and an inbox that
   # never asked should not have a year of somebody else's conversations imported into it

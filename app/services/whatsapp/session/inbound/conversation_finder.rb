@@ -74,15 +74,6 @@ class Whatsapp::Session::Inbound::ConversationFinder
     (chain.where(created_at: ..at).last if at) || chain.first
   end
 
-  # The thread an answer paged back from `anchor_at` starts filing into: the newest of what
-  # comes back is the message just before the anchor, so the last thread opened strictly
-  # before it. The rest of the page goes to the threads before that one. `nil` is a request
-  # with no anchor, which a provider answers from the oldest it knows, so the oldest thread.
-  def self.history_thread(inbox:, contact:, anchor_at:)
-    chain = contact.conversations.where(inbox_id: inbox.id).reorder(:created_at, :id)
-    (chain.where(created_at: ...anchor_at).last if anchor_at) || chain.first
-  end
-
   def perform
     conversation = conversation_for_reaction || conversation_by_inbox_config
     return backfill_first_touch(mark_as_group(conversation)) if conversation
@@ -105,8 +96,11 @@ class Whatsapp::Session::Inbound::ConversationFinder
     # Scoped to the contact across all its contact_inboxes: one person can hold several
     # source_ids in the same inbox (phone and LID), and reopen must see all of them.
     conversations = contact.conversations.where(inbox_id: inbox.id)
-    return archive_thread if archived
+    # An inbox locked to one conversation keeps the history in it too: the thread reads
+    # in date order on its own, and filing by date would put it in threads from before the
+    # lock was turned on.
     return conversations.last if inbox.lock_to_single_conversation
+    return archive_thread if archived
 
     conversations.where.not(status: :resolved).last
   end

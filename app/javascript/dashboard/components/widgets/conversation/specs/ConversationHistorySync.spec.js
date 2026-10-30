@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
-import { CONTACT_CONVERSATION_NAVIGATION } from 'dashboard/composables/useContactConversationNavigation';
 import ConversationHistorySync from '../ConversationHistorySync.vue';
 
 const mockDispatch = vi.fn();
@@ -17,17 +16,10 @@ vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => mockAlert(...args),
 }));
 
-const mockOpenConversation = vi.fn();
-
 const mountControl = (props = {}) =>
   mount(ConversationHistorySync, {
     props: { conversationId: 7, ...props },
     global: {
-      provide: {
-        [CONTACT_CONVERSATION_NAVIGATION]: {
-          openConversation: mockOpenConversation,
-        },
-      },
       stubs: {
         NextButton: defineComponent({
           name: 'NextButton',
@@ -44,7 +36,7 @@ describe('ConversationHistorySync', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('asks the provider for the page before this thread', async () => {
-    mockDispatch.mockResolvedValue({ filed_in: 7 });
+    mockDispatch.mockResolvedValue({});
     const wrapper = mountControl();
 
     await button(wrapper).trigger('click');
@@ -54,10 +46,23 @@ describe('ConversationHistorySync', () => {
   });
 
   // The phone answers on the webhook minutes later, or never, so the press can only
-  // report that the request went out.
-  it('reports that the phone was asked', async () => {
-    mockDispatch.mockResolvedValue({ filed_in: 7 });
+  // report that the request went out, and where to look: each message is filed in the
+  // conversation from its own date.
+  it('reports that the phone was asked, and that the messages go by date', async () => {
+    mockDispatch.mockResolvedValue({});
     const wrapper = mountControl();
+
+    await button(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.HISTORY_SYNC.REQUESTED_BY_DATE'
+    );
+  });
+
+  it('says they appear here on an inbox locked to one conversation', async () => {
+    mockDispatch.mockResolvedValue({});
+    const wrapper = mountControl({ singleConversation: true });
 
     await button(wrapper).trigger('click');
     await flushPromises();
@@ -81,44 +86,6 @@ describe('ConversationHistorySync', () => {
 
     expect(button(wrapper).exists()).toBe(true);
     expect(wrapper.text()).not.toContain('CONVERSATION.HISTORY_SYNC.EXHAUSTED');
-  });
-
-  it('stays on this thread when the answer lands here', async () => {
-    mockDispatch.mockResolvedValue({ filed_in: 7 });
-    const wrapper = mountControl();
-
-    await button(wrapper).trigger('click');
-    await flushPromises();
-
-    expect(mockOpenConversation).not.toHaveBeenCalled();
-  });
-
-  // The answer is filed by date, often in an older thread than this one; the server says
-  // which and the agent is taken there.
-  it('takes the agent to the thread the answer lands in', async () => {
-    mockDispatch.mockResolvedValue({ filed_in: 3 });
-    const wrapper = mountControl();
-
-    await button(wrapper).trigger('click');
-    await flushPromises();
-
-    expect(mockOpenConversation).toHaveBeenCalledWith({ id: 3 });
-    expect(mockAlert).toHaveBeenCalledWith(
-      'CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE'
-    );
-  });
-
-  it('says so, and stays, when the answer lands where the agent may not look', async () => {
-    mockDispatch.mockResolvedValue({ filed_in: null });
-    const wrapper = mountControl();
-
-    await button(wrapper).trigger('click');
-    await flushPromises();
-
-    expect(mockOpenConversation).not.toHaveBeenCalled();
-    expect(mockAlert).toHaveBeenCalledWith(
-      'CONVERSATION.HISTORY_SYNC.REQUESTED_HIDDEN'
-    );
   });
 
   it('reports a request the server refused', async () => {

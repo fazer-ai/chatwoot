@@ -93,8 +93,7 @@
       "BUTTON": "Carregar mensagens mais antigas",
       "HELP": "Pede ao celular o que veio antes. Ele precisa estar ligado para responder, e fica em silêncio quando já enviou este trecho.",
       "REQUESTED": "Pedimos as mensagens mais antigas ao celular. Elas aparecem aqui conforme ele envia.",
-      "REQUESTED_ELSEWHERE": "Pedimos as mensagens mais antigas ao celular. Elas vão para uma conversa anterior com este contato (#{filedIn}), então trouxemos você para ela.",
-      "REQUESTED_HIDDEN": "Pedimos as mensagens mais antigas ao celular. Elas vão para uma conversa anterior com este contato, que você não tem permissão para abrir.",
+      "REQUESTED_BY_DATE": "Pedimos as mensagens mais antigas ao celular. Cada uma vai para a conversa da data em que foi enviada, então procure nas conversas anteriores deste contato.",
       "ERROR": "Não foi possível pedir as mensagens mais antigas. Tente de novo em instantes.",
       "EXHAUSTED": "Não há nada mais antigo aqui. O restante desta conversa está apenas no celular."
     },

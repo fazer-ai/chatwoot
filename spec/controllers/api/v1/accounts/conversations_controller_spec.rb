@@ -2021,42 +2021,6 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
       end
 
-      # The answer predates every thread of the contact in this inbox, so it lands in the
-      # first one. The dashboard only knows a thread's neighbours, and with another inbox's
-      # thread in between it offers the button on a later thread: the response names where
-      # to go instead.
-      it 'names the thread the answer lands in, skipping threads in other inboxes' do
-        first = create(:conversation, account: account, inbox: channel.inbox, contact: conversation.contact,
-                                      contact_inbox: conversation.contact_inbox, created_at: 3.days.ago)
-        create(:conversation, account: account, inbox: create(:inbox, account: account), contact: conversation.contact,
-                              created_at: 2.days.ago)
-
-        post url, headers: agent.create_new_auth_token, as: :json
-
-        expect(response.parsed_body).to eq('filed_in' => first.display_id)
-      end
-
-      # A custom role can let an agent read this thread and not the older one the answer is
-      # filed in, so the dashboard is told there is nowhere to take them.
-      it 'names no thread when the agent may not open the one the answer lands in' do
-        first = create(:conversation, account: account, inbox: channel.inbox, contact: conversation.contact,
-                                      contact_inbox: conversation.contact_inbox, created_at: 3.days.ago)
-        allow(ConversationPolicy).to receive(:new).and_wrap_original do |original, user_context, record|
-          record == first ? instance_double(ConversationPolicy, show?: false) : original.call(user_context, record)
-        end
-
-        post url, headers: agent.create_new_auth_token, as: :json
-
-        expect(response).to have_http_status(:success)
-        expect(response.parsed_body).to eq('filed_in' => nil)
-      end
-
-      it 'names the thread itself when it is the first' do
-        post url, headers: agent.create_new_auth_token, as: :json
-
-        expect(response.parsed_body).to eq('filed_in' => conversation.display_id)
-      end
-
       # The request reaches the phone through the session, so a closed one would have the
       # operator told it was asked and nothing would ever arrive.
       it 'refuses while the session is down' do
