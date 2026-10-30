@@ -16,6 +16,14 @@ vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => mockAlert(...args),
 }));
 
+const mockPush = vi.fn();
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+vi.mock('dashboard/composables/useConversationRoutePath', () => ({
+  useConversationRoutePath: () => ({
+    buildConversationPath: id => `/conversations/${id}`,
+  }),
+}));
+
 const mountControl = (props = {}) =>
   mount(ConversationHistorySync, {
     props: { conversationId: 7, ...props },
@@ -36,7 +44,7 @@ describe('ConversationHistorySync', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('asks the provider for the page before this thread', async () => {
-    mockDispatch.mockResolvedValue({});
+    mockDispatch.mockResolvedValue({ filed_in: 7 });
     const wrapper = mountControl();
 
     await button(wrapper).trigger('click');
@@ -48,7 +56,7 @@ describe('ConversationHistorySync', () => {
   // The phone answers on the webhook minutes later, or never, so the press can only
   // report that the request went out.
   it('reports that the phone was asked', async () => {
-    mockDispatch.mockResolvedValue({});
+    mockDispatch.mockResolvedValue({ filed_in: 7 });
     const wrapper = mountControl();
 
     await button(wrapper).trigger('click');
@@ -73,6 +81,32 @@ describe('ConversationHistorySync', () => {
 
     expect(button(wrapper).exists()).toBe(true);
     expect(wrapper.text()).not.toContain('CONVERSATION.HISTORY_SYNC.EXHAUSTED');
+  });
+
+  it('stays on this thread when the answer lands here', async () => {
+    mockDispatch.mockResolvedValue({ filed_in: 7 });
+    const wrapper = mountControl();
+
+    await button(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // The thread view only knows a thread's neighbours, so with another inbox's thread in
+  // between it can offer the button on a later thread; the server says where the answer
+  // goes and the agent is taken there.
+  it('takes the agent to the thread the answer lands in', async () => {
+    mockDispatch.mockResolvedValue({ filed_in: 3 });
+    const wrapper = mountControl();
+
+    await button(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(mockPush).toHaveBeenCalledWith('/conversations/3');
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE'
+    );
   });
 
   it('reports a request the server refused', async () => {

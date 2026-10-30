@@ -297,7 +297,12 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     # itself as ON_DEMAND, uazapi's does not, and this is what tells that one somebody asked.
     Whatsapp::Session::HistoryBackfill.open!(channel)
     Whatsapp::Session::ConversationHistoryJob.perform_later(@conversation)
-    head :ok
+    # Which thread the answer will land in, so the dashboard can take the agent there when
+    # it is not the one on screen. A thread whose contact is gone asks for nothing (see
+    # ConversationHistoryJob), so it names itself.
+    contact = @conversation.contact
+    filed_in = contact ? Whatsapp::Session::Inbound::ConversationFinder.history_thread(inbox: @conversation.inbox, contact: contact) : @conversation
+    render json: { filed_in: filed_in.display_id }
   end
 
   # Asked by the dashboard when it opens a conversation whose number was flagged as having no

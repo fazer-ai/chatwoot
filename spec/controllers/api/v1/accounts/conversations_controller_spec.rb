@@ -2021,6 +2021,27 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
       end
 
+      # The answer predates every thread of the contact in this inbox, so it lands in the
+      # first one. The dashboard only knows a thread's neighbours, and with another inbox's
+      # thread in between it offers the button on a later thread: the response names where
+      # to go instead.
+      it 'names the thread the answer lands in, skipping threads in other inboxes' do
+        first = create(:conversation, account: account, inbox: channel.inbox, contact: conversation.contact,
+                                      contact_inbox: conversation.contact_inbox, created_at: 3.days.ago)
+        create(:conversation, account: account, inbox: create(:inbox, account: account), contact: conversation.contact,
+                              created_at: 2.days.ago)
+
+        post url, headers: agent.create_new_auth_token, as: :json
+
+        expect(response.parsed_body).to eq('filed_in' => first.display_id)
+      end
+
+      it 'names the thread itself when it is the first' do
+        post url, headers: agent.create_new_auth_token, as: :json
+
+        expect(response.parsed_body).to eq('filed_in' => conversation.display_id)
+      end
+
       # The request reaches the phone through the session, so a closed one would have the
       # operator told it was asked and nothing would ever arrive.
       it 'refuses while the session is down' do

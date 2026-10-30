@@ -305,11 +305,13 @@ const actions = {
     return request;
   },
 
-  // Asks the provider for the page before this thread's oldest message. Nothing comes
-  // back here: the phone answers on the webhook minutes later, or never, and the rows
-  // arrive through the same cable push live traffic uses.
+  // Asks the provider for the page before this thread's oldest message. The messages do
+  // not come back here: the phone answers on the webhook minutes later, or never, and the
+  // rows arrive through the same cable push live traffic uses. What does come back is the
+  // thread they will be filed in (`filed_in`, a display id).
   syncHistory: async (_, conversationId) => {
-    await ConversationApi.syncHistory(conversationId);
+    const { data } = await ConversationApi.syncHistory(conversationId);
+    return data;
   },
 
   fetchAllAttachments: async ({ commit }, conversationId) => {

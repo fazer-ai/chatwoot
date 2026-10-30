@@ -66,6 +66,15 @@ class Whatsapp::Session::Inbound::ConversationFinder
     slices
   end
 
+  # Where an answer to the history button is filed. The request pages back from the oldest
+  # message stored for the contact, so the answer predates every thread and lands in the
+  # first one (see #archive_thread). Asked separately because the thread somebody pressed
+  # the button from is not necessarily that one: the dashboard only knows a thread's
+  # neighbours, which can sit in another inbox.
+  def self.history_thread(inbox:, contact:)
+    contact.conversations.where(inbox_id: inbox.id).reorder(:created_at, :id).first
+  end
+
   def perform
     conversation = conversation_for_reaction || conversation_by_inbox_config
     return backfill_first_touch(mark_as_group(conversation)) if conversation

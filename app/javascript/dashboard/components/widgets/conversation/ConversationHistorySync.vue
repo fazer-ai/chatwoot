@@ -2,7 +2,9 @@
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
+import { useRouter } from 'vue-router';
 import { useAlert } from 'dashboard/composables';
+import { useConversationRoutePath } from 'dashboard/composables/useConversationRoutePath';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
@@ -24,17 +26,32 @@ const props = defineProps({
 });
 
 const store = useStore();
+const router = useRouter();
 const { t } = useI18n();
+const { buildConversationPath } = useConversationRoutePath();
 
 // The phone answers on the webhook minutes later, or never -- it has to be awake and it
 // declines to resend a stretch it has already handed over. So the press reports that the
 // request went out, and the messages appear on their own above.
+//
+// Above this thread only when it is the contact's oldest in the inbox, which is where the
+// answer is filed. The thread view hides the button when the one before is in the same
+// inbox, but it only knows the neighbours: with another inbox's thread in between, the
+// server names the thread instead (`filed_in`), and the agent is taken there to watch.
 const requesting = ref(false);
 const requestOlder = async () => {
   requesting.value = true;
   try {
-    await store.dispatch('syncHistory', props.conversationId);
-    useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED'));
+    const { filed_in: filedIn } = await store.dispatch(
+      'syncHistory',
+      props.conversationId
+    );
+    if (filedIn && filedIn !== Number(props.conversationId)) {
+      useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE', { filedIn }));
+      router.push(buildConversationPath(filedIn, { keepFolderScope: false }));
+    } else {
+      useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED'));
+    }
   } catch (error) {
     useAlert(t('CONVERSATION.HISTORY_SYNC.ERROR'));
   } finally {
