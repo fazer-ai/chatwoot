@@ -66,13 +66,21 @@ class Whatsapp::Session::Inbound::ConversationFinder
     slices
   end
 
-  # Where an answer to the history button is filed. The request pages back from the oldest
-  # message stored for the contact, so the answer predates every thread and lands in the
-  # first one (see #archive_thread). Asked separately because the thread somebody pressed
-  # the button from is not necessarily that one: the dashboard only knows a thread's
-  # neighbours, which can sit in another inbox.
-  def self.history_thread(inbox:, contact:)
-    contact.conversations.where(inbox_id: inbox.id).reorder(:created_at, :id).first
+  # The thread an archived message sent at `at` is filed in: the last one opened at or
+  # before it, or the oldest when it predates them all, or when nothing says when it was
+  # sent.
+  def self.thread_at(inbox:, contact:, at:)
+    chain = contact.conversations.where(inbox_id: inbox.id).reorder(:created_at, :id)
+    (chain.where(created_at: ..at).last if at) || chain.first
+  end
+
+  # The thread an answer paged back from `anchor_at` starts filing into: the newest of what
+  # comes back is the message just before the anchor, so the last thread opened strictly
+  # before it. The rest of the page goes to the threads before that one. `nil` is a request
+  # with no anchor, which a provider answers from the oldest it knows, so the oldest thread.
+  def self.history_thread(inbox:, contact:, anchor_at:)
+    chain = contact.conversations.where(inbox_id: inbox.id).reorder(:created_at, :id)
+    (chain.where(created_at: ...anchor_at).last if anchor_at) || chain.first
   end
 
   def perform
@@ -97,7 +105,7 @@ class Whatsapp::Session::Inbound::ConversationFinder
     # Scoped to the contact across all its contact_inboxes: one person can hold several
     # source_ids in the same inbox (phone and LID), and reopen must see all of them.
     conversations = contact.conversations.where(inbox_id: inbox.id)
-    return archive_thread(conversations) if archived
+    return archive_thread if archived
     return conversations.last if inbox.lock_to_single_conversation
 
     conversations.where.not(status: :resolved).last
@@ -115,12 +123,8 @@ class Whatsapp::Session::Inbound::ConversationFinder
   # nowhere near it (measured at a customer in 2026-10).
   #
   # Filed by date, walking back from the newest thread reads everything in the order it
-  # happened, and an answer to the button, always older than everything stored, lands in
-  # the oldest thread, which is the only one that shows the button.
-  def archive_thread(conversations)
-    chain = conversations.reorder(:created_at, :id)
-    (chain.where(created_at: ..occurred_at).last if occurred_at) || chain.first
-  end
+  # happened.
+  def archive_thread = self.class.thread_at(inbox: inbox, contact: contact, at: occurred_at)
 
   def conversation_params
     params = {

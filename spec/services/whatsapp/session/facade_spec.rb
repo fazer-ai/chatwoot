@@ -881,6 +881,25 @@ RSpec.describe Whatsapp::Session::Facade do
       expect(backend.last_command.before.id).to eq('3EB0NAMED')
     end
 
+    # The answer is filed by date and pages back from the anchor, so its newest message lands
+    # in the thread opened before the anchor, which a live thread older than every import
+    # does not make the oldest.
+    it 'names the thread opened before the anchor as where the answer lands' do
+      thread = lambda do |at|
+        create(:conversation, contact: contact, contact_inbox: contact_inbox, inbox: inbox, account: channel.account, created_at: at)
+      end
+      live = thread.call(2.months.ago)
+      stored(live, '3EB0LIVEOLD', 2.months.ago)
+      paged = thread.call(2.weeks.ago)
+      stored(paged, '3EB0ANCHOR', 1.week.ago).update!(content_attributes: { 'imported' => true })
+      stored(thread.call(1.day.ago), '3EB0TODAY', 1.day.ago)
+
+      expect(facade.history_thread(contact)).to eq(paged)
+
+      allow(backend.class).to receive(:history_needs_anchor?).and_return(false)
+      expect(facade.history_thread(contact)).to eq(live)
+    end
+
     # Without an anchor the connector refuses the request as unsupported, so none is sent.
     it 'asks nothing for a contact with no stored message to page back from' do
       conversation

@@ -301,23 +301,14 @@ export default {
     // would never offer this. A first page that came back short is the other way: the
     // server sends at most MessageFinder::PAGE_LIMIT, which is 20, so fewer than that
     // means there was never a second page to ask for.
-    //
-    // Only on the oldest thread this inbox has for the contact. History is filed by date,
-    // and whatever the phone sends back is older than everything stored, so the answer
-    // lands in that thread: offered anywhere else, the press would fill a thread the agent
-    // is not looking at. The link to the older thread takes the button's place.
     canRequestOlderMessages() {
       const exhausted = this.listLoadingStatus || this.getMessages.length < 20;
-      const hasOlderThreadHere =
-        Boolean(this.olderConversation) &&
-        this.olderConversation.inbox_id === this.currentChat.inbox_id;
 
       return Boolean(
         this.currentChat?.id &&
           this.currentChat.dataFetched &&
           this.hasInboxCapability(CAPABILITIES.HISTORY_SYNC) &&
           exhausted &&
-          !hasOlderThreadHere &&
           !this.isLoadingPrevious
       );
     },

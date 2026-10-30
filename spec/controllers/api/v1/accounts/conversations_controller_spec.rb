@@ -2036,6 +2036,21 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response.parsed_body).to eq('filed_in' => first.display_id)
       end
 
+      # A custom role can let an agent read this thread and not the older one the answer is
+      # filed in, so the dashboard is told there is nowhere to take them.
+      it 'names no thread when the agent may not open the one the answer lands in' do
+        first = create(:conversation, account: account, inbox: channel.inbox, contact: conversation.contact,
+                                      contact_inbox: conversation.contact_inbox, created_at: 3.days.ago)
+        allow(ConversationPolicy).to receive(:new).and_wrap_original do |original, user_context, record|
+          record == first ? instance_double(ConversationPolicy, show?: false) : original.call(user_context, record)
+        end
+
+        post url, headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq('filed_in' => nil)
+      end
+
       it 'names the thread itself when it is the first' do
         post url, headers: agent.create_new_auth_token, as: :json
 

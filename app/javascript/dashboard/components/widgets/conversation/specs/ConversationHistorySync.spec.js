@@ -93,9 +93,8 @@ describe('ConversationHistorySync', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  // The thread view only knows a thread's neighbours, so with another inbox's thread in
-  // between it can offer the button on a later thread; the server says where the answer
-  // goes and the agent is taken there.
+  // The answer is filed by date, often in an older thread than this one; the server says
+  // which and the agent is taken there.
   it('takes the agent to the thread the answer lands in', async () => {
     mockDispatch.mockResolvedValue({ filed_in: 3 });
     const wrapper = mountControl();
@@ -106,6 +105,19 @@ describe('ConversationHistorySync', () => {
     expect(mockPush).toHaveBeenCalledWith('/conversations/3');
     expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE'
+    );
+  });
+
+  it('says so, and stays, when the answer lands where the agent may not look', async () => {
+    mockDispatch.mockResolvedValue({ filed_in: null });
+    const wrapper = mountControl();
+
+    await button(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.HISTORY_SYNC.REQUESTED_HIDDEN'
     );
   });
 

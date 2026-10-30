@@ -34,10 +34,10 @@ const { buildConversationPath } = useConversationRoutePath();
 // declines to resend a stretch it has already handed over. So the press reports that the
 // request went out, and the messages appear on their own above.
 //
-// Above this thread only when it is the contact's oldest in the inbox, which is where the
-// answer is filed. The thread view hides the button when the one before is in the same
-// inbox, but it only knows the neighbours: with another inbox's thread in between, the
-// server names the thread instead (`filed_in`), and the agent is taken there to watch.
+// The answer is filed by date, so it lands in the thread that was current before the
+// anchor the request pages back from, which is often an older one than this. The server
+// names it (`filed_in`) and the agent is taken there to watch it arrive; `null` is a
+// thread the agent may not open.
 const requesting = ref(false);
 const requestOlder = async () => {
   requesting.value = true;
@@ -46,7 +46,9 @@ const requestOlder = async () => {
       'syncHistory',
       props.conversationId
     );
-    if (filedIn && filedIn !== Number(props.conversationId)) {
+    if (!filedIn) {
+      useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED_HIDDEN'));
+    } else if (filedIn !== Number(props.conversationId)) {
       useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE', { filedIn }));
       router.push(buildConversationPath(filedIn, { keepFolderScope: false }));
     } else {
