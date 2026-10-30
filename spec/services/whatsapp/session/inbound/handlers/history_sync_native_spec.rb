@@ -424,6 +424,17 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
       expect(filed_in('3EB0LOCK40', '3EB0LOCK7')).to eq([latest_thread])
     end
+
+    # The lock picks the highest id, and a thread a gap import opened is dated back, so the
+    # pick can be older by date than another thread: the run still lands whole in it.
+    it 'files a locked inbox in its last thread even when ids and dates disagree' do
+      inbox.update!(lock_to_single_conversation: true)
+      backdated = thread_opened(20.days.ago)
+
+      deliver(slice([3, 2].map { |days| historical("3EB0BACK#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0BACK3', '3EB0BACK2')).to eq([backdated])
+    end
   end
 
   describe 'the name of a group' do

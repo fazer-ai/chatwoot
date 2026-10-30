@@ -50,18 +50,27 @@ class Whatsapp::Session::Inbound::ConversationFinder
   # one per message. `messages` is oldest first and the block reads when one was sent,
   # which a Baileys record can leave blank: such a message sorts first and is filed with
   # the first slice.
+  #
+  # An inbox locked to one conversation files the whole run in it. Every slice also takes
+  # the first message left, whatever thread the finder picked: the boundary is read off
+  # that thread, and a pick that is not the thread of that message by date (the lock
+  # takes the highest id, which a backdated thread need not have) would otherwise leave
+  # the message out of every slice and the loop going forever.
   def self.archive_slices(inbox:, contact_inbox:, messages:)
     slices = []
     until messages.empty?
+      first, *rest = messages
       conversation = new(inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox,
-                         archived: true, occurred_at: yield(messages.first)).perform
+                         archived: true, occurred_at: yield(first)).perform
+      return slices << [conversation, messages] if inbox.lock_to_single_conversation
+
       following = inbox.conversations.where(contact_id: contact_inbox.contact_id)
                        .where.not(created_at: ..conversation.created_at).minimum(:created_at)
-      slice, messages = messages.partition do |message|
+      slice, messages = rest.partition do |message|
         at = yield(message)
         following.nil? || at.nil? || at < following
       end
-      slices << [conversation, slice]
+      slices << [conversation, [first, *slice]]
     end
     slices
   end
