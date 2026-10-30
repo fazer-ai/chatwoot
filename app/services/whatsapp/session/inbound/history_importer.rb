@@ -143,8 +143,18 @@ class Whatsapp::Session::Inbound::HistoryImporter
     run = fileable(run, contact_inbox)
     return [] if run.empty?
 
-    conversation = track(conversation_for(contact_inbox, run.first, archived))
-    run.filter_map { |message| write(conversation, contact_inbox.contact, message) }
+    slices(contact_inbox, run, archived).flat_map do |conversation, slice|
+      track(conversation)
+      slice.filter_map { |message| write(conversation, contact_inbox.contact, message) }
+    end
+  end
+
+  # A gap is one slice, in the thread the reopen policy picks; an archive is filed by date
+  # and can span several threads.
+  def slices(contact_inbox, run, archived)
+    return [[conversation_for(contact_inbox, run.first, archived), run]] unless archived
+
+    inbound::ConversationFinder.archive_slices(inbox: inbox, contact_inbox: contact_inbox, messages: run, &:sent_at)
   end
 
   # The message in the run that says the most about who the chat belongs to: an incoming

@@ -69,6 +69,20 @@ describe Whatsapp::Baileys::HistoryImporter do
     # A first pairing has no coverage at all, so the whole pile is archive. With nobody
     # having asked, that means nothing is written: the privacy protection the outright
     # refusal used to provide.
+    # By date, not into the newest thread: the dashboard walks a contact's threads in the
+    # order they were opened, so each message goes to the one that was current then.
+    it 'files each archived message in the thread that was current when it was sent' do
+      import([raw_message('FIRST', sent_at: 20.days.ago)], watermark: watermark)
+      first = inbox.messages.find_by(source_id: 'FIRST').conversation
+      later = create(:conversation, inbox: inbox, account: inbox.account, contact: first.contact,
+                                    contact_inbox: first.contact_inbox, created_at: 5.days.ago)
+
+      import([raw_message('BEFORE', sent_at: 10.days.ago), raw_message('AFTER', sent_at: 4.days.ago)], watermark: 1.day.ago)
+
+      expect(inbox.messages.find_by(source_id: 'BEFORE').conversation).to eq(first)
+      expect(inbox.messages.find_by(source_id: 'AFTER').conversation).to eq(later)
+    end
+
     it 'writes nothing from a pile nobody asked for' do
       import([raw_message('OLD', sent_at: 10.days.ago)], watermark: nil, requested: false)
 

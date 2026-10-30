@@ -12,8 +12,8 @@ class Whatsapp::Session::Inbound::ConversationFinder
   #
   # `archived` is the history import saying this message predates the inbox's coverage
   # (see Inbound::Coverage): it never had a chance to be answered here, so it must not
-  # open work. `occurred_at` is when it actually happened, used to date a thread that has
-  # to be created for it.
+  # open work. `occurred_at` is when it actually happened, which picks the thread an
+  # archived message is filed in and dates a thread that has to be created for it.
   # rubocop:disable Metrics/ParameterLists -- every one of these is an independent fact
   # about the message being filed; an options object would only move the list elsewhere.
   def initialize(inbox:, contact:, contact_inbox:, attribution: {}, reaction_target_id: nil, archived: false, occurred_at: nil)
@@ -44,6 +44,28 @@ class Whatsapp::Session::Inbound::ConversationFinder
     conversation
   end
 
+  # An archived run split by the thread each part is filed in, as [conversation, messages]
+  # pairs. A run can span several threads, since an archive is filed by date, so each part
+  # runs up to where the next thread was opened: one lookup per thread crossed rather than
+  # one per message. `messages` is oldest first and the block reads when one was sent,
+  # which a Baileys record can leave blank: such a message sorts first and is filed with
+  # the first slice.
+  def self.archive_slices(inbox:, contact_inbox:, messages:)
+    slices = []
+    until messages.empty?
+      conversation = new(inbox: inbox, contact: contact_inbox.contact, contact_inbox: contact_inbox,
+                         archived: true, occurred_at: yield(messages.first)).perform
+      following = inbox.conversations.where(contact_id: contact_inbox.contact_id)
+                       .where.not(created_at: ..conversation.created_at).minimum(:created_at)
+      slice, messages = messages.partition do |message|
+        at = yield(message)
+        following.nil? || at.nil? || at < following
+      end
+      slices << [conversation, slice]
+    end
+    slices
+  end
+
   def perform
     conversation = conversation_for_reaction || conversation_by_inbox_config
     return backfill_first_touch(mark_as_group(conversation)) if conversation
@@ -66,15 +88,29 @@ class Whatsapp::Session::Inbound::ConversationFinder
     # Scoped to the contact across all its contact_inboxes: one person can hold several
     # source_ids in the same inbox (phone and LID), and reopen must see all of them.
     conversations = contact.conversations.where(inbox_id: inbox.id)
-    # An archived import takes whatever thread the contact last had, open or resolved. The
-    # reopen policy is the wrong question for it twice over: skipping a resolved thread
-    # would open a new one for a message from last year, and doing that per message would
-    # end an import of nine hundred messages with nine hundred conversations. Landing in
-    # the thread that is already on screen is also what the on-demand button means, since
-    # it is pressed to see further back in a conversation that exists.
-    return conversations.last if archived || inbox.lock_to_single_conversation
+    return archive_thread(conversations) if archived
+    return conversations.last if inbox.lock_to_single_conversation
 
     conversations.where.not(status: :resolved).last
+  end
+
+  # An archived message goes to the thread that was current when it happened: the last one
+  # opened at or before it, open or resolved, or the oldest when it predates them all.
+  #
+  # The reopen policy is the wrong question for it twice over: skipping a resolved thread
+  # would open a new one for a message from last year, and doing that per message would end
+  # an import of nine hundred messages with nine hundred conversations. The contact's last
+  # thread is the wrong answer too, which is what this used to be. Each press of the button
+  # then filed its page into whatever thread was newest that day, and the dashboard, which
+  # walks a contact's threads by creation date, read August after the 27th and the 27th
+  # nowhere near it (measured at a customer in 2026-10).
+  #
+  # Filed by date, walking back from the newest thread reads everything in the order it
+  # happened, and an answer to the button, always older than everything stored, lands in
+  # the oldest thread, which is the only one that shows the button.
+  def archive_thread(conversations)
+    chain = conversations.reorder(:created_at, :id)
+    (chain.where(created_at: ..occurred_at).last if occurred_at) || chain.first
   end
 
   def conversation_params
