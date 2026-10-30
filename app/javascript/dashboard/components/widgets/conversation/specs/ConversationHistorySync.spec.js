@@ -46,10 +46,23 @@ describe('ConversationHistorySync', () => {
   });
 
   // The phone answers on the webhook minutes later, or never, so the press can only
-  // report that the request went out.
-  it('reports that the phone was asked', async () => {
+  // report that the request went out, and where to look: each message is filed in the
+  // conversation from its own date.
+  it('reports that the phone was asked, and that the messages go by date', async () => {
     mockDispatch.mockResolvedValue({});
     const wrapper = mountControl();
+
+    await button(wrapper).trigger('click');
+    await flushPromises();
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'CONVERSATION.HISTORY_SYNC.REQUESTED_BY_DATE'
+    );
+  });
+
+  it('says they appear here on an inbox locked to one conversation', async () => {
+    mockDispatch.mockResolvedValue({});
+    const wrapper = mountControl({ singleConversation: true });
 
     await button(wrapper).trigger('click');
     await flushPromises();

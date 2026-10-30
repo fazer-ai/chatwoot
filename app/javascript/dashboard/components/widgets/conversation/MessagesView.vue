@@ -1125,6 +1125,7 @@ export default {
           v-if="canRequestOlderMessages"
           :conversation-id="currentChat.id"
           :exhausted="historyExhausted"
+          :single-conversation="inbox.lock_to_single_conversation"
         />
         <ContactConversationLink
           v-if="olderConversation && listLoadingStatus"

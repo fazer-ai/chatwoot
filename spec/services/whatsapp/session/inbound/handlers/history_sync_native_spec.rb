@@ -375,6 +375,68 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  # The dashboard walks a contact's threads by creation date, so history is filed in the
+  # thread that was current when it happened, not in whichever one is newest when it
+  # arrives: pressing the button on different days used to scatter one chat's past across
+  # them out of order.
+  describe 'which thread the archive lands in' do
+    let(:contact) { a_contact }
+    let(:contact_inbox) { create(:contact_inbox, contact: contact, inbox: inbox, source_id: phone) }
+    let(:first_thread) { thread_opened(10.days.ago) }
+    let(:second_thread) { thread_opened(5.days.ago) }
+    let(:latest_thread) { thread_opened(1.day.ago, status: :open) }
+
+    before do
+      channel.update!(provider_config: channel.provider_config.merge('history_sync' => true))
+      [first_thread, second_thread, latest_thread]
+    end
+
+    def thread_opened(at, status: :resolved)
+      conversation = create(:conversation, inbox: inbox, account: inbox.account, contact: contact, contact_inbox: contact_inbox,
+                                           status: status, created_at: at)
+      create(:message, conversation: conversation, inbox: inbox, account: inbox.account, source_id: "LIVE#{SecureRandom.hex(4)}",
+                       created_at: at)
+      conversation
+    end
+
+    def filed_in(*ids) = inbox.messages.where(source_id: ids).map(&:conversation).uniq
+
+    it 'files what predates every thread in the oldest one, however new the latest is' do
+      deliver(slice([40, 20].map { |days| historical("3EB0PAST#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0PAST40', '3EB0PAST20')).to eq([first_thread])
+    end
+
+    it 'splits one slice across the threads that were current when each message was sent' do
+      deliver(slice([20, 8, 7, 3, 2].map { |days| historical("3EB0SPAN#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0SPAN20', '3EB0SPAN8', '3EB0SPAN7')).to eq([first_thread])
+      expect(filed_in('3EB0SPAN3', '3EB0SPAN2')).to eq([second_thread])
+      expect(latest_thread.messages.count).to eq(1)
+    end
+
+    # The lock means one thread for the contact, history included: by date it would go to
+    # threads from before the lock was turned on.
+    it 'files everything in the last thread on an inbox locked to one conversation' do
+      inbox.update!(lock_to_single_conversation: true)
+
+      deliver(slice([40, 7].map { |days| historical("3EB0LOCK#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0LOCK40', '3EB0LOCK7')).to eq([latest_thread])
+    end
+
+    # The lock picks the highest id, and a thread a gap import opened is dated back, so the
+    # pick can be older by date than another thread: the run still lands whole in it.
+    it 'files a locked inbox in its last thread even when ids and dates disagree' do
+      inbox.update!(lock_to_single_conversation: true)
+      backdated = thread_opened(20.days.ago)
+
+      deliver(slice([3, 2].map { |days| historical("3EB0BACK#{days}", days.days.ago) }))
+
+      expect(filed_in('3EB0BACK3', '3EB0BACK2')).to eq([backdated])
+    end
+  end
+
   describe 'the name of a group' do
     let(:unnamed) { model::Address.group('120363400000000001') }
     let(:named) { model::Address.group('120363400000000002') }

@@ -21,6 +21,8 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 const props = defineProps({
   conversationId: { type: [Number, String], required: true },
   exhausted: { type: Boolean, default: false },
+  // An inbox locked to one conversation files the history in it, so it appears here.
+  singleConversation: { type: Boolean, default: false },
 });
 
 const store = useStore();
@@ -28,13 +30,20 @@ const { t } = useI18n();
 
 // The phone answers on the webhook minutes later, or never -- it has to be awake and it
 // declines to resend a stretch it has already handed over. So the press reports that the
-// request went out, and the messages appear on their own above.
+// request went out. Where the messages land is not known until they do: each is filed in
+// the thread that was current when it was sent, usually an older one than this, which
+// the agent reaches with the previous-conversation link. An inbox locked to one
+// conversation is the exception, and the messages appear here.
 const requesting = ref(false);
 const requestOlder = async () => {
   requesting.value = true;
   try {
     await store.dispatch('syncHistory', props.conversationId);
-    useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED'));
+    useAlert(
+      props.singleConversation
+        ? t('CONVERSATION.HISTORY_SYNC.REQUESTED')
+        : t('CONVERSATION.HISTORY_SYNC.REQUESTED_BY_DATE')
+    );
   } catch (error) {
     useAlert(t('CONVERSATION.HISTORY_SYNC.ERROR'));
   } finally {

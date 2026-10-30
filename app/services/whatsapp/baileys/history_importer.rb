@@ -219,8 +219,7 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
     run = fileable(run)
     return [] if run.empty?
 
-    conversation = track(conversation_for(@contact_inbox, run.first, archived))
-    run.filter_map { |raw| write(conversation, @contact, raw) }
+    file_slices(@contact_inbox, run, archived) { |conversation, raw| write(conversation, @contact, raw) }
   end
 
   # The message that says the most about who the chat belongs to: an incoming one carries
@@ -238,17 +237,39 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
   end
 
   # A group is the one chat whose author changes from message to message, so its sender is
-  # resolved per message while the group contact and its thread are resolved once.
+  # resolved per message while the group contact and its threads are resolved once.
   def import_group_run(run, archived)
     @group_contact_inbox, @group_contact = find_or_create_group_contact
-    conversation = track(conversation_for(@group_contact_inbox, run.first, archived))
-
-    run.filter_map do |raw|
+    file_slices(@group_contact_inbox, run, archived) do |conversation, raw|
       @raw_message = raw
       resolve_group_sender_contact
       add_group_member(@group_contact, @sender_contact) if @sender_contact
       write(conversation, @sender_contact, raw)
     end
+  end
+
+  # Hands each message of the run to the block with the thread it is filed in. A gap is
+  # one thread, the one the reopen policy picks; an archive is filed by date and can span
+  # several (see ConversationFinder.archive_slices).
+  def file_slices(contact_inbox, run, archived)
+    slices = if archived
+               inbound::ConversationFinder.archive_slices(inbox: inbox, contact_inbox: contact_inbox, messages: run) { |raw| sent_at_of(raw) }
+             else
+               [[conversation_for(contact_inbox, run.first, archived), run]]
+             end
+    slices.flat_map do |conversation, slice|
+      track(conversation)
+      slice.filter_map { |raw| yield(reaction_thread(raw) || conversation, raw) }
+    end
+  end
+
+  # A reaction annotates a message already filed, so it goes to that message's thread, as on
+  # the live path (ConversationFinder#conversation_for_reaction). Filed by its own date it
+  # can land in another thread, where the reply lookup cannot find its target and the
+  # thread never shows it. The run is oldest first, so a target in the same run is stored.
+  def reaction_thread(raw)
+    target = unwrap_message_content(raw[:message])&.dig(:reactionMessage, :key, :id)
+    inbox.messages.find_by(source_id: target)&.conversation if target.present?
   end
 
   def conversation_for(contact_inbox, raw, archived)
