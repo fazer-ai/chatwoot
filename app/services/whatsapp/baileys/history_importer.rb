@@ -259,8 +259,17 @@ class Whatsapp::Baileys::HistoryImporter < Whatsapp::IncomingMessageBaileysServi
              end
     slices.flat_map do |conversation, slice|
       track(conversation)
-      slice.filter_map { |raw| yield(conversation, raw) }
+      slice.filter_map { |raw| yield(reaction_thread(raw) || conversation, raw) }
     end
+  end
+
+  # A reaction annotates a message already filed, so it goes to that message's thread, as on
+  # the live path (ConversationFinder#conversation_for_reaction). Filed by its own date it
+  # can land in another thread, where the reply lookup cannot find its target and the
+  # thread never shows it. The run is oldest first, so a target in the same run is stored.
+  def reaction_thread(raw)
+    target = unwrap_message_content(raw[:message])&.dig(:reactionMessage, :key, :id)
+    inbox.messages.find_by(source_id: target)&.conversation if target.present?
   end
 
   def conversation_for(contact_inbox, raw, archived)
