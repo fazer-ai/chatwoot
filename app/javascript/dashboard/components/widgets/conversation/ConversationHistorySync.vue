@@ -1,10 +1,9 @@
 <script setup>
-import { ref } from 'vue';
+import { inject, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 import { useAlert } from 'dashboard/composables';
-import { useConversationRoutePath } from 'dashboard/composables/useConversationRoutePath';
+import { CONTACT_CONVERSATION_NAVIGATION } from 'dashboard/composables/useContactConversationNavigation';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
@@ -26,9 +25,9 @@ const props = defineProps({
 });
 
 const store = useStore();
-const router = useRouter();
 const { t } = useI18n();
-const { buildConversationPath } = useConversationRoutePath();
+// The same move as the previous-conversation link, so the older thread opens as history.
+const { openConversation } = inject(CONTACT_CONVERSATION_NAVIGATION);
 
 // The phone answers on the webhook minutes later, or never -- it has to be awake and it
 // declines to resend a stretch it has already handed over. So the press reports that the
@@ -50,7 +49,7 @@ const requestOlder = async () => {
       useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED_HIDDEN'));
     } else if (filedIn !== Number(props.conversationId)) {
       useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE', { filedIn }));
-      router.push(buildConversationPath(filedIn, { keepFolderScope: false }));
+      openConversation({ id: filedIn });
     } else {
       useAlert(t('CONVERSATION.HISTORY_SYNC.REQUESTED'));
     }

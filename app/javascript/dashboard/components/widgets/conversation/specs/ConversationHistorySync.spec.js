@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
+import { CONTACT_CONVERSATION_NAVIGATION } from 'dashboard/composables/useContactConversationNavigation';
 import ConversationHistorySync from '../ConversationHistorySync.vue';
 
 const mockDispatch = vi.fn();
@@ -16,18 +17,17 @@ vi.mock('dashboard/composables', () => ({
   useAlert: (...args) => mockAlert(...args),
 }));
 
-const mockPush = vi.fn();
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }) }));
-vi.mock('dashboard/composables/useConversationRoutePath', () => ({
-  useConversationRoutePath: () => ({
-    buildConversationPath: id => `/conversations/${id}`,
-  }),
-}));
+const mockOpenConversation = vi.fn();
 
 const mountControl = (props = {}) =>
   mount(ConversationHistorySync, {
     props: { conversationId: 7, ...props },
     global: {
+      provide: {
+        [CONTACT_CONVERSATION_NAVIGATION]: {
+          openConversation: mockOpenConversation,
+        },
+      },
       stubs: {
         NextButton: defineComponent({
           name: 'NextButton',
@@ -90,7 +90,7 @@ describe('ConversationHistorySync', () => {
     await button(wrapper).trigger('click');
     await flushPromises();
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockOpenConversation).not.toHaveBeenCalled();
   });
 
   // The answer is filed by date, often in an older thread than this one; the server says
@@ -102,7 +102,7 @@ describe('ConversationHistorySync', () => {
     await button(wrapper).trigger('click');
     await flushPromises();
 
-    expect(mockPush).toHaveBeenCalledWith('/conversations/3');
+    expect(mockOpenConversation).toHaveBeenCalledWith({ id: 3 });
     expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.HISTORY_SYNC.REQUESTED_ELSEWHERE'
     );
@@ -115,7 +115,7 @@ describe('ConversationHistorySync', () => {
     await button(wrapper).trigger('click');
     await flushPromises();
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockOpenConversation).not.toHaveBeenCalled();
     expect(mockAlert).toHaveBeenCalledWith(
       'CONVERSATION.HISTORY_SYNC.REQUESTED_HIDDEN'
     );
