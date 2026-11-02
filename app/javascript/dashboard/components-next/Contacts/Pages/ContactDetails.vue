@@ -67,12 +67,15 @@ const avatarSrc = computed(() => {
   return avatarUrl.value ? avatarUrl.value : contactData.value?.thumbnail;
 });
 
+// A claim settled from the unverified details: apply only what changed to the local copy, which
+// still holds the agent's unsaved edits, and remount the form so it shows it.
 const formKey = ref(0);
-const reloadFromStore = () => {
-  Object.assign(
-    contactData.value,
-    store.getters['contacts/getContactById'](props.selectedContact.id)
-  );
+const applySettledClaim = ({ changes, claimKey }) => {
+  Object.assign(contactData.value, changes);
+  contactData.value.additionalAttributes = {
+    ...contactData.value.additionalAttributes,
+    [claimKey]: null,
+  };
   formKey.value += 1;
 };
 
@@ -200,7 +203,7 @@ const handleAvatarDelete = async () => {
       <UnverifiedContactDetails
         v-if="selectedContact"
         :contact="selectedContact"
-        @settled="reloadFromStore"
+        @settled="applySettledClaim"
       />
       <ContactsForm
         :key="formKey"

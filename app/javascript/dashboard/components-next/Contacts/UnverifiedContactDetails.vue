@@ -19,8 +19,9 @@ const props = defineProps({
   contact: { type: Object, required: true },
 });
 
-// The contact page edits a local copy of the contact and posts all of it on save, so it reloads
-// that copy after a claim settles; otherwise a later save would bring back what was just settled.
+// The contact page edits a local copy of the contact and posts all of it on save. `settled` hands
+// it what changed (camelized, like that copy) so it can apply just that and keep unsaved edits;
+// otherwise a later save would bring back what was just settled.
 const emit = defineEmits(['settled']);
 
 const { t } = useI18n();
@@ -33,16 +34,15 @@ const CLAIMS = [
     field: 'email',
     claimKey: 'claimed_email',
     camelKey: 'claimedEmail',
+    camelField: 'email',
     label: t('CONTACT_PANEL.UNVERIFIED_DETAILS.EMAIL'),
-    heldBy: (contact, value) =>
-      contact.email?.toLowerCase() === value.toLowerCase(),
   },
   {
     field: 'phone_number',
     claimKey: 'claimed_phone_number',
     camelKey: 'claimedPhoneNumber',
+    camelField: 'phoneNumber',
     label: t('CONTACT_PANEL.UNVERIFIED_DETAILS.PHONE_NUMBER'),
-    heldBy: (contact, value) => contact.phone_number === value,
   },
 ];
 
@@ -57,29 +57,46 @@ const claims = computed(() => {
   })).filter(claim => claim.value);
 });
 
+// An exact match through the contacts filter (email compared case-insensitively there): a text
+// search matches substrings of names and identifiers too and pages its results, so the holder can
+// fall off the first page.
 const findHolder = async claim => {
   try {
     const {
       data: { payload },
-    } = await ContactAPI.search(claim.value);
-    return (
-      payload.find(
-        other =>
-          other.id !== props.contact.id && claim.heldBy(other, claim.value)
-      ) || null
-    );
+    } = await ContactAPI.filter(1, 'name', {
+      payload: [
+        {
+          attribute_key: claim.field,
+          filter_operator: 'equal_to',
+          values: [claim.value],
+          query_operator: null,
+        },
+      ],
+    });
+    return payload.find(other => other.id !== props.contact.id) || null;
   } catch {
     return null;
   }
 };
 
+// Lookups for a contact the panel has already moved away from are dropped: answering out of order,
+// they would show the previous contact's holder on the current one.
+let latestLookup = 0;
 watch(
-  () => claims.value.map(claim => `${claim.field}:${claim.value}`).join('|'),
+  () =>
+    [
+      props.contact.id,
+      ...claims.value.map(claim => `${claim.field}:${claim.value}`),
+    ].join('|'),
   async () => {
+    latestLookup += 1;
+    const lookup = latestLookup;
+    holders.value = {};
     const entries = await Promise.all(
       claims.value.map(async claim => [claim.field, await findHolder(claim)])
     );
-    holders.value = Object.fromEntries(entries);
+    if (lookup === latestLookup) holders.value = Object.fromEntries(entries);
   },
   { immediate: true }
 );
@@ -93,7 +110,12 @@ const settle = async (claim, attributes, successMessage) => {
       additional_attributes: { [claim.claimKey]: null },
     });
     useAlert(successMessage);
-    emit('settled');
+    emit('settled', {
+      changes: attributes[claim.field]
+        ? { [claim.camelField]: attributes[claim.field] }
+        : {},
+      claimKey: claim.camelKey,
+    });
   } catch {
     useAlert(t('CONTACT_PANEL.UNVERIFIED_DETAILS.ERROR'));
   } finally {
