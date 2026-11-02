@@ -20,6 +20,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import VoiceCallButton from 'dashboard/components-next/Contacts/VoiceCallButton.vue';
 import AgentsConversationButton from './AgentsConversationButton.vue';
 import InlineInput from 'dashboard/components-next/inline-input/InlineInput.vue';
+import UnverifiedContactDetails from 'dashboard/components-next/Contacts/UnverifiedContactDetails.vue';
 
 export default {
   components: {
@@ -35,6 +36,7 @@ export default {
     VoiceCallButton,
     InlineInput,
     AgentsConversationButton,
+    UnverifiedContactDetails,
   },
   props: {
     contact: {
@@ -300,6 +302,7 @@ export default {
             editable
             @update="value => onFieldUpdate('phone_number', value)"
           />
+          <UnverifiedContactDetails :contact="contact" />
           <ContactInfoRow
             v-if="formattedWhatsappUsername"
             :value="formattedWhatsappUsername"

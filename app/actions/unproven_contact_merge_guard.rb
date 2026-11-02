@@ -71,7 +71,7 @@ module UnprovenContactMergeGuard
       phone_number = params[:phone_number]
       return if phone_number.blank? || phone_number == @contact.phone_number
 
-      @attributes_to_update.delete(:phone_number)
+      # A value that is not a phone number is left to upstream, which discards or rejects it.
       hold_back_claim(:phone_number) if UnprovenContactMergeGuard.claimable_phone_number?(phone_number)
     end
 
