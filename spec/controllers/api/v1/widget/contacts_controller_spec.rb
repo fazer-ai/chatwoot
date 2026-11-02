@@ -54,15 +54,14 @@ RSpec.describe '/api/v1/widget/contacts', type: :request do
         expect(response).to have_http_status(:success)
       end
 
-      it 'update phone number if valid phone number passed' do
+      it 'keeps a valid phone number as an unverified claim instead of the contact phone' do
         patch '/api/v1/widget/contact',
               params: params.merge({ phone_number: '+245623239' }),
               headers: { 'X-Auth-Token' => token },
               as: :json
-        body = response.parsed_body
-        expect(body['has_phone_number']).to be true
         contact.reload
-        expect(contact.phone_number).to eq('+245623239')
+        expect(contact.phone_number).to eq('+745623239')
+        expect(contact.additional_attributes['claimed_phone_number']).to eq('+245623239')
         expect(response).to have_http_status(:success)
       end
 

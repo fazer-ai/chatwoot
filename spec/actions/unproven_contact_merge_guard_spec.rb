@@ -203,4 +203,116 @@ RSpec.describe 'Unproven contact merge on public channels', type: :request do
       expect(customer_conversation.reload.contact_id).to eq(customer.id)
     end
   end
+
+  # A phone number typed on a public channel proves nothing even when nobody holds it yet: kept on
+  # the contact, it reaches an agent bot's tools as the visitor's verified phone (and through them
+  # whatever an outside system keeps for that number), and the real owner writing in later through
+  # WhatsApp lands on the visitor's contact.
+  describe 'a phone number nobody holds yet' do
+    let(:free_phone) { '+5511977776666' }
+
+    it 'stays an unverified claim on the widget contact update' do
+      patch '/api/v1/widget/contact', params: { website_token: web_widget.website_token, phone_number: free_phone },
+                                      headers: headers, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(visitor.reload.phone_number).to be_nil
+      expect(visitor.additional_attributes['claimed_phone_number']).to eq(free_phone)
+    end
+
+    it 'stays an unverified claim on the pre-chat form' do
+      post '/api/v1/widget/conversations',
+           params: { website_token: web_widget.website_token, contact: { name: 'Someone', phone_number: free_phone },
+                     message: { content: 'hi' } },
+           headers: headers, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(visitor.reload.phone_number).to be_nil
+      expect(visitor.additional_attributes['claimed_phone_number']).to eq(free_phone)
+    end
+
+    it 'stays an unverified claim on a new public API session' do
+      post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts", params: { phone_number: free_phone }
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['phone_number']).to be_nil
+      expect(account.contacts.find(response.parsed_body['id']).additional_attributes['claimed_phone_number']).to eq(free_phone)
+    end
+
+    it 'leaves the real owner arriving later through another channel on a contact of their own' do
+      patch '/api/v1/widget/contact', params: { website_token: web_widget.website_token, phone_number: free_phone },
+                                      headers: headers, as: :json
+
+      owner_session = ContactInboxWithContactBuilder.new(
+        inbox: api_inbox, source_id: SecureRandom.uuid, contact_attributes: { name: 'Owner', phone_number: free_phone }
+      ).perform
+
+      expect(owner_session.contact_id).not_to eq(visitor.id)
+    end
+
+    it 'records no claim for a value that is not a phone number' do
+      patch '/api/v1/widget/contact', params: { website_token: web_widget.website_token, phone_number: '12345' },
+                                      headers: headers, as: :json
+
+      expect(visitor.reload.additional_attributes).not_to have_key('claimed_phone_number')
+    end
+
+    it 'records no claim for the phone number the contact already has' do
+      visitor.update!(phone_number: free_phone)
+      patch '/api/v1/widget/contact', params: { website_token: web_widget.website_token, phone_number: free_phone },
+                                      headers: headers, as: :json
+
+      expect(visitor.reload.phone_number).to eq(free_phone)
+      expect(visitor.additional_attributes).not_to have_key('claimed_phone_number')
+    end
+  end
+
+  # WhatsApp contacts carry "<lid>@lid" (and group JIDs) as their identifier. On an inbox where HMAC
+  # is optional, an unsigned identifier finds its contact, so a visitor who knows someone's LID would
+  # reach their WhatsApp contact. No site identifies its users that way.
+  describe 'an identifier in the format WhatsApp uses' do
+    let!(:whatsapp_contact) { create(:contact, account: account, identifier: '123456789012345@lid', phone_number: '+5511955554444') }
+
+    %w[123456789012345@lid 5511955554444@s.whatsapp.net 120363000000000000@g.us].each do |identifier|
+      it "is refused by setUser (#{identifier.split('@').last})" do
+        patch '/api/v1/widget/contact/set_user',
+              params: { website_token: web_widget.website_token, identifier: identifier }, headers: headers, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(visitor_session.reload.contact_id).to eq(visitor.id)
+        expect(whatsapp_contact.reload.contact_inboxes.where(inbox: web_widget.inbox)).to be_empty
+      end
+    end
+
+    it 'is refused by the widget contact update' do
+      patch '/api/v1/widget/contact', params: { website_token: web_widget.website_token, identifier: whatsapp_contact.identifier },
+                                      headers: headers, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(visitor_session.reload.contact_id).to eq(visitor.id)
+    end
+
+    it 'is refused by setUser even with a valid hash' do
+      identifier_hash = OpenSSL::HMAC.hexdigest('sha256', web_widget.hmac_token, whatsapp_contact.identifier)
+      patch '/api/v1/widget/contact/set_user',
+            params: { website_token: web_widget.website_token, identifier: whatsapp_contact.identifier, identifier_hash: identifier_hash },
+            headers: headers, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'is refused by the public API' do
+      post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts", params: { identifier: whatsapp_contact.identifier }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(whatsapp_contact.reload.contact_inboxes.where(inbox: api_inbox)).to be_empty
+    end
+  end
+
+  it 'answers 401, not 500, to a public API request without the hash an inbox requires' do
+    api_channel.update!(hmac_mandatory: true)
+    post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts", params: { identifier: 'customer-42' }
+
+    expect(response).to have_http_status(:unauthorized)
+  end
 end

@@ -5,12 +5,23 @@
 # was enough to become the customer: the session lands on their contact, an agent bot's HTTP tools
 # get their contact_id and phone, and the human agent reads the visitor's messages under the
 # customer's name. Upstream closed the case where the existing contact carries an identifier
-# (chatwoot/chatwoot#14935); a contact that came in through WhatsApp or an API inbox carries none.
+# (chatwoot/chatwoot#14935); a contact that came in through an API inbox carries none.
 #
 # Inside those requests a value that already belongs to another contact is therefore not used to
-# find or merge one. It stays on the visitor as an unverified claim in
-# additional_attributes (`claimed_email`, `claimed_phone_number`), which agents can read and act on
-# by merging the contacts by hand once they have checked. A value nobody holds is saved as before.
+# find or merge one. It stays on the visitor as an unverified claim in additional_attributes
+# (`claimed_email`, `claimed_phone_number`), which the contact panel shows so an agent can confirm
+# it or merge the contacts by hand.
+#
+# A phone number is held back as a claim even when nobody holds it yet. Saved on the contact it is
+# the visitor's verified phone to everything downstream: an agent bot's tools get it as
+# contact_phone, and whatever an outside system keeps for that number with it, and the real owner
+# writing in later through WhatsApp is found by it and lands on the visitor's contact. An email
+# nobody holds is still saved, because the reply-by-email of a widget conversation needs it and
+# nothing downstream treats it as a credential.
+#
+# Identifiers in WhatsApp's format ("<lid>@lid", phone and group JIDs) are refused outright: the
+# fork's WhatsApp providers store them as contact identifiers, so an unsigned setUser with
+# someone's LID would reach their WhatsApp contact, and no site identifies its users that way.
 #
 # That holds with a valid identifier_hash too: the site signs the identifier and nothing else, so a
 # signed-in visitor could otherwise send their own identifier and hash next to someone else's phone.
@@ -21,6 +32,9 @@
 # (config/initializers/unproven_contact_merge_guard.rb).
 module UnprovenContactMergeGuard
   CLAIM_PREFIX = 'claimed_'.freeze
+  # Contact's own phone_number format: anything else is not a phone number to claim.
+  PHONE_NUMBER_FORMAT = /\A\+[1-9]\d{1,14}\z/
+  WHATSAPP_IDENTIFIER_FORMAT = /@(lid|s\.whatsapp\.net|c\.us|g\.us)\z/
 
   class Context < ActiveSupport::CurrentAttributes
     attribute :unproven
@@ -34,6 +48,14 @@ module UnprovenContactMergeGuard
     Context.unproven == true
   end
 
+  def self.claimable_phone_number?(value)
+    value.to_s.match?(PHONE_NUMBER_FORMAT)
+  end
+
+  def self.whatsapp_identifier?(value)
+    value.to_s.match?(WHATSAPP_IDENTIFIER_FORMAT)
+  end
+
   module IdentifyAction
     private
 
@@ -44,9 +66,13 @@ module UnprovenContactMergeGuard
     end
 
     def merge_if_existing_phone_number_contact
-      return super unless UnprovenContactMergeGuard.unproven? && someone_else?(existing_phone_number_contact)
+      return super unless UnprovenContactMergeGuard.unproven?
 
-      hold_back_claim(:phone_number)
+      phone_number = params[:phone_number]
+      return if phone_number.blank? || phone_number == @contact.phone_number
+
+      # A value that is not a phone number is left to upstream, which discards or rejects it.
+      hold_back_claim(:phone_number) if UnprovenContactMergeGuard.claimable_phone_number?(phone_number)
     end
 
     def someone_else?(existing_contact)
@@ -78,31 +104,47 @@ module UnprovenContactMergeGuard
     def create_contact
       return super unless UnprovenContactMergeGuard.unproven?
 
-      taken = taken_contact_details
-      return super if taken.empty?
+      held_back = held_back_details
+      return super if held_back.empty?
 
-      claims = taken.to_h { |key| ["#{CLAIM_PREFIX}#{key}", contact_attributes[key]] }
-      @contact_attributes = contact_attributes.merge(taken.index_with(nil)).merge(
+      claims = held_back.to_h { |key| ["#{CLAIM_PREFIX}#{key}", contact_attributes[key]] }
+      @contact_attributes = contact_attributes.merge(held_back.index_with(nil)).merge(
         additional_attributes: (contact_attributes[:additional_attributes] || {}).to_h.merge(claims)
       )
       super
     end
 
-    def taken_contact_details
-      phone_number = contact_attributes[:phone_number]
-      taken = []
-      taken << :email if find_contact_by_email(contact_attributes[:email])
-      taken << :phone_number if phone_number.present? && account.contacts.exists?(phone_number: phone_number)
-      taken
+    def held_back_details
+      held_back = []
+      held_back << :email if find_contact_by_email(contact_attributes[:email])
+      held_back << :phone_number if UnprovenContactMergeGuard.claimable_phone_number?(contact_attributes[:phone_number])
+      held_back
+    end
+  end
+
+  module RefusesWhatsappIdentifier
+    private
+
+    def whatsapp_identifier_refused?
+      return false unless UnprovenContactMergeGuard.whatsapp_identifier?(params[:identifier])
+
+      render json: { error: 'This identifier is reserved for WhatsApp contacts' }, status: :unprocessable_entity
+      true
     end
   end
 
   module WidgetContacts
+    include RefusesWhatsappIdentifier
+
     def update
+      return if whatsapp_identifier_refused?
+
       UnprovenContactMergeGuard.unproven { super }
     end
 
     def set_user
+      return if whatsapp_identifier_refused?
+
       UnprovenContactMergeGuard.unproven { super }
     end
   end
@@ -120,12 +162,27 @@ module UnprovenContactMergeGuard
   end
 
   module PublicContacts
+    include RefusesWhatsappIdentifier
+
     def create
+      return if whatsapp_identifier_refused?
+
       UnprovenContactMergeGuard.unproven { super }
     end
 
     def update
       UnprovenContactMergeGuard.unproven { super }
+    end
+
+    private
+
+    # Upstream raises a bare StandardError for a missing or wrong hash, which reaches the client as a 500.
+    def process_hmac
+      super
+    rescue StandardError => e
+      raise unless e.message.start_with?('HMAC failed')
+
+      render json: { error: e.message }, status: :unauthorized
     end
   end
 

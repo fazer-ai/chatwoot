@@ -72,7 +72,8 @@ RSpec.describe '/api/v1/widget/conversations/toggle_typing', type: :request do
       json_response = response.parsed_body
       expect(json_response['id']).not_to be_nil
       expect(json_response['contact']['email']).to eq 'contact-email@chatwoot.com'
-      expect(json_response['contact']['phone_number']).to eq '+919745313456'
+      expect(json_response['contact']['phone_number']).to be_nil
+      expect(contact.reload.additional_attributes['claimed_phone_number']).to eq '+919745313456'
       expect(json_response['contact']['name']).to eq 'contact-name'
     end
 
@@ -134,8 +135,8 @@ RSpec.describe '/api/v1/widget/conversations/toggle_typing', type: :request do
       json_response = response.parsed_body
       expect(json_response['id']).not_to be_nil
       expect(json_response['contact']['id']).to eq contact.id
-      expect(json_response['contact']['phone_number']).to eq '+919745313456'
-      expect(contact.reload.additional_attributes['claimed_email']).to eq existing_contact.email
+      expect(contact.reload.additional_attributes).to include('claimed_email' => existing_contact.email,
+                                                              'claimed_phone_number' => '+919745313456')
       expect(json_response['custom_attributes']['order_id']).to eq '12345'
       expect(json_response['messages'][0]['content']).to eq 'This is a test message'
     end

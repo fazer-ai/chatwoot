@@ -37,6 +37,18 @@
     }
   },
   "CONTACT_PANEL": {
-    "OPEN_IN_AGENTS": "Open in fazer.ai agents"
+    "OPEN_IN_AGENTS": "Open in fazer.ai agents",
+    "UNVERIFIED_DETAILS": {
+      "TITLE": "Typed by the visitor, not verified",
+      "DESCRIPTION": "The visitor typed this on the website chat or through the API. Nothing proves it is theirs, so it was not saved on the contact.",
+      "EMAIL": "Email",
+      "PHONE_NUMBER": "Phone number",
+      "HELD_BY": "Already on {name}'s contact. Open it to merge the two if they are the same person.",
+      "CONFIRM": "Confirm",
+      "DISMISS": "Dismiss",
+      "CONFIRMED": "Saved on the contact",
+      "DISMISSED": "Dismissed",
+      "ERROR": "Could not update the contact"
+    }
   }
 }

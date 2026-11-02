@@ -37,6 +37,18 @@
     }
   },
   "CONTACT_PANEL": {
-    "OPEN_IN_AGENTS": "Abrir no fazer.ai agents"
+    "OPEN_IN_AGENTS": "Abrir no fazer.ai agents",
+    "UNVERIFIED_DETAILS": {
+      "TITLE": "Informado pelo visitante, não verificado",
+      "DESCRIPTION": "O visitante digitou isto no chat do site ou pela API. Nada comprova que é dele, por isso não foi salvo no contato.",
+      "EMAIL": "E-mail",
+      "PHONE_NUMBER": "Telefone",
+      "HELD_BY": "Já está no contato de {name}. Abra para juntar os dois se forem a mesma pessoa.",
+      "CONFIRM": "Confirmar",
+      "DISMISS": "Descartar",
+      "CONFIRMED": "Salvo no contato",
+      "DISMISSED": "Descartado",
+      "ERROR": "Não foi possível atualizar o contato"
+    }
   }
 }
