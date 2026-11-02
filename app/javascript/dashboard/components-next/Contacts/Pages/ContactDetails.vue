@@ -67,16 +67,15 @@ const avatarSrc = computed(() => {
   return avatarUrl.value ? avatarUrl.value : contactData.value?.thumbnail;
 });
 
-// A claim settled from the unverified details: apply only what changed to the local copy, which
-// still holds the agent's unsaved edits, and remount the form so it shows it.
-const formKey = ref(0);
+// A claim settled from the unverified details: write only what changed into the local copy and into
+// the form's own state, which may hold edits not yet emitted (the form emits only once valid).
 const applySettledClaim = ({ changes, claimKey }) => {
   Object.assign(contactData.value, changes);
+  Object.assign(contactsFormRef.value.state, changes);
   contactData.value.additionalAttributes = {
     ...contactData.value.additionalAttributes,
     [claimKey]: null,
   };
-  formKey.value += 1;
 };
 
 const handleFormUpdate = updatedData => {
@@ -206,7 +205,6 @@ const handleAvatarDelete = async () => {
         @settled="applySettledClaim"
       />
       <ContactsForm
-        :key="formKey"
         ref="contactsFormRef"
         :contact-data="contactData"
         is-details-view
