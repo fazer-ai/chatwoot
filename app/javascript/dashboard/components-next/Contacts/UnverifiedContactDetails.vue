@@ -4,6 +4,10 @@
 // additional_attributes as claimed_email / claimed_phone_number). The agent confirms it, which
 // makes it the contact's own, or, when another contact already holds it, opens that contact to
 // merge the two after checking.
+//
+// The contact page reads its contact through the store getter, which camelizes every key, nested
+// ones included (additionalAttributes.claimedEmail); the conversation panel passes the raw
+// payload. Both shapes are read.
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'dashboard/composables/store';
@@ -15,6 +19,10 @@ const props = defineProps({
   contact: { type: Object, required: true },
 });
 
+// The contact page edits a local copy of the contact and posts all of it on save, so it reloads
+// that copy after a claim settles; otherwise a later save would bring back what was just settled.
+const emit = defineEmits(['settled']);
+
 const { t } = useI18n();
 const store = useStore();
 const holders = ref({});
@@ -24,6 +32,7 @@ const CLAIMS = [
   {
     field: 'email',
     claimKey: 'claimed_email',
+    camelKey: 'claimedEmail',
     label: t('CONTACT_PANEL.UNVERIFIED_DETAILS.EMAIL'),
     heldBy: (contact, value) =>
       contact.email?.toLowerCase() === value.toLowerCase(),
@@ -31,17 +40,21 @@ const CLAIMS = [
   {
     field: 'phone_number',
     claimKey: 'claimed_phone_number',
+    camelKey: 'claimedPhoneNumber',
     label: t('CONTACT_PANEL.UNVERIFIED_DETAILS.PHONE_NUMBER'),
     heldBy: (contact, value) => contact.phone_number === value,
   },
 ];
 
 const claims = computed(() => {
-  const attributes = props.contact.additional_attributes || {};
-  return CLAIMS.filter(claim => attributes[claim.claimKey]).map(claim => ({
+  const attributes =
+    props.contact.additional_attributes ||
+    props.contact.additionalAttributes ||
+    {};
+  return CLAIMS.map(claim => ({
     ...claim,
-    value: attributes[claim.claimKey],
-  }));
+    value: attributes[claim.claimKey] || attributes[claim.camelKey],
+  })).filter(claim => claim.value);
 });
 
 const findHolder = async claim => {
@@ -80,6 +93,7 @@ const settle = async (claim, attributes, successMessage) => {
       additional_attributes: { [claim.claimKey]: null },
     });
     useAlert(successMessage);
+    emit('settled');
   } catch {
     useAlert(t('CONTACT_PANEL.UNVERIFIED_DETAILS.ERROR'));
   } finally {

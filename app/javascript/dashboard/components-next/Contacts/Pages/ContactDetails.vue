@@ -67,6 +67,15 @@ const avatarSrc = computed(() => {
   return avatarUrl.value ? avatarUrl.value : contactData.value?.thumbnail;
 });
 
+const formKey = ref(0);
+const reloadFromStore = () => {
+  Object.assign(
+    contactData.value,
+    store.getters['contacts/getContactById'](props.selectedContact.id)
+  );
+  formKey.value += 1;
+};
+
 const handleFormUpdate = updatedData => {
   Object.assign(contactData.value, updatedData);
 };
@@ -191,8 +200,10 @@ const handleAvatarDelete = async () => {
       <UnverifiedContactDetails
         v-if="selectedContact"
         :contact="selectedContact"
+        @settled="reloadFromStore"
       />
       <ContactsForm
+        :key="formKey"
         ref="contactsFormRef"
         :contact-data="contactData"
         is-details-view

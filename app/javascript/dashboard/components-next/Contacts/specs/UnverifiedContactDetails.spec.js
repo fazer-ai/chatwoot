@@ -76,6 +76,7 @@ describe('UnverifiedContactDetails', () => {
     expect(useAlert).toHaveBeenCalledWith(
       'CONTACT_PANEL.UNVERIFIED_DETAILS.CONFIRMED'
     );
+    expect(wrapper.emitted('settled')).toHaveLength(1);
   });
 
   it('points to the contact that already holds the value instead of offering to confirm it', async () => {
@@ -92,6 +93,22 @@ describe('UnverifiedContactDetails', () => {
     expect(
       buttonLabeled(wrapper, 'CONTACT_PANEL.UNVERIFIED_DETAILS.CONFIRM')
     ).toBeUndefined();
+  });
+
+  it('reads the camelized contact the contact page gets from the store', async () => {
+    ContactAPI.search.mockResolvedValue({ data: { payload: [] } });
+    const wrapper = mount(UnverifiedContactDetails, {
+      props: {
+        contact: {
+          id: 7,
+          additionalAttributes: { claimedPhoneNumber: '+5511977776666' },
+        },
+      },
+      global: { stubs: { RouterLink: true, Button: true } },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('+5511977776666');
   });
 
   it('dismisses a claim without touching the contact field', async () => {
