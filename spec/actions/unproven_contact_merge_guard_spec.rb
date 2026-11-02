@@ -94,8 +94,29 @@ RSpec.describe 'Unproven contact merge on public channels', type: :request do
     end
 
     context 'with a valid identifier hash' do
-      it 'joins the contact the site vouched for, as before' do
-        identifier_hash = OpenSSL::HMAC.hexdigest('sha256', web_widget.hmac_token, identifier)
+      let(:identifier_hash) { OpenSSL::HMAC.hexdigest('sha256', web_widget.hmac_token, identifier) }
+
+      # The hash signs the identifier and nothing else: a signed-in visitor can send their own
+      # identifier and hash next to someone else's email.
+      context 'with the email of a contact that lacks that identifier' do
+        before do
+          patch '/api/v1/widget/contact/set_user',
+                params: { website_token: web_widget.website_token, identifier: identifier, identifier_hash: identifier_hash,
+                          email: customer.email },
+                headers: headers, as: :json
+        end
+
+        it_behaves_like 'a session that keeps its own contact'
+
+        it 'still identifies the visitor by the signed identifier' do
+          expect(response).to have_http_status(:success)
+          expect(visitor.reload.identifier).to eq(identifier)
+          expect(visitor.additional_attributes['claimed_email']).to eq(customer.email)
+        end
+      end
+
+      it 'joins the contact that holds the signed identifier' do
+        customer.update!(identifier: identifier)
         patch '/api/v1/widget/contact/set_user',
               params: { website_token: web_widget.website_token, identifier: identifier, identifier_hash: identifier_hash,
                         email: customer.email },
@@ -103,7 +124,6 @@ RSpec.describe 'Unproven contact merge on public channels', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(visitor_session.reload.contact_id).to eq(customer.id)
-        expect(customer.reload.identifier).to eq(identifier)
       end
     end
   end
@@ -153,6 +173,16 @@ RSpec.describe 'Unproven contact merge on public channels', type: :request do
       expect(response.parsed_body['email']).to be_nil
       expect(response.parsed_body['name']).not_to eq('Customer')
       expect(response.parsed_body['phone_number']).to be_nil
+    end
+
+    it 'still finds the contact that holds a signed identifier' do
+      customer.update!(identifier: 'customer-42')
+      identifier_hash = OpenSSL::HMAC.hexdigest('sha256', api_channel.hmac_token, 'customer-42')
+      post "/public/api/v1/inboxes/#{api_channel.identifier}/contacts",
+           params: { identifier: 'customer-42', identifier_hash: identifier_hash, email: 'someone.else@example.com' }
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['id']).to eq(customer.id)
     end
 
     it 'creates the new session with the taken email kept as a claim' do

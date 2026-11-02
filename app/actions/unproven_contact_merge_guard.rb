@@ -7,13 +7,15 @@
 # customer's name. Upstream closed the case where the existing contact carries an identifier
 # (chatwoot/chatwoot#14935); a contact that came in through WhatsApp or an API inbox carries none.
 #
-# Inside a request that is not HMAC-proven, a value that already belongs to another contact is
-# therefore not used to find or merge one. It stays on the visitor as an unverified claim in
+# Inside those requests a value that already belongs to another contact is therefore not used to
+# find or merge one. It stays on the visitor as an unverified claim in
 # additional_attributes (`claimed_email`, `claimed_phone_number`), which agents can read and act on
 # by merging the contacts by hand once they have checked. A value nobody holds is saved as before.
 #
-# Proof is a valid identifier_hash in the same request. The site signs the identifier, and a merge
-# it vouches for that way keeps working, with the email and phone it sends along.
+# That holds with a valid identifier_hash too: the site signs the identifier and nothing else, so a
+# signed-in visitor could otherwise send their own identifier and hash next to someone else's phone.
+# The identifier keeps finding and merging its contact as upstream does, signed or, where the inbox
+# leaves HMAC optional, unsigned (upstream's contract for setUser without identity validation).
 #
 # Module prepends rather than edits to upstream files, so an upstream sync never conflicts here
 # (config/initializers/unproven_contact_merge_guard.rb).
@@ -24,8 +26,8 @@ module UnprovenContactMergeGuard
     attribute :unproven
   end
 
-  def self.unproven(proven: false, &)
-    Context.set(unproven: !proven, &)
+  def self.unproven(&)
+    Context.set(unproven: true, &)
   end
 
   def self.unproven?
@@ -66,7 +68,7 @@ module UnprovenContactMergeGuard
   module ContactBuilder
     private
 
-    # Only the identifier finds an existing contact here; its proof is checked by the caller.
+    # Only the identifier finds an existing contact here, under the caller's HMAC rules.
     def find_contact
       return super unless UnprovenContactMergeGuard.unproven?
 
@@ -97,17 +99,11 @@ module UnprovenContactMergeGuard
 
   module WidgetContacts
     def update
-      UnprovenContactMergeGuard.unproven(proven: hmac_proven?) { super }
+      UnprovenContactMergeGuard.unproven { super }
     end
 
     def set_user
-      UnprovenContactMergeGuard.unproven(proven: hmac_proven?) { super }
-    end
-
-    private
-
-    def hmac_proven?
-      params[:identifier].present? && params[:identifier_hash].present? && valid_hmac?
+      UnprovenContactMergeGuard.unproven { super }
     end
   end
 
@@ -125,17 +121,11 @@ module UnprovenContactMergeGuard
 
   module PublicContacts
     def create
-      UnprovenContactMergeGuard.unproven(proven: hmac_proven?) { super }
+      UnprovenContactMergeGuard.unproven { super }
     end
 
     def update
-      UnprovenContactMergeGuard.unproven(proven: hmac_proven?) { super }
-    end
-
-    private
-
-    def hmac_proven?
-      params[:identifier].present? && params[:identifier_hash].present? && valid_hmac?
+      UnprovenContactMergeGuard.unproven { super }
     end
   end
 
