@@ -652,7 +652,8 @@ RSpec.describe Message do
       conversation.resolved!
 
       expect { message.save! }.to have_enqueued_job(Conversations::ActivityMessageJob)
-        .with(conversation, hash_including(content: 'Conversa desatribuída de Bia porque não é membro do time da conversa, plantão'))
+        .with(conversation,
+              hash_including(content: 'A conversa deixou de estar atribuída a Bia, que não faz parte da equipe da conversa (plantão)'))
     end
 
     it 'keeps an assignee who is a member of the team' do

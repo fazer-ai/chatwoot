@@ -55,6 +55,7 @@ describe('fazer.ai translation overlay', () => {
       pt_BR: [
         'ATTRIBUTES.STATUS',
         'SENDER_TYPES.AGENT_BOT',
+        'SENDER_TYPES.CAPTAIN',
         'ADD.FORM.MONITOR.LABEL',
         'ATTRIBUTES.CAPTAIN',
       ],
