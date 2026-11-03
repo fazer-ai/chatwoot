@@ -110,7 +110,6 @@ export default {
       ],
       emittedValues: [],
       pendingSync: null,
-      isTextSelected: false, // Tracks text selection and prevents unnecessary re-renders on mouse selection
       showSlashMenu: false,
       slashSearchTerm: '',
       slashRange: null,
@@ -458,7 +457,6 @@ export default {
           if (tx.docChanged) {
             this.emitOnChange();
           }
-          this.checkSelection(state);
         },
         handleDrop: (view, event, slice, moved) => {
           if (moved) return false;
@@ -549,64 +547,10 @@ export default {
       return false;
     },
     onBlur() {
-      // ProseMirror keeps its selection on blur — clear the menu flag manually.
-      this.isTextSelected = false;
-      this.$refs.editor?.classList.remove('has-selection');
       this.$emit('blur');
     },
     onFocus() {
       this.$emit('focus');
-    },
-    checkSelection(editorState) {
-      const { selection } = editorState;
-      // Skip NodeSelection (from Esc -> selectParentNode); only text ranges count.
-      const hasSelection = !selection.empty && !selection.node;
-      // If the selection state is the same as the previous state, do nothing
-      if (hasSelection === this.isTextSelected) return;
-      // Update the selection state
-      this.isTextSelected = hasSelection;
-
-      const { editor } = this.$refs;
-
-      // Toggle the 'has-selection' class based on whether there's a selection
-      editor.classList.toggle('has-selection', hasSelection);
-      // If there's a selection, update the menubar position
-      if (hasSelection) this.setMenubarPosition(editorState);
-    },
-    setMenubarPosition(editorState) {
-      if (!editorState.selection) return;
-
-      // Get the start and end positions of the selection
-      const { from, to } = editorState.selection;
-      const { editor } = this.$refs;
-      // Get the editor's position relative to the viewport
-      const { left: editorLeft, top: editorTop } =
-        editor.getBoundingClientRect();
-
-      // Get the editor's width
-      const editorWidth = editor.offsetWidth;
-      const menubar = editor.querySelector('.ProseMirror-menubar');
-      const menubarWidth = menubar ? menubar.scrollWidth : 480;
-
-      // Get the end position of the selection
-      const { bottom: endBottom, right: endRight } = editorView.coordsAtPos(to);
-      // Get the start position of the selection
-      const { left: startLeft } = editorView.coordsAtPos(from);
-
-      // Calculate the top position for the menubar (10px below the selection)
-      const top = endBottom - editorTop + 10;
-      // Calculate the left position for the menubar
-      // This centers the menubar on the selection while keeping it within the editor's bounds
-      const left = Math.max(
-        0,
-        Math.min(
-          (startLeft + endRight) / 2 - editorLeft,
-          editorWidth - menubarWidth
-        )
-      );
-      // Set the CSS custom properties for positioning the menubar
-      editor.style.setProperty('--selection-top', `${top}px`);
-      editor.style.setProperty('--selection-left', `${left}px`);
     },
   },
 };

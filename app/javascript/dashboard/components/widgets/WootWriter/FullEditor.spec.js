@@ -1484,29 +1484,6 @@ describe('FullEditor', () => {
       expect(wrapper.emitted('keydown')).toHaveLength(1);
     });
 
-    it('flags a text range and positions the floating menubar', async () => {
-      mountEditor({ modelValue: 'Hello' });
-      selectAll();
-      await wrapper.vm.$nextTick();
-
-      const editor = wrapper.vm.$refs.editor;
-      expect(editor.classList.contains('has-selection')).toBe(true);
-      expect(editor.style.getPropertyValue('--selection-top')).toBe('10px');
-      expect(editor.style.getPropertyValue('--selection-left')).toBe('0px');
-    });
-
-    it('clears the selection flag on blur', async () => {
-      mountEditor({ modelValue: 'Hello' });
-      selectAll();
-      await wrapper.vm.$nextTick();
-      view.dom.dispatchEvent(new FocusEvent('blur'));
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.$refs.editor.classList.contains('has-selection')).toBe(
-        false
-      );
-    });
-
     it('collapses the selection on escape when the menu is closed', async () => {
       mountEditor({ modelValue: 'Hello' });
       selectAll();

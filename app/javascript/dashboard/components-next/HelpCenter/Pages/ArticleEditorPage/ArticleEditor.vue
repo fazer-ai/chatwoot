@@ -258,34 +258,26 @@ const handleCreateArticle = event => {
   }
 }
 
+// Fixed toolbar: always visible and pinned to the top of the scrolling
+// editor area, instead of the floating bubble shown on text selection.
 :deep(.ProseMirror-menubar) {
-  display: none; // Hide by default
+  @apply sticky top-0 z-40 flex flex-wrap items-center gap-4 rounded-lg !px-3 !py-1.5 mb-3 bg-n-background shadow-md outline outline-1 outline-n-weak;
+  width: 100% !important;
+
+  .ProseMirror-menuitem {
+    @apply ltr:mr-0 rtl:ml-0 size-4 flex items-center;
+
+    .ProseMirror-icon {
+      @apply p-0.5 flex-shrink-0 ltr:mr-2 rtl:ml-2;
+    }
+  }
+
+  .ProseMirror-menu-active {
+    @apply bg-n-slate-3;
+  }
 }
 
-:deep(.editor-root .has-selection) {
-  .ProseMirror-menubar:not(:has(*)) {
-    display: none !important;
-  }
-
-  .ProseMirror-menubar {
-    @apply rounded-lg !px-3 !py-1.5 z-50 bg-n-background items-center gap-4 ml-0 mb-0 shadow-md outline outline-1 outline-n-weak;
-    display: flex;
-    top: var(--selection-top, auto) !important;
-    left: var(--selection-left, 0) !important;
-    width: fit-content !important;
-    position: absolute !important;
-
-    .ProseMirror-menuitem {
-      @apply ltr:mr-0 rtl:ml-0 size-4 flex items-center;
-
-      .ProseMirror-icon {
-        @apply p-0.5 flex-shrink-0 ltr:mr-2 rtl:ml-2;
-      }
-    }
-
-    .ProseMirror-menu-active {
-      @apply bg-n-slate-3;
-    }
-  }
+:deep(.ProseMirror-menubar:not(:has(*))) {
+  display: none !important;
 }
 </style>
