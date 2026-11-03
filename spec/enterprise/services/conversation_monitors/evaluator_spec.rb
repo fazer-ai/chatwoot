@@ -156,7 +156,8 @@ RSpec.describe ConversationMonitors::Evaluator do
   end
 
   it 'holds exhausted accounts until next month and preserves full history across new input' do
-    travel_to(Time.utc(2026, 10, 31, 12))
+    # The last day of next month: always after the work item built by the before block, with 19 earlier days in it.
+    travel_to(1.month.from_now.utc.end_of_month.change(hour: 12))
     now = Time.current.utc
     reset = now.beginning_of_month.next_month
     (1..19).each do |days_ago|
@@ -184,7 +185,7 @@ RSpec.describe ConversationMonitors::Evaluator do
   end
 
   it 'preserves the monthly hold through an earlier batch provider cooldown after the reset' do
-    travel_to(Time.utc(2026, 10, 31, 23, 55))
+    travel_to(1.month.from_now.utc.end_of_month.change(hour: 23, min: 55))
     now = Time.current.utc
     reset = now.beginning_of_month.next_month
     (1..19).each do |days_ago|
