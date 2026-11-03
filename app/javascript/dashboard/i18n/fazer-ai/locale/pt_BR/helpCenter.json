@@ -27,8 +27,8 @@
           "SORT_BY": "Ordenar por",
           "ORDER": "Ordem",
           "FIELDS": {
-            "UPDATED_AT": "Atualização",
-            "CREATED_AT": "Criação",
+            "UPDATED_AT": "Última atualização",
+            "CREATED_AT": "Data de criação",
             "TITLE": "Título",
             "VIEWS": "Visualizações"
           },

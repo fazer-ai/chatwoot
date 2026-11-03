@@ -3,11 +3,11 @@
     "BETA_DESCRIPTION": "Este recurso está em fase beta e pode mudar conforme o aprimoramos."
   },
   "CONVERSATION": {
-    "UNSUPPORTED_MESSAGE": "Esta mensagem não é suportada. Você pode ver esta mensagem no aplicativo.",
+    "UNSUPPORTED_MESSAGE": "Este tipo de mensagem não é compatível. Você pode visualizá-la no aplicativo.",
     "REPLYBOX": {
       "INSERT_READ_MORE": "Ler mais"
     },
-    "CHANGE_TEAM": "Time da conversa alterado"
+    "CHANGE_TEAM": "Equipe da conversa alterada"
   },
   "INBOX_MGMT": {
     "ADD": {
@@ -68,13 +68,13 @@
       },
       "ENTERPRISE_PAYWALL": {
         "UPGRADE_PROMPT": "Faça upgrade para um plano pago para exigir atributos obrigatórios antes da resolução da conversa.",
-        "ASK_ADMIN": "Entre em contato com seu administrador para o upgrade."
+        "ASK_ADMIN": "Entre em contato com o seu administrador para fazer o upgrade."
       }
     }
   },
   "AUTOMATION": {
     "ACTIONS": {
-      "REMOVE_ASSIGNED_AGENT": "Remover Agente Atribuído"
+      "REMOVE_ASSIGNED_AGENT": "Remover agente atribuído"
     }
   }
 }

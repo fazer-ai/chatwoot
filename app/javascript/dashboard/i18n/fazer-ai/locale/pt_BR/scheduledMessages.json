@@ -24,7 +24,7 @@
       "GO_TO_MESSAGE": "Ir para a mensagem",
       "SEARCHING_MESSAGE": "Buscando mensagem...",
       "MESSAGE_NOT_FOUND": "A mensagem vinculada não foi encontrada. Ela pode ter sido excluída.",
-      "HELD_REASON": "Retida porque o cliente respondeu antes desta mensagem ser enviada."
+      "HELD_REASON": "Retida porque o cliente respondeu antes de esta mensagem ser enviada."
     },
     "MODAL": {
       "TITLE_NEW": "Agendar mensagem",
@@ -42,7 +42,7 @@
       "SAVE_DRAFT": "Salvar como rascunho",
       "SCHEDULE": "Agendar",
       "HOLD_ON_REPLY_LABEL": "Reter se o cliente responder primeiro",
-      "HOLD_ON_REPLY_DESCRIPTION": "Se o cliente enviar uma mensagem antes desta ser enviada, ela ficará retida para revisão em vez de ser enviada automaticamente.",
+      "HOLD_ON_REPLY_DESCRIPTION": "Se o cliente enviar uma mensagem antes de esta ser enviada, ela ficará retida para revisão em vez de ser enviada automaticamente.",
       "SHORTCUTS": {
         "TOMORROW_MORNING": "Amanhã de manhã",
         "TOMORROW_AFTERNOON": "Amanhã à tarde",
@@ -53,7 +53,7 @@
       "CUSTOM_INPUT_HINT": "Tente: amanhã às 15h, próxima segunda, 20 de março às 10h",
       "PARSED_DATE_IN_PAST": "Esta data já passou",
       "DATEPICKER_TOOLTIP": "Escolher no calendário",
-      "SCHEDULE_LABEL": "Programar envio"
+      "SCHEDULE_LABEL": "Agendar envio"
     },
     "CONFIRM_CLOSE": {
       "TITLE": "Alterações não salvas",
@@ -69,7 +69,7 @@
       "DELETE": "Excluir"
     },
     "ERRORS": {
-      "CONTENT_REQUIRED": "Adicione uma mensagem, template ou anexo antes de salvar.",
+      "CONTENT_REQUIRED": "Adicione uma mensagem, um modelo ou um anexo antes de salvar.",
       "CONTENT_TOO_LONG": "A mensagem é muito longa. Máximo de {maxLength} caracteres permitidos.",
       "DATETIME_REQUIRED": "Selecione uma data e hora para agendar a mensagem.",
       "SCHEDULE_IN_PAST": "O horário agendado deve ser no futuro.",
@@ -123,11 +123,11 @@
       "NEXT_SEND": "Próxima: {time}",
       "EXPAND": "Expandir histórico",
       "COLLAPSE": "Recolher histórico",
-      "STOP": "Parar recorrência",
+      "STOP": "Interromper recorrência",
       "STOP_CONFIRM": {
-        "TITLE": "Parar recorrência",
+        "TITLE": "Interromper recorrência",
         "MESSAGE": "A mensagem pendente será removida e a recorrência será encerrada permanentemente.",
-        "CONFIRM": "Parar",
+        "CONFIRM": "Interromper",
         "CANCEL": "Cancelar"
       },
       "EDIT": "Editar recorrência",

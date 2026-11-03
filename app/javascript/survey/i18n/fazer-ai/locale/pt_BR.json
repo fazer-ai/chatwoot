@@ -1,7 +1,7 @@
 {
   "SURVEY": {
     "RATING": {
-      "CONFIRM_LABEL": "Confirme a nota que você escolheu para enviá-la.",
+      "CONFIRM_LABEL": "Confirme a nota escolhida para enviá-la.",
       "CONFIRM_BUTTON": "Confirmar nota",
       "SELECTED": "Sua nota: {rating}"
     }

@@ -8,7 +8,7 @@
       "TEMPLATE_USE": "Usar este template"
     },
     "ACTIONS": {
-      "CREATE_SCHEDULED_MESSAGE": "Criar Mensagem Agendada",
+      "CREATE_SCHEDULED_MESSAGE": "Criar mensagem agendada",
       "REMOVE_CUSTOM_ATTRIBUTE": "Remover atributo personalizado"
     },
     "ATTRIBUTES": {
@@ -19,7 +19,7 @@
       "CONTACT": "Contato",
       "USER": "Agente",
       "AGENT_BOT": "Bot",
-      "CAPTAIN": "Capitão"
+      "CAPTAIN": "Captain"
     },
     "EVENTS": {
       "MESSAGE_EDITED": "Mensagem editada"
@@ -33,7 +33,7 @@
           "EXPLANATION": {
             "CONVERSATION_INACTIVE": "A contagem começa na última atividade da conversa. Se nada acontecer nela por {duration}, as ações abaixo serão executadas. Qualquer nova atividade reinicia a contagem."
           },
-          "INBOX_ERROR": "Escolha pelo menos uma caixa de entrada para essa espera."
+          "INBOX_ERROR": "Selecione pelo menos uma caixa de entrada para esta espera."
         }
       }
     }

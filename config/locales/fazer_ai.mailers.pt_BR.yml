@@ -21,27 +21,27 @@ pt_BR:
       csat:
         ratings:
           poor: Ruim
-          fair: Regular
-          average: Neutro
+          fair: Fraco
+          average: Regular
           good: Bom
           excellent: Excelente
     agent_notifications:
       conversation_creation:
-        subject: "%{agent_name}, Uma nova conversa [ID - %{conversation_id}] foi criada em %{inbox_name}."
+        subject: "%{agent_name}, uma nova conversa [ID - %{conversation_id}] foi criada em %{inbox_name}."
         body: 'Uma nova conversa (<a href="%{url}">#%{conversation_id}</a>) foi criada em %{inbox_name}. <strong>%{contact_name}</strong> escreveu:'
       conversation_assignment:
-        subject: "%{agent_name}, Uma nova conversa [ID - %{conversation_id}] foi atribuída a você."
+        subject: "%{agent_name}, uma nova conversa [ID - %{conversation_id}] foi atribuída a você."
         body: Uma nova conversa foi atribuída a você
       conversation_mention:
         subject: "%{agent_name}, Você foi mencionado na conversa [ID - %{conversation_id}]"
         body: 'Você foi mencionado em uma conversa. <b>%{sender_name}</b> escreveu:'
         previous_messages: 'Mensagens anteriores:'
-        view_message: Ver Mensagem
+        view_message: Ver mensagem
       assigned_conversation_new_message:
         subject: "%{agent_name}, Nova mensagem na sua conversa atribuída [ID - %{conversation_id}]."
         body: Você recebeu uma nova mensagem na sua conversa atribuída.
       participating_conversation_new_message:
-        subject: "%{agent_name}, Nova mensagem na sua conversa participante [ID - %{conversation_id}]."
+        subject: "%{agent_name}, nova mensagem em uma conversa da qual você participa [ID - %{conversation_id}]."
         body: Você recebeu uma nova mensagem em uma conversa da qual você participa.
       sla_missed_first_response:
         subject: Conversa [ID - %{conversation_id}] violou o SLA de primeira resposta
@@ -92,14 +92,14 @@ pt_BR:
           explanation: Isso normalmente acontece quando você exclui atributos personalizados que ainda estão sendo usados em regras de automação.
           action: Clique <a href="%{url}">aqui</a> para atualizar as condições.
         contact_import_complete:
-          subject: Importação de Contatos Concluída
+          subject: Importação de contatos concluída
           body: Sua importação de contatos foi concluída. Verifique a aba de contatos para visualizar os contatos importados.
           imported_records: 'Número de registros importados: %{count}'
           failed_records: 'Número de registros com falha: %{count}'
           click_to_view_imported: Clique <a href="%{url}">aqui</a> para visualizar os contatos importados.
           click_to_view_failed: Clique <a href="%{url}" target="_blank">aqui</a> para visualizar os registros com falha.
         contact_import_failed:
-          subject: Falha na Importação de Contatos
+          subject: Falha na importação de contatos
           body: Sua importação de contatos falhou. Parece que o arquivo CSV enviado pode não ser válido. Por favor, revise o arquivo e garanta que ele esteja no formato correto.
         contact_export_complete:
           subject: Seu arquivo de exportação de contatos está disponível para download.
@@ -132,17 +132,17 @@ pt_BR:
           body: Sua integração com o Dialogflow foi desconectada devido a problemas de permissão. Para resolver isso, exclua a integração do painel de administração e reconecte-a usando novas credenciais.
       account_compliance:
         account_deleted:
-          subject: Notificação de Exclusão de Conta para %{account_id} - %{account_name}
+          subject: Notificação de exclusão de conta para %{account_id} - %{account_name}
           body: Esta é uma notificação para informar que uma conta foi permanentemente excluída da sua instância %{brand_name}.
           installation: 'Instalação %{brand_name}:'
-          account_id: 'ID da Conta:'
-          account_name: 'Nome da Conta:'
+          account_id: 'ID da conta:'
+          account_name: 'Nome da conta:'
           deletion_due_at: 'Exclusão prevista para:'
           deleted_at: 'Excluída em:'
-          deletion_reason: 'Motivo da Exclusão:'
-          deleted_users: 'Usuários Excluídos (%{count}):'
-          deleted_users_none: 'Usuários Excluídos: Nenhum'
-          user_id: 'ID do Usuário:'
+          deletion_reason: 'Motivo da exclusão:'
+          deleted_users: 'Usuários excluídos (%{count}):'
+          deleted_users_none: 'Usuários excluídos: nenhum'
+          user_id: 'ID do usuário:'
           compliance_notice: Este e-mail serve como registro para fins de conformidade.
           thank_you: Obrigado,
           system_name: Sistema %{brand_name}

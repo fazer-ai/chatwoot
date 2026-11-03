@@ -8,7 +8,7 @@
         "NAME": {
           "LABEL": "Nome da marca",
           "PLACEHOLDER": "Sua empresa",
-          "HELP": "Aparece no rodapé do e-mail, depois de \"Fornecido por\"."
+          "HELP": "Aparece no rodapé do e-mail, depois de \"Desenvolvido por\"."
         },
         "URL": {
           "LABEL": "Site da marca",
@@ -24,7 +24,7 @@
           "UPLOAD": "Enviar logo",
           "REPLACE": "Trocar logo",
           "REMOVE": "Remover",
-          "HELP": "PNG, JPG ou GIF, até 2 MB. SVG não é aceito porque os aplicativos de e-mail não exibem."
+          "HELP": "PNG, JPG ou GIF, até 2 MB. SVG não é aceito porque os clientes de e-mail não o exibem."
         },
         "API": {
           "SUCCESS": "Marca dos e-mails atualizada",

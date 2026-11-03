@@ -24,7 +24,7 @@
           }
         },
         "PREVIEW": {
-          "TITLE": "Pré-visualização da Assinatura",
+          "TITLE": "Pré-visualização da assinatura",
           "NOTE": "Esta é a aparência da sua assinatura nas mensagens",
           "EMPTY": "Digite uma assinatura acima para ver a pré-visualização",
           "SAMPLE_MESSAGE": "Olá! Obrigado por entrar em contato. Como posso ajudá-lo hoje?"
@@ -32,7 +32,7 @@
       },
       "NOTIFICATIONS": {
         "TYPES": {
-          "INTERNAL_CHAT_MENTION": "Você é mencionado no chat interno",
+          "INTERNAL_CHAT_MENTION": "Você foi mencionado no chat interno",
           "INTERNAL_CHAT_NEW_MESSAGE": "Uma nova mensagem direta no chat interno"
         }
       }

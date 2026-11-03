@@ -5,17 +5,17 @@
         "PROVIDERS": {
           "360_DIALOG_DESC": "Conectar através de credenciais 360Dialog",
           "BAILEYS": "Baileys",
-          "BAILEYS_DESC": "Conectar via API não oficial Baileys",
+          "BAILEYS_DESC": "Conectar pela API não oficial do Baileys",
           "ZAPI": "Z-API",
-          "ZAPI_DESC": "Conectar via API não oficial Z-API",
+          "ZAPI_DESC": "Conectar pela API não oficial da Z-API",
           "NATIVE": "WhatsApp (nativo)",
           "NATIVE_DESC": "Conectar via API não oficial, pareando como no WhatsApp Web, sem provedor externo",
           "UAZAPI": "Uazapi",
-          "UAZAPI_DESC": "Conectar via API não oficial Uazapi, na sua própria instância"
+          "UAZAPI_DESC": "Conectar pela API não oficial da Uazapi, na sua própria instância"
         },
         "PROVIDER_URL": {
           "LABEL": "URL do provedor",
-          "PLACEHOLDER": "Se o provedor não está rodando localmente, por favor, insira a URL do provedor",
+          "PLACEHOLDER": "Se o provedor não estiver em execução local, informe a URL dele",
           "ERROR": "Por favor, insira uma URL válida"
         },
         "MARK_AS_READ": {
@@ -26,17 +26,17 @@
         },
         "INSTANCE_ID": {
           "LABEL": "ID da instância",
-          "PLACEHOLDER": "Por favor, insira o ID da sua instância",
+          "PLACEHOLDER": "Informe o ID da instância",
           "ERROR": "Este campo é obrigatório"
         },
         "TOKEN": {
           "LABEL": "Token",
-          "PLACEHOLDER": "Por favor, insira o Token da sua instância",
+          "PLACEHOLDER": "Informe o token da instância",
           "ERROR": "Este campo é obrigatório"
         },
         "CLIENT_TOKEN": {
-          "LABEL": "Token de Segurança",
-          "PLACEHOLDER": "Por favor, insira o Token de Segurança (veja a aba Segurança no painel do Z-API)",
+          "LABEL": "Token de segurança",
+          "PLACEHOLDER": "Informe o token de segurança (veja a aba Segurança no painel da Z-API)",
           "ERROR": "Este campo é obrigatório"
         },
         "ADVANCED_OPTIONS": "Opções avançadas",
@@ -60,7 +60,7 @@
             "CONNECTED": "Seu dispositivo foi conectado com sucesso. Agora você pode começar a enviar e receber mensagens.",
             "IMPORT_SESSION_TITLE": "O QR code não funciona?",
             "IMPORT_SESSION_SHOW_MORE": "Ver mais",
-            "IMPORT_SESSION_DESC": "O WhatsApp passou a exigir chave de acesso ao vincular algumas contas, o que bloqueia o QR code. Instale a extensão de navegador para importar uma sessão em que você já está logado no WhatsApp Web.",
+            "IMPORT_SESSION_DESC": "O WhatsApp passou a exigir chave de acesso ao vincular algumas contas, o que bloqueia o QR code. Instale a extensão de navegador para importar uma sessão em que você já está conectado ao WhatsApp Web.",
             "IMPORT_SESSION_INSTALL": "Instalar a extensão"
           }
         },
@@ -86,7 +86,7 @@
             },
             "HISTORY_SYNC": {
               "LABEL": "Importar conversas antigas ao parear",
-              "DESCRIPTION": "Traz o histórico que o celular oferece no pareamento, todo como conversas resolvidas. Mensagens recebidas enquanto a conexão esteve fora são recuperadas sempre, independente desta opção."
+              "DESCRIPTION": "Traz o histórico que o celular oferece no pareamento, todo como conversas resolvidas. Mensagens recebidas enquanto a conexão esteve fora são recuperadas de qualquer forma, independentemente desta opção."
             },
             "PROXY_URL": {
               "LABEL": "Proxy (opcional)",
@@ -99,8 +99,8 @@
         "LEGACY_PROVIDER": {
           "BADGE": "Legado",
           "BADGE_DESCRIPTION": "Este provedor continua funcionando e não recebe recursos novos.",
-          "NOTICE": "Este provedor é legado. Ele continua funcionando.",
-          "NOTICE_WITH_NATIVE": "Este provedor é legado. Ele continua funcionando, mas recomendamos usar o WhatsApp (nativo) no lugar.",
+          "NOTICE": "Este provedor é de uma versão anterior, mas continua funcionando.",
+          "NOTICE_WITH_NATIVE": "Este provedor é de uma versão anterior, mas continua funcionando. Recomendamos usar o WhatsApp (nativo) no lugar dele.",
           "CONVERT_TO_NATIVE": "Converter para WhatsApp (nativo)",
           "USE_NATIVE": "Usar o WhatsApp (nativo)"
         },
@@ -119,13 +119,13 @@
         "TITLE": "Converter provedor da caixa de entrada",
         "INTRO": "Você está prestes a trocar o provedor de WhatsApp de '{inboxName}' (atualmente {currentProvider}). Antes de continuar, revise o que vai acontecer:",
         "EFFECT_DISCONNECT": "A sessão atual com {currentProvider} será desconectada.",
-        "EFFECT_TEMPLATES": "Modelos de mensagem serão limpos e precisarão ser re-sincronizados no novo provedor.",
-        "EFFECT_CONNECTION": "O estado de conexão do provedor será resetado.",
+        "EFFECT_TEMPLATES": "Os modelos de mensagem serão apagados e precisarão ser sincronizados novamente no novo provedor.",
+        "EFFECT_CONNECTION": "O estado de conexão do provedor será redefinido.",
         "EFFECT_PRESERVED": "Conversas, mensagens, contatos, atribuições de agentes e histórico são preservados.",
         "EFFECT_IDENTITY": "O nome da caixa de entrada e o número de telefone permanecem os mesmos.",
         "CONFIRM_PROMPT": "Para confirmar, digite o nome da caixa de entrada abaixo:",
         "PLACE_HOLDER": "Digite {inboxName} para continuar",
-        "CONTINUE": "Continuar conversão",
+        "CONTINUE": "Continuar com a conversão",
         "CANCEL": "Cancelar"
       },
       "SELECT_PROVIDER_TITLE": "Selecione o novo provedor",
@@ -137,7 +137,7 @@
       }
     },
     "SETTINGS_POPUP": {
-      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Gerenciar Conexão do Provedor",
+      "WHATSAPP_MANAGE_PROVIDER_CONNECTION_TITLE": "Gerenciar conexão do provedor",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_SUBHEADER": "Conecte o seu dispositivo e gerencie a conexão do provedor.",
       "WHATSAPP_MANAGE_PROVIDER_CONNECTION_BUTTON": "Gerenciar conexão",
       "WHATSAPP_PROVIDER_URL_TITLE": "URL do provedor",
@@ -148,20 +148,20 @@
       "WHATSAPP_MARK_AS_READ_SUBHEADER": "Se essa opção estiver desativada, ao visualizar uma mensagem pelo Chatwoot, não será enviada uma confirmação de leitura para o remetente. As suas mensagens ainda poderão receber confirmações de leitura.",
       "WHATSAPP_MARK_AS_READ_LABEL": "Enviar confirmações de leitura",
       "WHATSAPP_PRESENCE_SUBSCRIBE_TITLE": "Indicadores de digitação do contato",
-      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "Quando ativado, você verá indicadores de digitação na conversa quando um contato do WhatsApp estiver digitando ou gravando áudio. Requer reconectar o canal para entrar em vigor.",
+      "WHATSAPP_PRESENCE_SUBSCRIBE_SUBHEADER": "Quando ativado, você verá indicadores de digitação na conversa quando um contato do WhatsApp estiver digitando ou gravando áudio. É preciso reconectar o canal para a alteração valer.",
       "WHATSAPP_PRESENCE_SUBSCRIBE_LABEL": "Mostrar indicadores de digitação do contato",
-      "WHATSAPP_INSTANCE_ID_TITLE": "ID da Instância",
-      "WHATSAPP_INSTANCE_ID_SUBHEADER": "Seu ID da Instância Z-API.",
-      "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Atualizar ID da Instância",
+      "WHATSAPP_INSTANCE_ID_TITLE": "ID da instância",
+      "WHATSAPP_INSTANCE_ID_SUBHEADER": "Seu ID de instância da Z-API.",
+      "WHATSAPP_INSTANCE_ID_UPDATE_TITLE": "Atualizar ID da instância",
       "WHATSAPP_INSTANCE_ID_UPDATE_SUBHEADER": "Digite o novo ID da Instância aqui",
       "WHATSAPP_TOKEN_TITLE": "Token",
-      "WHATSAPP_TOKEN_SUBHEADER": "Seu Token da Instância Z-API.",
+      "WHATSAPP_TOKEN_SUBHEADER": "Seu token de instância da Z-API.",
       "WHATSAPP_TOKEN_UPDATE_TITLE": "Atualizar Token",
-      "WHATSAPP_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token aqui",
-      "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de Segurança",
+      "WHATSAPP_TOKEN_UPDATE_SUBHEADER": "Digite o novo token aqui",
+      "WHATSAPP_CLIENT_TOKEN_TITLE": "Token de segurança",
       "WHATSAPP_CLIENT_TOKEN_SUBHEADER": "Seu Token de Segurança Z-API (veja a aba Segurança no painel do Z-API).",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Atualizar Token de Segurança",
-      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Digite o novo Token de Segurança aqui",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_TITLE": "Atualizar token de segurança",
+      "WHATSAPP_CLIENT_TOKEN_UPDATE_SUBHEADER": "Digite o novo token de segurança aqui",
       "WHATSAPP_APP_SECRET": {
         "TITLE": "Chave secreta do aplicativo",
         "HELP": "A chave secreta do aplicativo da Meta que gerou o token de acesso desta caixa. Ela confirma que cada webhook veio mesmo da Meta.",
@@ -181,27 +181,27 @@
         "ERROR": "A Z-API não aceitou o novo endereço. A caixa continua recebendo pelo atual; tente de novo."
       },
       "WHATSAPP_DISCONNECTED": {
-        "MESSAGE": "Este WhatsApp está desconectado, e a caixa não envia nem recebe mensagens. Conecte o celular para parear de novo.",
+        "MESSAGE": "Este WhatsApp está desconectado, e a caixa de entrada não envia nem recebe mensagens. Conecte o celular para parear de novo.",
         "CONNECT": "Conectar"
       }
     },
     "ASSIGNMENT": {
-      "PREVENT_TAKEOVER": "Impedir tomada de conversa atribuída",
+      "PREVENT_TAKEOVER": "Impedir que outra pessoa assuma a conversa",
       "PREVENT_TAKEOVER_SUB_TEXT": "Depois que um agente assume uma conversa, só ele ou um administrador pode mudar quem está atendendo. Não afeta a atribuição automática.",
       "REOPEN_TEAM": {
-        "TITLE": "Na reabertura, manter o responsável só se ele estiver no time da conversa",
-        "DESCRIPTION": "Quando a mensagem de um cliente reabre uma conversa resolvida ou adiada que tem time, o responsável continua com ela só se for membro desse time. Se não for, a conversa vai para Não atribuídas, com o time e as etiquetas de antes."
+        "TITLE": "Na reabertura, manter o responsável somente se ele estiver na equipe da conversa",
+        "DESCRIPTION": "Quando a mensagem de um cliente reabre uma conversa resolvida ou adiada que tem equipe, o responsável continua com ela somente se for membro dessa equipe. Se não for, a conversa vai para Não atribuídas, mantendo a equipe e as etiquetas."
       },
       "REOPEN_OWNER": {
         "TITLE": "Quando o cliente escreve numa conversa que uma pessoa resolveu",
-        "DESCRIPTION": "Vale para caixas com robô ativo. Define quem fica com a conversa quando a mensagem do cliente a reabre.",
+        "DESCRIPTION": "Vale para caixas de entrada com bot ativo. Define quem fica com a conversa quando a mensagem do cliente a reabre.",
         "OPTIONS": {
-          "AGENT_BOT": "Passar para o robô",
+          "AGENT_BOT": "Passar para o bot",
           "ASSIGNEE": "Manter com a pessoa",
           "ASSIGNEE_WITHIN_WINDOW": "Manter com a pessoa se o cliente escrever dentro de algumas horas"
         },
         "HOURS_LABEL": "Horas depois da resolução",
-        "HOURS_HELP": "Depois desse prazo, a conversa passa para o robô.",
+        "HOURS_HELP": "Depois desse prazo, a conversa passa para o bot.",
         "HOURS_ERROR": "Informe um número inteiro de horas entre 1 e 8760."
       }
     },
@@ -241,16 +241,16 @@
     },
     "ACCOUNT_HEALTH": {
       "WEBHOOK": {
-        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registrado, mas a Meta não confirmou o apontamento deste número em si para cá. Veja no cartão abaixo para onde a entrega vai agora.",
-        "RIDES_ON_APP_CALLBACK": "A entrega segue a URL de callback do aplicativo: nem este número nem a conta do WhatsApp Business dele estão apontados para esta instalação, então ela para se aquela URL mudar.",
-        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número não tem roteamento próprio, então a entrega segue a URL de callback do aplicativo, mostrada abaixo, que não é a esperada para este número. Registrar o webhook aponta este número para cá; se a Meta recusar isso nesta conta, o que precisa mudar é o callback do aplicativo."
+        "REGISTER_SUCCESS_WITHOUT_ROUTING": "Webhook registrado, mas a Meta não confirmou que este número aponta para esta instalação. Veja o card abaixo para conferir para onde as mensagens estão sendo entregues.",
+        "RIDES_ON_APP_CALLBACK": "A entrega segue a URL de callback do aplicativo: nem este número nem a conta do WhatsApp Business dele estão apontados para esta instalação, então as mensagens param de chegar se essa URL mudar.",
+        "APP_CALLBACK_POINTS_ELSEWHERE": "Este número não tem roteamento próprio, então a entrega segue a URL de callback do aplicativo, mostrada abaixo, que não é a esperada para este número. Registrar o webhook faz este número apontar para cá; se a Meta recusar isso nesta conta, o que precisa mudar é o callback do aplicativo."
       }
     },
     "CONVERSATION_CONTINUITY": {
       "TITLE": "Continuidade da conversa",
-      "NOTE_TEXT": "Decide onde um e-mail novo vai parar quando ele não responde a nenhuma thread existente. Uma resposta sempre fica na thread que ela responde, independentemente desta configuração.",
+      "NOTE_TEXT": "Define onde um e-mail novo é entregue quando ele não é resposta de uma cadeia existente. Respostas sempre permanecem na cadeia original, independentemente desta configuração.",
       "TOGGLE_AVAILABILITY": "Continuar o caso em aberto do contato",
-      "TOGGLE_HELP": "Quando o contato escreve um e-mail novo enquanto uma conversa dele ainda está aberta, a mensagem entra nessa conversa em vez de abrir outra. Depois que a conversa é resolvida, o próximo e-mail abre uma nova. Deixe desligado para manter uma conversa por thread de e-mail.",
+      "TOGGLE_HELP": "Quando o contato escreve um e-mail novo enquanto uma conversa dele ainda está aberta, a mensagem entra nessa conversa em vez de abrir outra. Depois que a conversa é resolvida, o próximo e-mail abre uma nova. Deixe desligado para manter uma conversa por cadeia de e-mails.",
       "EDIT": {
         "BUTTON_TEXT": "Atualizar",
         "SUCCESS_MESSAGE": "Continuidade da conversa atualizada com sucesso"
@@ -259,11 +259,11 @@
     "WHATSAPP_CALLING": {
       "ENABLE": {
         "PAIRED_DESCRIPTION": "Permite que os agentes recebam e façam ligações de WhatsApp nesta caixa, pelo celular pareado com ela. Os clientes podem ligar para este número direto pelo WhatsApp.",
-        "PROXY_BLOCKED": "Esta caixa de entrada sai por um proxy, e as ligações do WhatsApp não passam por proxy: a voz vai direto do servidor para o WhatsApp. Para ligar as chamadas, remova o proxy na aba {tab}.",
-        "CONNECTOR_WITHOUT_CALLS": "O conector de WhatsApp desta instalação não está levando a voz das ligações. Para ligar as chamadas, defina WAC_CALLS_UDP_PORT (por exemplo 40000) e publique essa porta em UDP no container onde o conector roda (o worker do Sidekiq, no modo embutido). Atrás de NAT, defina também WAC_CALLS_PUBLIC_IP com o IP público do servidor."
+        "PROXY_BLOCKED": "Esta caixa de entrada sai por um proxy, e as ligações do WhatsApp não passam por proxy: a voz vai direto do servidor para o WhatsApp. Para ativar as chamadas, remova o proxy na aba {tab}.",
+        "CONNECTOR_WITHOUT_CALLS": "O conector de WhatsApp desta instalação não transmite a voz das ligações. Para ativar as chamadas, defina WAC_CALLS_UDP_PORT (por exemplo 40000) e publique essa porta em UDP no contêiner onde o conector roda (o worker do Sidekiq, no modo embutido). Atrás de NAT, defina também WAC_CALLS_PUBLIC_IP com o IP público do servidor."
       },
       "INBOUND_PHONE": {
-        "DESCRIPTION": "Permita que os clientes liguem para este número e que a chamada toque para os atendentes aqui. Quando desativado, o Chatwoot não toca e a chamada continua tocando só no celular pareado. Os atendentes ainda podem fazer chamadas de saída."
+        "DESCRIPTION": "Permite que os clientes liguem para este número e que a chamada toque para os agentes aqui. Quando desativado, o Chatwoot não toca e as chamadas continuam tocando apenas no celular pareado. Os agentes ainda podem fazer chamadas de saída."
       }
     }
   }

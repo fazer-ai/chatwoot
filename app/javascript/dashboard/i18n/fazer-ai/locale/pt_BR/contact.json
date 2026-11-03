@@ -23,7 +23,7 @@
                 "DESCRIPTION": "Apenas você poderá ver e gerenciar este segmento."
               }
             },
-            "READ_ONLY_TOOLTIP": "Segmento público. Peça a um administrador para editar ou excluir."
+            "READ_ONLY_TOOLTIP": "Segmento público. Peça a um administrador para editá-lo ou excluí-lo."
           }
         }
       }
@@ -40,10 +40,10 @@
     "OPEN_IN_AGENTS": "Abrir no fazer.ai agents",
     "UNVERIFIED_DETAILS": {
       "TITLE": "Informado pelo visitante, não verificado",
-      "DESCRIPTION": "O visitante digitou isto no chat do site ou pela API. Nada comprova que é dele, por isso não foi salvo no contato.",
+      "DESCRIPTION": "O visitante digitou isso no chat do site ou pela API. Nada comprova que seja dele, por isso não foi salvo no contato.",
       "EMAIL": "E-mail",
       "PHONE_NUMBER": "Telefone",
-      "HELD_BY": "Já está no contato de {name}. Abra para juntar os dois se forem a mesma pessoa.",
+      "HELD_BY": "Já está no contato de {name}. Abra-o para mesclar os dois, se forem da mesma pessoa.",
       "CONFIRM": "Confirmar",
       "DISMISS": "Descartar",
       "CONFIRMED": "Salvo no contato",

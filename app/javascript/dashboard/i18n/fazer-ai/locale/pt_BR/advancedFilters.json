@@ -1,7 +1,7 @@
 {
   "FILTER": {
     "ATTRIBUTES": {
-      "GROUP_TYPE": "Tipo de conversa"
+      "GROUP_TYPE": "Tipo de grupo"
     },
     "CUSTOM_VIEWS": {
       "EDIT": {
@@ -23,7 +23,7 @@
           "DESCRIPTION": "Apenas você poderá ver e gerenciar este filtro."
         }
       },
-      "READ_ONLY_TOOLTIP": "Pasta pública. Peça a um administrador para editar ou excluir."
+      "READ_ONLY_TOOLTIP": "Pasta pública. Peça a um administrador para editá-la ou excluí-la."
     }
   }
 }

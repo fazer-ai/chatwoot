@@ -27,7 +27,7 @@ pt_BR:
     automation:
       scheduled_message:
         delay_out_of_range: O atraso deve ser entre 1 minuto e 999 dias
-        content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou template
+        content_attachment_or_template_required: A mensagem agendada deve ter conteúdo, anexo ou modelo
     scheduled_messages:
       cannot_delete_processed: Não é possível excluir uma mensagem agendada que já foi enviada ou falhou
     conversations:
@@ -44,7 +44,7 @@ pt_BR:
       calls:
         group_not_supported: Não é possível ligar para um grupo
         proxy_unsupported: 'As ligações do WhatsApp não passam por proxy. Remova o proxy desta caixa de entrada para ligar as chamadas.'
-        connector_without_calls: 'O conector de WhatsApp desta instalação não leva a voz das ligações: ele precisa de WAC_CALLS_UDP_PORT definido e dessa porta publicada em UDP.'
+        connector_without_calls: 'O conector de WhatsApp desta instalação não transmite a voz das ligações: ele precisa de WAC_CALLS_UDP_PORT definido e dessa porta publicada em UDP.'
         provider_unsupported: 'Este provedor de WhatsApp não faz ligações.'
         channel_voice_required: 'As ligações não estão disponíveis no plano desta conta.'
       group_announcement_only: Somente administradores podem enviar mensagens neste grupo
@@ -110,8 +110,8 @@ pt_BR:
           single: "%{author_name} removeu %{contact_name} do grupo"
           multiple: "%{author_name} removeu %{contact_names} e %{last_contact_name} do grupo"
         promote:
-          single: "%{author_name} promoveu %{contact_name} a admin"
-          multiple: "%{author_name} promoveu %{contact_names} e %{last_contact_name} a admin"
+          single: "%{author_name} promoveu %{contact_name} a administrador"
+          multiple: "%{author_name} promoveu %{contact_names} e %{last_contact_name} a administrador"
         demote:
           single: "%{author_name} rebaixou %{contact_name} a membro"
           multiple: "%{author_name} rebaixou %{contact_names} e %{last_contact_name} a membro"
@@ -122,33 +122,33 @@ pt_BR:
         subject_changed: '%{author_name} alterou o nome do grupo para "%{value}"'
         description_changed: "%{author_name} alterou a descrição do grupo"
         description_removed: "%{author_name} removeu a descrição do grupo"
-        restrict_enabled: "%{author_name} mudou as configurações para permitir que somente admins editem as configurações do grupo"
-        restrict_disabled: "%{author_name} mudou as configurações para permitir que todos os membros editem as configurações do grupo"
-        announce_enabled: "%{author_name} mudou as configurações desse grupo para permitir que somente admins enviem mensagens ao grupo"
-        announce_disabled: "%{author_name} mudou as configurações do grupo para permitir que todos os membros enviem mensagens"
-        member_add_mode_enabled: "%{author_name} mudou as configurações do grupo para permitir que todos os membros adicionem outras pessoas"
-        member_add_mode_disabled: "%{author_name} mudou as configurações deste grupo para permitir que somente admins adicionem outras pessoas ao grupo"
-        join_approval_mode_enabled: "%{author_name} ativou a autorização de admins para entrar neste grupo"
-        join_approval_mode_disabled: "%{author_name} desativou a autorização de admins para entrar neste grupo"
-        invite_link_reset: "%{author_name} redefiniu o link do grupo para convidar outras pessoas"
+        restrict_enabled: "%{author_name} configurou o grupo para que somente administradores editem suas configurações"
+        restrict_disabled: "%{author_name} configurou o grupo para que todos os membros editem suas configurações"
+        announce_enabled: "%{author_name} configurou o grupo para que somente administradores enviem mensagens"
+        announce_disabled: "%{author_name} configurou o grupo para que todos os membros enviem mensagens"
+        member_add_mode_enabled: "%{author_name} configurou o grupo para que todos os membros adicionem outras pessoas"
+        member_add_mode_disabled: "%{author_name} configurou o grupo para que somente administradores adicionem outras pessoas"
+        join_approval_mode_enabled: "%{author_name} ativou a aprovação de administradores para entrar neste grupo"
+        join_approval_mode_disabled: "%{author_name} desativou a aprovação de administradores para entrar neste grupo"
+        invite_link_reset: "%{author_name} redefiniu o link de convite do grupo"
         unknown_author: Alguém
         membership_request_created: "%{contact_name} deseja entrar no grupo"
         membership_request_revoked: "%{contact_name} não deseja mais fazer parte do grupo"
         icon_changed: "%{author_name} alterou a imagem do grupo"
-      recurring_message_failed: Mensagem agendada recorrente falhou ao enviar. Próxima ocorrência agendada para %{next_date}.
-      recurring_message_completed: Série de mensagem agendada recorrente concluída após %{count} ocorrências.
-      recurring_message_cancelled: Recorrência de mensagem agendada foi interrompida por %{agent}.
+      recurring_message_failed: Falha ao enviar a mensagem agendada recorrente. Próxima ocorrência agendada para %{next_date}.
+      recurring_message_completed: A série da mensagem agendada recorrente foi concluída após %{count} ocorrências.
+      recurring_message_cancelled: A recorrência da mensagem agendada foi interrompida por %{agent}.
       unknown_agent: Desconhecido
       assignee:
-        removed_not_in_conversation_team: "Conversa desatribuída de %{assignee_name} porque não é membro do time da conversa, %{team_name}"
+        removed_not_in_conversation_team: "A conversa deixou de estar atribuída a %{assignee_name}, que não faz parte da equipe da conversa (%{team_name})"
         handed_to_agent_bot_on_reopen: "Conversa passada de %{assignee_name} para %{bot_name} porque o cliente escreveu de novo"
   contacts:
     group:
-      inbox_id_required: Este grupo está em mais de uma caixa de entrada. Diga por qual delas a ação vale enviando inbox_id.
+      inbox_id_required: Este grupo está em mais de uma caixa de entrada. Informe em qual delas a ação deve ser aplicada, enviando o inbox_id.
     sync_group:
       not_a_group: O contato não é um grupo
       no_identifier: O contato não possui um identificador de grupo
-      no_supported_inbox: Nenhuma caixa de entrada com suporte a sincronização de grupo encontrada para este contato
+      no_supported_inbox: Nenhuma caixa de entrada com suporte à sincronização de grupos foi encontrada para este contato
       metadata_unavailable: Não foi possível obter os metadados do grupo do provedor
   recurring_scheduled_messages:
     description:
@@ -185,4 +185,4 @@ pt_BR:
     inbox_csv:
       handled_count: Conversas atendidas
       avg_customer_waiting_time: Tempo médio de espera do cliente
-      resolution_count: Contagem de Resolução
+      resolution_count: Número de resoluções

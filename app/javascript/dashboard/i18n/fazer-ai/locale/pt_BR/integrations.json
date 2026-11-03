@@ -6,8 +6,8 @@
           "EVENTS": {
             "MESSAGE_INCOMING": "Mensagem recebida",
             "MESSAGE_OUTGOING": "Mensagem enviada",
-            "CONVERSATION_RECORDING": "Gravação de Áudio na Conversa",
-            "PROVIDER_EVENT_RECEIVED": "Evento do Provedor Recebido",
+            "CONVERSATION_RECORDING": "Áudio da gravação da conversa",
+            "PROVIDER_EVENT_RECEIVED": "Evento recebido do provedor",
             "INTERNAL_CHAT_MESSAGE_CREATED": "Mensagem do chat interno criada",
             "INTERNAL_CHAT_MESSAGE_UPDATED": "Mensagem do chat interno atualizada",
             "INTERNAL_CHAT_MESSAGE_DELETED": "Mensagem do chat interno excluída",
@@ -15,7 +15,7 @@
           }
         },
         "INBOX": {
-          "LABEL": "Caixa de Entrada",
+          "LABEL": "Caixa de entrada",
           "TITLE": "Selecione a caixa de entrada",
           "PLACEHOLDER": "Todas as caixas de entrada",
           "NO_RESULTS": "Nenhuma caixa de entrada encontrada",

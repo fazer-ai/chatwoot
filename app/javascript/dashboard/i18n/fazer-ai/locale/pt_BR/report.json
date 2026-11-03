@@ -9,7 +9,7 @@
       "TITLE": {
         "AGENT": "Distribuição por agente",
         "INBOX": "Distribuição por caixa de entrada",
-        "TEAM": "Distribuição por time"
+        "TEAM": "Distribuição por equipe"
       },
       "METRIC": {
         "RESOLUTIONS": "Resolvidas",
@@ -27,7 +27,7 @@
       "HANDLED_AGENT": "Conversas em que o agente enviou pelo menos uma mensagem pública no período. Notas privadas e mensagens de bot não contam.",
       "HANDLED": "Conversas em que algum agente enviou pelo menos uma mensagem pública no período. Notas privadas e mensagens de bot não contam.",
       "ASSIGNED_AGENT": "Conversas abertas no período que hoje estão atribuídas ao agente. Não indica quem atendeu.",
-      "ASSIGNED_TEAM": "Conversas abertas no período que hoje estão atribuídas ao time.",
+      "ASSIGNED_TEAM": "Conversas abertas no período que hoje estão atribuídas à equipe.",
       "OPENED": "Conversas abertas no período."
     },
     "METRICS": {
