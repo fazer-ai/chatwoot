@@ -19,6 +19,9 @@
 # nobody holds is still saved, because the reply-by-email of a widget conversation needs it and
 # nothing downstream treats it as a credential.
 #
+# The visitor's own additional_attributes cannot carry the keys the system writes there: the claims
+# above and the CRM lead ids under `external`.
+#
 # Identifiers in WhatsApp's format ("<lid>@lid", phone and group JIDs) are refused outright: the
 # fork's WhatsApp providers store them as contact identifiers, so an unsigned setUser with
 # someone's LID would reach their WhatsApp contact, and no site identifies its users that way.
@@ -52,11 +55,26 @@ module UnprovenContactMergeGuard
     value.to_s.match?(PHONE_NUMBER_FORMAT)
   end
 
+  def self.system_attribute?(key)
+    key.to_s.start_with?(CLAIM_PREFIX) || key.to_s == 'external'
+  end
+
   def self.whatsapp_identifier?(value)
     value.to_s.match?(WHATSAPP_IDENTIFIER_FORMAT)
   end
 
   module IdentifyAction
+    # The widget's contact update takes additional_attributes as the visitor sends them. Two keys there
+    # are the system's, not the visitor's: the claims this guard records (the panel shows them as typed
+    # by the visitor) and `external`, the CRM lead ids the CRM sync reads to decide which lead to write.
+    def perform
+      submitted = params[:additional_attributes]
+      if UnprovenContactMergeGuard.unproven? && submitted.present?
+        @params = params.merge(additional_attributes: submitted.reject { |key, _| UnprovenContactMergeGuard.system_attribute?(key) })
+      end
+      super
+    end
+
     private
 
     def merge_if_existing_email_contact
