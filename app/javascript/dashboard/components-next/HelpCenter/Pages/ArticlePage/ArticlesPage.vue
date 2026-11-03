@@ -28,6 +28,7 @@ import Input from 'dashboard/components-next/input/Input.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
 import BulkTranslateDialog from './BulkTranslateDialog.vue';
+import AddTranslationDialog from './AddTranslationDialog.vue';
 
 const props = defineProps({
   articles: {
@@ -220,6 +221,22 @@ const clearSelection = () => {
 const handleTranslateArticle = articleId => {
   selectedArticleIds.value = new Set([articleId]);
   bulkTranslateDialogRef.value?.dialogRef?.open();
+};
+
+const addTranslationDialogRef = ref(null);
+const translationSourceArticle = ref(null);
+
+const handleAddTranslation = article => {
+  translationSourceArticle.value = article;
+  addTranslationDialogRef.value?.dialogRef?.open();
+};
+
+const onTranslationCreated = ({ articleId, locale }) => {
+  const { portalSlug } = route.params;
+  router.push({
+    name: 'portals_articles_edit',
+    params: { portalSlug, locale, articleSlug: articleId },
+  });
 };
 
 const openTranslateDialog = () => {
@@ -498,6 +515,7 @@ watch(
           :total-pages="totalPages"
           class="relative z-0"
           @translate-article="handleTranslateArticle"
+          @add-translation="handleAddTranslation"
           @toggle-select="handleToggleSelect"
           @navigate-page="handlePageChange"
           @dragging="isArticleDragging = $event"
@@ -520,6 +538,12 @@ watch(
       :selected-article-ids="[...selectedArticleIds]"
       :allowed-locales="allowedLocales"
       @translate-started="clearSelection"
+    />
+    <AddTranslationDialog
+      ref="addTranslationDialogRef"
+      :article="translationSourceArticle"
+      :allowed-locales="allowedLocales"
+      @translation-created="onTranslationCreated"
     />
     <Dialog
       ref="deleteConfirmDialogRef"

@@ -45,6 +45,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'translateArticle',
+  'addTranslation',
   'toggleSelect',
   'navigatePage',
   'dragging',
@@ -220,6 +221,13 @@ const handleArticleAction = async (action, { status, id }) => {
 const updateArticle = ({ action, value, id }) => {
   if (action === 'translate') {
     emit('translateArticle', id);
+    return;
+  }
+  if (action === 'add-translation') {
+    emit(
+      'addTranslation',
+      props.articles.find(article => article.id === id)
+    );
     return;
   }
   const status = action !== 'delete' ? getArticleStatus(value) : null;

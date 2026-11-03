@@ -98,6 +98,13 @@ export const ARTICLE_MENU_ITEMS = {
     action: 'translate',
     icon: 'i-lucide-languages',
   },
+  addTranslation: {
+    label:
+      'HELP_CENTER.ARTICLES_PAGE.ARTICLE_CARD.CARD.DROPDOWN_MENU.ADD_TRANSLATION',
+    value: 'add-translation',
+    action: 'add-translation',
+    icon: 'i-lucide-file-plus-2',
+  },
   delete: {
     label: 'HELP_CENTER.ARTICLES_PAGE.ARTICLE_CARD.CARD.DROPDOWN_MENU.DELETE',
     value: 'delete',
@@ -107,9 +114,24 @@ export const ARTICLE_MENU_ITEMS = {
 };
 
 export const ARTICLE_MENU_OPTIONS = {
-  [ARTICLE_STATUSES.ARCHIVED]: ['publish', 'draft', 'translate'],
-  [ARTICLE_STATUSES.DRAFT]: ['publish', 'archive', 'translate'],
-  [ARTICLE_STATUSES.PUBLISHED]: ['draft', 'archive', 'translate'],
+  [ARTICLE_STATUSES.ARCHIVED]: [
+    'publish',
+    'draft',
+    'translate',
+    'addTranslation',
+  ],
+  [ARTICLE_STATUSES.DRAFT]: [
+    'publish',
+    'archive',
+    'translate',
+    'addTranslation',
+  ],
+  [ARTICLE_STATUSES.PUBLISHED]: [
+    'draft',
+    'archive',
+    'translate',
+    'addTranslation',
+  ],
 };
 
 export const ARTICLE_TABS = {

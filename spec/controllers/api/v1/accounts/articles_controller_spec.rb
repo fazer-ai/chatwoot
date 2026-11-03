@@ -119,14 +119,17 @@ RSpec.describe 'Api::V1::Accounts::Articles', type: :request do
       end
 
       it 'associate to the root article' do
+        portal.update!(config: { allowed_locales: %w[en es fr] })
+        category_es = create(:category, name: 'category es', portal: portal, account_id: account.id, locale: 'es', slug: 'category_es_slug')
+        category_fr = create(:category, name: 'category fr', portal: portal, account_id: account.id, locale: 'fr', slug: 'category_fr_slug')
         root_article = create(:article, category: category, slug: 'root-article', portal: portal, account_id: account.id, author_id: agent.id,
                                         associated_article_id: nil)
-        parent_article = create(:article, category: category, slug: 'parent-article', portal: portal, account_id: account.id, author_id: agent.id,
+        parent_article = create(:article, category: category_es, slug: 'parent-article', portal: portal, account_id: account.id, author_id: agent.id,
                                           associated_article_id: root_article.id)
 
         article_params = {
           article: {
-            category_id: category.id,
+            category_id: category_fr.id,
             description: 'test description',
             title: 'MyTitle',
             slug: 'MyTitle',
@@ -142,17 +145,21 @@ RSpec.describe 'Api::V1::Accounts::Articles', type: :request do
         expect(response).to have_http_status(:success)
         json_response = response.parsed_body
         expect(json_response['payload']['title']).to eql('MyTitle')
+        expect(json_response['payload']['locale']).to eql('fr')
+        expect(json_response['payload']['associated_article_id']).to eql(root_article.id)
 
         category = Article.find(json_response['payload']['id'])
         expect(category.associated_article_id).to eql(root_article.id)
       end
 
       it 'associate to the current parent article' do
+        portal.update!(config: { allowed_locales: %w[en es] })
+        category_es = create(:category, name: 'category es', portal: portal, account_id: account.id, locale: 'es', slug: 'category_es_slug')
         parent_article = create(:article, category: category, portal: portal, account_id: account.id, author_id: agent.id, associated_article_id: nil)
 
         article_params = {
           article: {
-            category_id: category.id,
+            category_id: category_es.id,
             description: 'test description',
             title: 'MyTitle',
             slug: 'MyTitle',
@@ -412,10 +419,13 @@ RSpec.describe 'Api::V1::Accounts::Articles', type: :request do
       end
 
       it 'get associated articles' do
+        portal.update!(config: { allowed_locales: %w[en es fr] })
+        category_es = create(:category, name: 'category es', portal: portal, account_id: account.id, locale: 'es', slug: 'category_es_slug')
+        category_fr = create(:category, name: 'category fr', portal: portal, account_id: account.id, locale: 'fr', slug: 'category_fr_slug')
         root_article = create(:article, category: category, portal: portal, account_id: account.id, author_id: agent.id, associated_article_id: nil)
-        child_article_1 = create(:article, slug: 'child-1', category: category, portal: portal, account_id: account.id, author_id: agent.id,
+        child_article_1 = create(:article, slug: 'child-1', category: category_es, portal: portal, account_id: account.id, author_id: agent.id,
                                            associated_article_id: root_article.id)
-        child_article_2 = create(:article, slug: 'child-2', category: category, portal: portal, account_id: account.id, author_id: agent.id,
+        child_article_2 = create(:article, slug: 'child-2', category: category_fr, portal: portal, account_id: account.id, author_id: agent.id,
                                            associated_article_id: root_article.id)
 
         get "/api/v1/accounts/#{account.id}/portals/#{portal.slug}/articles/#{root_article.id}",
@@ -426,7 +436,14 @@ RSpec.describe 'Api::V1::Accounts::Articles', type: :request do
         expect(json_response['payload']['associated_articles'].length).to eq(2)
         associated_articles_ids = json_response['payload']['associated_articles'].pluck('id')
         expect(associated_articles_ids).to contain_exactly(child_article_1.id, child_article_2.id)
+        expect(json_response['payload']['associated_articles'].pluck('locale')).to contain_exactly('es', 'fr')
         expect(json_response['payload']['id']).to eq(root_article.id)
+
+        get "/api/v1/accounts/#{account.id}/portals/#{portal.slug}/articles/#{child_article_1.id}",
+            headers: admin.create_new_auth_token
+        expect(response).to have_http_status(:success)
+        family_ids = response.parsed_body['payload']['associated_articles'].pluck('id')
+        expect(family_ids).to contain_exactly(root_article.id, child_article_2.id)
       end
     end
   end

@@ -68,6 +68,8 @@ class Article < ApplicationRecord
   validates :draft_content, length: { maximum: 65_535 }
   validates :slug, exclusion: { in: RESERVED_SLUGS }
   validates :slug, uniqueness: true, format: { with: /\A[a-zA-Z0-9_-]+\z/ }, if: :will_save_change_to_slug?
+  validate :unique_locale_in_translation_family,
+           if: -> { associated_article_id.present? && (new_record? || will_save_change_to_locale? || will_save_change_to_associated_article_id?) }
 
   # ensuring that the position is always set correctly
   before_create :add_position_to_article
@@ -189,6 +191,18 @@ class Article < ApplicationRecord
   private_class_method :rebalance_positions, :resequence_category
 
   private
+
+  # A translation family holds one article per locale, so the public locale
+  # switcher never has to pick between two translations in the same language.
+  def unique_locale_in_translation_family
+    return if root_article.blank?
+
+    root_id = self.class.find_root_article_id(root_article)
+    family = self.class.where(id: root_id).or(self.class.where(associated_article_id: root_id))
+    return unless family.where(locale: locale).where.not(id: id).exists?
+
+    errors.add(:locale, 'already has a translation for this article')
+  end
 
   def category_id_changed_action
     # We need to update the position of the article in the new category

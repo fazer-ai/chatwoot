@@ -4,6 +4,7 @@ json.title article.title
 json.content article.content
 json.description article.description
 json.status article.status
+json.locale article.public_locale
 json.account_id article.account_id
 
 if article.portal.present?

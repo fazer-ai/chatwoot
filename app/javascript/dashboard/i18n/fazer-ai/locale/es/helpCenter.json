@@ -40,7 +40,25 @@
       },
       "ARTICLE_CARD": {
         "CARD": {
-          "CREATED": "Creado {time}"
+          "CREATED": "Creado {time}",
+          "DROPDOWN_MENU": {
+            "ADD_TRANSLATION": "Añadir traducción"
+          }
+        }
+      },
+      "ADD_TRANSLATION": {
+        "TITLE": "Añadir traducción",
+        "DESCRIPTION": "Cree una copia en borrador de este artículo en otro idioma, vinculada al original, para traducirla manualmente.",
+        "LOCALE_LABEL": "Idioma de destino",
+        "LOCALE_PLACEHOLDER": "Seleccione un idioma",
+        "CATEGORY_LABEL": "Categoría de destino",
+        "CATEGORY_PLACEHOLDER": "Seleccione una categoría",
+        "OPTIONAL": "(opcional)",
+        "CONFIRM": "Crear borrador",
+        "NO_LOCALES": "Este artículo ya tiene una traducción en todos los idiomas de este portal.",
+        "API": {
+          "SUCCESS_MESSAGE": "Borrador de traducción creado. Ahora puede traducir el contenido.",
+          "ERROR_MESSAGE": "No se pudo crear la traducción. Inténtelo de nuevo."
         }
       }
     }

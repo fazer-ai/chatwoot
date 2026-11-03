@@ -7,6 +7,8 @@ json.status article.status
 json.draft_title article.draft_title
 json.draft_content article.draft_content
 json.position article.position
+json.locale article.public_locale
+json.associated_article_id article.associated_article_id
 json.account_id article.account_id
 json.created_at article.created_at.to_i
 json.updated_at article.updated_at.to_i
@@ -30,8 +32,11 @@ if article.author&.current_account_user
 end
 
 json.associated_articles do
-  if article.associated_articles.any?
-    json.array! article.associated_articles.each do |associated_article|
+  # The whole translation family (root and siblings), not only the articles
+  # pointing at this one, so a translation knows every locale already taken.
+  family = article.translation_family.where.not(id: article.id)
+  if family.any?
+    json.array! family.each do |associated_article|
       json.partial! 'api/v1/accounts/articles/associated_article', formats: [:json], article: associated_article
     end
   end

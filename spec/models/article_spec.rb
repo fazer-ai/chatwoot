@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe Article do
   let!(:account) { create(:account) }
   let(:user) { create(:user, account_ids: [account.id], role: :agent) }
-  let!(:portal_1) { create(:portal, account_id: account.id, config: { allowed_locales: %w[en es] }) }
+  let!(:portal_1) { create(:portal, account_id: account.id, config: { allowed_locales: %w[en es fr] }) }
   let!(:category_1) { create(:category, slug: 'category_1', locale: 'en', portal_id: portal_1.id) }
 
   context 'with validations' do
@@ -34,6 +34,41 @@ RSpec.describe Article do
   describe 'associations' do
     it { is_expected.to belong_to(:account) }
     it { is_expected.to belong_to(:author) }
+  end
+
+  describe 'translation family locale uniqueness' do
+    let!(:category_es) { create(:category, slug: 'category_es', locale: 'es', portal_id: portal_1.id) }
+    let!(:root_article) do
+      create(:article, category_id: category_1.id, portal_id: portal_1.id, author_id: user.id, title: 'root')
+    end
+    let!(:spanish_article) do
+      create(:article, category_id: category_es.id, portal_id: portal_1.id, author_id: user.id, title: 'raíz',
+                       associated_article_id: root_article.id)
+    end
+
+    it 'allows a translation in a locale the family does not have yet' do
+      category_fr = create(:category, slug: 'category_fr', locale: 'fr', portal_id: portal_1.id)
+      article = build(:article, category_id: category_fr.id, portal_id: portal_1.id, author_id: user.id,
+                                title: 'racine', associated_article_id: spanish_article.id)
+
+      expect(article).to be_valid
+    end
+
+    it 'rejects a second translation in a locale the family already has' do
+      article = build(:article, category_id: category_es.id, portal_id: portal_1.id, author_id: user.id,
+                                title: 'otra raíz', associated_article_id: root_article.id)
+
+      expect(article).not_to be_valid
+      expect(article.errors[:locale]).to include('already has a translation for this article')
+    end
+
+    it 'rejects a translation in the root article locale' do
+      article = build(:article, category_id: category_1.id, portal_id: portal_1.id, author_id: user.id,
+                                title: 'another root', associated_article_id: root_article.id)
+
+      expect(article).not_to be_valid
+      expect(article.errors[:locale]).to include('already has a translation for this article')
+    end
   end
 
   describe 'length validations' do
