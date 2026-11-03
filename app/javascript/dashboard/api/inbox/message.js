@@ -143,6 +143,12 @@ class MessageApi extends ApiClient {
     );
   }
 
+  transcribe(conversationId, messageId) {
+    return axios.post(
+      `${this.url}/${conversationId}/messages/${messageId}/transcription`
+    );
+  }
+
   toggleReaction(conversationId, messageId, emoji, echoId) {
     return axios.post(
       `${this.url}/${conversationId}/messages/${messageId}/reactions`,

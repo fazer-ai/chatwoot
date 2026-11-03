@@ -666,6 +666,10 @@ export default {
   mounted() {
     this.addScrollListener();
     this.fetchAllAttachmentsFromCurrentChat();
+    // The message context menu offers audio transcription only with the OpenAI integration on.
+    if (!this.$store.getters['integrations/getAppIntegrations'].length) {
+      this.$store.dispatch('integrations/get');
+    }
   },
 
   unmounted() {

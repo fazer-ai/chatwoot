@@ -7,6 +7,7 @@ import AddCannedModal from 'dashboard/routes/dashboard/settings/canned/AddCanned
 import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
+import MessageApi from 'dashboard/api/inbox/message';
 import { conversationUrl, frontendURL } from '../../../helper/URLHelper';
 import {
   ACCOUNT_EVENTS,
@@ -152,6 +153,16 @@ export default {
         useTrack(CONVERSATION_EVENTS.TRANSLATE_A_MESSAGE);
       } catch (error) {
         useAlert(parseAPIErrorResponse(error));
+      }
+      this.handleClose();
+    },
+    // The text arrives later with the message's update event.
+    async handleTranscribe() {
+      try {
+        await MessageApi.transcribe(this.conversationId, this.messageId);
+        useAlert(this.$t('MESSAGE_TRANSCRIPTION.REQUESTED'));
+      } catch {
+        useAlert(this.$t('MESSAGE_TRANSCRIPTION.ERROR'));
       }
       this.handleClose();
     },
@@ -346,6 +357,15 @@ export default {
           }"
           variant="icon"
           @click.stop="handleTranslate"
+        />
+        <MenuItem
+          v-if="enabledOptions['transcribe']"
+          :option="{
+            icon: 'microphone',
+            label: $t('MESSAGE_TRANSCRIPTION.ACTION'),
+          }"
+          variant="icon"
+          @click.stop="handleTranscribe"
         />
         <hr />
         <MenuItem

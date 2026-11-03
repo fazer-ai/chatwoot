@@ -1,0 +1,7 @@
+{
+  "MESSAGE_TRANSCRIPTION": {
+    "ACTION": "Transcribe audio",
+    "REQUESTED": "Transcribing the audio. The text will appear below it in a few moments.",
+    "ERROR": "Could not transcribe this audio. Check the OpenAI integration and try again."
+  }
+}

@@ -205,6 +205,7 @@ Rails.application.routes.draw do
                 resources :attachments, only: [:update]
                 scope module: :messages do
                   resource :reactions, only: [:create]
+                  resource :transcription, only: [:create]
                 end
               end
               resources :scheduled_messages, only: [:index, :create, :update, :destroy]

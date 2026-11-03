@@ -175,6 +175,10 @@ const isOnChatwootCloud = useMapGetter('globalConfig/isOnChatwootCloud');
 const { replaceInstallationName } = useBranding();
 const { accountId: currentAccountId, currentAccount } = useAccount();
 const currentUser = useMapGetter('getCurrentUser');
+const getIntegration = useMapGetter('integrations/getIntegration');
+const isOpenAIIntegrationEnabled = computed(() =>
+  (getIntegration.value('openai').hooks || []).some(hook => hook.status)
+);
 
 // Mirrors `MessagePolicy#destroy?`: hiding the option is a convenience, the
 // endpoint enforces the same rule.
@@ -496,6 +500,16 @@ const contextMenuEnabledOptions = computed(() => {
       !isMessageDeleted.value &&
       hasText &&
       !isAutoTranslated.value,
+    // A call recording shows the call's own transcript, not the attachment's.
+    transcribe:
+      isOpenAIIntegrationEnabled.value &&
+      !isMessageDeleted.value &&
+      props.contentType !== CONTENT_TYPES.VOICE_CALL &&
+      props.attachments.some(
+        attachment =>
+          attachment.fileType === ATTACHMENT_TYPES.AUDIO &&
+          !attachment.transcribedText
+      ),
     replyTo:
       (props.private || props.inboxSupportsReplyTo.outgoing) &&
       !isFailedOrProcessing,

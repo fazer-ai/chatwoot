@@ -1,0 +1,7 @@
+{
+  "MESSAGE_TRANSCRIPTION": {
+    "ACTION": "Transcrever áudio",
+    "REQUESTED": "Transcrevendo o áudio. O texto vai aparecer abaixo dele em instantes.",
+    "ERROR": "Não foi possível transcrever este áudio. Verifique a integração com a OpenAI e tente novamente."
+  }
+}
