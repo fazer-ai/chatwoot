@@ -35,3 +35,29 @@ ignore:
   # reassess if the supported Ruby runtime changes.
   - CVE-2026-67987
   - CVE-2026-67989
+  # Rails advisories published 2026-11-04, patched only in 8.0.5.2 and 8.1.4.1 (no 7.2 release).
+  # Reachability for this install is assessed in https://github.com/fazer-ai/chatwoot/issues/930.
+  # Remove all of them once on Rails >= 8.0.5.2.
+  # Backported locally (config/initializers/monkey_patches):
+  - GHSA-v924-7rp8-4mxh # Active Storage tempfile extension picks the ffprobe/vips decoder
+  - GHSA-8474-xrp6-wh69 # safe_constantize regexp reachable from anonymous /cable subscribe
+  # Not reachable: the variant processor is :vips (load_defaults 7.0), so the ImageMagick
+  # analyzer never runs, nothing calls MiniMagick, and libvips runs with VIPS_BLOCK_UNTRUSTED=1.
+  - GHSA-f3w6-w445-fwh9
+  # Not reachable: no code passes the return value of params.each_key to mass assignment.
+  - GHSA-wm3x-v3qw-4jh3
+  # Medium and low, assessed in the issue above:
+  - GHSA-5957-c7qm-m469
+  - GHSA-2586-8ghr-69fj
+  - GHSA-gmj8-hvj3-49mw
+  - GHSA-r9jg-fmfx-2gv6
+  - GHSA-rwvh-fw6r-pwvp
+  - GHSA-x6mj-8jx9-qhqv
+  - GHSA-2p2f-4rq4-gjwc
+  - GHSA-68p9-83h6-5wpj
+  - GHSA-rq8q-p985-fjq7
+  - GHSA-v6rj-xm57-3p59
+  - GHSA-3f4q-8x5m-76v8
+  - GHSA-3w93-6hmw-whh4
+  - GHSA-hfr4-8rjc-97m2
+  - GHSA-p2pm-g2h6-7j5j
