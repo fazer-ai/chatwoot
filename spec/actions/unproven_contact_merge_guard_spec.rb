@@ -80,6 +80,35 @@ RSpec.describe 'Unproven contact merge on public channels', type: :request do
     end
   end
 
+  describe 'additional attributes the system reads as its own' do
+    before do
+      visitor.update!(additional_attributes: { 'external' => { 'leadsquared_id' => 'visitor-lead' } })
+    end
+
+    it 'ignores claims and CRM ids sent by the visitor and keeps the rest' do
+      patch '/api/v1/widget/contact', params: {
+        website_token: web_widget.website_token,
+        additional_attributes: { city: 'Recife', claimed_email: 'customer@example.com', external: { leadsquared_id: 'customer-lead' } }
+      }, headers: headers, as: :json
+
+      expect(response).to have_http_status(:success)
+      attributes = visitor.reload.additional_attributes
+      expect(attributes['city']).to eq('Recife')
+      expect(attributes).not_to have_key('claimed_email')
+      expect(attributes['external']).to eq('leadsquared_id' => 'visitor-lead')
+    end
+
+    it 'ignores them on setUser too' do
+      patch '/api/v1/widget/contact/set_user', params: {
+        website_token: web_widget.website_token, identifier: 'visitor-on-site',
+        additional_attributes: { claimed_phone_number: '+5511988887777' }
+      }, headers: headers, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(visitor.reload.additional_attributes).not_to have_key('claimed_phone_number')
+    end
+  end
+
   describe 'PATCH /api/v1/widget/contact/set_user' do
     let(:identifier) { 'visitor-on-the-site' }
 
