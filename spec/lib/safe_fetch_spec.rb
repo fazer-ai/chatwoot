@@ -314,14 +314,17 @@ RSpec.describe SafeFetch do
       end
 
       it 'matches the host case-insensitively' do
+        allow(Resolv).to receive(:getaddresses).with('AGENTS.internal').and_return(['10.40.10.20'])
         stub = stub_request(:get, 'http://agents.internal:3000/hook').to_return(png)
 
         expect { fetch_with_targets('http://AGENTS.internal:3000/hook', 'agents.internal:3000') }.not_to raise_error
         expect(stub).to have_been_requested
       end
 
-      it 'still rejects a URL without a host as invalid' do
-        expect { fetch_with_targets('http:///path') }.to(raise_error { |error| expect(error.class.name).to eq('SafeFetch::InvalidUrlError') })
+      it 'refuses a redirect from a listed target to a URL without a host' do
+        stub_request(:get, 'http://10.40.10.20:3000/hook').to_return(status: 302, headers: { 'Location' => 'http:/escape' })
+
+        expect_unsafe { fetch_with_targets('http://10.40.10.20:3000/hook') }
       end
 
       it 'refuses another private host on the same port' do
