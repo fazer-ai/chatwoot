@@ -13,6 +13,9 @@ import {
   CONVERSATION_EVENTS,
 } from 'dashboard/helper/AnalyticsHelper/events';
 import ContactDetailsItem from './ContactDetailsItem.vue';
+import MessageApi from 'dashboard/api/inbox/message';
+import Switch from 'dashboard/components-next/switch/Switch.vue';
+import { useUISettings } from 'dashboard/composables/useUISettings';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import ConversationLabels from './labels/LabelBox.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -35,6 +38,33 @@ const { t } = useI18n();
 const currentChat = useMapGetter('getSelectedChat');
 const currentUser = useMapGetter('getCurrentUser');
 const teams = useMapGetter('teams/getTeams');
+const getIntegration = useMapGetter('integrations/getIntegration');
+const { uiSettings, updateUISettings } = useUISettings();
+
+// The AI summary runs on the account's OpenAI integration, not on Captain.
+const isOpenAIIntegrationEnabled = computed(() =>
+  (getIntegration.value('openai').hooks || []).some(hook => hook.status)
+);
+
+const isSummarizing = ref(false);
+
+const summaryOnHandoff = computed({
+  get: () => uiSettings.value.ai_summary_on_handoff !== false,
+  set: value => updateUISettings({ ai_summary_on_handoff: value }),
+});
+
+const requestSummary = async () => {
+  if (isSummarizing.value) return;
+  isSummarizing.value = true;
+  try {
+    await MessageApi.summarize(currentChat.value.id);
+    useAlert(t('CONVERSATION.AI_SUMMARY.GENERATING'));
+  } catch {
+    useAlert(t('CONVERSATION.AI_SUMMARY.ERROR'));
+  } finally {
+    isSummarizing.value = false;
+  }
+};
 
 const { agentsList } = useAgentsList(true, { includeAIAssignees: true });
 const { accountLabels, savedLabels, onUpdateLabels } = useConversationLabels();
@@ -103,6 +133,7 @@ const assignedAgent = computed({
   },
   async set(agent) {
     const assigneeType = agent ? agent.assignee_type || 'User' : null;
+    const previousAssigneeId = assignedAgent.value?.id;
     try {
       await store.dispatch('assignAgent', {
         conversationId: currentChat.value.id,
@@ -110,6 +141,20 @@ const assignedAgent = computed({
         assigneeType,
       });
       useAlert(t('CONVERSATION.CHANGE_AGENT'));
+      // Handoff to another agent: leave an AI summary note so the next agent
+      // picks the conversation up with context, without reading the thread.
+      const isHandoff =
+        agent &&
+        assigneeType === 'User' &&
+        agent.id !== currentUser.value.id &&
+        agent.id !== previousAssigneeId;
+      if (
+        isHandoff &&
+        isOpenAIIntegrationEnabled.value &&
+        summaryOnHandoff.value
+      ) {
+        requestSummary();
+      }
     } catch (error) {
       useAssignmentError(error, t('CONVERSATION.CHANGE_AGENT_FAILED'));
     }
@@ -328,6 +373,22 @@ const rejectSuggestedLabel = ({ title }) => {
         "
         @select="onClickAssignAgent"
       />
+      <div v-if="isOpenAIIntegrationEnabled" class="mt-2">
+        <NextButton
+          sm
+          icon="i-ph-sparkle-fill"
+          class="w-full"
+          :label="$t('CONVERSATION.AI_SUMMARY.BUTTON')"
+          :is-loading="isSummarizing"
+          @click="requestSummary"
+        />
+        <div class="flex items-center justify-between gap-2 mt-2">
+          <span class="text-xs text-n-slate-11">
+            {{ $t('CONVERSATION.AI_SUMMARY.HANDOFF_LABEL') }}
+          </span>
+          <Switch v-model="summaryOnHandoff" />
+        </div>
+      </div>
     </div>
     <div>
       <ContactDetailsItem

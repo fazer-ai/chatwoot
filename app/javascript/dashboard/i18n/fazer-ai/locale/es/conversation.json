@@ -19,6 +19,12 @@
       "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "El archivo adjunto se descartó porque la conversación cambió entre nota y respuesta.",
       "RECORDING_DISCARDED_ON_MODE_CHANGE": "La grabación se descartó porque la conversación cambió entre nota y respuesta."
     },
+    "AI_SUMMARY": {
+      "BUTTON": "Resumir con IA",
+      "GENERATING": "Generando resumen… Aparecerá como nota privada.",
+      "ERROR": "No se pudo generar el resumen. Inténtelo de nuevo.",
+      "HANDOFF_LABEL": "Resumir al transferir a otro agente"
+    },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "La conversación ya está asignada",
       "DESCRIPTION": "{agentName} ya está atendiendo esta conversación. Pídale que la libere o pida a un administrador que la reasigne.",

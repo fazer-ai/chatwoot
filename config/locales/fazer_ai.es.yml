@@ -6,6 +6,9 @@
 #
 # Adding a language means adding fazer_ai.<locale>.yml. Nothing else changes.
 es:
+  integrations:
+    openai:
+      summary_note_title: Resumen de la conversación generado por IA
   internal_chat:
     default_category_name: Canales
     default_channel_name: General

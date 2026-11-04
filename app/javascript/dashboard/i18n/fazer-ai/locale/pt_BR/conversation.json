@@ -19,6 +19,12 @@
       "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "O anexo foi descartado porque a conversa alternou entre nota e resposta.",
       "RECORDING_DISCARDED_ON_MODE_CHANGE": "A gravação foi descartada porque a conversa alternou entre nota e resposta."
     },
+    "AI_SUMMARY": {
+      "BUTTON": "Resumir com IA",
+      "GENERATING": "Gerando resumo… Ele aparecerá como nota privada.",
+      "ERROR": "Não foi possível gerar o resumo. Tente novamente.",
+      "HANDOFF_LABEL": "Resumir ao transferir para outro agente"
+    },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversa já atribuída",
       "DESCRIPTION": "{agentName} já está atendendo a esta conversa. Peça para ele liberá-la ou peça a um administrador para reatribuí-la.",

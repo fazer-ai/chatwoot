@@ -44,6 +44,19 @@ describe('#ConversationAPI', () => {
       );
     });
   });
+  describe('#summarize', () => {
+    it('posts to the conversation summary endpoint', () => {
+      const originalAxios = window.axios;
+      window.axios = { post: vi.fn(() => Promise.resolve()) };
+
+      messageAPI.summarize(12);
+
+      expect(window.axios.post).toHaveBeenCalledWith(
+        '/api/v1/conversations/12/summary'
+      );
+      window.axios = originalAxios;
+    });
+  });
   describe('#autoTranslate', () => {
     it('posts the message ids', () => {
       const originalAxios = window.axios;

@@ -211,6 +211,7 @@ Rails.application.routes.draw do
               resources :scheduled_messages, only: [:index, :create, :update, :destroy]
               resources :recurring_scheduled_messages, only: [:index, :create, :update, :destroy]
               resource :contact_info_request, only: [:show, :create]
+              resource :summary, only: [:create], controller: 'summaries'
               resources :assignments, only: [:create]
               resources :labels, only: [:create, :index]
               resource :participants, only: [:show, :create, :update, :destroy]

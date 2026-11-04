@@ -19,6 +19,12 @@
       "ATTACHMENT_DISCARDED_ON_MODE_CHANGE": "The attachment was discarded because the conversation switched between note and reply.",
       "RECORDING_DISCARDED_ON_MODE_CHANGE": "The recording was discarded because the conversation switched between note and reply."
     },
+    "AI_SUMMARY": {
+      "BUTTON": "Summarize with AI",
+      "GENERATING": "Generating summary… It will appear as a private note.",
+      "ERROR": "Could not generate the summary. Try again.",
+      "HANDOFF_LABEL": "Summarize when handing off to another agent"
+    },
     "ASSIGNMENT_CONFLICT": {
       "TITLE": "Conversation already assigned",
       "DESCRIPTION": "{agentName} is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
