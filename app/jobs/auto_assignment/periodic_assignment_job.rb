@@ -13,6 +13,10 @@ class AutoAssignment::PeriodicAssignmentJob < ApplicationJob
             AutoAssignment::AssignmentJob.enqueue_for_inbox(inbox.id)
           end
         end
+
+        Inbox.holding_assignment_without_policy.where(account_id: account.id).find_each do |inbox|
+          AutoAssignment::AssignmentJob.enqueue_for_inbox(inbox.id)
+        end
       end
     end
   end
