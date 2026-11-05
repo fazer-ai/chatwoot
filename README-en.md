@@ -20,7 +20,7 @@
 
 ## About
 
-Chatwoot fazer.ai is a fork of official Chatwoot, maintained by fazer.ai (FAZER.AI LTDA), Chatwoot's official partner in Brazil. Chatwoot Inc. develops the original product and is a separate company.
+Chatwoot fazer.ai is a fork of official Chatwoot, maintained by fazer.ai (FAZER.AI LTDA). Chatwoot Inc. develops the original product and is a separate company.
 
 The fork follows official Chatwoot releases and adds features for teams that set up and operate WhatsApp customer support. You can use the open-source edition for free or subscribe to Chatwoot fazer.ai Pro to add the sales Kanban.
 
@@ -91,7 +91,7 @@ Explore the [Pro Kanban](https://fazer.ai/kanban) and activate your license at [
 
 fazer.ai licenses do not include Chatwoot Enterprise features. SSO and Captain, along with audit logs and custom roles, are licensed by Chatwoot Inc.
 
-To use these features with the fork, purchase a license from Chatwoot Inc. and use the `ghcr.io/fazer-ai/chatwoot:latest-ee` image. The image with the `-ee` suffix does not replace the license. The partnership offers a [licensing discount](https://fazer.ai/parceria-chatwoot).
+To use these features with the fork, purchase a license from Chatwoot Inc. and use the `ghcr.io/fazer-ai/chatwoot:latest-ee` image. The image with the `-ee` suffix does not replace the license.
 
 ## Install
 
@@ -161,4 +161,4 @@ See [NOTICE](NOTICE) and [LICENSE](LICENSE) for the full terms.
 - [Official Chatwoot](https://www.chatwoot.com)
 - [Official Chatwoot source code](https://github.com/chatwoot/chatwoot)
 
-Maintained by fazer.ai, Chatwoot's official partner in Brazil.
+Maintained by fazer.ai.
