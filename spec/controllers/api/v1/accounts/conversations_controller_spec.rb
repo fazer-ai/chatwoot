@@ -872,6 +872,24 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.status).to eq('resolved')
       end
 
+      # Opening a bot conversation self-assigns the agent, which is a claim.
+      it 'answers 409 when opening a bot conversation while the inbox is closed' do
+        conversation.update!(status: 'pending', assignee: nil)
+        conversation.inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+
+        travel_to(Time.utc(2026, 11, 8, 12)) do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+               headers: agent.create_new_auth_token,
+               params: { status: 'open' },
+               as: :json
+        end
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['reason']).to eq('outside_working_hours')
+        expect(conversation.reload.assignee).to be_nil
+        expect(conversation.status).to eq('pending')
+      end
+
       # Regression: reopening self-assigns the agent, and that used to be a
       # second save. `previous_changes` only carries the last save, so the
       # status callbacks (reopen activity message, automations, reporting) went

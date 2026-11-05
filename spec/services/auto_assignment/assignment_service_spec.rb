@@ -150,6 +150,43 @@ RSpec.describe AutoAssignment::AssignmentService do
       end
     end
 
+    context 'when the inbox only assigns during business hours' do
+      let(:inbox) do
+        create(:inbox, account: account, enable_auto_assignment: true, working_hours_enabled: true,
+                       restrict_assignment_to_working_hours: true)
+      end
+      let!(:waiting) { create(:conversation, inbox: inbox, assignee: nil, status: 'open') }
+
+      before do
+        allow(OnlineStatusTracker).to receive(:get_available_users).and_return({ agent.id.to_s => 'online' })
+        waiting.update!(assignee_id: nil)
+      end
+
+      # The factory's default week is Monday to Friday 09:00 to 17:00.
+      it 'holds conversations while the inbox is closed and hands them out once it opens' do
+        travel_to(Time.utc(2026, 11, 8, 12)) do
+          expect(service.perform_bulk_assignment(limit: 10)).to eq(0)
+          expect(waiting.reload.assignee).to be_nil
+        end
+
+        travel_to(Time.utc(2026, 11, 9, 12)) do
+          expect(service.perform_bulk_assignment(limit: 10)).to eq(1)
+          expect(waiting.reload.assignee).to eq(agent)
+        end
+      end
+
+      # A batch that starts before closing time can still be running after it.
+      it 'stops handing out conversations once the inbox closes mid-batch' do
+        later = create(:conversation, inbox: inbox, assignee: nil, status: 'open')
+        later.update!(assignee_id: nil)
+        allow(inbox).to receive(:assignment_closed?).and_return(false, false, true)
+
+        expect(service.perform_bulk_assignment(limit: 10)).to eq(1)
+        expect(waiting.reload.assignee).to eq(agent)
+        expect(later.reload.assignee).to be_nil
+      end
+    end
+
     context 'when auto assignment is disabled' do
       before { assignment_policy.update!(enabled: false) }
 

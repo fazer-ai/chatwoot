@@ -80,12 +80,16 @@ class Voice::Conference::Manager
     first_time
   end
 
+  # A call answered while the inbox holds assignment for being closed is answered unclaimed,
+  # including when it closes between the check and the save.
   def auto_assign_conversation!(user_id)
     conversation = call.conversation
-    return if conversation.assigned_entity.present?
+    return if conversation.assigned_entity.present? || conversation.inbox.assignment_closed?
 
     Conversations::AssignmentService.new(conversation: conversation, assignee_id: user_id).perform
     conference_service.remember_claim_assignment(user_id)
+  rescue CustomExceptions::Conversation::OutsideWorkingHours
+    conversation.restore_attributes
   end
 
   # Parses agent user_id from participant_label. Only returns an id when the

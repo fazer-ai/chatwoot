@@ -265,6 +265,10 @@
       "INBOUND_PHONE": {
         "DESCRIPTION": "Permite que los clientes llamen a este número y que la llamada suene para los agentes aquí. Si está desactivado, Chatwoot no suena y la llamada sigue sonando solo en el teléfono vinculado. Los agentes aún pueden hacer llamadas salientes."
       }
+    },
+    "BUSINESS_HOURS": {
+      "RESTRICT_ASSIGNMENT": "Solo asignar conversaciones dentro del horario de atención",
+      "RESTRICT_ASSIGNMENT_HELP": "Fuera del horario indicado arriba, los agentes no pueden asignar conversaciones de esta bandeja, ni a sí mismos ni a otras personas, y la asignación automática no las reparte. Con la asignación V2, lo que llegó con la bandeja cerrada se reparte cuando abre. Los administradores pueden asignar en cualquier momento."
     }
   }
 }

@@ -704,6 +704,35 @@ RSpec.describe 'Inboxes API', type: :request do
         end
       end
 
+      it 'turns assignment during business hours only on and off and exposes it' do
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { restrict_assignment_to_working_hours: true }, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(inbox.reload.restrict_assignment_to_working_hours).to be(true)
+
+        get "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}", headers: admin.create_new_auth_token, as: :json
+        expect(response.parsed_body['restrict_assignment_to_working_hours']).to be(true)
+
+        patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+              headers: admin.create_new_auth_token, params: { restrict_assignment_to_working_hours: false }, as: :json
+
+        expect(response.parsed_body['restrict_assignment_to_working_hours']).to be(false)
+        expect(inbox.reload.restrict_assignment_to_working_hours).to be(false)
+      end
+
+      it 'refuses a business hours assignment setting that is not a boolean' do
+        inbox.update!(restrict_assignment_to_working_hours: true)
+
+        ['false', '', nil].each do |value|
+          patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
+                headers: admin.create_new_auth_token, params: { restrict_assignment_to_working_hours: value }, as: :json
+
+          expect(response).to have_http_status(:unprocessable_entity), "accepted #{value.inspect}"
+          expect(inbox.reload.restrict_assignment_to_working_hours).to be(true)
+        end
+      end
+
       it 'sets who owns a reopened conversation and exposes it' do
         patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
               headers: admin.create_new_auth_token, params: { reopen_owner: 'assignee_within_window', reopen_owner_window_hours: 6 }, as: :json

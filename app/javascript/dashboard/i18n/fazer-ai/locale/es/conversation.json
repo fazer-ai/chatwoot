@@ -23,7 +23,11 @@
       "TITLE": "La conversación ya está asignada",
       "DESCRIPTION": "{agentName} ya está atendiendo esta conversación. Pídale que la libere o pida a un administrador que la reasigne.",
       "DESCRIPTION_UNKNOWN_AGENT": "Otro agente ya está atendiendo esta conversación. Pídale que la libere o pida a un administrador que la reasigne.",
-      "CONFIRM": "Entendido"
+      "CONFIRM": "Entendido",
+      "OUTSIDE_WORKING_HOURS": {
+        "TITLE": "Bandeja fuera del horario de atención",
+        "DESCRIPTION": "Las conversaciones de esta bandeja solo se pueden asignar dentro de su horario de atención. Inténtelo de nuevo cuando abra, o pida a un administrador."
+      }
     },
     "CHANGE_TEAM_FAILED": "No se pudo cambiar el equipo",
     "MESSAGE_DELETED_BY_CONTACT": "Eliminado por el contacto",

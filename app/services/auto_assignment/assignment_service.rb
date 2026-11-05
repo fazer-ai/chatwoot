@@ -2,8 +2,7 @@ class AutoAssignment::AssignmentService
   pattr_initialize [:inbox!]
 
   def perform_bulk_assignment(limit: 100)
-    return 0 unless inbox.auto_assignment_v2_enabled?
-    return 0 unless inbox.enable_auto_assignment?
+    return 0 unless assigning?
 
     conversations = unassigned_conversations(limit).to_a
     return 0 if conversations.empty?
@@ -18,6 +17,12 @@ class AutoAssignment::AssignmentService
 
   private
 
+  # A closed inbox that holds assignment until it opens keeps its queue: the
+  # periodic job hands those conversations out on its first run after opening.
+  def assigning?
+    inbox.auto_assignment_v2_enabled? && inbox.enable_auto_assignment? && !inbox.assignment_closed?
+  end
+
   def perform_for_conversation(conversation)
     return false unless assignable?(conversation)
 
@@ -27,9 +32,12 @@ class AutoAssignment::AssignmentService
     assign_conversation(conversation, agent)
   end
 
+  # The schedule is read again per conversation: a batch that starts before closing time can
+  # still be running after it.
   def assignable?(conversation)
     conversation.status == 'open' &&
-      conversation.assignee_id.nil?
+      conversation.assignee_id.nil? &&
+      !inbox.assignment_closed?
   end
 
   def unassigned_conversations(limit)

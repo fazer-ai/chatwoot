@@ -72,6 +72,36 @@ RSpec.describe AutoAssignment::PeriodicAssignmentJob, type: :job do
       end
     end
 
+    # Assignment V2 runs without a policy too, but only this job hands out what an
+    # inbox held while it was closed, so those inboxes are queued here as well.
+    context 'when a round-robin inbox without a policy holds assignment while closed' do
+      let!(:holding_inbox) do
+        create(:inbox, account: account, enable_auto_assignment: true, working_hours_enabled: true,
+                       restrict_assignment_to_working_hours: true)
+      end
+
+      before do
+        account.enable_features('assignment_v2')
+        account.save!
+        allow(Account).to receive(:find_in_batches).and_yield([account])
+      end
+
+      it 'queues it, and leaves policy-less inboxes without the option alone' do
+        expect(AutoAssignment::AssignmentJob).to receive(:enqueue_for_inbox).with(holding_inbox.id)
+        expect(AutoAssignment::AssignmentJob).not_to receive(:enqueue_for_inbox).with(inbox.id)
+
+        described_class.new.perform
+      end
+
+      it 'queues an inbox with a policy only once' do
+        create(:inbox_assignment_policy, inbox: holding_inbox, assignment_policy: assignment_policy)
+
+        expect(AutoAssignment::AssignmentJob).to receive(:enqueue_for_inbox).with(holding_inbox.id).once
+
+        described_class.new.perform
+      end
+    end
+
     context 'when account does not have assignment_v2 feature enabled' do
       before do
         allow(Account).to receive(:find_in_batches).and_yield([account])

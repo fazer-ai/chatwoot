@@ -28,9 +28,10 @@ class BulkActionsJob < ApplicationJob
       bulk_add_labels(conversation)
       bulk_snoozed_until(conversation)
       conversation.update!(params) if params
-    rescue CustomExceptions::Conversation::AlreadyAssigned
-      # The conversation belongs to another agent. Skip it instead of taking the
-      # rest of the batch down with it: there is no response to raise into here.
+    rescue CustomExceptions::Conversation::AlreadyAssigned, CustomExceptions::Conversation::OutsideWorkingHours
+      # The conversation belongs to another agent, or its inbox is closed. Skip it
+      # instead of taking the rest of the batch down with it: there is no response
+      # to raise into here.
       next
     end
   end

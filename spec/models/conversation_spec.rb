@@ -1556,6 +1556,154 @@ RSpec.describe Conversation do
     end
   end
 
+  describe 'business hours assignment guard' do
+    let(:account) { create(:account) }
+    # The factory's default week: Monday to Friday 09:00 to 17:00, weekends closed.
+    let(:inbox) do
+      create(:inbox, account: account, enable_auto_assignment: false, working_hours_enabled: true,
+                     restrict_assignment_to_working_hours: true)
+    end
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:other_agent) { create(:user, account: account, role: :agent) }
+    let(:administrator) { create(:user, account: account, role: :administrator) }
+    let(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: nil) }
+    let(:sunday_noon) { Time.utc(2026, 11, 8, 12) }
+    let(:monday_noon) { Time.utc(2026, 11, 9, 12) }
+
+    before do
+      create(:inbox_member, user: agent, inbox: inbox)
+      create(:inbox_member, user: other_agent, inbox: inbox)
+      conversation
+    end
+
+    after { Current.reset }
+
+    context 'when the inbox is closed' do
+      around { |example| travel_to(sunday_noon) { example.run } }
+
+      it 'refuses an agent claiming the conversation' do
+        Current.user = agent
+
+        expect { conversation.update!(assignee: agent) }
+          .to raise_error(CustomExceptions::Conversation::OutsideWorkingHours)
+        expect(conversation.reload.assignee).to be_nil
+      end
+
+      it 'refuses an agent handing the conversation to someone else' do
+        Current.user = agent
+
+        expect { conversation.update!(assignee: other_agent) }
+          .to raise_error(CustomExceptions::Conversation::OutsideWorkingHours)
+      end
+
+      it 'lets an administrator assign the conversation' do
+        Current.user = administrator
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
+      it 'lets an agent release the conversation' do
+        conversation.update!(assignee: agent)
+        Current.user = agent
+
+        expect { conversation.update!(assignee: nil) }
+          .to change { conversation.reload.assignee }.from(agent).to(nil)
+      end
+
+      # Automation rules and API integrations reach the callback with no user.
+      it 'lets assignment without a user through' do
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
+      # A bot-authenticated request puts an AgentBot in Current.user.
+      it 'lets an agent bot assign the conversation' do
+        Current.user = create(:agent_bot, account: account)
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
+      it 'does not restrict an inbox that has the option off' do
+        inbox.update!(restrict_assignment_to_working_hours: false)
+        Current.user = agent
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
+      # The schedule only means "closed" while business hours are on.
+      it 'does not restrict an inbox with business hours off' do
+        inbox.update!(working_hours_enabled: false)
+        Current.user = agent
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
+      # Picking a team with auto assign hands the conversation to a member, which
+      # is distribution, not a claim: the team changes and nobody is assigned.
+      it 'changes the team without auto assigning a member' do
+        online_member = create(:user, account: account, role: :agent, auto_offline: false)
+        create(:inbox_member, user: online_member, inbox: inbox)
+        team = create(:team, account: account, allow_auto_assign: true)
+        create(:team_member, team: team, user: online_member)
+        Current.user = agent
+
+        conversation.update!(team: team)
+
+        expect(conversation.reload.team).to eq(team)
+        expect(conversation.assignee).to be_nil
+      end
+    end
+
+    it 'lets an agent claim the conversation while the inbox is open' do
+      travel_to(monday_noon) do
+        Current.user = agent
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+    end
+
+    # 10:00 UTC on a Monday is open in UTC and 07:00, before opening, in Sao Paulo.
+    it 'reads the schedule in the inbox timezone' do
+      inbox.update!(timezone: 'America/Sao_Paulo')
+
+      travel_to(Time.utc(2026, 11, 9, 10)) do
+        Current.user = agent
+
+        expect { conversation.update!(assignee: agent) }
+          .to raise_error(CustomExceptions::Conversation::OutsideWorkingHours)
+      end
+    end
+
+    context 'with round robin while the inbox is closed' do
+      let(:inbox) do
+        create(:inbox, account: account, enable_auto_assignment: true, working_hours_enabled: true,
+                       restrict_assignment_to_working_hours: true)
+      end
+      let(:agent) { create(:user, account: account, role: :agent, auto_offline: false) }
+
+      around { |example| travel_to(sunday_noon) { example.run } }
+
+      before { allow(Redis::Alfred).to receive(:rpoplpush).and_return(agent.id) }
+
+      it 'does not assign a new conversation' do
+        expect(conversation.reload.assignee).to be_nil
+      end
+
+      it 'does not assign a reopened conversation' do
+        conversation.update!(status: :resolved)
+
+        conversation.update!(status: :open)
+
+        expect(conversation.reload.assignee).to be_nil
+      end
+    end
+  end
+
   describe '#status_changed_at' do
     let(:conversation) { create(:conversation) }
 

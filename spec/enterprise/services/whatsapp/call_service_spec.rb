@@ -50,6 +50,38 @@ describe Whatsapp::CallService do
       expect(conversation.reload.assignee_id).to eq(agent.id)
     end
 
+    # Meta has already accepted by the time the claim runs, so a closed inbox must not
+    # roll the acceptance back here: the call is answered and nobody is assigned.
+    it 'answers without claiming the conversation while the inbox holds assignment' do
+      inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+      Current.user = agent
+
+      travel_to(Time.utc(2026, 11, 8, 12)) do
+        described_class.new(call: call, agent: agent, sdp_answer: sdp_answer).accept
+      end
+
+      expect(call.reload.status).to eq('in_progress')
+      expect(conversation.reload.assignee_id).to be_nil
+    ensure
+      Current.reset
+    end
+
+    # The inbox can still close between the check and the save.
+    it 'still records the call status when the claim itself is refused for business hours' do
+      # The service reads the conversation back under the call lock, so it is another instance.
+      allow_any_instance_of(Conversation).to receive(:update!).and_wrap_original do |original, attrs| # rubocop:disable RSpec/AnyInstance
+        raise CustomExceptions::Conversation::OutsideWorkingHours.new({}) if attrs.key?(:assignee)
+
+        original.call(attrs)
+      end
+
+      described_class.new(call: call, agent: agent, sdp_answer: sdp_answer).accept
+
+      expect(call.reload.status).to eq('in_progress')
+      expect(conversation.reload.assignee_id).to be_nil
+      expect(conversation.additional_attributes['call_status']).to be_present
+    end
+
     it 'keeps the AgentBot owner when accepting the call' do
       agent_bot = create(:agent_bot, account: account)
       conversation.update!(ai_assignee: agent_bot)

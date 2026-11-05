@@ -265,6 +265,10 @@
       "INBOUND_PHONE": {
         "DESCRIPTION": "Let customers call this number and ring the agents here. When disabled, Chatwoot does not ring and calls keep ringing on the paired phone only. Agents can still place outbound calls."
       }
+    },
+    "BUSINESS_HOURS": {
+      "RESTRICT_ASSIGNMENT": "Only assign conversations during business hours",
+      "RESTRICT_ASSIGNMENT_HELP": "Outside the hours above, agents cannot assign this inbox's conversations, to themselves or to anyone else, and automatic assignment does not hand them out. With assignment V2, what arrived while closed is handed out once the inbox opens. Administrators can still assign at any time."
     }
   }
 }

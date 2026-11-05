@@ -39,6 +39,7 @@ export default {
   data() {
     return {
       isBusinessHoursEnabled: false,
+      restrictAssignment: false,
       unavailableMessage: '',
       timeZone: DEFAULT_TIMEZONE,
       dayNames: {
@@ -93,6 +94,7 @@ export default {
     setDefaults() {
       const {
         working_hours_enabled: isEnabled = false,
+        restrict_assignment_to_working_hours: restrictAssignment = false,
         out_of_office_message: unavailableMessage,
         working_hours: timeSlots = [],
         timezone: timeZone,
@@ -101,6 +103,7 @@ export default {
         ? timeSlotParse(timeSlots)
         : defaultTimeSlot;
       this.isBusinessHoursEnabled = isEnabled;
+      this.restrictAssignment = restrictAssignment;
       this.unavailableMessage = unavailableMessage || '';
       this.timeSlots = slots;
       this.timeZone =
@@ -118,6 +121,7 @@ export default {
           id: this.inbox.id,
           formData: false,
           working_hours_enabled: this.isBusinessHoursEnabled,
+          restrict_assignment_to_working_hours: this.restrictAssignment,
           out_of_office_message: this.unavailableMessage,
           working_hours: timeSlotTransform(this.timeSlots),
           timezone: this.timeZone.value,
@@ -213,6 +217,15 @@ export default {
             </tbody>
           </table>
         </div>
+        <SettingsToggleSection
+          v-model="restrictAssignment"
+          compact
+          class="mt-6"
+          :header="$t('INBOX_MGMT.BUSINESS_HOURS.RESTRICT_ASSIGNMENT')"
+          :description="
+            $t('INBOX_MGMT.BUSINESS_HOURS.RESTRICT_ASSIGNMENT_HELP')
+          "
+        />
       </div>
       <div class="w-full flex justify-end items-center py-4 mt-2">
         <NextButton

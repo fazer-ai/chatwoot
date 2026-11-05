@@ -265,6 +265,10 @@
       "INBOUND_PHONE": {
         "DESCRIPTION": "Permita que os clientes liguem para este número e que a chamada toque para os atendentes aqui. Quando desativado, o Chatwoot não toca e a chamada continua tocando só no celular pareado. Os atendentes ainda podem fazer chamadas de saída."
       }
+    },
+    "BUSINESS_HOURS": {
+      "RESTRICT_ASSIGNMENT": "Só atribuir conversas dentro do horário de funcionamento",
+      "RESTRICT_ASSIGNMENT_HELP": "Fora do horário acima, os agentes não conseguem atribuir conversas desta caixa, nem a si mesmos nem a outras pessoas, e a atribuição automática não as distribui. Com a atribuição V2, o que chegou com a caixa fechada é distribuído quando ela abre. Administradores continuam podendo atribuir a qualquer hora."
     }
   }
 }

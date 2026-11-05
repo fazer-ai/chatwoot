@@ -160,6 +160,45 @@ RSpec.describe 'WhatsApp Calls API', type: :request do
       expect(initiate_conversation.reload.assignee_id).to eq(agent.id)
     end
 
+    # The dial already happened by the time the claim runs, so a closed inbox must not
+    # turn it into a refusal: the call goes through and the conversation stays unassigned.
+    it 'places the call without claiming the conversation while the inbox holds assignment' do
+      inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+      initiate_conversation
+      allow(provider_service).to receive(:initiate_call).and_return({ 'calls' => [{ 'id' => 'wacid_closed' }] })
+
+      travel_to(Time.utc(2026, 11, 8, 12)) do
+        post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
+             params: { conversation_id: initiate_conversation.display_id, sdp_offer: 'sdp_offer' },
+             headers: agent.create_new_auth_token
+      end
+
+      expect(response).to have_http_status(:ok)
+      expect(Call.find_by(provider_call_id: 'wacid_closed')).to be_present
+      expect(initiate_conversation.reload.assignee_id).to be_nil
+    end
+
+    # Monday 17:00 closes the factory's default week while the dial is in flight.
+    it 'keeps a call dialed as the inbox closes, without claiming the conversation' do
+      inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+      initiate_conversation
+      travel_to(Time.utc(2026, 11, 9, 16, 59, 59))
+      allow(provider_service).to receive(:initiate_call) do
+        travel_to(Time.utc(2026, 11, 9, 17, 0, 1))
+        { 'calls' => [{ 'id' => 'wacid_closing' }] }
+      end
+
+      post "/api/v1/accounts/#{account.id}/whatsapp_calls/initiate",
+           params: { conversation_id: initiate_conversation.display_id, sdp_offer: 'sdp_offer' },
+           headers: agent.create_new_auth_token
+
+      expect(response).to have_http_status(:ok)
+      expect(Call.find_by(provider_call_id: 'wacid_closing')).to be_present
+      expect(initiate_conversation.reload.assignee_id).to be_nil
+    ensure
+      travel_back
+    end
+
     it 'keeps the existing assignee when the conversation is already assigned' do
       other_agent = create(:user, account: account, role: :agent)
       create(:inbox_member, user: other_agent, inbox: inbox)

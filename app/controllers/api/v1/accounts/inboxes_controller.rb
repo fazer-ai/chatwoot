@@ -7,7 +7,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   before_action :check_authorization,
                 except: [:show, :health, :setup_channel_provider, :import_whatsapp_session, :request_pairing_code]
   # rubocop:enable Rails/LexicallyScopedActionFilter
-  before_action :validate_drop_assignee_outside_team_on_reopen, only: [:create, :update]
+  before_action :validate_strict_boolean_settings, only: [:create, :update]
   before_action :validate_reopen_owner, only: [:create, :update]
 
   include Api::V1::Accounts::Concerns::InboxHealthManagement
@@ -222,13 +222,15 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     render json: { error: error.message, code: error.class::CODE }, status: status
   end
 
+  STRICT_BOOLEAN_SETTINGS = %i[drop_assignee_outside_team_on_reopen restrict_assignment_to_working_hours].freeze
+
   # Strong params would cast "yes", 1 or "" into a boolean (or nil, which the column refuses
   # with a 500), so only a JSON boolean is accepted.
-  def validate_drop_assignee_outside_team_on_reopen
-    return unless params.key?(:drop_assignee_outside_team_on_reopen)
-    return if [true, false].include?(params[:drop_assignee_outside_team_on_reopen])
+  def validate_strict_boolean_settings
+    invalid = STRICT_BOOLEAN_SETTINGS.find { |key| params.key?(key) && [true, false].exclude?(params[key]) }
+    return if invalid.nil?
 
-    render_could_not_create_error('drop_assignee_outside_team_on_reopen must be true or false')
+    render_could_not_create_error("#{invalid} must be true or false")
   end
 
   # The enum would take an integer for its index and strong params would cast "6" or "abc" for the
@@ -366,7 +368,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   def inbox_attributes
     [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
      :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
-     :lock_to_single_conversation, :prevent_assignment_takeover, :drop_assignee_outside_team_on_reopen, :portal_id, :sender_name_type, :business_name,
+     :lock_to_single_conversation, :prevent_assignment_takeover, :restrict_assignment_to_working_hours, :drop_assignee_outside_team_on_reopen,
+     :portal_id, :sender_name_type, :business_name,
      :reopen_owner, :reopen_owner_window_hours,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
