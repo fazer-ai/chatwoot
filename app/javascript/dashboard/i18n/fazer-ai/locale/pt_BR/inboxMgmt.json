@@ -268,7 +268,7 @@
     },
     "BUSINESS_HOURS": {
       "RESTRICT_ASSIGNMENT": "Só atribuir conversas dentro do horário de funcionamento",
-      "RESTRICT_ASSIGNMENT_HELP": "Fora do horário acima, os agentes não conseguem atribuir conversas desta caixa, nem a si mesmos nem a outras pessoas, e a atribuição automática espera a caixa abrir. Administradores continuam podendo atribuir a qualquer hora."
+      "RESTRICT_ASSIGNMENT_HELP": "Fora do horário acima, os agentes não conseguem atribuir conversas desta caixa, nem a si mesmos nem a outras pessoas, e a atribuição automática não as distribui. Com a atribuição V2, o que chegou com a caixa fechada é distribuído quando ela abre. Administradores continuam podendo atribuir a qualquer hora."
     }
   }
 }

@@ -57,6 +57,8 @@ module AutoAssignmentHandler
 
   def should_run_auto_assignment?
     return false unless inbox.enable_auto_assignment?
+    # Legacy (V1) assignment has no catch-up when the inbox opens, the same as when no
+    # agent is online: what arrived while closed waits in the unassigned list.
     return false if inbox.assignment_closed?
     # Assignment V2: Resolved/snoozed conversations still have an assignee, so bypass the
     # assignee-blank check below. The AssignmentJob needs to run to rebalance assignments.

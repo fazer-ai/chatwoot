@@ -268,7 +268,7 @@
     },
     "BUSINESS_HOURS": {
       "RESTRICT_ASSIGNMENT": "Solo asignar conversaciones dentro del horario de atención",
-      "RESTRICT_ASSIGNMENT_HELP": "Fuera del horario indicado arriba, los agentes no pueden asignar conversaciones de esta bandeja, ni a sí mismos ni a otras personas, y la asignación automática espera a que la bandeja abra. Los administradores pueden asignar en cualquier momento."
+      "RESTRICT_ASSIGNMENT_HELP": "Fuera del horario indicado arriba, los agentes no pueden asignar conversaciones de esta bandeja, ni a sí mismos ni a otras personas, y la asignación automática no las reparte. Con la asignación V2, lo que llegó con la bandeja cerrada se reparte cuando abre. Los administradores pueden asignar en cualquier momento."
     }
   }
 }
