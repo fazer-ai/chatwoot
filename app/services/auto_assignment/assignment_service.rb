@@ -32,9 +32,12 @@ class AutoAssignment::AssignmentService
     assign_conversation(conversation, agent)
   end
 
+  # The schedule is read again per conversation: a batch that starts before closing time can
+  # still be running after it.
   def assignable?(conversation)
     conversation.status == 'open' &&
-      conversation.assignee_id.nil?
+      conversation.assignee_id.nil? &&
+      !inbox.assignment_closed?
   end
 
   def unassigned_conversations(limit)

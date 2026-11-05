@@ -174,6 +174,17 @@ RSpec.describe AutoAssignment::AssignmentService do
           expect(waiting.reload.assignee).to eq(agent)
         end
       end
+
+      # A batch that starts before closing time can still be running after it.
+      it 'stops handing out conversations once the inbox closes mid-batch' do
+        later = create(:conversation, inbox: inbox, assignee: nil, status: 'open')
+        later.update!(assignee_id: nil)
+        allow(inbox).to receive(:assignment_closed?).and_return(false, false, true)
+
+        expect(service.perform_bulk_assignment(limit: 10)).to eq(1)
+        expect(waiting.reload.assignee).to eq(agent)
+        expect(later.reload.assignee).to be_nil
+      end
     end
 
     context 'when auto assignment is disabled' do
