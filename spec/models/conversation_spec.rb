@@ -1617,6 +1617,14 @@ RSpec.describe Conversation do
           .to change { conversation.reload.assignee }.from(nil).to(agent)
       end
 
+      # A bot-authenticated request puts an AgentBot in Current.user.
+      it 'lets an agent bot assign the conversation' do
+        Current.user = create(:agent_bot, account: account)
+
+        expect { conversation.update!(assignee: agent) }
+          .to change { conversation.reload.assignee }.from(nil).to(agent)
+      end
+
       it 'does not restrict an inbox that has the option off' do
         inbox.update!(restrict_assignment_to_working_hours: false)
         Current.user = agent
@@ -1637,8 +1645,10 @@ RSpec.describe Conversation do
       # Picking a team with auto assign hands the conversation to a member, which
       # is distribution, not a claim: the team changes and nobody is assigned.
       it 'changes the team without auto assigning a member' do
+        online_member = create(:user, account: account, role: :agent, auto_offline: false)
+        create(:inbox_member, user: online_member, inbox: inbox)
         team = create(:team, account: account, allow_auto_assign: true)
-        create(:team_member, team: team, user: other_agent)
+        create(:team_member, team: team, user: online_member)
         Current.user = agent
 
         conversation.update!(team: team)

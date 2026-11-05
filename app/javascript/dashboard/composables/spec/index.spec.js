@@ -1,6 +1,12 @@
 import { emitter } from 'shared/helpers/mitt';
 import analyticsHelper from 'dashboard/helper/AnalyticsHelper';
-import { useTrack, useAlert, usePendingAlert } from '../index';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
+import {
+  useTrack,
+  useAlert,
+  usePendingAlert,
+  useAssignmentError,
+} from '../index';
 
 vi.mock('shared/helpers/mitt', () => ({
   emitter: {
@@ -107,6 +113,25 @@ describe('usePendingAlert', () => {
     dismiss2();
     expect(emitter.emit).toHaveBeenCalledWith('dismissToastMessage', {
       key: key2,
+    });
+  });
+});
+
+describe('useAssignmentError', () => {
+  it('passes the refusal reason on to the conflict dialog', () => {
+    useAssignmentError(
+      {
+        response: {
+          status: 409,
+          data: { message: 'closed', reason: 'outside_working_hours' },
+        },
+      },
+      'fallback'
+    );
+
+    expect(emitter.emit).toHaveBeenCalledWith(BUS_EVENTS.ASSIGNMENT_CONFLICT, {
+      agentName: '',
+      reason: 'outside_working_hours',
     });
   });
 });

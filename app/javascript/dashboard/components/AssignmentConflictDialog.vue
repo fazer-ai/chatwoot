@@ -9,22 +9,41 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 
 const { t } = useI18n();
 
+const OUTSIDE_WORKING_HOURS = 'outside_working_hours';
+
 const dialogRef = ref(null);
 const agentName = ref('');
+const reason = ref('');
 
-const description = computed(() =>
-  agentName.value
+const isOutsideWorkingHours = computed(
+  () => reason.value === OUTSIDE_WORKING_HOURS
+);
+
+const title = computed(() =>
+  isOutsideWorkingHours.value
+    ? t('CONVERSATION.ASSIGNMENT_CONFLICT.OUTSIDE_WORKING_HOURS.TITLE')
+    : t('CONVERSATION.ASSIGNMENT_CONFLICT.TITLE')
+);
+
+const description = computed(() => {
+  if (isOutsideWorkingHours.value) {
+    return t(
+      'CONVERSATION.ASSIGNMENT_CONFLICT.OUTSIDE_WORKING_HOURS.DESCRIPTION'
+    );
+  }
+  return agentName.value
     ? t('CONVERSATION.ASSIGNMENT_CONFLICT.DESCRIPTION', {
         agentName: agentName.value,
       })
-    : t('CONVERSATION.ASSIGNMENT_CONFLICT.DESCRIPTION_UNKNOWN_AGENT')
-);
+    : t('CONVERSATION.ASSIGNMENT_CONFLICT.DESCRIPTION_UNKNOWN_AGENT');
+});
 
 // Mounted once globally, next to the toast container, because the assignment
 // actions that can collide live in four unrelated components (conversation
 // sidebar, reply box banner, command bar and the chat list context menu).
 const onAssignmentConflict = payload => {
   agentName.value = payload?.agentName || '';
+  reason.value = payload?.reason || '';
   dialogRef.value?.open();
 };
 
@@ -51,11 +70,14 @@ onUnmounted(() =>
       <div
         class="flex items-center justify-center flex-shrink-0 size-10 rounded-xl bg-n-amber-3"
       >
-        <span class="i-lucide-lock text-xl text-n-amber-11" />
+        <span
+          class="text-xl text-n-amber-11"
+          :class="isOutsideWorkingHours ? 'i-lucide-clock' : 'i-lucide-lock'"
+        />
       </div>
       <div class="flex flex-col gap-1">
         <h3 class="text-base font-medium leading-6 text-n-slate-12">
-          {{ $t('CONVERSATION.ASSIGNMENT_CONFLICT.TITLE') }}
+          {{ title }}
         </h3>
         <p class="mb-0 text-sm text-n-slate-11">
           {{ description }}

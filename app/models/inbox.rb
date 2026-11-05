@@ -23,6 +23,7 @@
 #  prevent_assignment_takeover          :boolean          default(FALSE), not null
 #  reopen_owner                         :integer          default(0), not null
 #  reopen_owner_window_hours            :integer
+#  restrict_assignment_to_working_hours :boolean          default(FALSE), not null
 #  sender_name_type                     :integer          default("friendly"), not null
 #  timezone                             :string           default("UTC")
 #  working_hours_enabled                :boolean          default(FALSE)
@@ -218,6 +219,12 @@ class Inbox < ApplicationRecord
 
   def auto_assignment_v2_enabled?
     account.feature_enabled?('assignment_v2')
+  end
+
+  # Closed by the weekly schedule, with the inbox set to hold assignment until it opens.
+  # `out_of_office?` is already false whenever business hours are off.
+  def assignment_closed?
+    restrict_assignment_to_working_hours? && out_of_office?
   end
 
   # Callers (Reauthorizable) only invoke this on a real transition, so the previous

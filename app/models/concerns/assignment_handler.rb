@@ -7,6 +7,7 @@ module AssignmentHandler
     # Declared after the team callback on purpose: that one can null the assignee
     # when the new team excludes them, and the guard has to see the final value.
     before_save :ensure_assignment_not_taken, if: :assignee_id_changed?
+    before_save :ensure_assignment_within_working_hours, if: :assignee_id_changed?
     after_commit :notify_assignment_change, :process_assignment_changes
   end
 
@@ -60,6 +61,22 @@ module AssignmentHandler
     account.account_users.exists?(user_id: Current.user.id, role: :administrator)
   end
 
+  # An inbox that holds assignment until it opens turns away every agent who
+  # assigns one of its conversations while it is closed, to themselves or to
+  # someone else. Releasing a conversation is not a claim, and administrators
+  # keep assigning at any hour. Automated assignment has no `Current.user` and
+  # is held back where it starts instead (`AutoAssignmentHandler`,
+  # `AutoAssignment::AssignmentService`), except automation rules and API
+  # integrations, which an administrator set up on purpose.
+  def ensure_assignment_within_working_hours
+    return if new_record? || assignee_id.blank?
+    return unless Current.user.is_a?(User)
+    return unless inbox.assignment_closed?
+    return if account.account_users.exists?(user_id: Current.user.id, role: :administrator)
+
+    raise CustomExceptions::Conversation::OutsideWorkingHours.new({})
+  end
+
   def ensure_assignee_is_from_team
     return unless team_id_changed?
     return if ai_assignee_type.present?
@@ -74,6 +91,7 @@ module AssignmentHandler
 
   def find_assignee_from_team
     return if team&.allow_auto_assign.blank?
+    return if inbox.assignment_closed?
 
     team_members_with_capacity = inbox.member_ids_with_assignment_capacity & team.members.ids
     ::AutoAssignment::AgentAssignmentService.new(conversation: self, allowed_agent_ids: team_members_with_capacity).find_assignee

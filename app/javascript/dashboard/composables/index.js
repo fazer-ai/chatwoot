@@ -48,7 +48,8 @@ export const usePendingAlert = message => {
  * A 409 means an inbox with `prevent_assignment_takeover` would not move the
  * conversation away from the agent handling it, which can come from assigning
  * an agent, from picking a team that excludes the current one, or from
- * reopening. It gets a dialog rather than a toast: the toast fades on its own
+ * reopening. It also means an inbox with `restrict_assignment_to_working_hours`
+ * is closed, which the response tells apart with `reason`. It gets a dialog rather than a toast: the toast fades on its own
  * and the agent is about to start working a conversation that is not theirs.
  * Anything else falls back to the caller's own message.
  * @param {Object} error - The rejected axios error.
@@ -62,5 +63,6 @@ export const useAssignmentError = (error, fallbackMessage) => {
 
   emitter.emit(BUS_EVENTS.ASSIGNMENT_CONFLICT, {
     agentName: error.response.data?.agent_name ?? '',
+    reason: error.response.data?.reason ?? '',
   });
 };

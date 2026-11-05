@@ -23,7 +23,11 @@
       "TITLE": "Conversation already assigned",
       "DESCRIPTION": "{agentName} is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
       "DESCRIPTION_UNKNOWN_AGENT": "Another agent is already handling this conversation. Ask them to release it, or ask an administrator to reassign it.",
-      "CONFIRM": "Got it"
+      "CONFIRM": "Got it",
+      "OUTSIDE_WORKING_HOURS": {
+        "TITLE": "Inbox outside business hours",
+        "DESCRIPTION": "Conversations in this inbox can only be assigned during its business hours. Try again once it opens, or ask an administrator."
+      }
     },
     "CHANGE_TEAM_FAILED": "Team change failed",
     "MESSAGE_DELETED_BY_CONTACT": "Deleted by the contact",
