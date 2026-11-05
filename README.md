@@ -91,7 +91,7 @@ Conheça o [Kanban do Pro](https://fazer.ai/kanban) e ative sua licença em [app
 
 As licenças fazer.ai não incluem recursos do Chatwoot Enterprise. SSO e Captain, assim como logs de auditoria e funções personalizadas, são licenciados pela Chatwoot Inc.
 
-Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e use a imagem `ghcr.io/fazer-ai/chatwoot:latest-ee`. A imagem com sufixo `-ee` não substitui a licença. A parceria oferece [desconto na contratação](https://fazer.ai/parceria-chatwoot).
+Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e use a imagem `ghcr.io/fazer-ai/chatwoot:latest-ee`. A imagem com sufixo `-ee` não substitui a licença.
 
 ## Instalar
 

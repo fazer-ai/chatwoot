@@ -91,7 +91,7 @@ Explore the [Pro Kanban](https://fazer.ai/kanban) and activate your license at [
 
 fazer.ai licenses do not include Chatwoot Enterprise features. SSO and Captain, along with audit logs and custom roles, are licensed by Chatwoot Inc.
 
-To use these features with the fork, purchase a license from Chatwoot Inc. and use the `ghcr.io/fazer-ai/chatwoot:latest-ee` image. The image with the `-ee` suffix does not replace the license. The partnership offers a [licensing discount](https://fazer.ai/parceria-chatwoot).
+To use these features with the fork, purchase a license from Chatwoot Inc. and use the `ghcr.io/fazer-ai/chatwoot:latest-ee` image. The image with the `-ee` suffix does not replace the license.
 
 ## Install
 
