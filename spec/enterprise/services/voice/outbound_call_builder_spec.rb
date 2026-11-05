@@ -89,6 +89,23 @@ RSpec.describe Voice::OutboundCallBuilder do
       expect(conversation.reload.assignee_id).to eq(user.id)
     end
 
+    # The dial already happened when the claim runs, so a closed inbox must not fail the
+    # build and roll back the record of a call that is ringing.
+    it 'places the call without claiming a reused conversation while the inbox holds assignment' do
+      inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+      conversation = create(:conversation, account: account, inbox: inbox, contact: contact).reload
+      Current.user = user
+
+      call = travel_to(Time.utc(2026, 11, 8, 12)) do
+        described_class.perform!(account: account, inbox: inbox, user: user, contact: contact, conversation: conversation)
+      end
+
+      expect(call.provider_call_id).to eq(call_sid)
+      expect(conversation.reload.assignee_id).to be_nil
+    ensure
+      Current.reset
+    end
+
     it 'keeps the existing assignee when a reused conversation is already assigned' do
       other_agent = create(:user, account: account)
       conversation = create(:conversation, account: account, inbox: inbox, contact: contact, assignee: other_agent).reload

@@ -26,4 +26,16 @@ RSpec.describe Voice::Conference::Manager do
 
     expect(call.reload).to have_attributes(status: 'completed', missed?: false)
   end
+
+  it 'answers without claiming the conversation while the inbox holds assignment' do
+    channel.inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+    conversation.update!(assignee: nil)
+
+    travel_to(Time.utc(2026, 11, 8, 12)) do
+      described_class.new(call: call, event: 'join', participant_label: agent_label).process
+    end
+
+    expect(call.reload.status).to eq('in_progress')
+    expect(conversation.reload.assignee).to be_nil
+  end
 end

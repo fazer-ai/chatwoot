@@ -17,9 +17,7 @@ class Voice::OutboundCallBuilder
     raise ArgumentError, 'Contact phone number required' if contact.phone_number.blank?
     raise ArgumentError, 'Agent required' if user.blank?
 
-    # Claim for the caller if a reused conversation is unassigned at trigger time; wins over auto-assignment.
-    # New conversations set the assignee at creation instead (see create_conversation!).
-    claim_for_caller = @existing_conversation && @existing_conversation.assigned_entity.nil?
+    claim_for_caller = claim_reused_conversation?
 
     ActiveRecord::Base.transaction do
       contact_inbox = ensure_contact_inbox!
@@ -40,6 +38,13 @@ class Voice::OutboundCallBuilder
   end
 
   private
+
+  # Claim for the caller if a reused conversation is unassigned at trigger time; wins over auto-assignment.
+  # New conversations set the assignee at creation instead (see create_conversation!). An inbox holding
+  # assignment while closed is not claimed, since the dial in perform! cannot be undone.
+  def claim_reused_conversation?
+    @existing_conversation.present? && @existing_conversation.assigned_entity.nil? && !@existing_conversation.inbox.assignment_closed?
+  end
 
   def ensure_contact_inbox!
     ContactInbox.find_or_create_by!(
