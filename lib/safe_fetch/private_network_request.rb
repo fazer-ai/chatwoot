@@ -1,6 +1,8 @@
 class SafeFetch::PrivateNetworkRequest
-  def initialize(options)
+  # fazer-ai/chatwoot#927: with `only`, every hop (redirects included) must be one of these [host, port] pairs.
+  def initialize(options, only: nil)
     @options = options
+    @only = only
   end
 
   def perform(&)
@@ -11,6 +13,7 @@ class SafeFetch::PrivateNetworkRequest
     (SsrfFilter::DEFAULT_MAX_REDIRECTS + 1).times do
       uri = URI(url)
       validate_scheme!(uri)
+      validate_target!(uri) if @only
 
       response, next_url = fetch_once(uri, resolved_addresses(uri.hostname).sample.to_s, original_uri, &)
       return response if next_url.nil?
@@ -29,6 +32,12 @@ class SafeFetch::PrivateNetworkRequest
     return if SsrfFilter::DEFAULT_SCHEME_WHITELIST.include?(uri.scheme)
 
     raise SsrfFilter::InvalidUriScheme, "URI scheme '#{uri.scheme}' not in whitelist: #{SsrfFilter::DEFAULT_SCHEME_WHITELIST}"
+  end
+
+  def validate_target!(uri)
+    return if SafeFetch.private_target?(uri, @only)
+
+    raise SsrfFilter::PrivateIPAddress, "#{normalized_hostname(uri)} is not in SAFE_FETCH_PRIVATE_TARGETS"
   end
 
   def resolved_addresses(hostname)

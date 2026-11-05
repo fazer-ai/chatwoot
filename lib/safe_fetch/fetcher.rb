@@ -46,6 +46,10 @@ class SafeFetch::Fetcher
   def perform_request(&)
     return SafeFetch::PrivateNetworkRequest.new(options).perform(&) if SafeFetch.allow_private_network?
 
+    # fazer-ai/chatwoot#927
+    targets = SafeFetch.private_targets
+    return SafeFetch::PrivateNetworkRequest.new(options, only: targets).perform(&) if SafeFetch.private_target?(URI(options.url), targets)
+
     SsrfFilter.public_send(options.method, options.url, **options.request_options, &)
   end
 
