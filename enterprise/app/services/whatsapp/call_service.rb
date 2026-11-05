@@ -79,12 +79,18 @@ class Whatsapp::CallService
 
   # Claim an unheld conversation and set call_status in one save so previous_changes carries both the
   # assignee change (activity message + ASSIGNEE_CHANGED) and the call_status change (conversation.updated webhook).
-  # Meta has already accepted by now, so an inbox holding assignment while closed is answered unclaimed.
+  # Meta has already accepted by now, so an inbox holding assignment while closed is answered unclaimed,
+  # including when it closes between the check and the save.
   def claim_conversation_and_set_call_status
     conversation = call.conversation
     attrs = { additional_attributes: (conversation.additional_attributes || {}).merge('call_status' => call.display_status) }
     attrs[:assignee] = agent if conversation.assigned_entity.nil? && !conversation.inbox.assignment_closed?
-    conversation.update!(attrs)
+    begin
+      conversation.update!(attrs)
+    rescue CustomExceptions::Conversation::OutsideWorkingHours
+      conversation.restore_attributes
+      conversation.update!(attrs.except(:assignee))
+    end
   end
 
   # Raise on Meta failure (bool false or transport error) so callers bail before

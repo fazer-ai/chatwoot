@@ -57,6 +57,19 @@ describe Voice::Provider::Twilio::ConferenceService do
       Current.reset
     end
 
+    it 'joins the agent when the claim itself is refused for business hours' do
+      agent = create(:user, account: account, role: :agent)
+      allow(Conversations::AssignmentService).to receive(:new)
+        .and_return(instance_double(Conversations::AssignmentService, perform: nil).tap do |service|
+          allow(service).to receive(:perform).and_raise(CustomExceptions::Conversation::OutsideWorkingHours.new({}))
+        end)
+
+      expect { service.mark_agent_joined(user: agent) }.not_to raise_error
+
+      expect(call.reload.accepted_by_agent_id).to eq(agent.id)
+      expect(conversation.reload.assignee).to be_nil
+    end
+
     it 'holds a place for the connection of the attempt the agent names' do
       agent = create(:user, account: account)
 

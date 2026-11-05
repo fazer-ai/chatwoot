@@ -126,6 +126,21 @@ RSpec.describe Voice::OutboundCallBuilder do
       Current.reset
     end
 
+    # The inbox can still close between the check and the save (waiting on the row lock).
+    it 'keeps the call when the claim itself is refused for business hours' do
+      conversation = create(:conversation, account: account, inbox: inbox, contact: contact).reload
+      allow(conversation).to receive(:update!).and_wrap_original do |original, attrs|
+        raise CustomExceptions::Conversation::OutsideWorkingHours.new({}) if attrs.key?(:assignee)
+
+        original.call(attrs)
+      end
+
+      call = described_class.perform!(account: account, inbox: inbox, user: user, contact: contact, conversation: conversation)
+
+      expect(call.reload.provider_call_id).to eq(call_sid)
+      expect(conversation.reload.assignee_id).to be_nil
+    end
+
     it 'keeps the existing assignee when a reused conversation is already assigned' do
       other_agent = create(:user, account: account)
       conversation = create(:conversation, account: account, inbox: inbox, contact: contact, assignee: other_agent).reload

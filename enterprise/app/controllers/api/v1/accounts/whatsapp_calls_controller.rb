@@ -158,11 +158,20 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
     provider_call_id = result.dig('calls', 0, 'id') || result['call_id']
 
     @conversation = open_conversation!
-    # Checked after the dial, which cannot be undone: an inbox that holds assignment while closed,
-    # including one that closed while the call was being placed, keeps the call and stays unassigned.
-    @conversation.with_lock { @conversation.update!(assignee: Current.user) } if claim_for_caller && !@conversation.inbox.assignment_closed?
+    claim_conversation_for_caller if claim_for_caller
 
     create_call_record(provider_call_id)
+  end
+
+  # Runs after the dial, which cannot be undone: an inbox that holds assignment while closed keeps
+  # the call and stays unassigned, including when it closes while the row lock is awaited and the
+  # save itself is refused.
+  def claim_conversation_for_caller
+    return if @conversation.inbox.assignment_closed?
+
+    @conversation.with_lock { @conversation.update!(assignee: Current.user) }
+  rescue CustomExceptions::Conversation::OutsideWorkingHours
+    @conversation.restore_attributes
   end
 
   # The connector dials numbers only. The contact panel hands over the contact's number,

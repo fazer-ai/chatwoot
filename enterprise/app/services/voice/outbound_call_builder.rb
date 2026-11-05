@@ -38,13 +38,16 @@ class Voice::OutboundCallBuilder
 
   private
 
-  # Checked after the dial, which cannot be undone: an inbox that holds assignment while closed,
-  # including one that closed while the call was being placed, keeps the call and stays unassigned.
+  # Runs after the dial, which cannot be undone: an inbox that holds assignment while closed keeps
+  # the call and stays unassigned, including when it closes while the row lock is awaited and the
+  # save itself is refused.
   def claim_reused_conversation!
     return if @existing_conversation.inbox.assignment_closed?
 
     @existing_conversation.lock!
     @existing_conversation.update!(assignee: user)
+  rescue CustomExceptions::Conversation::OutsideWorkingHours
+    @existing_conversation.restore_attributes
   end
 
   def ensure_contact_inbox!
