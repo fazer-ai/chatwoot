@@ -20,7 +20,7 @@
 
 ## O que é
 
-Chatwoot fazer.ai é um fork do Chatwoot oficial, mantido pela fazer.ai (FAZER.AI LTDA), parceira oficial do Chatwoot no Brasil. A Chatwoot Inc. desenvolve o produto original e é uma empresa separada.
+Chatwoot fazer.ai é um fork do Chatwoot oficial, mantido pela fazer.ai (FAZER.AI LTDA). A Chatwoot Inc. desenvolve o produto original e é uma empresa separada.
 
 O fork acompanha as versões do Chatwoot oficial e acrescenta recursos para quem monta e opera atendimento por WhatsApp. Você pode usar a edição aberta gratuitamente ou contratar o Chatwoot fazer.ai Pro para incluir o Kanban de vendas.
 
@@ -161,4 +161,4 @@ Consulte [NOTICE](NOTICE) e [LICENSE](LICENSE) para os termos completos.
 - [Chatwoot oficial](https://www.chatwoot.com)
 - [Código do Chatwoot oficial](https://github.com/chatwoot/chatwoot)
 
-Mantido pela fazer.ai, parceira oficial do Chatwoot no Brasil.
+Mantido pela fazer.ai.
