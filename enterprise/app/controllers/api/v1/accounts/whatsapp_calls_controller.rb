@@ -152,15 +152,15 @@ class Api::V1::Accounts::WhatsappCallsController < Api::V1::Accounts::BaseContro
   def create_outbound_call
     # A reused thread unassigned at click time is claimed for the caller (wins over auto-assignment); a
     # fresh thread (@conversation nil until the dial succeeds) is created already assigned to the caller.
-    # An inbox holding assignment while closed is not claimed: the dial below cannot be undone, so the
-    # call goes through and the conversation stays unassigned.
-    claim_for_caller = @conversation.present? && @conversation.assigned_entity.nil? && !@conversation.inbox.assignment_closed?
+    claim_for_caller = @conversation.present? && @conversation.assigned_entity.nil?
 
     result = provider_service.initiate_call(call_recipient, params[:sdp_offer], **connector_call_context)
     provider_call_id = result.dig('calls', 0, 'id') || result['call_id']
 
     @conversation = open_conversation!
-    @conversation.with_lock { @conversation.update!(assignee: Current.user) } if claim_for_caller
+    # Checked after the dial, which cannot be undone: an inbox that holds assignment while closed,
+    # including one that closed while the call was being placed, keeps the call and stays unassigned.
+    @conversation.with_lock { @conversation.update!(assignee: Current.user) } if claim_for_caller && !@conversation.inbox.assignment_closed?
 
     create_call_record(provider_call_id)
   end

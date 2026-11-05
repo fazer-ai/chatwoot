@@ -17,17 +17,16 @@ class Voice::OutboundCallBuilder
     raise ArgumentError, 'Contact phone number required' if contact.phone_number.blank?
     raise ArgumentError, 'Agent required' if user.blank?
 
-    claim_for_caller = claim_reused_conversation?
+    # Claim for the caller if a reused conversation is unassigned at trigger time; wins over auto-assignment.
+    # New conversations set the assignee at creation instead (see create_conversation!).
+    claim_for_caller = @existing_conversation && @existing_conversation.assigned_entity.nil?
 
     ActiveRecord::Base.transaction do
       contact_inbox = ensure_contact_inbox!
       conversation = @existing_conversation || create_conversation!(contact_inbox)
       # Dial before locking so the Twilio round-trip doesn't hold the conversation row lock.
       call_sid = initiate_call!
-      if claim_for_caller
-        @existing_conversation.lock!
-        @existing_conversation.update!(assignee: user)
-      end
+      claim_reused_conversation! if claim_for_caller
       call = create_call!(conversation, call_sid)
       message = Voice::CallMessageBuilder.new(call).perform!
       call.update!(message_id: message.id)
@@ -39,11 +38,13 @@ class Voice::OutboundCallBuilder
 
   private
 
-  # Claim for the caller if a reused conversation is unassigned at trigger time; wins over auto-assignment.
-  # New conversations set the assignee at creation instead (see create_conversation!). An inbox holding
-  # assignment while closed is not claimed, since the dial in perform! cannot be undone.
-  def claim_reused_conversation?
-    @existing_conversation.present? && @existing_conversation.assigned_entity.nil? && !@existing_conversation.inbox.assignment_closed?
+  # Checked after the dial, which cannot be undone: an inbox that holds assignment while closed,
+  # including one that closed while the call was being placed, keeps the call and stays unassigned.
+  def claim_reused_conversation!
+    return if @existing_conversation.inbox.assignment_closed?
+
+    @existing_conversation.lock!
+    @existing_conversation.update!(assignee: user)
   end
 
   def ensure_contact_inbox!
