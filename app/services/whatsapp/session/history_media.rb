@@ -83,15 +83,16 @@ module Whatsapp::Session::HistoryMedia
   # unsupported, it would trade its text and buttons for the placeholder, for good if the
   # header never comes.
   #
-  # Under the lock it looks again, since a download may have landed or given up since the
-  # caller looked: marking either pending would hide the file or ask for one that is gone.
+  # Under the lock it looks again, since a download may have landed or given up, or an
+  # agent deleted the message, since the caller looked: marking any of them pending would
+  # hide the file, ask for one that is gone, or put a deleted message's caption back.
   def defer(message, inbound)
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     return if media&.ref.blank?
 
     as_history(message) do
       message.with_lock do
-        next if message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
+        next if settled?(message)
 
         message.update!(content_attributes: message.content_attributes.merge(
           'is_unsupported' => (true unless readable_card?(message)), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
@@ -99,6 +100,10 @@ module Whatsapp::Session::HistoryMedia
         ).compact)
       end
     end
+  end
+
+  def settled?(message)
+    message.deleted? || message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
   end
 
   # Any write to an imported message, its file or its bookkeeping, at the level the message

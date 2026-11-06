@@ -42,6 +42,14 @@ RSpec.describe Whatsapp::Session::HistoryMedia do
       expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
     end
 
+    it 'leaves a message deleted meanwhile as it is' do
+      message.update!(content_attributes: message.content_attributes.merge('deleted' => true))
+
+      described_class.defer(message, inbound)
+
+      expect(message.reload.content_attributes).not_to include('history_media', 'pending_media')
+    end
+
     it 'leaves a message whose file was given up on meanwhile as it is' do
       message.update!(content_attributes: message.content_attributes.merge('media_unavailable' => true))
 
