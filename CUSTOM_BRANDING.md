@@ -5,7 +5,7 @@
 The brand lives in the installation config, and there are two ways to set it:
 
 - **The super admin:** **Settings → Branding** (`/super_admin/app_config?config=branding`) edits every key in the table below. What is saved there is what the installation shows, and it stays when the containers restart.
-- **The environment:** set the variables on the Rails container and run `bundle exec rails branding:update`, for example in a `post_start` hook. This seeds the brand: the task writes a key only while it still holds its default value, and leaves alone a key that was changed from it, whether on the Branding page or by an earlier run with another value. So a value saved in the super admin is never undone by the next container start.
+- **The environment:** set the variables on the Rails container and run `bundle exec rails branding:update`, for example in a `post_start` hook. This seeds the brand: until the Branding page is saved for the first time, the task writes every key from the environment, and an unset variable puts its key back to the default. Once the page is saved, the installation records it (`BRANDING_EDITED_IN_SUPER_ADMIN`) and the task leaves the whole brand as the page left it, so the next container start never undoes it.
 
 ```yaml
 environment:
@@ -15,15 +15,13 @@ environment:
   LOGO: "https://fazer.ai/logo.svg"
 ```
 
-To apply the environment again over edited values, run the task once with `BRANDING_FORCE=true`:
+To apply the environment again over the saved values, run the task once with `BRANDING_FORCE=true`. It writes every key from the environment and hands the brand back to it, until the page is saved again:
 
 ```bash
 BRANDING_FORCE=true \
 BRAND_NAME="My Company" \
 bundle exec rails branding:update
 ```
-
-With `BRANDING_FORCE=true`, an unset variable puts its key back to the default value, which is what the task always did before.
 
 ### With `CW_EDITION=ee`
 

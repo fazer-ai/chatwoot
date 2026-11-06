@@ -31,6 +31,8 @@ RSpec.describe 'Super Admin branding settings', type: :request do
       expect(flash[:alert]).to be_blank
       expect(GlobalConfig.get('BRAND_NAME', 'LOGO', 'BRAND_COLOR'))
         .to eq('BRAND_NAME' => 'Acme', 'LOGO' => 'https://acme.test/logo.svg', 'BRAND_COLOR' => '#123abc')
+      # What tells `branding:update` that the brand is the operator's now.
+      expect(InstallationConfig.find_by!(name: 'BRANDING_EDITED_IN_SUPER_ADMIN').value).to be(true)
     end
 
     # The colour goes straight into the emails' CSS and the manifest.
@@ -40,6 +42,7 @@ RSpec.describe 'Super Admin branding settings', type: :request do
       expect(flash[:alert]).to eq(I18n.t('super_admin.app_configs.branding.invalid_color'))
       expect(InstallationConfig.find_by!(name: 'BRAND_NAME').value).to eq('Chatwoot')
       expect(InstallationConfig.find_by!(name: 'BRAND_COLOR').value).to eq('#1f93ff')
+      expect(InstallationConfig.find_by(name: 'BRANDING_EDITED_IN_SUPER_ADMIN')).to be_nil
     end
   end
 

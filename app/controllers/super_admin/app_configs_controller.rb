@@ -14,14 +14,15 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
   ].freeze
   # The installation's brand, edited here on a Community install. Enterprise brings its own page
   # for these keys and puts them back to their defaults on its community plan, so the page is
-  # offered only without enterprise/. What is saved here is what the installation shows:
-  # `branding:update` fills a key from the environment only while it still holds its default
-  # (CUSTOM_BRANDING.md).
+  # offered only without enterprise/. What is saved here is what the installation shows: once
+  # the page is saved, BRANDING_EDITED_IN_SUPER_ADMIN tells `branding:update` to leave the
+  # brand alone (CUSTOM_BRANDING.md).
   BRANDING_CONFIGS = %w[
     INSTALLATION_NAME LOGO_THUMBNAIL LOGO LOGO_DARK LOGO_EMAIL BRAND_NAME BRAND_URL WIDGET_BRAND_URL
     BRAND_COLOR TERMS_URL PRIVACY_URL DISPLAY_MANIFEST
   ].freeze
   BRAND_COLOR_FORMAT = /\A#(?:\h{3}|\h{6})\z/
+  BRANDING_EDITED_FLAG = 'BRANDING_EDITED_IN_SUPER_ADMIN'.freeze
 
   before_action :set_config
   before_action :allowed_configs
@@ -48,6 +49,7 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
       i.value = value
       errors.concat(i.errors.full_messages) unless i.save
     end
+    mark_branding_edited if errors.empty?
 
     redirect_to super_admin_app_config_path(config: @config), flash: errors.any? ? { alert: errors.join(', ') } : success_flash
   end
@@ -70,6 +72,14 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
     return [] if color.blank? || color.match?(BRAND_COLOR_FORMAT)
 
     [I18n.t('super_admin.app_configs.branding.invalid_color')]
+  end
+
+  # The whole page, and not the keys that changed: the form submits every key, and a value the
+  # operator saved equal to its default is as much theirs as any other.
+  def mark_branding_edited
+    return unless @config == 'branding'
+
+    InstallationConfig.where(name: BRANDING_EDITED_FLAG).first_or_create!(value: true, locked: false).update!(value: true)
   end
 
   def set_config

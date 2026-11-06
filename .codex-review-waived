@@ -203,3 +203,4 @@ app/models/message.rb: Clear the flag for receipts on already-delivered echoes  
 app/models/concerns/assignment_handler.rb: Enforce working hours on initial human assignments  # PR#933
 app/javascript/dashboard/composables/useWhatsappCallSession.js: Release the call session before awaiting its recording upload  # PR#940
 app/javascript/dashboard/helper/actionCable.js: Preserve early lifecycle events for Cloud calls  # PR#940
+fazer_ai_ee/app/services/fazer_ai_ee/whatsapp/incoming_call_service.rb: Normalize incoming-call conversation IDs in the CE consumer  # PR#940

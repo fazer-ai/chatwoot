@@ -29,10 +29,12 @@ namespace :branding do
       'DISPLAY_MANIFEST' => true
     }
 
-    # The environment seeds the brand; the super admin's Branding page edits it. So a key is
-    # written only while it still holds its default, and one somebody changed (on that page, or
-    # an earlier run of this task with another value) is left as it is. BRANDING_FORCE=true
-    # writes every key from the environment again, edits included.
+    # The environment seeds the brand until the super admin's Branding page is saved; from then
+    # on the page owns it and this task leaves it as it is. BRANDING_FORCE=true writes every key
+    # from the environment again and hands the brand back to it.
+    edited = InstallationConfig.find_by(name: 'BRANDING_EDITED_IN_SUPER_ADMIN')
+    next puts('Kept the branding saved in the super admin.') if edited&.value.present? && ENV['BRANDING_FORCE'] != 'true'
+
     configurable_items.each do |config_name, default_value|
       value = if default_value.in?([true, false])
                 ENV.fetch(config_name, default_value.to_s) == 'true'
@@ -40,14 +42,11 @@ namespace :branding do
                 ENV.fetch(config_name, default_value)
               end
 
-      config = InstallationConfig.find_by!(name: config_name)
-      kept = config.value.to_s != default_value.to_s && config.value.to_s != value.to_s && ENV['BRANDING_FORCE'] != 'true'
-      next puts("Kept '#{config_name}' as '#{config.value}': it was changed from its default.") if kept
-
-      config.update!(value: value)
+      InstallationConfig.find_by!(name: config_name).update!(value: value)
       puts "Updated '#{config_name}' to '#{value}'."
     end
 
+    edited&.destroy!
     puts 'Branding configuration update finished.'
   end
 end
