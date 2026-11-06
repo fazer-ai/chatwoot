@@ -14,8 +14,12 @@ class Whatsapp::Session::Inbound::MessageAttributes
   HISTORY_MEDIA = 'history_media'.freeze
 
   # Unsupported for good, as opposed to an imported file that is still waiting for its bytes.
+  # A history card whose header is gone is marked apart (`media_unavailable`), since the
+  # card itself still reads.
   def self.given_up?(message)
     attributes = message.content_attributes || {}
+    return true if attributes['media_unavailable'].present?
+
     attributes['is_unsupported'].present? && attributes[HISTORY_MEDIA].blank?
   end
 

@@ -13,7 +13,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # event carried.
   def perform(message, content, chat = nil)
     return if message.attachments.any?
-    return as_history(message) { perform(message, content, chat) } if imported?(message)
+    return Whatsapp::Session::HistoryMedia.as_history(message) { perform(message, content, chat) } if imported?(message)
 
     channel = message.inbox.channel
     media = Whatsapp::Session::Model::Content.from_h(content)
@@ -42,18 +42,8 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
 
   private
 
-  # The file of an imported message is written as history, as the message was: it reaches
-  # the open dashboard and nothing else, no bot, webhook or automation. Archived traffic
-  # replayed to them because its file arrived later is what the import suppressed.
   def imported?(message)
     message.content_attributes&.dig('imported').present? && !Import::SilentWrite.on?
-  end
-
-  # At the level the message was written at: the archive half stays archive, so an old
-  # voice note spends no transcription, and the gap half, which is somebody's unread work
-  # recovered late, keeps the side effects a live arrival has.
-  def as_history(message, &)
-    Import::SilentWrite.wrap(announce: true, archive: message.content_attributes['history_archive'].present?, &)
   end
 
   # One question in two halves, both about a queue entry that outlived a conversion: can
@@ -89,11 +79,21 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # buttons, only without the picture.
   def give_up(message, reason)
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
-    readable = message.content_attributes&.dig(history_media).present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
-    message.update_under_lock!(is_unsupported: true) unless readable
+    return spare_card(message) if message.content_attributes&.dig(history_media).present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
+
+    message.update_under_lock!(is_unsupported: true)
     return if message.content_attributes&.dig(history_media).blank?
 
     message.with_lock { message.update!(content_attributes: message.content_attributes.except(history_media)) }
+  end
+
+  # A history card whose header is gone keeps its text and buttons, so it is not marked
+  # unsupported; its own mark, which `given_up?` reads in place of that flag, keeps a later
+  # delivery from asking again.
+  def spare_card(message)
+    message.with_lock do
+      message.update!(content_attributes: message.content_attributes.except(history_media).merge('media_unavailable' => true))
+    end
   end
 
   def history_media = Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA

@@ -82,16 +82,34 @@ module Whatsapp::Session::HistoryMedia
   # A card with readable text keeps rendering as a card while its header waits: marked
   # unsupported, it would trade its text and buttons for the placeholder, for good if the
   # header never comes.
+  #
+  # Under the lock it looks again, since a download may have landed or given up since the
+  # caller looked: marking either pending would hide the file or ask for one that is gone.
   def defer(message, inbound)
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     return if media&.ref.blank?
 
-    message.with_lock do
-      message.update!(content_attributes: message.content_attributes.merge(
-        'is_unsupported' => (true unless readable_card?(message)), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
-        'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
-      ).compact)
+    as_history(message) do
+      message.with_lock do
+        next if message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
+
+        message.update!(content_attributes: message.content_attributes.merge(
+          'is_unsupported' => (true unless readable_card?(message)), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
+          'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
+        ).compact)
+      end
     end
+  end
+
+  # Any write to an imported message, its file or its bookkeeping, at the level the message
+  # was written at: it reaches the open dashboard and nothing else, no bot, webhook or
+  # automation. The archive half stays archive, so an old voice note spends no
+  # transcription; the gap half, somebody's unread work recovered late, keeps the side
+  # effects a live arrival has. Inside an import already, the import's level stands.
+  def as_history(message, &)
+    return yield if Import::SilentWrite.on?
+
+    Import::SilentWrite.wrap(announce: true, archive: message.content_attributes['history_archive'].present?, &)
   end
 
   # A card whose text renders without its header. It stays a card whatever happens to the

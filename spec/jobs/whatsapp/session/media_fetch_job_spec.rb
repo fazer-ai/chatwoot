@@ -125,6 +125,8 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     described_class.perform_now(message, media.to_h)
 
     expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
+    # Gone for good all the same: a later delivery with the header's reference asks for nothing.
+    expect(Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)).to be(true)
   end
 
   # A file whose bytes never came with the message has no ref to carry, and the provider
