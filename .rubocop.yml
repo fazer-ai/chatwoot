@@ -254,7 +254,7 @@ AllCops:
     - 'storage/**/*'
     - 'db/migrate/20230426130150_init_schema.rb'
     # Upstream's Enterprise code and specs, kept byte-identical to the release we track: never
-    # reformatted here. The fork's changes to them live in fazer_ai_ee/, which is linted.
+    # reformatted here. The fork does not modify them.
     - 'enterprise/**/*'
     - 'spec/enterprise/**/*'
 

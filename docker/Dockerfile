@@ -93,9 +93,8 @@ COPY . /app
 # the assets are built with the official tree in place even though the image drops it. What
 # stays is a link from /app/enterprise to tmp/cw-enterprise, the container's own activation,
 # which docker/entrypoints/helpers/enterprise.sh points at the verified tree at boot. A
-# checkout whose enterprise/ differs from the official one fails here: the fork's overrides
-# in fazer_ai_ee/ are written against that tree and nothing else, and it is the one that
-# arrives at boot.
+# checkout whose enterprise/ differs from the official one fails here: the fork ships
+# Enterprise exactly as upstream publishes it, and that tree is the one that arrives at boot.
 COPY --from=enterprise-lock /lock/out/enterprise_lock /app/.enterprise_lock
 COPY --from=enterprise-lock /lock/out/enterprise /tmp/official-enterprise
 RUN pinned=$(sed -n 's/^sha256=//p' /app/.enterprise_lock) \

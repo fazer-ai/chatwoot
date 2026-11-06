@@ -385,7 +385,6 @@ Rails.application.routes.draw do
               end
               collection do
                 post :initiate
-                patch :ai_voice, to: 'whatsapp_ai_voice#update'
               end
             end
           end
@@ -419,7 +418,6 @@ Rails.application.routes.draw do
               end
               post :enable_whatsapp_calling, on: :member
               post :disable_whatsapp_calling, on: :member
-              get :whatsapp_calling_status, on: :member
               post :set_inbound_calls, on: :member
               post :set_call_recording, on: :member
             end

@@ -14,7 +14,6 @@ describe Whatsapp::GraphRequestOptions do
       app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb
       app/services/whatsapp/business_profile_service.rb
       app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb
-      enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb
     ]
   end
 
@@ -35,7 +34,10 @@ describe Whatsapp::GraphRequestOptions do
       # open_timeout, and read and write timeouts set apart because HTTParty's `timeout` sets all
       # three. It is also the one file a scan for `HTTParty.<verb>(` cannot see, because it dispatches
       # the verb -- which is why this check looks for the string and not for the call shape.
-      'app/services/whatsapp/session/backends/uazapi/client.rb' => 'uazapi session client, ceilings already set per axis'
+      'app/services/whatsapp/session/backends/uazapi/client.rb' => 'uazapi session client, ceilings already set per axis',
+      # Upstream's Enterprise code, which the fork neither modifies nor patches: its Graph calls
+      # carry whatever options upstream gives them.
+      'enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb' => 'upstream Enterprise, not ours to change'
     }
   end
 
@@ -87,49 +89,8 @@ describe Whatsapp::GraphRequestOptions do
     expect(described_class::GRAPH_REQUEST_OPTIONS).to eq(timeout: 10, max_retries: 0)
   end
 
-  # The CE suite runs with `rm -rf enterprise spec/enterprise` in front of it, so a guarded path in
-  # that tree is legitimately absent there and reading it would fail the fence for a reason that has
-  # nothing to do with a missing ceiling. Absence is only ever expected for that tree: a CE file that
-  # has gone missing is a real change and reads as one.
-  def present_sources(paths)
-    present, missing = paths.partition { |path| Rails.root.join(path).exist? }
-    expect(missing.grep_v(%r{\Aenterprise/})).to be_empty
-    present
-  end
-
-  # enterprise/ is upstream's code, kept identical to the release we track, so its calls carry no
-  # options of their own: the fork puts the ceiling on the methods that hold them
-  # (FazerAiEe::RequestCeilings). A call there passes when its method is one of those.
-  def fork_graph_methods
-    return [] unless defined?(FazerAiEe::RequestCeilings)
-
-    FazerAiEe::RequestCeilings.ceilings.fetch('Whatsapp::Providers::WhatsappCloudService')
-                              .select { |_name, ceiling| ceiling == described_class::GRAPH_REQUEST_OPTIONS }.keys
-  end
-
-  # Each HTTParty call in the file, with the name of the method it sits in.
-  def httparty_calls_by_method(path)
-    require 'prism'
-    stack = [[Prism.parse(Rails.root.join(path).read).value, nil]]
-    calls = []
-    until stack.empty?
-      node, method = stack.pop
-      method = node.name if node.is_a?(Prism::DefNode)
-      stack.concat(node.compact_child_nodes.map { |child| [child, method] })
-      calls << [node.location.start_line, method] if node.is_a?(Prism::CallNode) && node.receiver.try(:name) == :HTTParty
-    end
-    calls
-  end
-
-  def calls_outside_fork_ceilings(path)
-    httparty_calls_by_method(path).reject { |_line, method| fork_graph_methods.include?(method) }
-                                  .map { |line, method| "#{path}:#{line} (#{method})" }
-  end
-
   it 'leaves no Graph call in the guarded files without the ceiling' do
-    without_ceiling = present_sources(guarded_sources).flat_map do |path|
-      next calls_outside_fork_ceilings(path) if path.start_with?('enterprise/')
-
+    without_ceiling = guarded_sources.flat_map do |path|
       graph_calls(Rails.root.join(path).read)
         .reject { |call| call.include?('GRAPH_REQUEST_OPTIONS') }
         .map { |call| "#{path}: #{call.lines.first.strip} #{call.lines[1].to_s.strip}" }
@@ -156,13 +117,11 @@ describe Whatsapp::GraphRequestOptions do
       'app/services/whatsapp/csat_template_service.rb' => 3,
       'app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb' => 1,
       'app/services/whatsapp/business_profile_service.rb' => 1,
-      'app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb' => 1,
-      'enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb' => 4
+      'app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb' => 1
     }
-    present = present_sources(guarded_sources)
-    counts = present.index_with { |path| graph_calls(Rails.root.join(path).read).size }
+    counts = guarded_sources.index_with { |path| graph_calls(Rails.root.join(path).read).size }
 
-    expect(counts).to eq(expected.slice(*present))
+    expect(counts).to eq(expected)
   end
 
   # The list above is written by hand, and a hand-written list has one failure mode: a new file that

@@ -12,6 +12,16 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
     SHOPIFY_PARTNER_ACCESS_TOKEN
     SHOPIFY_PARTNER_API_VERSION
   ].freeze
+  # The installation's brand, edited here on a Community install. Enterprise brings its own page
+  # for these keys and puts them back to their defaults on its community plan, so the page is
+  # offered only without enterprise/. What is saved here is what the installation shows:
+  # `branding:update` fills a key from the environment only while it still holds its default
+  # (CUSTOM_BRANDING.md).
+  BRANDING_CONFIGS = %w[
+    INSTALLATION_NAME LOGO_THUMBNAIL LOGO LOGO_DARK LOGO_EMAIL BRAND_NAME BRAND_URL WIDGET_BRAND_URL
+    BRAND_COLOR TERMS_URL PRIVACY_URL DISPLAY_MANIFEST
+  ].freeze
+  BRAND_COLOR_FORMAT = /\A#(?:\h{3}|\h{6})\z/
 
   before_action :set_config
   before_action :allowed_configs
@@ -29,7 +39,7 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
   end
 
   def create
-    errors = shopify_partner_config_errors + stripe_config_errors
+    errors = shopify_partner_config_errors + stripe_config_errors + branding_config_errors
     params['app_config'].each do |key, value|
       break if errors.any?
       next unless @allowed_configs.include?(key)
@@ -50,6 +60,16 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
     values = InstallationConfig.where(name: @allowed_configs).to_h { |config| [config.name, config.value] }
     values.merge!(params.fetch('app_config', {}).permit(*@allowed_configs).to_h)
     Integrations::Stripe::Oauth.configuration_errors(url: values['STRIPE_APP_AUTHORIZE_URL'], key: values['STRIPE_APP_SECRET_KEY'])
+  end
+
+  # Emails and the PWA manifest put the colour straight into CSS and HTML attributes.
+  def branding_config_errors
+    return [] unless @config == 'branding'
+
+    color = params.dig('app_config', 'BRAND_COLOR')
+    return [] if color.blank? || color.match?(BRAND_COLOR_FORMAT)
+
+    [I18n.t('super_admin.app_configs.branding.invalid_color')]
   end
 
   def set_config
@@ -75,6 +95,7 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
       'captain' => %w[CAPTAIN_OPEN_AI_API_KEY CAPTAIN_OPEN_AI_MODEL CAPTAIN_OPEN_AI_ENDPOINT
                       CAPTAIN_OPENROUTER_API_KEY CAPTAIN_OPENROUTER_DECISION_MODEL_ENDPOINT]
     }
+    mapping['branding'] = BRANDING_CONFIGS unless ChatwootApp.enterprise?
 
     @allowed_configs = mapping.fetch(@config, general_configs)
   end

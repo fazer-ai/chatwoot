@@ -16,7 +16,6 @@ class Whatsapp::Session::Inbound::Handlers::ConnectionState < Whatsapp::Session:
     result = Whatsapp::Session::ConnectionStateWriter.new(channel).apply(state, instance: instance)
     return :ignored if result == :stale
 
-    channel.apply_pending_call_policy if payload.wire_type == 'pairing.success'
     :handled
   end
 
