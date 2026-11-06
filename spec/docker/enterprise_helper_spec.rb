@@ -130,6 +130,19 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(File.read(File.join(entry, 'enterprise/config/premium.yml'))).to eq("a: 2\n")
   end
 
+  it 'gives the way out for a tampered tree even on a volume it cannot write' do
+    ensure_enterprise
+    File.write(File.join(entry, 'enterprise/config/premium.yml'), "a: 2\n")
+    FileUtils.chmod(0o444, File.join(cache_root, '.lock'))
+    FileUtils.chmod(0o555, cache_root)
+
+    _out, err, status = ensure_enterprise
+
+    expect(status).not_to be_success
+    expect(err).to include('no longer matches the pinned hash', "rm -rf #{entry}")
+    expect(err).not_to include('cannot open')
+  end
+
   it 'downloads anew once the damaged entry was removed' do
     ensure_enterprise
     File.write(File.join(entry, 'enterprise/config/premium.yml'), "a: 2\n")

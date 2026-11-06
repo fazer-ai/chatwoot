@@ -170,6 +170,17 @@ activate() {
   check_target
 }
 
+# A published entry is never replaced at boot: other containers may be running on it, and a
+# verified tree that stopped matching its hash was damaged or tampered with after the fact,
+# which an operator has to look at. Repairing it means stopping what mounts the volume
+# first. Called before the lock too, so a volume this container cannot write still gets
+# the path and the way out instead of a failure to open the lock.
+refuse_damaged() {
+  if [ -e "$ENTRY" ]; then
+    fail "$ENTRY no longer matches the pinned hash $PINNED. Stop every container that mounts this volume, remove it (rm -rf $ENTRY) and start them again; the next boot downloads it anew"
+  fi
+}
+
 cmd_ensure() {
   edition=${CW_EDITION:-}
   if [ "$edition" != "ee" ] || [ -n "${DISABLE_ENTERPRISE+set}" ]; then
@@ -188,6 +199,7 @@ cmd_ensure() {
     log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
+  refuse_damaged
 
   # Downloading writes to the shared cache, so it happens under an exclusive lock there: a
   # second run waits, then finds the entry the first one published. flock on NFS becomes a
@@ -216,13 +228,7 @@ cmd_ensure_locked() {
     log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
-  # A published entry is never replaced at boot: other containers may be running on it, and
-  # a verified tree that stopped matching its hash was damaged or tampered with after the
-  # fact, which an operator has to look at. Repairing it means stopping what mounts the
-  # volume first.
-  if [ -e "$ENTRY" ]; then
-    fail "$ENTRY no longer matches the pinned hash $PINNED. Stop every container that mounts this volume, remove it (rm -rf $ENTRY) and start them again; the next boot downloads it anew"
-  fi
+  refuse_damaged
 
   # Downloads only run under this lock, so an .incoming directory found here belongs to one
   # that was killed halfway.
