@@ -38,12 +38,13 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     File.write(File.join(app_dir, 'VERSION_CW'), "#{version}\n")
     write_lock(version, pinned)
     # what the image's Dockerfile leaves in place of the tree
-    File.symlink("storage/.cw-enterprise/#{version}-#{pinned}/enterprise", File.join(app_dir, 'enterprise'))
+    File.symlink("storage/.cw-enterprise/#{version}-#{pinned}.active", File.join(app_dir, 'enterprise'))
     build_tarball(tree)
   end
 
   after do
     FileUtils.chmod(0o755, app_dir)
+    FileUtils.chmod(0o755, cache_root) if Dir.exist?(cache_root)
     FileUtils.remove_entry(work_dir)
   end
 
@@ -67,10 +68,10 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     raise err unless status.success?
   end
 
-  def ensure_enterprise(env = {})
+  def ensure_enterprise(env = {}, umask = '022')
     defaults = { 'CW_EDITION' => 'ee', 'DISABLE_ENTERPRISE' => nil, 'CW_ENTERPRISE_SOURCE_URL' => "file://#{tarball}",
                  'CW_ENTERPRISE_FETCH_RETRIES' => '0' }
-    Open3.capture3(defaults.merge(env), helper, 'ensure')
+    Open3.capture3(defaults.merge(env), 'sh', '-c', "umask #{umask}; exec \"$0\" ensure", helper)
   end
 
   # what Rails sees through the link
@@ -137,6 +138,94 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(err).to include('downloaded, verified and installed')
     expect(installed).to eq(tree.keys.sort)
     expect(File).to exist(File.join(other, 'old.rb'))
+  end
+
+  # Going back from the -ee tag to the default one keeps the volume, and the tree in it.
+  describe 'after an Enterprise boot left the tree in the volume' do
+    before { ensure_enterprise }
+
+    it 'turns enterprise/ off again for a container that does not ask for it' do
+      _out, _err, status = ensure_enterprise('CW_EDITION' => nil)
+
+      expect(status).to be_success
+      expect(Pathname.new(app_dir).join('enterprise')).not_to exist
+      expect(File).to exist(File.join(entry, 'enterprise/config/premium.yml'))
+    end
+
+    it 'turns enterprise/ off when DISABLE_ENTERPRISE is set' do
+      _out, _err, status = ensure_enterprise('DISABLE_ENTERPRISE' => '1')
+
+      expect(status).to be_success
+      expect(Pathname.new(app_dir).join('enterprise')).not_to exist
+    end
+
+    it 'turns it back on from the cache, without the network, when the edition asks again' do
+      ensure_enterprise('CW_EDITION' => 'ce')
+
+      _out, _err, status = ensure_enterprise('CW_ENTERPRISE_SOURCE_URL' => unreachable)
+
+      expect(status).to be_success
+      expect(installed).to eq(tree.keys.sort)
+    end
+  end
+
+  it 'leaves a checkout without a lock alone when the edition is not ee' do
+    FileUtils.rm_f(File.join(app_dir, '.enterprise_lock'))
+
+    _out, _err, status = ensure_enterprise('CW_EDITION' => nil)
+
+    expect(status).to be_success
+  end
+
+  # A volume filled by one UID can be mounted later by another (root first, then an
+  # unprivileged user, or the reverse). Switching UIDs needs root, so these hold the
+  # conditions that UID would meet: modes another user can read, and files this one
+  # cannot write.
+  describe 'a volume shared across UIDs' do
+    it 'publishes the tree readable by everyone, whatever the umask' do
+      _out, _err, status = ensure_enterprise({}, '077')
+
+      expect(status).to be_success
+      modes = Dir.glob('**/*', base: entry).push('.').map do |path|
+        full = File.join(entry, path)
+        [File.directory?(full), File.stat(full).mode & 0o777]
+      end
+      expect(modes.select(&:first).map(&:last).uniq).to eq([0o755])
+      expect(modes.reject(&:first).map(&:last).uniq).to eq([0o644])
+      expect(File.stat(cache_root).mode & 0o777).to eq(0o755)
+      expect(File.stat(File.join(cache_root, '.lock')).mode & 0o777).to eq(0o644)
+    end
+
+    it 'locks a lock file it cannot write' do
+      FileUtils.mkdir_p(cache_root)
+      File.write(File.join(cache_root, '.lock'), '')
+      FileUtils.chmod(0o444, File.join(cache_root, '.lock'))
+
+      _out, _err, status = ensure_enterprise
+
+      expect(status).to be_success
+      expect(installed).to eq(tree.keys.sort)
+    end
+
+    it 'boots from an intact entry in a cache it cannot write' do
+      ensure_enterprise
+      FileUtils.chmod(0o555, cache_root)
+
+      _out, _err, status = ensure_enterprise('CW_ENTERPRISE_SOURCE_URL' => unreachable)
+
+      expect(status).to be_success
+      expect(installed).to eq(tree.keys.sort)
+    end
+
+    it 'says so when the cache it cannot write holds no tree for this version' do
+      FileUtils.mkdir_p(cache_root)
+      FileUtils.chmod(0o555, cache_root)
+
+      _out, err, status = ensure_enterprise
+
+      expect(status).not_to be_success
+      expect(err).to include('is not writable by uid')
+    end
   end
 
   # /app can be a read-only filesystem, or owned by another user than the one running

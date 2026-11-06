@@ -1,11 +1,12 @@
 #!/bin/sh
 
 # Brings enterprise/ into the app at boot, from the official tag in VERSION_CW, when the
-# edition asks for it. The image itself ships without the tree: /app/enterprise is a symlink
-# into storage/.cw-enterprise/<version>-<hash>/enterprise, made at build time, and it dangles
-# until this helper has put a verified tree there. A dangling link does not exist as far as
-# Rails is concerned (ChatwootApp.enterprise? asks Pathname#exist?, which follows it), so an
-# image without the tree boots as Community.
+# edition asks for it. The image itself ships without the tree: /app/enterprise is a symlink,
+# made at build time, to storage/.cw-enterprise/<version>-<hash>.active, which this helper
+# points at the verified tree in <version>-<hash>/enterprise when the edition is ee, and
+# removes otherwise. Until then the chain dangles, and a dangling link does not exist as far
+# as Rails is concerned (ChatwootApp.enterprise? asks Pathname#exist?, which follows it), so
+# the image boots as Community.
 #
 #   enterprise.sh ensure          run by every entrypoint before anything boots Rails
 #   enterprise.sh lock <out_dir>  build time: download the official tree, write the lock
@@ -16,7 +17,7 @@
 # download would break on a recompression that changed nothing that runs.
 #
 # `ensure` only ever writes under storage/.cw-enterprise, so /app itself can be read-only.
-# It does nothing unless CW_EDITION=ee. With it, a missing lock, a lock for another version,
+# Unless CW_EDITION=ee it only removes the activation link. With it, a missing lock, a lock for another version,
 # a download that fails and a tree that does not match the lock all stop the boot with a
 # message saying which. Booting without enterprise/ instead would quietly turn an Enterprise
 # installation into a Community one: custom roles fall back to the plain agent role, SAML
@@ -101,6 +102,7 @@ read_lock() {
   [ -n "$PINNED" ] || fail "$LOCK_FILE has no sha256"
   [ "$locked_version" = "$VERSION" ] || fail "$LOCK_FILE pins v$locked_version, but this image is v$VERSION"
   ENTRY="$CACHE_ROOT/$VERSION-$PINNED"
+  ACTIVE="$ENTRY.active"
 }
 
 # Downloads the official tarball for a version and extracts only enterprise/ from it, into
@@ -150,31 +152,61 @@ check_target() {
 
 cmd_ensure() {
   edition=${CW_EDITION:-}
-  if [ "$edition" != "ee" ]; then
-    log "edition '${edition:-unset}': not fetching enterprise/"
-    exit 0
-  fi
-  # ChatwootApp.enterprise? is false whenever DISABLE_ENTERPRISE is set, to any value.
-  if [ -n "${DISABLE_ENTERPRISE+set}" ]; then
-    log "DISABLE_ENTERPRISE is set: not fetching enterprise/"
+  if [ "$edition" != "ee" ] || [ -n "${DISABLE_ENTERPRISE+set}" ]; then
+    # ChatwootApp.enterprise? is false whenever DISABLE_ENTERPRISE is set, to any value.
+    log "edition '${edition:-unset}'${DISABLE_ENTERPRISE+, DISABLE_ENTERPRISE set}: not using enterprise/"
+    deactivate
     exit 0
   fi
 
   read_lock
   # Checking and filling the cache happen under one lock on it, which the web and worker
-  # containers share: a second run waits, then finds the entry the first one made.
-  mkdir -p "$CACHE_ROOT" || fail "cannot create $CACHE_ROOT"
-  ruby -e 'File.open(ARGV.shift, File::RDWR | File::CREAT, 0o644) { |f| f.flock(File::LOCK_EX); exit(system(*ARGV) ? 0 : 1) }' \
+  # containers share: a second run waits, then finds the entry the first one made. The
+  # lock is opened read-only and kept readable by everyone (the umask may say otherwise):
+  # flock needs no write permission, so a volume filled by one UID can be locked by another.
+  if [ ! -d "$CACHE_ROOT" ]; then
+    { mkdir -p "$CACHE_ROOT" && chmod 755 "$CACHE_ROOT"; } || fail "cannot create $CACHE_ROOT"
+  fi
+  [ -e "$CACHE_ROOT/.lock" ] || [ -w "$CACHE_ROOT" ] || fail "$CACHE_ROOT is not writable by uid $(id -u), and holds no verified tree for v$VERSION"
+  ruby -e 'File.open(ARGV.shift, File::RDONLY | File::CREAT, 0o644) { |f| (f.chmod(0o644) rescue nil); f.flock(File::LOCK_EX); exit(system(*ARGV) ? 0 : 1) }' \
     "$CACHE_ROOT/.lock" "$0" ensure-locked
+}
+
+# A tree left in the volume by an earlier Enterprise boot must not switch Enterprise back
+# on for a container that did not ask for it: the image's link reaches the tree only
+# through the activation link, and this removes it. Done on the filesystem rather than in
+# the environment, so `docker exec ... rails console` sees the same edition as the server.
+deactivate() {
+  [ -f "$LOCK_FILE" ] || return 0
+  read_lock
+  if [ -L "$ACTIVE" ] || [ -e "$ACTIVE" ]; then
+    rm -f "$ACTIVE" || fail "cannot remove $ACTIVE, and enterprise/ would stay active"
+    log "removed $ACTIVE"
+  fi
+  if [ -e "$TARGET/" ] && [ -L "$TARGET" ]; then
+    fail "$TARGET still leads to a tree"
+  fi
+}
+
+# Points the activation link at the verified entry, by an atomic rename over the old one.
+activate() {
+  link="$VERSION-$PINNED/enterprise"
+  [ -L "$ACTIVE" ] && [ "$(readlink "$ACTIVE")" = "$link" ] && return 0
+  tmp="$ACTIVE.$$"
+  rm -f "$tmp"
+  ln -s "$link" "$tmp"
+  ruby -e 'File.rename(ARGV[0], ARGV[1])' "$tmp" "$ACTIVE"
 }
 
 cmd_ensure_locked() {
   read_lock
   if intact "$ENTRY/enterprise"; then
+    activate || fail "cannot write $ACTIVE"
     check_target
     log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
+  [ -w "$CACHE_ROOT" ] || fail "$CACHE_ROOT is not writable by uid $(id -u), and holds no verified tree for v$VERSION"
   if [ -e "$ENTRY" ]; then
     log "cached enterprise/ in $ENTRY does not match the pinned hash; downloading it again"
     rm -rf "$ENTRY"
@@ -190,7 +222,11 @@ cmd_ensure_locked() {
     rm -rf "$work"
     fail "downloaded enterprise/ for v$VERSION hashes to ${actual:-nothing}, the image pins $PINNED. Not starting"
   fi
+  # mktemp made the directory 0700, and the tarball's modes went through this process's
+  # umask: publish it readable by every UID that may mount this volume later.
+  chmod -R u=rwX,go=rX "$work"
   mv "$work" "$ENTRY"
+  activate
   check_target
   log "enterprise/ v$VERSION downloaded, verified and installed"
 }
