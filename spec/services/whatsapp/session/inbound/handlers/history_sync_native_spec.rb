@@ -507,7 +507,13 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
       deliver(slice([historical('3EB0CARD', 2.days.ago, content: card)]))
 
-      expect(inbox.messages.find_by(source_id: '3EB0CARD').content_attributes['is_unsupported']).to be_nil
+      # Still a card, and its header still waits for the drain like any other history file.
+      message = inbox.messages.find_by(source_id: '3EB0CARD')
+      expect(message.content_attributes['is_unsupported']).to be_nil
+      expect(Whatsapp::Session::HistoryMedia.pending?(message)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
     end
 
     # The same card with a reference to its header: the header waits for the drain, and

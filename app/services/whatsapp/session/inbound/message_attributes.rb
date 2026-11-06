@@ -103,9 +103,11 @@ class Whatsapp::Session::Inbound::MessageAttributes
     }.merge(history_file)
   end
 
-  # What a history file whose bytes did not come needs to be asked for later.
+  # What a history file whose bytes did not come needs to be asked for later. The header of
+  # a card with readable text counts too: the card is not marked unsupported, but the header
+  # is still worth asking for.
   def history_file
-    pending = imported && unfetchable_media?
+    pending = imported && pending_media.present?
     {
       # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
       history_media: (true if pending),

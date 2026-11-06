@@ -33,7 +33,14 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     Redis::Alfred.set(requeue_key(inbox), SecureRandom.uuid) if requeue
     return unless Redis::Alfred.set(scheduled_key(inbox), '1', nx: true, ex: SCHEDULED_TTL.to_i)
 
-    set(wait: wait).perform_later(inbox)
+    begin
+      set(wait: wait).perform_later(inbox)
+    rescue StandardError
+      # Nothing was queued, so nothing will clear the claim: the next file, or the minute
+      # sweep (Whatsapp::Session::HistoryMedia.resume_stranded), has to find it free.
+      Redis::Alfred.delete(scheduled_key(inbox))
+      raise
+    end
   end
 
   def self.scheduled_key(inbox) = "WHATSAPP::HISTORY_MEDIA_SCHEDULED::#{inbox.id}"

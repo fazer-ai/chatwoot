@@ -131,4 +131,17 @@ module Whatsapp::Session::HistoryMedia
   end
 
   def queue_key(inbox) = "WHATSAPP::HISTORY_MEDIA::#{inbox.id}"
+
+  # Run by the minute sweep. A queue or a rescan request with no drain behind it is left by
+  # a drain that could not be queued: the importer that tracked those files has finished,
+  # and a retry of it skips the messages it already wrote, so nothing else would ever come
+  # back for them. `kick` does nothing for an inbox whose drain is queued or running.
+  def resume_stranded
+    ids = Redis::Alfred.with do |conn|
+      %w[HISTORY_MEDIA HISTORY_MEDIA_REQUEUE].flat_map do |name|
+        conn.scan_each(match: "WHATSAPP::#{name}::*").map { |key| key.split('::').last.to_i }
+      end
+    end
+    Inbox.where(id: ids.uniq).find_each { |inbox| Whatsapp::Session::HistoryMediaJob.kick(inbox) }
+  end
 end
