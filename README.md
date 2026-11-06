@@ -131,6 +131,8 @@ Para rodar o conector como serviço separado na stack, configure `WHATSAPP_CONNE
 
 Para fixar uma versão, use a tag da release no lugar de `latest`.
 
+A imagem `-ee` passa a baixar o código Enterprise no primeiro boot de cada versão e guardar uma cópia em `/app/storage`. Se esse diretório já está em um volume persistente compartilhado entre web e Sidekiq e há acesso de saída ao GitHub, não é preciso mudar nada; esse primeiro boot leva apenas alguns segundos a mais. Mais detalhes na seção [Chatwoot Enterprise](#chatwoot-enterprise).
+
 ### Migrar do Chatwoot oficial
 
 1. Escolha uma versão do fork igual ou mais nova que a instalada.

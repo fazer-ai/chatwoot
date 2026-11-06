@@ -131,6 +131,8 @@ To run the connector as a separate service in your stack, set `WHATSAPP_CONNECTO
 
 To pin a version, use its release tag instead of `latest`.
 
+The `-ee` image now downloads the Enterprise code on the first boot of each version and stores a copy in `/app/storage`. If this directory is already on a persistent volume shared by web and Sidekiq and outbound access to GitHub is available, no changes are needed; that first boot just takes a few extra seconds. More details in the [Chatwoot Enterprise](#chatwoot-enterprise) section.
+
 ### Migrate from official Chatwoot
 
 1. Choose a fork version equal to or newer than your installed version.
