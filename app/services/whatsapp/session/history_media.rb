@@ -38,10 +38,12 @@ module Whatsapp::Session::HistoryMedia
   # A history message whose file has not come yet and that has not been given up on. The
   # attachment check is what keeps a second request from attaching the file twice.
   #
-  # The marks count only on a message that came from WhatsApp: a contact's, or one sent
-  # from the phone, which has no sender. Content attributes alone prove nothing, since the
-  # messages API stores whatever a client puts in them, and a descriptor an agent wrote
-  # would have the provider download any URL with the connector's token.
+  # The marks count only on a message that came from WhatsApp, carrying the WhatsApp id it
+  # was stored under: an incoming one (the API writes those only on API inboxes), or an
+  # outgoing one sent from the phone, which has no sender. Content attributes alone prove nothing, since the messages
+  # API stores whatever a client puts in them (and gives an activity it writes the
+  # contact as sender), and a descriptor an agent wrote would have the provider download
+  # any URL with the connector's token.
   def pending?(message)
     attributes = message.content_attributes || {}
     from_whatsapp?(message) && attributes[Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA].present? &&
@@ -49,7 +51,10 @@ module Whatsapp::Session::HistoryMedia
   end
 
   def from_whatsapp?(message)
-    !message.private? && (message.sender_id.nil? || message.sender_type == 'Contact')
+    return false if message.private? || message.source_id.blank?
+
+    contact_or_nobody = message.sender_id.nil? || message.sender_type == 'Contact'
+    (message.incoming? && contact_or_nobody) || (message.outgoing? && message.sender_id.nil?)
   end
 
   # Whether the inbox's standing consent covers this imported message: the switch and the
