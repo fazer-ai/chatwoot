@@ -36,6 +36,11 @@ set -x
 # match -- while the wait runs, PID 1 is still `sh docker/entrypoints/sidekiq.sh bundle
 # exec sidekiq ...`, which a plain grep for sidekiq is happy to call a worker.
 
+# enterprise/ arrives at boot (see docker/entrypoints/helpers/enterprise.sh). Composes use
+# this script as the entrypoint itself, so it does not rely on docker-entrypoint.sh for it;
+# when both run, the second call finds the tree in place and returns.
+docker/entrypoints/helpers/enterprise.sh ensure || exit 1
+
 # Let DATABASE_URL env take presedence over individual connection params.
 $(docker/entrypoints/helpers/pg_database_url.rb)
 PG_READY="pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USERNAME"

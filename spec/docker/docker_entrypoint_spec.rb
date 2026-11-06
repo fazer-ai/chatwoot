@@ -15,6 +15,7 @@ require 'tmpdir'
 # rubocop:disable RSpec/DescribeClass -- the subject is a shell script, not a constant
 RSpec.describe 'docker/entrypoints/docker-entrypoint.sh', type: :script do
   let(:app_dir) { Dir.mktmpdir }
+  let(:enterprise_helper) { File.join(app_dir, 'docker/entrypoints/helpers/enterprise.sh') }
 
   before do
     FileUtils.mkdir_p(File.join(app_dir, 'docker/entrypoints'))
@@ -26,12 +27,35 @@ RSpec.describe 'docker/entrypoints/docker-entrypoint.sh', type: :script do
     gate = File.join(app_dir, 'docker/entrypoints/sidekiq.sh')
     File.write(gate, %(#!/bin/sh\necho "GATED: $*"\n))
     FileUtils.chmod(0o755, gate)
+
+    FileUtils.mkdir_p(File.join(app_dir, 'docker/entrypoints/helpers'))
+    File.write(enterprise_helper, %(#!/bin/sh\necho "$*" >> "#{app_dir}/enterprise_calls"\nexit "${ENTERPRISE_STUB_STATUS:-0}"\n))
+    FileUtils.chmod(0o755, enterprise_helper)
   end
 
   after { FileUtils.remove_entry(app_dir) }
 
-  def run(*argv)
-    Open3.capture3('docker/entrypoints/docker-entrypoint.sh', *argv, chdir: app_dir)
+  def run(*argv, env: {})
+    Open3.capture3(env, 'docker/entrypoints/docker-entrypoint.sh', *argv, chdir: app_dir)
+  end
+
+  # enterprise/ has to be in place before any of these commands can boot Rails, and a
+  # container that could not get it must not start as if it had.
+  describe 'enterprise/' do
+    it 'is ensured before the command runs' do
+      out, _err, status = run('echo', 'rails', 's')
+
+      expect(status).to be_success
+      expect(File.read(File.join(app_dir, 'enterprise_calls'))).to eq("ensure\n")
+      expect(out).to eq("rails s\n")
+    end
+
+    it 'stops the container when it cannot be ensured' do
+      out, _err, status = run('echo', 'rails', 's', env: { 'ENTERPRISE_STUB_STATUS' => '1' })
+
+      expect(status).not_to be_success
+      expect(out).to eq('')
+    end
   end
 
   describe 'a worker' do

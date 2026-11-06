@@ -40,6 +40,10 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
     File.write(supervisor, "#!/bin/sh\necho \"supervise $*\" >> \"#{calls_file}\"\n")
     FileUtils.chmod(0o755, supervisor)
 
+    enterprise = File.join(app_dir, 'docker/entrypoints/helpers/enterprise.sh')
+    File.write(enterprise, "#!/bin/sh\necho \"enterprise $*\" >> \"#{calls_file}\"\nexit \"${ENTERPRISE_STUB_STATUS:-0}\"\n")
+    FileUtils.chmod(0o755, enterprise)
+
     stub('pg_isready', "exit 0\n")
     stub('sleep', "exit 0\n")
     stub('bundle', <<~SH)
@@ -77,6 +81,19 @@ RSpec.describe 'docker/entrypoints/sidekiq.sh', type: :script do
 
   def calls
     File.readlines(calls_file, chomp: true)
+  end
+
+  it 'ensures enterprise/ before it asks Rails anything' do
+    run
+
+    expect(calls.first).to eq('enterprise ensure')
+  end
+
+  it 'does not start the worker when enterprise/ cannot be ensured' do
+    _out, _err, status = run('ENTERPRISE_STUB_STATUS' => '1')
+
+    expect(status).not_to be_success
+    expect(calls).to eq(['enterprise ensure'])
   end
 
   it 'does not ask the rake anything while the schema is missing' do
