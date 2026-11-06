@@ -37,10 +37,15 @@ class Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed < Whatsapp::Sess
   # The chat is the one the event carried, for the same reason MediaFetchJob takes it
   # from the message event: a chat rebuilt from the contact addresses the fetch to a chat
   # the message does not live in.
+  #
+  # A message of an imported history is asked for through the inbox's drain instead, which
+  # holds it to the automatic-fetch switch and window like every other history file.
   def ask_again(message)
-    Whatsapp::Session::MediaFetchJob.perform_later(
-      message, message.content_attributes['pending_media'], payload.chat&.to_h
-    )
+    if message.content_attributes['imported'].present?
+      Whatsapp::Session::HistoryMedia.track(message)
+    else
+      Whatsapp::Session::MediaFetchJob.perform_later(message, message.content_attributes['pending_media'], payload.chat&.to_h)
+    end
     Rails.logger.info(
       "[WHATSAPP SESSION] media for #{payload.message_id} is #{payload.reason}, asking #{channel.provider} again"
     )

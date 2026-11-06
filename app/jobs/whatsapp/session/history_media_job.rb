@@ -37,7 +37,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
       set(wait: wait).perform_later(inbox)
     rescue StandardError
       # Nothing was queued, so nothing will clear the claim: the next file, or the minute
-      # sweep (Whatsapp::Session::HistoryMedia.resume_stranded), has to find it free.
+      # sweep (resume_stranded), has to find it free.
       Redis::Alfred.delete(scheduled_key(inbox))
       raise
     end
@@ -51,6 +51,31 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # downloading the same head. A run that finds it taken leaves: the one working queues
   # its own continuation.
   RUN_TTL = BATCH_TIME + 5.minutes
+
+  # Run by the minute sweep. A queue or a rescan request with no drain behind it is left by
+  # a drain that could not be queued: the importer that tracked those files has finished,
+  # and a retry of it skips the messages it already wrote, so nothing else would ever come
+  # back for them. `kick` does nothing for an inbox whose drain is queued or running.
+  #
+  # The keys of an inbox that was deleted go here too: its jobs are discarded, so nothing
+  # else would ever empty them.
+  def self.resume_stranded
+    ids = Redis::Alfred.with do |conn|
+      %w[HISTORY_MEDIA HISTORY_MEDIA_REQUEUE].flat_map do |name|
+        conn.scan_each(match: "WHATSAPP::#{name}::*").map { |key| key.split('::').last.to_i }
+      end
+    end.uniq
+    inboxes = Inbox.where(id: ids).to_a
+    inboxes.each { |inbox| kick(inbox) }
+    (ids - inboxes.map(&:id)).each { |id| forget(Inbox.new(id: id)) }
+  end
+
+  def self.forget(inbox)
+    keys = [Whatsapp::Session::HistoryMedia.queue_key(inbox), requeue_key(inbox), cursor_key(inbox), scheduled_key(inbox), run_key(inbox)]
+    keys.each do |key|
+      Redis::Alfred.delete(key)
+    end
+  end
 
   def perform(inbox)
     @inbox = inbox
@@ -151,18 +176,14 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # The window is read again here and not only when the file was queued: a dump takes
   # hours to work through, and an operator may have narrowed it in between.
   #
-  # A file whose stored description cannot be read is this file's problem alone: it is
-  # reported and left pending, where the button can still ask for it, and the drain moves
-  # on. Anything else (a misconfigured inbox, storage that is down) is everybody's: it
-  # fails the run with the file still at the head, and the retry, or the sweep after it,
-  # finds the whole queue where it was once the problem is fixed.
+  # A failure that is not the file's own (HistoryMedia.fetch) fails the run with the file
+  # still at the head, and the retry, or the sweep after it, finds the whole queue where it
+  # was once the problem is fixed.
   def fetch(message)
     return if message.nil? || !history_media.pending?(message)
     return if message.created_at < history_media.cutoff(inbox.channel)
 
     history_media.fetch(message)
-  rescue Whatsapp::Session::Errors::InvalidPayload => e
-    ChatwootExceptionTracker.new(e, account: inbox.account).capture_exception
   end
 
   # Cleared before looking again, so a file queued or a rescan asked for between the last

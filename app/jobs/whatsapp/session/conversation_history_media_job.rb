@@ -27,11 +27,11 @@ class Whatsapp::Session::ConversationHistoryMediaJob < ApplicationJob
   def fetch_batch(conversation, before_id, later)
     fetched = 0
     deadline = Whatsapp::Session::HistoryMediaJob::BATCH_TIME.from_now
-    scope = conversation.messages.where.missing(:attachments)
+    scope = conversation.messages.history_media_pending.where.missing(:attachments)
     scope = scope.where(id: ..before_id) if before_id
     scope.find_each(order: :desc) do |message|
-      next unless Whatsapp::Session::HistoryMedia.pending?(message)
       return later.call(0, message.id) if fetched == BATCH || Time.current >= deadline
+      next unless Whatsapp::Session::HistoryMedia.pending?(message)
 
       Whatsapp::Session::HistoryMedia.fetch(message)
       fetched += 1

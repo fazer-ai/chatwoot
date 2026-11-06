@@ -156,8 +156,15 @@ module Whatsapp::Session::HistoryMedia
   # One download, inline. Called from the drain and the conversation job, which pace
   # themselves; the button queues a MediaFetchJob instead, since a person is waiting on
   # that one file.
+  #
+  # A file whose stored description cannot be read is that file's problem alone: it is
+  # reported and left pending, where the button can still ask for it, and the caller moves
+  # on. Anything else (a misconfigured inbox, storage that is down) is everybody's and
+  # fails the caller's run, which keeps its place for the retry.
   def fetch(message)
     Whatsapp::Session::MediaFetchJob.new.perform(message, message.content_attributes['pending_media'], chat_for(message))
+  rescue Whatsapp::Session::Errors::InvalidPayload => e
+    ChatwootExceptionTracker.new(e, account: message.account).capture_exception
   end
 
   def enqueue(message)
@@ -174,29 +181,4 @@ module Whatsapp::Session::HistoryMedia
   end
 
   def queue_key(inbox) = "WHATSAPP::HISTORY_MEDIA::#{inbox.id}"
-
-  # Run by the minute sweep. A queue or a rescan request with no drain behind it is left by
-  # a drain that could not be queued: the importer that tracked those files has finished,
-  # and a retry of it skips the messages it already wrote, so nothing else would ever come
-  # back for them. `kick` does nothing for an inbox whose drain is queued or running.
-  #
-  # The keys of an inbox that was deleted go here too: its jobs are discarded, so nothing
-  # else would ever empty them.
-  def resume_stranded
-    ids = Redis::Alfred.with do |conn|
-      %w[HISTORY_MEDIA HISTORY_MEDIA_REQUEUE].flat_map do |name|
-        conn.scan_each(match: "WHATSAPP::#{name}::*").map { |key| key.split('::').last.to_i }
-      end
-    end.uniq
-    inboxes = Inbox.where(id: ids).to_a
-    inboxes.each { |inbox| Whatsapp::Session::HistoryMediaJob.kick(inbox) }
-    (ids - inboxes.map(&:id)).each { |id| forget(Inbox.new(id: id)) }
-  end
-
-  def forget(inbox)
-    job = Whatsapp::Session::HistoryMediaJob
-    [queue_key(inbox), job.requeue_key(inbox), job.cursor_key(inbox), job.scheduled_key(inbox), job.run_key(inbox)].each do |key|
-      Redis::Alfred.delete(key)
-    end
-  end
 end

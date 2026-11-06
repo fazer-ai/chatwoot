@@ -62,4 +62,35 @@ RSpec.describe Whatsapp::Session::ConversationHistoryMediaJob do
     expect(backend.commands).to be_empty
     expect(described_class).to have_been_enqueued.with(conversation, 99)
   end
+
+  # One file whose stored description cannot be read must not block every older one.
+  it 'reports an unreadable file and goes on with the rest of the conversation' do
+    broken = pending(conversation, 'BAD1', 1.hour.ago)
+    fine = pending(conversation, 'OK1', 2.hours.ago)
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      raise Whatsapp::Session::Errors::InvalidPayload, 'unreadable' if command.message_id == 'BAD1'
+
+      original.call(command)
+    end
+    allow(ChatwootExceptionTracker).to receive(:new).and_return(instance_double(ChatwootExceptionTracker, capture_exception: true))
+
+    described_class.perform_now(conversation)
+
+    expect(fine.reload.attachments.count).to eq(1)
+    expect(Whatsapp::Session::HistoryMedia.pending?(broken.reload)).to be(true)
+  end
+
+  it 'hands the rest to the next run once its time is up' do
+    second = pending(conversation, 'T1', 2.hours.ago)
+    pending(conversation, 'T2', 1.hour.ago)
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      travel(Whatsapp::Session::HistoryMediaJob::BATCH_TIME + 1.second)
+      original.call(command)
+    end
+
+    described_class.perform_now(conversation)
+
+    expect(backend.commands.map(&:message_id)).to eq(['T2'])
+    expect(described_class).to have_been_enqueued.with(conversation, second.id)
+  end
 end
