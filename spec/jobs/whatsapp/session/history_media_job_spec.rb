@@ -13,6 +13,7 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
   after do
     Redis::Alfred.delete(queue)
     Redis::Alfred.delete(described_class.scheduled_key(inbox))
+    Redis::Alfred.delete(described_class.requeue_key(inbox))
   end
 
   def pending(source_id, at)
@@ -100,18 +101,104 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
   it 'collects the pending files the window covers before draining, when asked to' do
     inside = pending('IN1', 3.days.ago)
     pending('OUT1', 60.days.ago)
+    described_class.kick(inbox, requeue: true)
 
-    described_class.perform_now(inbox, true)
+    described_class.perform_now(inbox)
 
     expect(backend.commands.map(&:message_id)).to eq(['IN1'])
     expect(inside.reload.attachments.count).to eq(1)
+  end
+
+  # The window widened while a drain was already queued: the kick finds the run scheduled
+  # and queues nothing, so the run that is there has to do the collecting.
+  it 'keeps a rescan asked for while a drain is already scheduled' do
+    queue_up(pending('Q1', 1.day.ago))
+    described_class.kick(inbox)
+    covered = pending('LATE1', 2.days.ago)
+    described_class.kick(inbox, requeue: true)
+
+    described_class.perform_now(inbox)
+
+    expect(described_class).to have_been_enqueued.with(inbox).exactly(:once)
+    expect(backend.commands.map(&:message_id)).to eq(%w[Q1 LATE1])
+    expect(covered.reload.attachments.count).to eq(1)
+  end
+
+  it 'comes back for a rescan asked for while the last run was draining' do
+    described_class.kick(inbox, requeue: true)
+    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_wrap_original do |original, *args|
+      original.call(*args)
+      described_class.kick(inbox, requeue: true)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(described_class).to have_been_enqueued.with(inbox).exactly(:twice)
+  end
+
+  # A deploy or a crash stops the worker in the middle of a download. The job goes back
+  # to Sidekiq, and the file has to be there when it runs again.
+  it 'keeps the file it was working on when the worker stops mid-download' do
+    message = pending('MID1', 1.day.ago)
+    queue_up(message)
+    allow(backend).to receive(:download_media).and_raise(Interrupt)
+
+    expect { described_class.perform_now(inbox) }.to raise_error(Interrupt)
+
+    expect(Redis::Alfred.zcard(queue)).to eq(1)
+  end
+
+  it 'reports a file that breaks for a reason of its own and goes on with the rest' do
+    broken = pending('BAD1', 1.hour.ago)
+    fine = pending('OK1', 2.hours.ago)
+    queue_up(broken, fine)
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      raise ArgumentError, 'boom' if command.message_id == 'BAD1'
+
+      original.call(command)
+    end
+    tracker = instance_double(ChatwootExceptionTracker, capture_exception: true)
+    allow(ChatwootExceptionTracker).to receive(:new).and_return(tracker)
+
+    described_class.perform_now(inbox)
+
+    expect(tracker).to have_received(:capture_exception)
+    expect(fine.reload.attachments.count).to eq(1)
+    expect(broken.reload.content_attributes).to include('history_media' => true)
+    expect(Redis::Alfred.zcard(queue)).to eq(0)
+  end
+
+  # The operator changes the setting while a batch is running; the job loaded the channel
+  # before the change.
+  it 'stops at the next file when the option is turned off in the middle of a batch' do
+    queue_up(pending('A1', 1.hour.ago), pending('A2', 2.hours.ago))
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      Channel::Whatsapp.find(channel.id).update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+      original.call(command)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(backend.commands.map(&:message_id)).to eq(['A1'])
+  end
+
+  it 'skips the rest of a batch that a window narrowed in the middle of it left out' do
+    queue_up(pending('B1', 1.hour.ago), pending('B2', 20.days.ago))
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      Channel::Whatsapp.find(channel.id).update!(provider_config: channel.provider_config.merge('history_media_days' => 7))
+      original.call(command)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(backend.commands.map(&:message_id)).to eq(['B1'])
   end
 
   # One drain per inbox is what keeps its history to one download at a time.
   it 'queues a single run however many files are tracked while one is pending' do
     3.times { |index| Whatsapp::Session::HistoryMedia.track(pending("T#{index}", index.hours.ago)) }
 
-    expect(described_class).to have_been_enqueued.with(inbox, false).exactly(:once)
+    expect(described_class).to have_been_enqueued.with(inbox).exactly(:once)
   end
 
   it 'lets the next file start a run once the queue has drained' do
@@ -120,6 +207,6 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
 
     Whatsapp::Session::HistoryMedia.track(pending('NEXT1', 2.days.ago))
 
-    expect(described_class).to have_been_enqueued.with(inbox, false).exactly(:twice)
+    expect(described_class).to have_been_enqueued.with(inbox).exactly(:twice)
   end
 end

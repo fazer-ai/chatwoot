@@ -174,7 +174,7 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(recent.content_attributes['pending_chat']).to eq(chat.to_h)
       queued = Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')
       expect(queued).to eq([recent.id.to_s])
-      expect(Whatsapp::Session::HistoryMediaJob).to have_been_enqueued.with(inbox, false).exactly(:once)
+      expect(Whatsapp::Session::HistoryMediaJob).to have_been_enqueued.with(inbox).exactly(:once)
     end
 
     it 'queues nothing when the inbox turned the automatic fetch off' do

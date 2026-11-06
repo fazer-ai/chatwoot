@@ -150,20 +150,27 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     # The drain stops without dropping the files that waited while the option was off, and
     # nothing else would wake it until the next import.
     context 'when the automatic fetch comes to cover more' do
-      after { Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(channel.inbox)) }
+      let(:rescan) { Whatsapp::Session::HistoryMediaJob.requeue_key(channel.inbox) }
+
+      after do
+        Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(channel.inbox))
+        Redis::Alfred.delete(rescan)
+      end
 
       it 'collects the files it now covers when it is turned back on' do
         channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
 
         expect do
           channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => true))
-        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox, true)
+        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox)
+        expect(Redis::Alfred.exists?(rescan)).to be(true)
       end
 
       it 'collects the files a wider window now covers' do
         expect do
           channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 90))
-        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox, true)
+        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox)
+        expect(Redis::Alfred.exists?(rescan)).to be(true)
       end
     end
 
