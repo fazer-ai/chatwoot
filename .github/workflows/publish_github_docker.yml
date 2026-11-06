@@ -36,12 +36,6 @@ jobs:
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
-      - name: Strip enterprise code
-        run: |
-          rm -rf enterprise
-          rm -rf spec/enterprise
-          rm -rf fazer_ai_ee
-
       - name: Update version in app.yml
         run: |
           if [[ "$GIT_REF" =~ ^v(.+)$ ]]; then

@@ -91,7 +91,9 @@ Conheça o [Kanban do Pro](https://fazer.ai/kanban) e ative sua licença em [app
 
 As licenças fazer.ai não incluem recursos do Chatwoot Enterprise. SSO e Captain, assim como logs de auditoria e funções personalizadas, são licenciados pela Chatwoot Inc.
 
-Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e use a imagem `ghcr.io/fazer-ai/chatwoot:latest-ee`. A imagem com sufixo `-ee` não substitui a licença.
+Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e defina `CW_EDITION=ee` no web e no Sidekiq da imagem `ghcr.io/fazer-ai/chatwoot`. A variável não substitui a licença.
+
+Com `CW_EDITION=ee`, o container baixa no boot o diretório `enterprise/` da tag oficial do Chatwoot que corresponde à versão da imagem, confere o conteúdo contra o hash fixado no build e guarda uma cópia em `storage/.cw-enterprise`. O primeiro boot de cada versão precisa de acesso a `codeload.github.com`, e os seguintes usam a cópia guardada. Se o download ou a conferência falhar, o container não sobe e o log diz por quê; as variáveis de ajuste estão descritas em `docker/entrypoints/helpers/enterprise.sh`.
 
 ## Instalar
 
@@ -128,6 +130,8 @@ Para rodar o conector como serviço separado na stack, configure `WHATSAPP_CONNE
 2. Baixe a nova imagem e reinicie os serviços pelo painel onde o Chatwoot roda.
 
 Para fixar uma versão, use a tag da release no lugar de `latest`.
+
+As tags `-ee` não são mais publicadas; quem usa uma delas continua funcionando, mas fica na última versão publicada, sem atualizações. Para continuar recebendo atualizações, troque para `ghcr.io/fazer-ai/chatwoot`, com `latest` ou uma tag de versão sem `-ee`, e defina `CW_EDITION=ee` no web e no Sidekiq. Com essa configuração, o primeiro boot de cada versão baixa o código Enterprise da tag oficial do Chatwoot e leva alguns segundos a mais: precisa de acesso de saída ao GitHub e de `/app/storage` em um volume persistente compartilhado entre web e Sidekiq, como já ocorre nos composes de exemplo e no instalador. Quem usa a imagem padrão sem Enterprise não precisa mudar nada; veja os detalhes em [Chatwoot Enterprise](#chatwoot-enterprise).
 
 ### Migrar do Chatwoot oficial
 

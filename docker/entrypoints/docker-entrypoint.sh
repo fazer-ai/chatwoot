@@ -28,6 +28,12 @@ if [ "$#" -eq 0 ]; then
   exit 1
 fi
 
+# Before anything can boot Rails, enterprise/ has to be in place when the edition asks for
+# it: ChatwootApp.enterprise? only looks at whether the directory exists. The helper says
+# nothing and does nothing unless CW_EDITION=ee, and stops the container when it cannot
+# deliver the tree it was asked for.
+docker/entrypoints/helpers/enterprise.sh ensure
+
 # Two arms because the worker arrives in two shapes. `bundle exec sidekiq -C ...` carries
 # `sidekiq` as its own argument, so a standalone word match finds it and a quoted
 # `rails runner 'Sidekiq::Queue.new.size'` -- one argument, contents invisible to a word
