@@ -975,6 +975,25 @@ RSpec.describe 'Conversation Messages API', type: :request do
       expect(response).to have_http_status(:unauthorized)
     end
 
+    # The messages API stores whatever content_attributes a client sends, so the marks of a
+    # history file are not proof that one is waiting: a descriptor an agent wrote would have
+    # the provider download any URL with the connector's token.
+    it 'refuses a message an agent wrote with the marks of a history file' do
+      forged = { 'is_unsupported' => true, 'history_media' => true, 'imported' => true,
+                 'pending_media' => pending_media.merge('ref' => { 'kind' => 'url', 'url' => 'http://169.254.169.254/latest' }) }
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
+           params: { content: 'x', content_attributes: forged }, headers: admin.create_new_auth_token, as: :json
+      written = conversation.messages.find(response.parsed_body['id'])
+      expect(written.content_attributes).to include('history_media' => true)
+
+      expect do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{written.id}/fetch_media",
+             headers: admin.create_new_auth_token, as: :json
+      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
     it 'answers not found for a message of another conversation' do
       other = create(:message, account: account)
 
