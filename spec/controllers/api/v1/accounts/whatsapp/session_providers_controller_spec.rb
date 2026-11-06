@@ -117,16 +117,53 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
 
       # Frozen, not withdrawn: they are what most inboxes run on today, and the
       # deprecation is what stops offering them.
-      it 'keeps the legacy providers on offer' do
-        legacy = payload.select { |p| p['legacy'] }
+      context 'when the installation has a Baileys API connected' do
+        before do
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', 'http://baileys.test')
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_API_KEY', 'key')
+          stub_request(:get, 'http://baileys.test/status').to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+        end
 
-        expect(legacy.pluck('key')).to contain_exactly('baileys', 'zapi')
-        expect(legacy.pluck('creatable')).to all(be(true))
+        it 'keeps the legacy providers on offer' do
+          legacy = payload.select { |p| p['legacy'] }
+
+          expect(legacy.pluck('key')).to contain_exactly('baileys', 'zapi')
+          expect(legacy.pluck('creatable')).to all(be(true))
+        end
+
+        it 'withdraws the legacy providers when the deprecation switch is thrown' do
+          with_modified_env WHATSAPP_LEGACY_PROVIDERS_CREATABLE: 'false' do
+            expect(payload.select { |p| p['legacy'] }.pluck('creatable')).to all(be(false))
+          end
+        end
       end
 
-      it 'withdraws the legacy providers when the deprecation switch is thrown' do
-        with_modified_env WHATSAPP_LEGACY_PROVIDERS_CREATABLE: 'false' do
-          expect(payload.select { |p| p['legacy'] }.pluck('creatable')).to all(be(false))
+      # Baileys is a separate API the installation points at. Where none is connected
+      # there is nothing to offer, and the rest of the catalog is unaffected.
+      describe 'the Baileys installation gate' do
+        let(:baileys) { payload.find { |p| p['key'] == 'baileys' } }
+        let(:zapi) { payload.find { |p| p['key'] == 'zapi' } }
+
+        it 'leaves Baileys out when no Baileys API is configured' do
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', nil)
+
+          expect(baileys['creatable']).to be(false)
+          expect(zapi['creatable']).to be(true)
+        end
+
+        it 'leaves Baileys out when the configured Baileys API does not answer' do
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', 'http://baileys.test')
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_API_KEY', 'key')
+          stub_request(:get, 'http://baileys.test/status').to_return(status: 503)
+
+          expect(baileys['creatable']).to be(false)
+        end
+
+        it 'still describes Baileys, so an existing inbox keeps its label and capabilities' do
+          stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', nil)
+
+          expect(baileys).to include('legacy' => true)
+          expect(baileys['capabilities']).to include('qr_pairing')
         end
       end
     end

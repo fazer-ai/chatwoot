@@ -20,6 +20,40 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_CLIENT_NAME', 'chatwoot-test')
   end
 
+  describe '.installed?' do
+    it 'is false without a Baileys API configured' do
+      stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', nil)
+
+      expect(described_class.installed?).to be(false)
+    end
+
+    context 'with a Baileys API configured' do
+      before do
+        stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_URL', 'http://test.com')
+        stub_const('Whatsapp::Providers::WhatsappBaileysService::DEFAULT_API_KEY', 'test_key')
+      end
+
+      it 'is true when the API answers' do
+        stub_request(:get, 'http://test.com/status').to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+
+        expect(described_class.installed?).to be(true)
+      end
+
+      it 'is false when the API errors' do
+        stub_request(:get, 'http://test.com/status').to_return(status: 500)
+
+        expect(described_class.installed?).to be(false)
+      end
+
+      it 'is false when the API does not answer in time, waiting the short timeout rather than a send one' do
+        allow(HTTParty).to receive(:get).and_raise(Net::OpenTimeout)
+
+        expect(described_class.installed?).to be(false)
+        expect(HTTParty).to have_received(:get).with('http://test.com/status', hash_including(timeout: described_class::INSTALLATION_CHECK_TIMEOUT))
+      end
+    end
+  end
+
   describe '.status' do
     context 'when DEFAULT_URL or DEFAULT_API_KEY are missing' do
       it 'raises ProviderUnavailableError when DEFAULT_URL is blank' do

@@ -52,7 +52,12 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     Whatsapp::Session::Registry.groups_enabled?
   end
 
-  def self.status
+  # How long the provider picker waits on the Baileys API before leaving it out. The
+  # picker asks on every load, and the request default (90s) is sized for a send, not
+  # for a page an administrator is looking at.
+  INSTALLATION_CHECK_TIMEOUT = 5
+
+  def self.status(timeout: BAILEYS_REQUEST_OPTIONS[:timeout])
     if DEFAULT_URL.blank? || DEFAULT_API_KEY.blank?
       raise ProviderUnavailableError, 'Missing BAILEYS_PROVIDER_DEFAULT_URL or BAILEYS_PROVIDER_DEFAULT_API_KEY setup'
     end
@@ -60,7 +65,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     response = HTTParty.get(
       "#{DEFAULT_URL}/status",
       headers: { 'x-api-key' => DEFAULT_API_KEY },
-      **BAILEYS_REQUEST_OPTIONS
+      **BAILEYS_REQUEST_OPTIONS, timeout: timeout
     )
 
     unless response.success?
@@ -74,6 +79,16 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   rescue StandardError => e
     Rails.logger.error e.message
     raise ProviderUnavailableError, 'Baileys API is unavailable'
+  end
+
+  # Whether this installation has a Baileys API connected: configured in the environment
+  # and answering. Baileys is legacy, so a new inbox on it is only offered where one is
+  # already running; an installation that never had it should not be shown it.
+  def self.installed?
+    status(timeout: INSTALLATION_CHECK_TIMEOUT)
+    true
+  rescue ProviderUnavailableError
+    false
   end
 
   def setup_channel_provider
