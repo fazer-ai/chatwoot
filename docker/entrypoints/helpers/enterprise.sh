@@ -216,10 +216,17 @@ cmd_ensure_locked() {
     log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
+  # A published entry is never replaced at boot: other containers may be running on it, and
+  # a verified tree that stopped matching its hash was damaged or tampered with after the
+  # fact, which an operator has to look at. Repairing it means stopping what mounts the
+  # volume first.
   if [ -e "$ENTRY" ]; then
-    log "cached enterprise/ in $ENTRY does not match the pinned hash; downloading it again"
+    fail "$ENTRY no longer matches the pinned hash $PINNED. Stop every container that mounts this volume, remove it (rm -rf $ENTRY) and start them again; the next boot downloads it anew"
   fi
 
+  # Downloads only run under this lock, so an .incoming directory found here belongs to one
+  # that was killed halfway.
+  rm -rf "$CACHE_ROOT"/.incoming.*
   work=$(mktemp -d "$CACHE_ROOT/.incoming.XXXXXX")
   if ! download_tree "$VERSION" "$work"; then
     rm -rf "$work"
@@ -233,17 +240,7 @@ cmd_ensure_locked() {
   # mktemp made the directory 0700, and the tarball's modes went through this process's
   # umask: publish it readable by every UID that may mount this volume later.
   chmod -R u=rwX,go=rX "$work"
-  # A damaged entry stays published until its replacement is complete and verified, so the
-  # containers already running on it keep a tree, and keep it if this download fails. The
-  # swap is two renames: the old entry out to a quarantine name, the new one in.
-  if [ -e "$ENTRY" ]; then
-    quarantine=$(mktemp -d "$CACHE_ROOT/.quarantine.XXXXXX")
-    mv "$ENTRY" "$quarantine/"
-    mv "$work" "$ENTRY"
-    rm -rf "$quarantine"
-  else
-    mv "$work" "$ENTRY"
-  fi
+  mv "$work" "$ENTRY"
   activate
   log "enterprise/ v$VERSION downloaded, verified and installed"
 }
