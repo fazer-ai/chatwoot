@@ -42,12 +42,6 @@ en:
       messaging_window_closed: Meta's reply window for this contact has closed. It reopens when the contact sends a new message.
       messaging_window_closed_for_automation: Meta only accepts automated replies within 24 hours of the contact's last message. Take over the conversation to reply as an agent.
     whatsapp:
-      calls:
-        group_not_supported: Calls cannot be placed to a group
-        proxy_unsupported: 'WhatsApp calls do not go through a proxy. Remove the proxy from this inbox to turn calls on.'
-        connector_without_calls: 'The WhatsApp connector of this installation does not carry call voice: it needs WAC_CALLS_UDP_PORT set and that port published over UDP.'
-        provider_unsupported: 'This WhatsApp provider does not support calls.'
-        channel_voice_required: 'Calls are not available on this account''s plan.'
       group_announcement_only: Only administrators are allowed to send messages in this group
       group_description_cannot_be_removed: WhatsApp does not allow a group description to be removed once it is set. Replace the text instead.
     inboxes:
@@ -187,3 +181,48 @@ en:
       handled_count: Handled conversations
       avg_customer_waiting_time: Avg customer waiting time
       resolution_count: Resolution Count
+  super_admin:
+    settings:
+      pages:
+        branding: 'Branding'
+        branding_description: 'The name, logos and links this installation shows. Saved here, they take precedence over the branding variables in the environment.'
+    app_configs:
+      branding:
+        invalid_color: 'Brand color must be a hex color such as #1f93ff.'
+      fields:
+        INSTALLATION_NAME:
+          title: 'Installation name'
+          description: 'The name shown in the dashboard, the page title and the emails.'
+        LOGO_THUMBNAIL:
+          title: 'Logo thumbnail'
+          description: 'The square image used as the favicon (512 × 512 px).'
+        LOGO:
+          title: 'Logo'
+          description: 'The logo on the dashboard and the login page.'
+        LOGO_DARK:
+          title: 'Logo for dark mode'
+          description: 'The logo on the dashboard and the login page in dark mode.'
+        LOGO_EMAIL:
+          title: 'Email logo'
+          description: 'The logo at the top of outgoing emails. PNG, JPG or GIF only: email clients do not render SVG. Left empty, the logo above is used when it is one of those formats.'
+        BRAND_NAME:
+          title: 'Brand name'
+          description: 'The name used in emails and in the widget.'
+        BRAND_URL:
+          title: 'Brand URL'
+          description: 'Where the "Powered by" line in emails links to.'
+        WIDGET_BRAND_URL:
+          title: 'Widget brand URL'
+          description: 'Where the "Powered by" line in the widget links to.'
+        BRAND_COLOR:
+          title: 'Brand color'
+          description: 'Hex color used in emails and for the app theme, such as #1f93ff.'
+        TERMS_URL:
+          title: 'Terms of service URL'
+          description: 'Linked from the signup page.'
+        PRIVACY_URL:
+          title: 'Privacy policy URL'
+          description: 'Linked from the app.'
+        DISPLAY_MANIFEST:
+          title: 'Chatwoot metadata'
+          description: 'Show the default Chatwoot favicons and upgrade warnings.'

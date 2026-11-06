@@ -4,9 +4,8 @@
 # which is what delegating to a specialist bot relies on.
 #
 # Declared here instead of as autoloaded classes, for the reason import_guards.rb gives: a
-# reloadable module handed to `prepend` is a new object after every reload. Prepended rather than
-# edited in, because the four files involved are upstream's and every line there is a conflict on
-# every sync.
+# reloadable module handed to `prepend` is a new object after every reload. Kept out of the files
+# involved, which are upstream's, so that each sync conflicts on one line at most.
 module AgentBotAssignment
   # The assignee dropdown listed every bot of the account, so the bot answering a WhatsApp inbox was
   # one click away from an e-mail conversation it had never been set up for; in production that
@@ -18,27 +17,24 @@ module AgentBotAssignment
   #
   # With several inboxes asked for, a bot has to pass for each of them, the rule agents already
   # follow in the same action.
+  #
+  # Called from the controller's own index rather than prepended over it: Enterprise prepends its
+  # half of that action, and a module put in front of it would wrap upstream's Enterprise code.
   module DropdownOffersNoForeignBot
-    def index
-      super
-      return if @agent_bots.blank?
+    def self.offered(agent_bots, inboxes, account)
+      return agent_bots if agent_bots.blank?
 
-      @agent_bots = @agent_bots.select { |agent_bot| @inboxes.all? { |inbox| offered_for?(agent_bot, inbox) } }
+      connected = [AgentBotInbox, AgentBotObserver].flat_map do |connection|
+        connection.where(account_id: account.id, agent_bot_id: agent_bots.map(&:id)).distinct.pluck(:agent_bot_id)
+      end.to_set
+      agent_bots.select { |agent_bot| inboxes.all? { |inbox| offered_for?(agent_bot, inbox, connected) } }
     end
 
-    private
-
-    def offered_for?(agent_bot, inbox)
+    def self.offered_for?(agent_bot, inbox, connected)
       bot_inbox = inbox.agent_bot_inbox
       return true if bot_inbox&.active? && bot_inbox.agent_bot_id == agent_bot.id
 
-      connected_bot_ids.exclude?(agent_bot.id)
-    end
-
-    def connected_bot_ids
-      @connected_bot_ids ||= [AgentBotInbox, AgentBotObserver].flat_map do |connection|
-        connection.where(account_id: Current.account.id, agent_bot_id: @agent_bots.map(&:id)).distinct.pluck(:agent_bot_id)
-      end.to_set
+      connected.exclude?(agent_bot.id)
     end
   end
 
@@ -70,6 +66,5 @@ module AgentBotAssignment
 end
 
 Rails.application.config.to_prepare do
-  Api::V1::Accounts::AssignableAgentsController.prepend(AgentBotAssignment::DropdownOffersNoForeignBot)
   Conversation.prepend(AgentBotAssignment::BotAssignmentActivity)
 end

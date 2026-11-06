@@ -10,7 +10,6 @@ module.exports = {
     './app/views/installation/**/*.erb',
     './enterprise/app/views/super_admin/**/*.erb',
     './enterprise/app/views/fields/**/*.erb',
-    './fazer_ai_ee/app/views/super_admin/**/*.erb',
     './app/helpers/super_admin/*.{rb,yml}',
     './app/javascript/entrypoints/superadmin.js',
     './app/javascript/superadmin_pages/**/*.{vue,js}',

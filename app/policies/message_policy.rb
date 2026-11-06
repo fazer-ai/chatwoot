@@ -19,8 +19,10 @@ class MessagePolicy < ApplicationPolicy
     user.is_a?(AgentBot)
   end
 
+  # A role in force, read off the permissions: a `custom_role_id` left on the row without
+  # Enterprise, or after the role was deleted, grants nothing.
   def custom_role?
-    account_user&.custom_role_id.present?
+    account_user&.permissions&.include?('custom_role')
   end
 end
 

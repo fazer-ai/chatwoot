@@ -13,9 +13,11 @@
         <% field_id = "app_config_#{key}" %>
         <div class="<%= class_names("grid gap-x-8 gap-y-1.5 px-5 py-4", "sm:grid-cols-2" => config['type'] != 'code') %>">
           <div class="text-label text-n-slate-12">
-            <%= form.label "app_config[#{key}]", config['display_title'] || key, for: field_id %>
-            <% if config['description'].present? %>
-              <p class="mt-0.5 max-w-xl text-label-small text-n-slate-11"><%= config['description'] %></p>
+            <%# A key can carry its title and description in the locale files; the English in installation_config.yml is the fallback. %>
+            <% description = t("super_admin.app_configs.fields.#{key}.description", default: config['description'].to_s) %>
+            <%= form.label "app_config[#{key}]", t("super_admin.app_configs.fields.#{key}.title", default: config['display_title'] || key), for: field_id %>
+            <% if description.present? %>
+              <p class="mt-0.5 max-w-xl text-label-small text-n-slate-11"><%= description %></p>
             <% end %>
           </div>
           <div class="min-w-0">

@@ -110,9 +110,6 @@ function extractCallData(message) {
     provider: call.provider,
     status: call.status,
     callDirection: call.direction === 'outgoing' ? 'outbound' : 'inbound',
-    // A call a voice agent is answering rings nobody here; it is handed back
-    // with this cleared when the voice agent cannot take it.
-    voiceAgent: call.voice_agent === true,
     conversationId: message?.conversation_id,
     inboxId: message?.inbox_id ?? message?.conversation?.inbox_id,
     assigneeId: extractAssigneeId(message?.conversation),
@@ -138,10 +135,8 @@ export function handleVoiceCallCreated(
     inboxId,
     assigneeId,
     senderId,
-    voiceAgent,
   } = extractCallData(message);
 
-  if (voiceAgent) return;
   if (callSid && dismissedCallSids.has(callSid)) return;
 
   // A voice_call message can be created already terminal when the caller hangs
@@ -193,7 +188,6 @@ export function handleVoiceCallUpdated(
     inboxId,
     assigneeId,
     senderId,
-    voiceAgent,
   } = extractCallData(message);
 
   const callsStore = useCallsStore();
@@ -222,7 +216,7 @@ export function handleVoiceCallUpdated(
     return;
   }
 
-  if (status === 'ringing' && !voiceAgent) {
+  if (status === 'ringing') {
     if (!shouldRingInbound(callDirection, currentUserAvailability)) return;
 
     callsStore.addCall({

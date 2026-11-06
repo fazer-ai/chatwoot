@@ -1,6 +1,6 @@
 #!/bin/sh
 # enterprise/ and spec/enterprise/ are upstream's, byte-identical to the release this fork
-# tracks (VERSION_CW). The fork's changes to them live in fazer_ai_ee/.
+# tracks (VERSION_CW). The fork does not modify Enterprise code.
 #
 #   bin/validate_enterprise_parity           compares HEAD with the upstream tag (CI)
 #   bin/validate_enterprise_parity --staged  compares the index (pre-commit hook)
@@ -39,9 +39,9 @@ enterprise parity: these paths differ from upstream $tag:
 
 $(echo "$changed" | sed 's/^/  /')
 
-enterprise/ and spec/enterprise/ must stay identical to upstream. Put the change in
-fazer_ai_ee/ instead (see fazer_ai_ee/README.md): a FazerAiEe:: module prepended over the
-Enterprise class, a view under fazer_ai_ee/app/views, specs under fazer_ai_ee/spec.
+enterprise/ and spec/enterprise/ must stay identical to upstream. The fork does not modify
+or patch Enterprise code: make the change in the CE code (app/, lib/) instead, so that it
+works the same with or without enterprise/.
 To restore a path: git checkout $tag -- <path>
 EOF
 exit 1

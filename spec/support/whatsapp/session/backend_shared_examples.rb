@@ -35,8 +35,7 @@ RSpec.shared_examples 'a whatsapp session backend' do
         commands::GroupParticipantsUpdate.new(group: group_address, participants: [phone_address], action: 'add')
       ],
       group_invite_code: [commands::GroupInviteGet.new(group: group_address)],
-      group_join_requests: [commands::GroupJoinRequestsList.new(group: group_address)],
-      accept_call: [commands::CallAccept.new(call_id: 'CALL0001', sdp: "v=0\r\n")]
+      group_join_requests: [commands::GroupJoinRequestsList.new(group: group_address)]
     }
   end
 

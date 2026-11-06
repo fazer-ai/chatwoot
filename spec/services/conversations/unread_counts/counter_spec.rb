@@ -69,6 +69,17 @@ RSpec.describe Conversations::UnreadCounts::Counter do
     )
   end
 
+  # The id outlives the role it named when Enterprise is not loaded, or the role was deleted,
+  # and the agent keeps the plain agent's counts instead of a custom role's empty ones.
+  it 'counts for an agent whose custom role id names no role in force as for a normal agent' do
+    create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], team: visible_team)
+    agent.account_users.find_by(account: account).update_column(:custom_role_id, 999_999) # rubocop:disable Rails/SkipsModelValidations
+
+    result = described_class.new(account: account, user: agent).perform
+
+    expect(result[:all_count]).to eq(1)
+  end
+
   it 'counts unread conversations across all account inboxes for admins' do
     create_unread_conversation(account: account, inbox: visible_inbox, labels: [label.title], team: visible_team)
     create_unread_conversation(account: account, inbox: hidden_inbox, labels: [label.title], team: visible_team)

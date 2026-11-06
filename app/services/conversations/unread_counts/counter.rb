@@ -167,8 +167,10 @@ class Conversations::UnreadCounts::Counter
       end
   end
 
+  # Through the permissions, not the column: without Enterprise, or with the role deleted, a
+  # `custom_role_id` left on the row grants nothing, and the agent counts as a plain agent.
   def custom_role_agent?
-    account_user&.agent? && account_user.custom_role_id.present?
+    account_user&.agent? && permissions.include?('custom_role')
   end
 
   def permissions

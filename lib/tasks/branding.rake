@@ -29,6 +29,12 @@ namespace :branding do
       'DISPLAY_MANIFEST' => true
     }
 
+    # The environment seeds the brand until the super admin's Branding page is saved; from then
+    # on the page owns it and this task leaves it as it is. BRANDING_FORCE=true writes every key
+    # from the environment again and hands the brand back to it.
+    edited = InstallationConfig.find_by(name: 'BRANDING_EDITED_IN_SUPER_ADMIN')
+    next puts('Kept the branding saved in the super admin.') if edited&.value.present? && ENV['BRANDING_FORCE'] != 'true'
+
     configurable_items.each do |config_name, default_value|
       value = if default_value.in?([true, false])
                 ENV.fetch(config_name, default_value.to_s) == 'true'
@@ -40,6 +46,7 @@ namespace :branding do
       puts "Updated '#{config_name}' to '#{value}'."
     end
 
+    edited&.destroy!
     puts 'Branding configuration update finished.'
   end
 end

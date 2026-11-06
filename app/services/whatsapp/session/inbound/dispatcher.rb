@@ -35,8 +35,6 @@ class Whatsapp::Session::Inbound::Dispatcher
     'group.activity' => 'GroupActivity',
     'history.sync' => 'HistorySync',
     'call.offer' => 'CallOffer',
-    'call.answered' => 'CallAnswered',
-    'call.terminate' => 'CallTerminate',
     'raw' => 'Raw'
   }.freeze
 
@@ -50,6 +48,7 @@ class Whatsapp::Session::Inbound::Dispatcher
   IGNORED = %w[
     pairing.passkey_request pairing.passkey_confirmation contact.identity_changed
     session.offline_sync_preview session.offline_sync_completed
+    call.answered call.terminate
   ].freeze
 
   attr_reader :channel, :event, :instance

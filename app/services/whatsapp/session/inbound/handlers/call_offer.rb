@@ -1,12 +1,8 @@
 # Somebody rang this account on WhatsApp.
 #
-# A call the agent cannot answer here is shown as having happened, next to the conversation
-# it happened in. That is an activity line, the same shape a group rename gets.
-#
-# A call the agent can answer is the other branch: the offer carries the connector's WebRTC
-# offer (`sdp`), and an installation with voice calling takes it up through `take_up_call`
-# instead, the way it takes up a Cloud API call. The calling flow lives in the enterprise
-# half, so here that hook takes nothing up.
+# The call rings on the operator's phone, and nobody answers it here: it is shown as having
+# happened, next to the conversation it happened in. That is an activity line, the same shape
+# a group rename gets.
 #
 # `call.terminate` is deliberately not routed here. Every call ends, so a second line per
 # call would say nothing an agent can act on.
@@ -19,10 +15,6 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
   end
 
   private
-
-  # The outcome when the call was taken up by the calling flow, nil when it was not and the
-  # line is written instead.
-  def take_up_call(_contact_inbox) = nil
 
   # Prefixed, and not the raw call id: this shares a column with WhatsApp's message ids,
   # and the prefix is what keeps a call from ever being the target of an edit, a revoke
@@ -40,9 +32,6 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
 
     contact = contact_inbox.contact
     return :ignored if Whatsapp::BlockedSender.silenced?(contact, from_me: false)
-
-    taken = take_up_call(contact_inbox)
-    return taken if taken
 
     conversation = inbound::ConversationFinder.new(
       inbox: inbox, contact: contact, contact_inbox: contact_inbox, occurred_at: occurred_at
@@ -88,5 +77,3 @@ class Whatsapp::Session::Inbound::Handlers::CallOffer < Whatsapp::Session::Inbou
     Time.zone.at(payload.timestamp / 1000.0)
   end
 end
-
-Whatsapp::Session::Inbound::Handlers::CallOffer.prepend_mod_with('Whatsapp::Session::Inbound::Handlers::CallOffer')
