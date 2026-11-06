@@ -195,9 +195,11 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
 
   # Cleared before looking again, so a file queued or a rescan asked for between the last
   # look and this line either sees the flag gone and kicks its own run, or is found here.
+  # The run claim goes first: a run kicked once scheduling reopens must not find this one
+  # still working and leave, holding the scheduling claim with nobody behind it.
   def finish
-    Redis::Alfred.delete(self.class.scheduled_key(inbox))
     release
+    Redis::Alfred.delete(self.class.scheduled_key(inbox))
     pending = Redis::Alfred.zcard(queue_key).positive? || Redis::Alfred.exists?(self.class.requeue_key(inbox))
     self.class.kick(inbox) if pending && enabled?
   end

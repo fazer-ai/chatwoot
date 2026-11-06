@@ -257,6 +257,21 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Redis::Alfred.exists?(described_class.scheduled_key(inbox))).to be(false)
   end
 
+  # A file tracked the moment scheduling reopens starts a run at once; this run must not
+  # still be holding the run claim then.
+  it 'gives its run claim back before it reopens scheduling' do
+    described_class.kick(inbox)
+    held = nil
+    allow(Redis::Alfred).to receive(:delete).and_wrap_original do |original, key|
+      held = Redis::Alfred.exists?(described_class.run_key(inbox)) if key == described_class.scheduled_key(inbox)
+      original.call(key)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(held).to be(false)
+  end
+
   # A deploy or a crash stops the worker in the middle of a download. The job goes back
   # to Sidekiq, and the file has to be there when it runs again.
   it 'keeps the file it was working on when the worker stops mid-download' do
