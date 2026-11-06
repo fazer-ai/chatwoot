@@ -161,5 +161,30 @@ describe('WhatsappHistorySync', () => {
         },
       });
     });
+
+    // Each save sends the whole config, so a second one sent while the first is still
+    // out would carry the switch from before it and turn the fetch back on.
+    it('holds a second save until the first one comes back', async () => {
+      let finish;
+      mockDispatch.mockReturnValueOnce(
+        new Promise(resolve => {
+          finish = resolve;
+        })
+      );
+      const wrapper = await mountSection(NATIVE);
+      wrapper.vm.fetchMedia = false;
+      const first = wrapper.vm.saveFetchMedia();
+      wrapper.vm.windowDays = 7;
+
+      wrapper.vm.saveWindowDays();
+      expect(mockDispatch).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.windowDays).toBe(30);
+
+      finish();
+      await first;
+      wrapper.vm.windowDays = 7;
+      await wrapper.vm.saveWindowDays();
+      expect(mockDispatch).toHaveBeenCalledTimes(2);
+    });
   });
 });

@@ -50,7 +50,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     return if media.nil? || media.ref.blank?
     return if message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
 
-    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
+    Whatsapp::Session::HistoryMedia.route(message, inbound, media)
   end
 
   # Replaces the placeholder a message left behind with the message itself.
@@ -316,7 +316,7 @@ class Whatsapp::Session::Inbound::MessageWriter
   # A rich card carries its header image, video or document in `media`, which is the
   # same downloadable reference a plain media message has: without this the card is
   # stored with its text and no attachment.
-  def enqueue_media_fetch(row) = Whatsapp::Session::HistoryMedia.route(row, inbound, imported) { self.class.fetch_media_for(row, inbound) }
+  def enqueue_media_fetch(message) = self.class.fetch_media_for(message, inbound)
 
   # One message per shared contact, each with a native contact attachment, so the
   # dashboard renders them in the contact bubble instead of as plain text.

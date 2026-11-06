@@ -68,8 +68,16 @@ const windowDaysValid = computed(
 );
 
 // One save for every option here, each sending the whole config back: the endpoint
-// replaces provider_config, so a partial one would drop the rest.
+// replaces provider_config, so a partial one would drop the rest. One at a time, with the
+// controls locked meanwhile: a second save sent before the first came back would copy the
+// config from before it and undo it.
+const saving = ref(false);
 const saveConfig = async (changes, rollback) => {
+  if (saving.value) {
+    rollback();
+    return;
+  }
+  saving.value = true;
   try {
     await store.dispatch('inboxes/updateInbox', {
       id: props.inbox.id,
@@ -85,6 +93,8 @@ const saveConfig = async (changes, rollback) => {
     // needs a different value, so leaving it there would mean toggling away and back to
     // retry.
     rollback();
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -115,7 +125,12 @@ const saveWindowDays = () => {
       "
     >
       <div class="flex items-center gap-2">
-        <Switch id="history_sync" v-model="enabled" @change="saveSetting" />
+        <Switch
+          id="history_sync"
+          v-model="enabled"
+          :disabled="saving"
+          @change="saveSetting"
+        />
         <span class="text-sm">
           {{ $t('INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.HISTORY_SYNC.LABEL') }}
         </span>
@@ -133,6 +148,7 @@ const saveWindowDays = () => {
           <Switch
             id="history_media_fetch"
             v-model="fetchMedia"
+            :disabled="saving"
             @change="saveFetchMedia"
           />
           <span class="text-sm">
@@ -150,6 +166,7 @@ const saveWindowDays = () => {
             type="number"
             min="1"
             class="w-48"
+            :disabled="saving"
             :label="
               $t(
                 'INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.HISTORY_MEDIA.DAYS_LABEL'
@@ -166,7 +183,8 @@ const saveWindowDays = () => {
             @enter="saveWindowDays"
           />
           <NextButton
-            :disabled="!windowDaysValid"
+            :disabled="!windowDaysValid || saving"
+            :is-loading="saving"
             :label="
               $t('INBOX_MGMT.ADD.WHATSAPP.SESSION.FIELDS.HISTORY_MEDIA.SAVE')
             "

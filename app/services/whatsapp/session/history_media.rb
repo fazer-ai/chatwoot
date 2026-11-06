@@ -59,15 +59,20 @@ module Whatsapp::Session::HistoryMedia
     Whatsapp::Session::HistoryMediaJob.kick(message.inbox)
   end
 
-  # Where the writer's media fetch goes. A live message's file is fetched as always. An
-  # imported one goes through the inbox's drain like every other history file, whether or
-  # not it came with a reference: a job queued straight away would download it even after
-  # the operator turned the option off or narrowed the window, which the drain checks
-  # before every file. The importer tracks it right after writing it.
-  def route(message, inbound, imported)
-    return yield unless imported
+  # Where a media fetch goes, on every path that queues one (MessageWriter.fetch_media_for:
+  # the write, a redelivery of a stored message, a placeholder recovered). A live
+  # message's file is fetched as always. An imported one goes through the inbox's drain
+  # like every other history file, with or without a reference and however many times it
+  # is delivered again: a job queued straight away would download it even after the
+  # operator turned the option off or narrowed the window, which the drain checks before
+  # every file. The reference it came with this time is kept for when it is asked for.
+  def route(message, inbound, media)
+    if message.content_attributes&.dig('imported').blank?
+      return Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
+    end
 
     defer(message, inbound)
+    track(message)
   end
 
   # A history file that came with a reference. It is marked the way a reference-less one

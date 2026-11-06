@@ -552,8 +552,32 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
       again = historical('3EB0M2', 3.days.ago + 1.minute, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
 
+      # Through the inbox's drain, which reads the switch and the window before asking,
+      # with the reference this delivery brought kept for the ask.
       expect { Whatsapp::Session::Inbound::MessageWriter.fetch_media_for(image, again) }
-        .to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+        .not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      queued = Redis::Alfred.zrangebyscore(Whatsapp::Session::HistoryMedia.queue_key(inbox), '-inf', '+inf')
+      expect(queued).to eq([image.id.to_s])
+      expect(image.reload.content_attributes.dig('pending_media', 'ref', 'url')).to eq('https://connector.test/media/abc')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    it 'asks for nothing on a redelivery once the inbox turned the automatic fetch off' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+      deliver(slice(messages))
+      image = inbox.messages.find_by(source_id: '3EB0M2')
+      ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
+      again = historical('3EB0M2', 3.days.ago + 1.minute, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+      expect { Whatsapp::Session::Inbound::MessageWriter.fetch_media_for(image, again) }
+        .not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      expect(Redis::Alfred.zcard(Whatsapp::Session::HistoryMedia.queue_key(inbox))).to eq(0)
+      expect(Whatsapp::Session::HistoryMedia.pending?(image.reload)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
     end
   end
 
