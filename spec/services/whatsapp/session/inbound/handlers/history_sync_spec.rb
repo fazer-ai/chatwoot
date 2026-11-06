@@ -204,6 +204,11 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
                                  )))
       fetched = ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job['job_class'] == 'Whatsapp::Session::MediaFetchJob' }
       expect(fetched.size).to eq(1)
+      # Turned away, it still waits for the button or the conversation action, with the
+      # reference the provider finds the file by.
+      deferred = inbox.messages.find_by(source_id: 'REF2')
+      expect(Whatsapp::Session::HistoryMedia.pending?(deferred)).to be(true)
+      expect(deferred.content_attributes.dig('pending_media', 'ref')).to be_present
 
       channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
       expect do

@@ -13,8 +13,10 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   BATCH = 20
   # Only a backstop for a run that died without clearing it: a live run refreshes it.
   SCHEDULED_TTL = 1.hour
-  # The provider could not be reached. The files stay queued and the drain comes back.
+  # The provider could not be reached, or asked us to slow down. The files stay queued and
+  # the drain comes back.
   UNAVAILABLE_WAIT = 2.minutes
+  TRANSIENT = [Down::Error, Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited].freeze
 
   def self.kick(inbox, wait: nil)
     return unless Redis::Alfred.set(scheduled_key(inbox), '1', nx: true, ex: SCHEDULED_TTL.to_i)
@@ -47,7 +49,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
       fetch(Message.find_by(id: id), id)
     end
     self.class.set(wait: 0).perform_later(inbox)
-  rescue Down::Error, Whatsapp::Session::Errors::ProviderUnavailable => e
+  rescue *TRANSIENT => e
     Rails.logger.warn("[WHATSAPP SESSION] history media of inbox ##{inbox.id} paused: #{e.message}")
     self.class.set(wait: UNAVAILABLE_WAIT).perform_later(inbox)
   end
@@ -59,7 +61,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     return if message.created_at < history_media.cutoff(inbox.channel)
 
     history_media.fetch(message)
-  rescue Down::Error, Whatsapp::Session::Errors::ProviderUnavailable
+  rescue *TRANSIENT
     Redis::Alfred.zadd(queue_key, message.created_at.to_f, id)
     raise
   end

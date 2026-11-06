@@ -81,16 +81,18 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Redis::Alfred.exists?(described_class.scheduled_key(inbox))).to be(false)
   end
 
-  it 'keeps the file queued and comes back later when the provider cannot be reached' do
-    message = pending('DOWN1', 1.day.ago)
-    queue_up(message)
-    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::ProviderUnavailable, 'down')
+  [Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited].each do |error|
+    it "keeps the file queued and comes back later on #{error.name.demodulize}" do
+      message = pending('DOWN1', 1.day.ago)
+      queue_up(message)
+      allow(backend).to receive(:download_media).and_raise(error, 'try later')
 
-    described_class.perform_now(inbox)
+      described_class.perform_now(inbox)
 
-    expect(Redis::Alfred.zcard(queue)).to eq(1)
-    expect(message.reload.content_attributes).to include('history_media' => true)
-    expect(described_class).to have_been_enqueued.with(inbox)
+      expect(Redis::Alfred.zcard(queue)).to eq(1)
+      expect(message.reload.content_attributes).to include('history_media' => true)
+      expect(described_class).to have_been_enqueued.with(inbox)
+    end
   end
 
   # One drain per inbox is what keeps its history to one download at a time.

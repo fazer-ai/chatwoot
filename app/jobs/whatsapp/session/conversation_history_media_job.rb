@@ -8,7 +8,7 @@
 class Whatsapp::Session::ConversationHistoryMediaJob < ApplicationJob
   queue_as :low
 
-  retry_on Down::Error, Whatsapp::Session::Errors::ProviderUnavailable, wait: :polynomially_longer, attempts: 3
+  retry_on(*Whatsapp::Session::HistoryMediaJob::TRANSIENT, wait: :polynomially_longer, attempts: 3)
 
   # Downloads per run. An old group can hold thousands of files, and one run holding a
   # worker for all of them is what the inbox's drain already avoids: each run takes a batch

@@ -58,6 +58,31 @@ module Whatsapp::Session::HistoryMedia
     Whatsapp::Session::HistoryMediaJob.kick(message.inbox)
   end
 
+  # Where the writer's media fetch goes. A live message's file is fetched as always; an
+  # imported one only when the inbox's consent covers it, and is marked to wait otherwise.
+  def route(message, inbound, imported)
+    return yield if !imported || wanted?(message)
+
+    defer(message, inbound)
+  end
+
+  # A history file that came with a reference but that the switch or the window turns
+  # away. Left as it was it would be a bubble with no file and nothing to ask for it with,
+  # so it is marked the way a reference-less one is, which is what the button and the
+  # conversation action look for. The reference is kept: it is how the provider finds the
+  # file when somebody does ask.
+  def defer(message, inbound)
+    media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
+    return if media&.ref.blank?
+
+    message.with_lock do
+      message.update!(content_attributes: message.content_attributes.merge(
+        'is_unsupported' => true, Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
+        'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
+      ).compact)
+    end
+  end
+
   # One download, inline. Called from the drain and the conversation job, which pace
   # themselves; the button queues a MediaFetchJob instead, since a person is waiting on
   # that one file.
