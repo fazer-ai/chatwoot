@@ -38,7 +38,7 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     File.write(File.join(app_dir, 'VERSION_CW'), "#{version}\n")
     write_lock(version, pinned)
     # what the image's Dockerfile leaves in place of the tree
-    File.symlink("storage/.cw-enterprise/#{version}-#{pinned}.active", File.join(app_dir, 'enterprise'))
+    File.symlink('tmp/cw-enterprise', File.join(app_dir, 'enterprise'))
     build_tarball(tree)
   end
 
@@ -196,19 +196,9 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
       expect(File.stat(File.join(cache_root, '.lock')).mode & 0o777).to eq(0o644)
     end
 
-    it 'locks a lock file it cannot write' do
-      FileUtils.mkdir_p(cache_root)
-      File.write(File.join(cache_root, '.lock'), '')
-      FileUtils.chmod(0o444, File.join(cache_root, '.lock'))
-
-      _out, _err, status = ensure_enterprise
-
-      expect(status).to be_success
-      expect(installed).to eq(tree.keys.sort)
-    end
-
-    it 'boots from an intact entry in a cache it cannot write' do
+    it 'uses an intact entry without writing to the volume, which may be read-only' do
       ensure_enterprise
+      FileUtils.chmod(0o444, File.join(cache_root, '.lock'))
       FileUtils.chmod(0o555, cache_root)
 
       _out, _err, status = ensure_enterprise('CW_ENTERPRISE_SOURCE_URL' => unreachable)
@@ -217,21 +207,77 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
       expect(installed).to eq(tree.keys.sort)
     end
 
-    it 'says so when the cache it cannot write holds no tree for this version' do
+    it 'says so when it has to download but cannot write the lock' do
+      FileUtils.mkdir_p(cache_root)
+      File.write(File.join(cache_root, '.lock'), '')
+      FileUtils.chmod(0o444, File.join(cache_root, '.lock'))
+
+      _out, err, status = ensure_enterprise
+
+      expect(status).not_to be_success
+      expect(err).to include('cannot open', 'for writing', 'holds no verified tree')
+    end
+
+    it 'says so when it has to download into a cache it cannot write' do
       FileUtils.mkdir_p(cache_root)
       FileUtils.chmod(0o555, cache_root)
 
       _out, err, status = ensure_enterprise
 
       expect(status).not_to be_success
-      expect(err).to include('is not writable by uid')
+      expect(err).to include('cannot open', 'holds no verified tree')
+    end
+  end
+
+  # Each container decides its own edition. The web and worker containers share the cache,
+  # and a container running Enterprise must keep its tree while another one on the same
+  # volume boots without it, or with it.
+  describe 'two containers on the same storage volume' do
+    let(:other_app) { File.join(work_dir, 'other') }
+    let(:other_helper) { File.join(other_app, 'docker/entrypoints/helpers/enterprise.sh') }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(other_helper))
+      FileUtils.cp(helper, other_helper)
+      %w[VERSION_CW .enterprise_lock].each { |name| FileUtils.cp(File.join(app_dir, name), other_app) }
+      File.symlink(File.join(app_dir, 'storage'), File.join(other_app, 'storage'))
+      File.symlink('tmp/cw-enterprise', File.join(other_app, 'enterprise'))
+    end
+
+    def ensure_other(env)
+      Open3.capture3({ 'DISABLE_ENTERPRISE' => nil, 'CW_ENTERPRISE_SOURCE_URL' => unreachable }.merge(env), other_helper, 'ensure')
+    end
+
+    it 'keeps enterprise/ for the running Enterprise container while another one boots as Community' do
+      ensure_enterprise
+
+      _out, _err, status = ensure_other('CW_EDITION' => 'ce')
+
+      expect(status).to be_success
+      expect(Pathname.new(other_app).join('enterprise')).not_to exist
+      expect(installed).to eq(tree.keys.sort)
+    end
+
+    it 'keeps a Community container without enterprise/ while another one boots as Enterprise' do
+      ensure_enterprise
+      ensure_enterprise('CW_EDITION' => 'ce')
+
+      _out, _err, status = ensure_other('CW_EDITION' => 'ee')
+
+      expect(status).to be_success
+      expect(Pathname.new(other_app).join('enterprise/config/premium.yml')).to exist
+      expect(Pathname.new(app_dir).join('enterprise')).not_to exist
     end
   end
 
   # /app can be a read-only filesystem, or owned by another user than the one running
-  # the container; only the storage volume has to be writable.
+  # the container. tmp/ stays writable, as Rails needs it to be (a tmpfs on a read-only
+  # root), and that is where the activation lives.
   describe 'with /app read-only' do
-    before { FileUtils.chmod(0o555, app_dir) }
+    before do
+      FileUtils.mkdir_p(File.join(app_dir, 'tmp'))
+      FileUtils.chmod(0o555, app_dir)
+    end
 
     it 'downloads into storage and boots' do
       _out, _err, status = ensure_enterprise

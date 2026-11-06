@@ -47,7 +47,7 @@ Os dois precisam do mesmo `/app/storage`, onde o Active Storage local guarda os 
 /data/<instalacao>/storage -> /app/storage   (nos dois recursos)
 ```
 
-Instalações que usam S3 ou GCS não precisam disso para os anexos, mas o volume ainda serve à edição Enterprise: com `CW_EDITION=ee` (a tag `-ee`), cada container guarda em `/app/storage/.cw-enterprise` o `enterprise/` que baixou e conferiu no boot. Sem esse volume, todo deploy baixa de novo, e um deploy sem acesso a `codeload.github.com` não sobe. O `/app` da imagem pode ser somente leitura: o helper só escreve dentro de `/app/storage/.cw-enterprise`, e `/app/enterprise` já vem na imagem como link para a entrada da versão.
+Instalações que usam S3 ou GCS não precisam disso para os anexos, mas o volume ainda serve à edição Enterprise: com `CW_EDITION=ee` (a tag `-ee`), cada container guarda em `/app/storage/.cw-enterprise` o `enterprise/` que baixou e conferiu no boot. Sem esse volume, todo deploy baixa de novo, e um deploy sem acesso a `codeload.github.com` não sobe. O `/app` da imagem pode ser somente leitura, desde que `/app/tmp` continue gravável (o Rails já exige isso): cada container ativa o Enterprise para si num link em `/app/tmp/cw-enterprise`, e só um download escreve no volume.
 
 ## Envs
 

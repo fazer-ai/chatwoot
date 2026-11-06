@@ -1,12 +1,23 @@
 #!/bin/sh
 
 # Brings enterprise/ into the app at boot, from the official tag in VERSION_CW, when the
-# edition asks for it. The image itself ships without the tree: /app/enterprise is a symlink,
-# made at build time, to storage/.cw-enterprise/<version>-<hash>.active, which this helper
-# points at the verified tree in <version>-<hash>/enterprise when the edition is ee, and
-# removes otherwise. Until then the chain dangles, and a dangling link does not exist as far
-# as Rails is concerned (ChatwootApp.enterprise? asks Pathname#exist?, which follows it), so
-# the image boots as Community.
+# edition asks for it. The image itself ships without the tree. Two places are involved:
+#
+#   storage/.cw-enterprise/<version>-<hash>/enterprise
+#       the verified tree, in the volume the stock composes already share between the web
+#       and worker containers. One directory per version and hash, published by an atomic
+#       rename and never changed afterwards, so a restart or a recreate on the same version
+#       needs no network and no container ever sees a tree change under it.
+#   tmp/cw-enterprise
+#       this container's own activation: a link to that tree, made only with CW_EDITION=ee
+#       and removed otherwise. /app/enterprise is a link to it, made at build time. A new
+#       container starts without it, so it boots as Community until this helper says
+#       otherwise, and what one container decides never reaches another. tmp/ has to be
+#       writable, which Rails already needs for its pids and caches.
+#
+# While tmp/cw-enterprise is missing the chain dangles, and a dangling link does not exist
+# as far as Rails is concerned (ChatwootApp.enterprise? asks Pathname#exist?, which follows
+# it). A `docker exec ... rails console` sees the same edition as the container's server.
 #
 #   enterprise.sh ensure          run by every entrypoint before anything boots Rails
 #   enterprise.sh lock <out_dir>  build time: download the official tree, write the lock
@@ -16,17 +27,14 @@
 # order, hashed again. GitHub does not promise byte-stable archives, so hashing the
 # download would break on a recompression that changed nothing that runs.
 #
-# `ensure` only ever writes under storage/.cw-enterprise, so /app itself can be read-only.
-# Unless CW_EDITION=ee it only removes the activation link. With it, a missing lock, a lock for another version,
-# a download that fails and a tree that does not match the lock all stop the boot with a
-# message saying which. Booting without enterprise/ instead would quietly turn an Enterprise
-# installation into a Community one: custom roles fall back to the plain agent role, SAML
-# sign-in goes away, and nothing on screen says why. A container that refuses to start is
-# the louder and safer failure. CW_EDITION=ce boots without it, on purpose.
-#
-# storage/ is the volume the stock composes already share between the web and worker
-# containers, so a restart or a recreate on the same version needs no network, and the
-# entry for one version never changes under a container running another one.
+# With CW_EDITION=ee, a missing lock, a lock for another version, a download that fails and
+# a tree that does not match the lock all stop the boot with a message saying which.
+# Booting without enterprise/ instead would quietly turn an Enterprise installation into a
+# Community one: custom roles fall back to the plain agent role, SAML sign-in goes away, and
+# nothing on screen says why. A container that refuses to start is the louder and safer
+# failure. CW_EDITION=ce boots without it, on purpose. An intact tree in the cache is used
+# without taking a lock or writing to the volume, so a read-only volume works; only a
+# download writes there, under an exclusive lock on storage/.cw-enterprise/.lock.
 #
 # Settings, both optional:
 #   CW_ENTERPRISE_SOURCE_URL     a mirror of the official tarball for the tag. The tree is
@@ -42,6 +50,7 @@ APP_ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 LOCK_FILE="$APP_ROOT/.enterprise_lock"
 TARGET="$APP_ROOT/enterprise"
 CACHE_ROOT="$APP_ROOT/storage/.cw-enterprise"
+ACTIVE="$APP_ROOT/tmp/cw-enterprise"
 
 log() {
   echo "[enterprise] $*" >&2
@@ -102,7 +111,6 @@ read_lock() {
   [ -n "$PINNED" ] || fail "$LOCK_FILE has no sha256"
   [ "$locked_version" = "$VERSION" ] || fail "$LOCK_FILE pins v$locked_version, but this image is v$VERSION"
   ENTRY="$CACHE_ROOT/$VERSION-$PINNED"
-  ACTIVE="$ENTRY.active"
 }
 
 # Downloads the official tarball for a version and extracts only enterprise/ from it, into
@@ -145,9 +153,19 @@ cmd_lock() {
   log "pinned v$version at $sha"
 }
 
-# The tree has to be where the image's link points, verified, before Rails boots.
+# The tree has to be where the image's link leads, verified, before Rails boots.
 check_target() {
   intact "$TARGET" || fail "$TARGET does not lead to the verified tree in $ENTRY"
+}
+
+# Points this container's activation link at the verified entry, by an atomic rename.
+activate() {
+  mkdir -p "$(dirname "$ACTIVE")"
+  tmp="$ACTIVE.$$"
+  rm -f "$tmp"
+  ln -s "$ENTRY/enterprise" "$tmp"
+  ruby -e 'File.rename(ARGV[0], ARGV[1])' "$tmp" "$ACTIVE"
+  check_target
 }
 
 cmd_ensure() {
@@ -155,58 +173,47 @@ cmd_ensure() {
   if [ "$edition" != "ee" ] || [ -n "${DISABLE_ENTERPRISE+set}" ]; then
     # ChatwootApp.enterprise? is false whenever DISABLE_ENTERPRISE is set, to any value.
     log "edition '${edition:-unset}'${DISABLE_ENTERPRISE+, DISABLE_ENTERPRISE set}: not using enterprise/"
-    deactivate
+    rm -f "$ACTIVE"
+    if [ -L "$TARGET" ] && [ -e "$TARGET/" ]; then
+      fail "$TARGET still leads to a tree"
+    fi
     exit 0
   fi
 
   read_lock
-  # Checking and filling the cache happen under one lock on it, which the web and worker
-  # containers share: a second run waits, then finds the entry the first one made. The
-  # lock is opened read-only and kept readable by everyone (the umask may say otherwise):
-  # flock needs no write permission, so a volume filled by one UID can be locked by another.
+  if intact "$ENTRY/enterprise"; then
+    activate
+    log "enterprise/ v$VERSION in place from $ENTRY"
+    exit 0
+  fi
+
+  # Downloading writes to the shared cache, so it happens under an exclusive lock there: a
+  # second run waits, then finds the entry the first one published. flock on NFS becomes a
+  # POSIX lock, which needs the file open for writing.
   if [ ! -d "$CACHE_ROOT" ]; then
     { mkdir -p "$CACHE_ROOT" && chmod 755 "$CACHE_ROOT"; } || fail "cannot create $CACHE_ROOT"
   fi
-  [ -e "$CACHE_ROOT/.lock" ] || [ -w "$CACHE_ROOT" ] || fail "$CACHE_ROOT is not writable by uid $(id -u), and holds no verified tree for v$VERSION"
-  ruby -e 'File.open(ARGV.shift, File::RDONLY | File::CREAT, 0o644) { |f| (f.chmod(0o644) rescue nil); f.flock(File::LOCK_EX); exit(system(*ARGV) ? 0 : 1) }' \
-    "$CACHE_ROOT/.lock" "$0" ensure-locked
-}
-
-# A tree left in the volume by an earlier Enterprise boot must not switch Enterprise back
-# on for a container that did not ask for it: the image's link reaches the tree only
-# through the activation link, and this removes it. Done on the filesystem rather than in
-# the environment, so `docker exec ... rails console` sees the same edition as the server.
-deactivate() {
-  [ -f "$LOCK_FILE" ] || return 0
-  read_lock
-  if [ -L "$ACTIVE" ] || [ -e "$ACTIVE" ]; then
-    rm -f "$ACTIVE" || fail "cannot remove $ACTIVE, and enterprise/ would stay active"
-    log "removed $ACTIVE"
-  fi
-  if [ -e "$TARGET/" ] && [ -L "$TARGET" ]; then
-    fail "$TARGET still leads to a tree"
-  fi
-}
-
-# Points the activation link at the verified entry, by an atomic rename over the old one.
-activate() {
-  link="$VERSION-$PINNED/enterprise"
-  [ -L "$ACTIVE" ] && [ "$(readlink "$ACTIVE")" = "$link" ] && return 0
-  tmp="$ACTIVE.$$"
-  rm -f "$tmp"
-  ln -s "$link" "$tmp"
-  ruby -e 'File.rename(ARGV[0], ARGV[1])' "$tmp" "$ACTIVE"
+  ruby -e '
+    path = ARGV.shift
+    begin
+      lock = File.open(path, File::RDWR | File::CREAT, 0o644)
+    rescue SystemCallError => e
+      warn "[enterprise] ERROR: cannot open #{path} for writing (#{e.message}), and #{File.dirname(path)} holds no verified tree for this version"
+      exit 1
+    end
+    lock.chmod(0o644) rescue nil
+    lock.flock(File::LOCK_EX)
+    exit(system(*ARGV) ? 0 : 1)
+  ' "$CACHE_ROOT/.lock" "$0" ensure-locked
 }
 
 cmd_ensure_locked() {
   read_lock
   if intact "$ENTRY/enterprise"; then
-    activate || fail "cannot write $ACTIVE"
-    check_target
+    activate
     log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
-  [ -w "$CACHE_ROOT" ] || fail "$CACHE_ROOT is not writable by uid $(id -u), and holds no verified tree for v$VERSION"
   if [ -e "$ENTRY" ]; then
     log "cached enterprise/ in $ENTRY does not match the pinned hash; downloading it again"
     rm -rf "$ENTRY"
@@ -227,7 +234,6 @@ cmd_ensure_locked() {
   chmod -R u=rwX,go=rX "$work"
   mv "$work" "$ENTRY"
   activate
-  check_target
   log "enterprise/ v$VERSION downloaded, verified and installed"
 }
 
