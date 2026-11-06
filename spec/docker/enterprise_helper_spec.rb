@@ -127,6 +127,42 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(File.read(File.join(app_dir, 'enterprise/config/premium.yml'))).to eq("a: 1\n")
   end
 
+  # Containers already running on a damaged entry must keep a tree while it is replaced,
+  # and keep it when the replacement cannot be downloaded.
+  describe 'replacing a damaged entry' do
+    before do
+      ensure_enterprise
+      File.write(File.join(entry, 'enterprise/config/premium.yml'), "a: 2\n")
+    end
+
+    it 'keeps it published while the replacement downloads' do
+      bin_dir = File.join(work_dir, 'bin')
+      seen = File.join(work_dir, 'seen')
+      FileUtils.mkdir_p(bin_dir)
+      File.write(File.join(bin_dir, 'curl'), <<~SH)
+        #!/bin/sh
+        [ -f "#{entry}/enterprise/config/premium.yml" ] && echo present > "#{seen}"
+        cat "#{tarball}"
+      SH
+      FileUtils.chmod(0o755, File.join(bin_dir, 'curl'))
+
+      _out, _err, status = ensure_enterprise('PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}")
+
+      expect(status).to be_success
+      expect(File.read(seen)).to eq("present\n")
+      expect(File.read(File.join(entry, 'enterprise/config/premium.yml'))).to eq("a: 1\n")
+      expect(Dir.children(cache_root).grep(/quarantine|incoming/)).to be_empty
+    end
+
+    it 'leaves it in place when the replacement cannot be downloaded' do
+      _out, err, status = ensure_enterprise('CW_ENTERPRISE_SOURCE_URL' => unreachable)
+
+      expect(status).not_to be_success
+      expect(err).to include('could not download')
+      expect(File.read(File.join(entry, 'enterprise/config/premium.yml'))).to eq("a: 2\n")
+    end
+  end
+
   it 'ignores a cache that holds another version and downloads this one' do
     other = File.join(cache_root, "4.18.0-#{'0' * 64}", 'enterprise')
     FileUtils.mkdir_p(other)

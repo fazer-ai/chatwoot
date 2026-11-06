@@ -69,11 +69,13 @@ sha256_of_stdin() {
   fi
 }
 
-sha256_line() {
+# sha256 lines for the NUL-separated paths on stdin, in one process per batch rather than
+# one per file: a fork per file put a single check of the tree at about a second.
+sha256_lines() {
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1"
+    xargs -0 sha256sum
   else
-    shasum -a 256 "$1"
+    xargs -0 shasum -a 256
   fi
 }
 
@@ -92,9 +94,7 @@ tree_hash() {
       echo "unexpected non-regular file under $name" >&2
       exit 1
     fi
-    find "$name/" -type f -print | sed 's|//*|/|g' | LC_ALL=C sort | while IFS= read -r file; do
-      sha256_line "$file"
-    done | sha256_of_stdin
+    find "$name/" -type f -print | sed 's|//*|/|g' | LC_ALL=C sort | tr '\n' '\0' | sha256_lines | sha256_of_stdin
   )
 }
 
@@ -153,9 +153,11 @@ cmd_lock() {
   log "pinned v$version at $sha"
 }
 
-# The tree has to be where the image's link leads, verified, before Rails boots.
+# The image's link has to lead to the entry just verified, before Rails boots. Comparing
+# where both resolve is enough: the entry's contents were hashed a moment ago.
 check_target() {
-  intact "$TARGET" || fail "$TARGET does not lead to the verified tree in $ENTRY"
+  [ "$(cd "$TARGET/" 2>/dev/null && pwd -P)" = "$(cd "$ENTRY/enterprise" && pwd -P)" ] ||
+    fail "$TARGET does not lead to the verified tree in $ENTRY"
 }
 
 # Points this container's activation link at the verified entry, by an atomic rename.
@@ -216,7 +218,6 @@ cmd_ensure_locked() {
   fi
   if [ -e "$ENTRY" ]; then
     log "cached enterprise/ in $ENTRY does not match the pinned hash; downloading it again"
-    rm -rf "$ENTRY"
   fi
 
   work=$(mktemp -d "$CACHE_ROOT/.incoming.XXXXXX")
@@ -232,7 +233,17 @@ cmd_ensure_locked() {
   # mktemp made the directory 0700, and the tarball's modes went through this process's
   # umask: publish it readable by every UID that may mount this volume later.
   chmod -R u=rwX,go=rX "$work"
-  mv "$work" "$ENTRY"
+  # A damaged entry stays published until its replacement is complete and verified, so the
+  # containers already running on it keep a tree, and keep it if this download fails. The
+  # swap is two renames: the old entry out to a quarantine name, the new one in.
+  if [ -e "$ENTRY" ]; then
+    quarantine=$(mktemp -d "$CACHE_ROOT/.quarantine.XXXXXX")
+    mv "$ENTRY" "$quarantine/"
+    mv "$work" "$ENTRY"
+    rm -rf "$quarantine"
+  else
+    mv "$work" "$ENTRY"
+  fi
   activate
   log "enterprise/ v$VERSION downloaded, verified and installed"
 }
