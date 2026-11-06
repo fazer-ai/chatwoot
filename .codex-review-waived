@@ -202,3 +202,9 @@ app/javascript/dashboard/routes/dashboard/settings/inbox/settingsPage/WhatsappAp
 app/models/message.rb: Clear the flag for receipts on already-delivered echoes  # PR#878
 fazer_ai_ee/app/services/whatsapp/connector_ai_call_service.rb: Make AI acceptance dismissal reversible on stream failure  # PR#887
 app/models/concerns/assignment_handler.rb: Enforce working hours on initial human assignments  # PR#933
+# PR#939: the history slot is a lease, not a hard cap, by design. It is the chat lock's TTL, the
+# time a history import batch is allowed to run, and an import batch has the same exposure. A
+# drain run checks its one-minute budget between files, and one file is at most MAX_MEDIA_BYTES
+# (100 MB): only a download slower than ~330 KB/s outlives the lease, and then one more history
+# job can start until it ends. Renewing the lease would need a token API on ImportSlots for that.
+app/jobs/whatsapp/session/history_media_job.rb: Keep downloads within the history-slot lease  # PR#939

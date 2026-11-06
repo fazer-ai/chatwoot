@@ -57,8 +57,10 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed do
 
     # A file of an imported history is held to the inbox's switch and window like any
     # other: it goes to the drain, which reads them before asking.
+    # Also the placeholder recovered live, which keeps `imported` but was rewritten without
+    # the history mark.
     it 'hands a history file to the drain instead of asking at once' do
-      message.update!(content_attributes: message.content_attributes.merge('imported' => true, 'history_media' => true))
+      message.update!(content_attributes: message.content_attributes.merge('imported' => true))
 
       expect { dispatch }.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
       expect(Redis::Alfred.zrangebyscore(Whatsapp::Session::HistoryMedia.queue_key(inbox), '-inf', '+inf')).to eq([message.id.to_s])

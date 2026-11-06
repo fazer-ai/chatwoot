@@ -42,7 +42,7 @@ class Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed < Whatsapp::Sess
   # holds it to the automatic-fetch switch and window like every other history file.
   def ask_again(message)
     if message.content_attributes['imported'].present?
-      Whatsapp::Session::HistoryMedia.track(message)
+      wait_for_drain(message)
     else
       Whatsapp::Session::MediaFetchJob.perform_later(message, message.content_attributes['pending_media'], payload.chat&.to_h)
     end
@@ -50,5 +50,19 @@ class Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed < Whatsapp::Sess
       "[WHATSAPP SESSION] media for #{payload.message_id} is #{payload.reason}, asking #{channel.provider} again"
     )
     :handled
+  end
+
+  # A placeholder of an imported message recovered live keeps its imported flag but not the
+  # history mark the drain looks for, which is written at import time; it gets it here,
+  # with the chat this event named, as history like every other write to that message.
+  def wait_for_drain(message)
+    Whatsapp::Session::HistoryMedia.as_history(message) do
+      message.with_lock do
+        message.update!(content_attributes: message.content_attributes.merge(
+          Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true, 'pending_chat' => payload.chat&.to_h
+        ).compact)
+      end
+    end
+    Whatsapp::Session::HistoryMedia.track(message)
   end
 end
