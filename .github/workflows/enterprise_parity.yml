@@ -32,7 +32,7 @@ jobs:
       # Ruby without the bundle: the check reads the source with Prism, which ships with Ruby.
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: '3.4'
 
       - name: Check that nothing outside enterprise/ patches it
         run: ruby bin/validate_enterprise_isolation
