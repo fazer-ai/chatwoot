@@ -36,12 +36,17 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
       original.call(command)
     end
     live = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA0002')
-    message.update!(content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'imported' => true })
+    gap = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA0003',
+                           content_attributes: { 'imported' => true })
+    message.update!(content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'imported' => true, 'history_archive' => true })
 
     described_class.perform_now(message, media.to_h)
+    described_class.perform_now(gap, media.to_h)
     described_class.perform_now(live, media.to_h)
 
-    expect(levels).to eq([[true, true], [false, false]])
+    # The archive stays archive; the gap, unread work recovered late, keeps what a live
+    # arrival sets off apart from the bots and webhooks.
+    expect(levels).to eq([[true, true], [true, false], [false, false]])
   end
 
   # The provider has just said these bytes are not coming, so a later delivery of the same

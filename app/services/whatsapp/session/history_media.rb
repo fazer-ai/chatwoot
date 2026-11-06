@@ -22,16 +22,17 @@ module Whatsapp::Session::HistoryMedia
 
   # On unless an operator turned it off: the point is that the files arrive with no action
   # from anybody, and an inbox paired before this existed never saved the option.
-  def enabled?(channel)
-    channel.provider_config.to_h[FETCH_KEY] != false
+  # Both read a provider_config, so a change can be compared with what it replaced.
+  def enabled?(config)
+    config.to_h[FETCH_KEY] != false
   end
 
-  def window_days(channel)
-    channel.provider_config.to_h[WINDOW_KEY] || DEFAULT_WINDOW_DAYS
+  def window_days(config)
+    config.to_h[WINDOW_KEY] || DEFAULT_WINDOW_DAYS
   end
 
   def cutoff(channel)
-    window_days(channel).days.ago
+    window_days(channel.provider_config).days.ago
   end
 
   # A history message whose file has not come yet and that has not been given up on. The
@@ -46,7 +47,7 @@ module Whatsapp::Session::HistoryMedia
   # window. Read for every history file, with or without a reference to fetch it by.
   def wanted?(message)
     channel = message.inbox.channel
-    enabled?(channel) && message.created_at >= cutoff(channel)
+    enabled?(channel.provider_config) && message.created_at >= cutoff(channel)
   end
 
   # Called by the importer for every message it writes. Only what the setting and the
@@ -81,6 +82,13 @@ module Whatsapp::Session::HistoryMedia
         'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
       ).compact)
     end
+  end
+
+  # Queues every pending file the inbox's consent now covers. For when it starts covering
+  # more than it did: the switch turned back on, or the window widened. Files written while
+  # it was off were never queued, and importing again does not write them again.
+  def requeue(inbox)
+    inbox.messages.where.missing(:attachments).where(created_at: cutoff(inbox.channel)..).find_each { |message| track(message) }
   end
 
   # One download, inline. Called from the drain and the conversation job, which pace

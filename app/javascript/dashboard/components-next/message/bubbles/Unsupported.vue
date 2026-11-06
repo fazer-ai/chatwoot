@@ -11,7 +11,8 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 const WHATSAPP_UNSUPPORTED_MESSAGE_HELP_URL =
   'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users#linked-devices';
 
-const { id, conversationId, inboxId, contentAttributes } = useMessageContext();
+const { id, conversationId, inboxId, content, contentAttributes } =
+  useMessageContext();
 const { t } = useI18n();
 
 const {
@@ -72,6 +73,14 @@ const unsupportedMessageKey = computed(() => {
 
 <template>
   <BaseBubble class="px-4 py-3 text-sm" data-bubble-name="unsupported">
+    <!-- The caption is the readable part of a history file, and it outlives the file. -->
+    <p
+      v-if="(isPendingHistoryFile || isUnavailableHistoryFile) && content"
+      class="mt-0 mb-2 whitespace-pre-wrap"
+      data-history-media="caption"
+    >
+      {{ content }}
+    </p>
     <div
       v-if="isPendingHistoryFile"
       class="flex flex-col items-start gap-2"

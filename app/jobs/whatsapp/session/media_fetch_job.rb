@@ -13,7 +13,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # event carried.
   def perform(message, content, chat = nil)
     return if message.attachments.any?
-    return as_history { perform(message, content, chat) } if imported?(message)
+    return as_history(message) { perform(message, content, chat) } if imported?(message)
 
     channel = message.inbox.channel
     media = Whatsapp::Session::Model::Content.from_h(content)
@@ -49,7 +49,12 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     message.content_attributes&.dig('imported').present? && !Import::SilentWrite.on?
   end
 
-  def as_history(&) = Import::SilentWrite.wrap(announce: true, archive: true, &)
+  # At the level the message was written at: the archive half stays archive, so an old
+  # voice note spends no transcription, and the gap half, which is somebody's unread work
+  # recovered late, keeps the side effects a live arrival has.
+  def as_history(message, &)
+    Import::SilentWrite.wrap(announce: true, archive: message.content_attributes['history_archive'].present?, &)
+  end
 
   # One question in two halves, both about a queue entry that outlived a conversion: can
   # the inbox this message belongs to still fetch these bytes?

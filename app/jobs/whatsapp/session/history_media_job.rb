@@ -18,19 +18,22 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   UNAVAILABLE_WAIT = 2.minutes
   TRANSIENT = [Down::Error, Whatsapp::Session::Errors::ProviderUnavailable, Whatsapp::Session::Errors::RateLimited].freeze
 
-  def self.kick(inbox, wait: nil)
+  # `requeue` first collects the pending files the consent covers, for when it has just
+  # grown (Whatsapp::Session::HistoryMedia.requeue).
+  def self.kick(inbox, wait: nil, requeue: false)
     return unless Redis::Alfred.set(scheduled_key(inbox), '1', nx: true, ex: SCHEDULED_TTL.to_i)
 
-    set(wait: wait).perform_later(inbox)
+    set(wait: wait).perform_later(inbox, requeue)
   end
 
   def self.scheduled_key(inbox) = "WHATSAPP::HISTORY_MEDIA_SCHEDULED::#{inbox.id}"
 
-  def perform(inbox)
+  def perform(inbox, requeue = false) # rubocop:disable Style/OptionalBooleanParameter
     @inbox = inbox
     Redis::Alfred.expire(self.class.scheduled_key(inbox), SCHEDULED_TTL.to_i)
-    return finish unless history_media.enabled?(inbox.channel)
+    return finish unless history_media.enabled?(inbox.channel.provider_config)
 
+    history_media.requeue(inbox) if requeue
     drain
   end
 
@@ -70,6 +73,6 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # either sees the flag gone and kicks its own run, or is found here.
   def finish
     Redis::Alfred.delete(self.class.scheduled_key(inbox))
-    self.class.kick(inbox) if Redis::Alfred.zcard(queue_key).positive? && history_media.enabled?(inbox.channel)
+    self.class.kick(inbox) if Redis::Alfred.zcard(queue_key).positive? && history_media.enabled?(inbox.channel.provider_config)
   end
 end

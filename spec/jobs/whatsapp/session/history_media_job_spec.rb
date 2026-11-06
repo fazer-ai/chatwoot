@@ -95,11 +95,23 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     end
   end
 
+  # Files written while the option was off were never queued, and importing again writes
+  # nothing, so the run that follows the option growing has to find them itself.
+  it 'collects the pending files the window covers before draining, when asked to' do
+    inside = pending('IN1', 3.days.ago)
+    pending('OUT1', 60.days.ago)
+
+    described_class.perform_now(inbox, true)
+
+    expect(backend.commands.map(&:message_id)).to eq(['IN1'])
+    expect(inside.reload.attachments.count).to eq(1)
+  end
+
   # One drain per inbox is what keeps its history to one download at a time.
   it 'queues a single run however many files are tracked while one is pending' do
     3.times { |index| Whatsapp::Session::HistoryMedia.track(pending("T#{index}", index.hours.ago)) }
 
-    expect(described_class).to have_been_enqueued.with(inbox).exactly(:once)
+    expect(described_class).to have_been_enqueued.with(inbox, false).exactly(:once)
   end
 
   it 'lets the next file start a run once the queue has drained' do
@@ -108,6 +120,6 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
 
     Whatsapp::Session::HistoryMedia.track(pending('NEXT1', 2.days.ago))
 
-    expect(described_class).to have_been_enqueued.with(inbox).exactly(:twice)
+    expect(described_class).to have_been_enqueued.with(inbox, false).exactly(:twice)
   end
 end

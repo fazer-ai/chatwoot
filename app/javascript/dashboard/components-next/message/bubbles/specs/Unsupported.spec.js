@@ -19,13 +19,14 @@ vi.mock('dashboard/api/inbox/message', () => ({
 }));
 vi.mock('dashboard/composables', () => ({ useAlert: vi.fn() }));
 
-const mountUnsupported = contentAttributes => {
+const mountUnsupported = (contentAttributes, content = '') => {
   const TestHost = defineComponent({
     components: { Unsupported },
     setup() {
       provideMessageContext({
         id: ref(42),
         conversationId: ref(7),
+        content: ref(content),
         inboxId: ref(1),
         contentAttributes: ref(contentAttributes),
       });
@@ -115,5 +116,25 @@ describe('Unsupported', () => {
 
     expect(wrapper.text()).toBe('No longer available.');
     expect(wrapper.find('button').exists()).toBe(false);
+  });
+
+  // A file that is not coming back must not take its caption with it.
+  it('keeps the caption of a history file, pending or gone', () => {
+    const pending = mountUnsupported(
+      {
+        isUnsupported: true,
+        historyMedia: true,
+        pendingMedia: { kind: 'image' },
+      },
+      'orçamento de junho'
+    );
+    const gone = mountUnsupported(
+      { isUnsupported: true, pendingMedia: { kind: 'image' } },
+      'orçamento de junho'
+    );
+
+    expect(pending.text()).toContain('orçamento de junho');
+    expect(gone.text()).toContain('orçamento de junho');
+    expect(gone.text()).toContain('No longer available.');
   });
 });

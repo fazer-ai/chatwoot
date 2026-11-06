@@ -328,17 +328,16 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # `?provider=` URL all reach this code and none of them read the dashboard. Only new
   # records and provider changes are checked, so flipping a switch back never makes an
   # inbox that already exists unsaveable.
-  # Turning the automatic fetch back on picks up the files that waited while it was off:
-  # the drain stopped without dropping them, and nothing else would wake it until the next
-  # import.
+  # When the automatic fetch comes to cover more than it did, the files it now covers are
+  # collected and fetched: those that waited while it was off, and those a narrower window
+  # had left out. Nothing else would ask for them, since importing again writes nothing.
   def resume_history_media
-    return unless session_provider?
+    history_media = Whatsapp::Session::HistoryMedia
+    before, after = saved_change_to_provider_config
+    return unless session_provider? && history_media.enabled?(after)
+    return unless !history_media.enabled?(before) || history_media.window_days(after) > history_media.window_days(before)
 
-    before, = saved_change_to_provider_config
-    key = Whatsapp::Session::HistoryMedia::FETCH_KEY
-    return unless before.to_h[key] == false && Whatsapp::Session::HistoryMedia.enabled?(self)
-
-    Whatsapp::Session::HistoryMediaJob.kick(inbox)
+    Whatsapp::Session::HistoryMediaJob.kick(inbox, requeue: true)
   end
 
   # What the inbox settings page writes for the history files (Whatsapp::Session::
