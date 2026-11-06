@@ -1,8 +1,11 @@
 #!/bin/sh
 
 # Brings enterprise/ into the app at boot, from the official tag in VERSION_CW, when the
-# edition asks for it. The image itself ships without enterprise/: it is fetched, checked
-# against the hash pinned when the image was built, and only then put where Rails looks.
+# edition asks for it. The image itself ships without the tree: /app/enterprise is a symlink
+# into storage/.cw-enterprise/<version>-<hash>/enterprise, made at build time, and it dangles
+# until this helper has put a verified tree there. A dangling link does not exist as far as
+# Rails is concerned (ChatwootApp.enterprise? asks Pathname#exist?, which follows it), so an
+# image without the tree boots as Community.
 #
 #   enterprise.sh ensure          run by every entrypoint before anything boots Rails
 #   enterprise.sh lock <out_dir>  build time: download the official tree, write the lock
@@ -12,19 +15,19 @@
 # order, hashed again. GitHub does not promise byte-stable archives, so hashing the
 # download would break on a recompression that changed nothing that runs.
 #
-# `ensure` does nothing unless CW_EDITION=ee. With it, a missing lock, a lock for another
-# version, a download that fails and a tree that does not match the lock all stop the boot
-# with a message saying which. Booting without enterprise/ instead would quietly turn an
-# Enterprise installation into a Community one: custom roles fall back to the plain agent
-# role, SAML sign-in goes away, and nothing on screen says why. A container that refuses to
-# start is the louder and safer failure. CW_EDITION=ce boots without it, on purpose.
+# `ensure` only ever writes under storage/.cw-enterprise, so /app itself can be read-only.
+# It does nothing unless CW_EDITION=ee. With it, a missing lock, a lock for another version,
+# a download that fails and a tree that does not match the lock all stop the boot with a
+# message saying which. Booting without enterprise/ instead would quietly turn an Enterprise
+# installation into a Community one: custom roles fall back to the plain agent role, SAML
+# sign-in goes away, and nothing on screen says why. A container that refuses to start is
+# the louder and safer failure. CW_EDITION=ce boots without it, on purpose.
 #
-# Settings, all optional:
-#   CW_ENTERPRISE_CACHE_DIR      where verified trees are kept, one directory per version
-#                                and hash. Defaults to storage/.cw-enterprise, which the
-#                                stock composes already mount as a volume shared by the
-#                                web and worker containers, so a restart or a recreate on
-#                                the same version needs no network.
+# storage/ is the volume the stock composes already share between the web and worker
+# containers, so a restart or a recreate on the same version needs no network, and the
+# entry for one version never changes under a container running another one.
+#
+# Settings, both optional:
 #   CW_ENTERPRISE_SOURCE_URL     a mirror of the official tarball for the tag. The tree is
 #                                checked against the same pinned hash, wherever it came from.
 #   CW_ENTERPRISE_FETCH_RETRIES  download attempts after the first one (default 3).
@@ -37,6 +40,7 @@ set -eu
 APP_ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 LOCK_FILE="$APP_ROOT/.enterprise_lock"
 TARGET="$APP_ROOT/enterprise"
+CACHE_ROOT="$APP_ROOT/storage/.cw-enterprise"
 
 log() {
   echo "[enterprise] $*" >&2
@@ -74,18 +78,29 @@ tree_hash() {
     cd "$parent"
     # Anything that is neither a directory nor a regular file (a symlink, above all) could
     # point outside the tree, and the hash would not cover what it points to.
-    if [ -n "$(find "$name" ! -type d ! -type f -print | head -n 1)" ]; then
+    if [ -n "$(find "$name/" ! -type d ! -type f -print | head -n 1)" ]; then
       echo "unexpected non-regular file under $name" >&2
       exit 1
     fi
-    find "$name" -type f -print | LC_ALL=C sort | while IFS= read -r file; do
+    find "$name/" -type f -print | sed 's|//*|/|g' | LC_ALL=C sort | while IFS= read -r file; do
       sha256_line "$file"
     done | sha256_of_stdin
   )
 }
 
-lock_value() {
-  sed -n "s/^$1=//p" "$LOCK_FILE" | head -n 1
+intact() {
+  [ "$(tree_hash "$1" 2>/dev/null || true)" = "$PINNED" ]
+}
+
+# Reads the lock into VERSION and PINNED, and refuses one that does not belong to this image.
+read_lock() {
+  [ -f "$LOCK_FILE" ] || fail "this image has no $LOCK_FILE, so there is no hash to check enterprise/ against"
+  VERSION=$(tr -d '[:space:]' < "$APP_ROOT/VERSION_CW")
+  locked_version=$(sed -n 's/^version=//p' "$LOCK_FILE" | head -n 1)
+  PINNED=$(sed -n 's/^sha256=//p' "$LOCK_FILE" | head -n 1)
+  [ -n "$PINNED" ] || fail "$LOCK_FILE has no sha256"
+  [ "$locked_version" = "$VERSION" ] || fail "$LOCK_FILE pins v$locked_version, but this image is v$VERSION"
+  ENTRY="$CACHE_ROOT/$VERSION-$PINNED"
 }
 
 # Downloads the official tarball for a version and extracts only enterprise/ from it, into
@@ -128,16 +143,9 @@ cmd_lock() {
   log "pinned v$version at $sha"
 }
 
-# Puts a verified tree in place of $TARGET. Copied rather than linked, so Rails, Zeitwerk
-# and bootsnap see plain files under the app root, exactly as in a checkout. The bootsnap
-# cache goes with it: it was built, if at all, for a tree that is no longer there.
-install_tree() {
-  src=$1
-  rm -rf "$TARGET.incoming"
-  cp -R "$src" "$TARGET.incoming"
-  rm -rf "$TARGET"
-  mv "$TARGET.incoming" "$TARGET"
-  rm -rf "$APP_ROOT/tmp/cache/bootsnap"
+# The tree has to be where the image's link points, verified, before Rails boots.
+check_target() {
+  intact "$TARGET" || fail "$TARGET does not lead to the verified tree in $ENTRY"
 }
 
 cmd_ensure() {
@@ -152,59 +160,46 @@ cmd_ensure() {
     exit 0
   fi
 
-  [ -f "$LOCK_FILE" ] || fail "this image has no $LOCK_FILE, so there is no hash to check enterprise/ against"
-  version=$(tr -d '[:space:]' < "$APP_ROOT/VERSION_CW")
-  locked_version=$(lock_value version)
-  pinned=$(lock_value sha256)
-  [ -n "$pinned" ] || fail "$LOCK_FILE has no sha256"
-  [ "$locked_version" = "$version" ] || fail "$LOCK_FILE pins v$locked_version, but this image is v$version"
+  read_lock
+  # Checking and filling the cache happen under one lock on it, which the web and worker
+  # containers share: a second run waits, then finds the entry the first one made.
+  mkdir -p "$CACHE_ROOT" || fail "cannot create $CACHE_ROOT"
+  ruby -e 'File.open(ARGV.shift, File::RDWR | File::CREAT, 0o644) { |f| f.flock(File::LOCK_EX); exit(system(*ARGV) ? 0 : 1) }' \
+    "$CACHE_ROOT/.lock" "$0" ensure-locked
+}
 
-  if [ -d "$TARGET" ] && [ "$(tree_hash "$TARGET" 2>/dev/null || true)" = "$pinned" ]; then
-    log "enterprise/ v$version already in place"
+cmd_ensure_locked() {
+  read_lock
+  if intact "$ENTRY/enterprise"; then
+    check_target
+    log "enterprise/ v$VERSION in place from $ENTRY"
     exit 0
   fi
-
-  cache_root=${CW_ENTERPRISE_CACHE_DIR:-$APP_ROOT/storage/.cw-enterprise}
-  mkdir -p "$cache_root" || fail "cannot create the cache directory $cache_root"
-  entry="$cache_root/$version-$pinned"
-
-  if [ -d "$entry/enterprise" ]; then
-    if [ "$(tree_hash "$entry/enterprise" 2>/dev/null || true)" = "$pinned" ]; then
-      log "using cached enterprise/ v$version from $entry"
-      install_tree "$entry/enterprise"
-      log "enterprise/ v$version installed"
-      exit 0
-    fi
-    log "cached enterprise/ in $entry does not match the pinned hash; downloading it again"
-    rm -rf "$entry"
+  if [ -e "$ENTRY" ]; then
+    log "cached enterprise/ in $ENTRY does not match the pinned hash; downloading it again"
+    rm -rf "$ENTRY"
   fi
 
-  work=$(mktemp -d "$cache_root/.incoming.XXXXXX")
-  if ! download_tree "$version" "$work"; then
+  work=$(mktemp -d "$CACHE_ROOT/.incoming.XXXXXX")
+  if ! download_tree "$VERSION" "$work"; then
     rm -rf "$work"
-    fail "could not download enterprise/ for v$version (network, or a source without that tag). Not starting: set CW_EDITION=ce to run without Enterprise on purpose"
+    fail "could not download enterprise/ for v$VERSION (network, or a source without that tag). Not starting: set CW_EDITION=ce to run without Enterprise on purpose"
   fi
   actual=$(tree_hash "$work/enterprise" 2>/dev/null || true)
-  if [ "$actual" != "$pinned" ]; then
+  if [ "$actual" != "$PINNED" ]; then
     rm -rf "$work"
-    fail "downloaded enterprise/ for v$version hashes to ${actual:-nothing}, the image pins $pinned. Not starting"
+    fail "downloaded enterprise/ for v$VERSION hashes to ${actual:-nothing}, the image pins $PINNED. Not starting"
   fi
-
-  # A rename is atomic, and refuses an existing non-empty target: when the web and worker
-  # containers race on a shared cache, one entry wins and the other run is discarded.
-  if ! ruby -e 'File.rename(ARGV[0], ARGV[1])' "$work" "$entry" 2>/dev/null; then
-    rm -rf "$work"
-  fi
-  [ "$(tree_hash "$entry/enterprise" 2>/dev/null || true)" = "$pinned" ] || fail "cache entry $entry is not usable"
-
-  install_tree "$entry/enterprise"
-  log "enterprise/ v$version downloaded, verified and installed"
+  mv "$work" "$ENTRY"
+  check_target
+  log "enterprise/ v$VERSION downloaded, verified and installed"
 }
 
 command=${1:-}
 [ "$#" -gt 0 ] && shift
 case "$command" in
   ensure) cmd_ensure "$@" ;;
+  ensure-locked) cmd_ensure_locked "$@" ;;
   lock) cmd_lock "$@" ;;
   tree-hash) cmd_tree_hash "$@" ;;
   *) fail "usage: enterprise.sh ensure | lock <out_dir> | tree-hash <enterprise_dir>" ;;

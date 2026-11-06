@@ -90,7 +90,9 @@ RUN pnpm i
 COPY . /app
 
 # The stylesheets are generated from every view Tailwind can see, enterprise/'s included, so
-# the assets are built with the official tree in place even though the image drops it. A
+# the assets are built with the official tree in place even though the image drops it. What
+# stays is a link from /app/enterprise into the storage volume, at the entry for this version
+# and hash, which docker/entrypoints/helpers/enterprise.sh fills at boot. A
 # checkout whose enterprise/ differs from the official one fails here: the fork's overrides
 # in fazer_ai_ee/ are written against that tree and nothing else, and it is the one that
 # arrives at boot.
@@ -113,7 +115,8 @@ RUN mkdir -p /app/log
 # generate production assets if production environment
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
-  && rm -rf spec node_modules tmp/cache enterprise; \
+  && rm -rf spec node_modules tmp/cache enterprise \
+  && ln -s "storage/.cw-enterprise/$(sed -n 's/^version=//p' .enterprise_lock)-$(sed -n 's/^sha256=//p' .enterprise_lock)/enterprise" enterprise; \
   fi
 
 # Generate .git_sha file with current commit hash

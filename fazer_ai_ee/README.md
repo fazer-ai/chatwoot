@@ -6,9 +6,9 @@ This directory only means something on top of `enterprise/`. It loads only when 
 
 ## In the image
 
-No published image carries `enterprise/`. `docker/Dockerfile` downloads the official tree for `VERSION_CW` in its `enterprise-lock` stage, pins the hash of that tree in `/app/.enterprise_lock`, builds the assets with it in place (Tailwind reads its views) and drops it. A build context whose `enterprise/` differs from the official tree fails there.
+No published image carries `enterprise/`. `docker/Dockerfile` downloads the official tree for `VERSION_CW` in its `enterprise-lock` stage, pins the hash of that tree in `/app/.enterprise_lock`, builds the assets with it in place (Tailwind reads its views) and drops it, leaving `/app/enterprise` as a link to `storage/.cw-enterprise/<version>-<hash>/enterprise`. Until that entry exists the link dangles, and `ChatwootApp.enterprise?` is false. A build context whose `enterprise/` differs from the official tree fails there.
 
-At boot, `docker/entrypoints/helpers/enterprise.sh ensure` runs from every entrypoint (`docker-entrypoint.sh`, `rails.sh`, `sidekiq.sh`) before anything boots Rails. With `CW_EDITION=ee` it installs the tree from the cache in `storage/.cw-enterprise` when the entry for this version and hash is intact, and otherwise downloads it from the tag, checks it against the pin, caches it and installs it. Any failure stops the container with a message; `CW_EDITION=ce` boots without Enterprise on purpose. `spec/docker/enterprise_helper_spec.rb` covers each path.
+At boot, `docker/entrypoints/helpers/enterprise.sh ensure` runs from every entrypoint (`docker-entrypoint.sh`, `rails.sh`, `sidekiq.sh`) before anything boots Rails. With `CW_EDITION=ee`, under a lock on the cache (shared by the web and worker containers), it keeps the entry for this version and hash when it is intact, and otherwise downloads the tree from the tag, checks it against the pin and puts it there. It never writes outside `storage/`, so `/app` can be read-only. Any failure stops the container with a message; `CW_EDITION=ce` boots without Enterprise on purpose. `spec/docker/enterprise_helper_spec.rb` covers each path.
 
 ## How a change lands here
 
