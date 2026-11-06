@@ -28,7 +28,7 @@ class Api::V1::Accounts::Whatsapp::SessionProvidersController < Api::V1::Account
   # serves theirs, so it does not apply to them. Withdrawing them ahead of the removal is
   # then one env var on this line rather than a dashboard change.
   def creatable?(descriptor)
-    return Whatsapp::Session::Registry.legacy_creatable? if descriptor.legacy?
+    return Whatsapp::Session::Registry.legacy_creatable? && legacy_installed?(descriptor) if descriptor.legacy?
     return false unless descriptor.available?
     return false unless connector_running?(descriptor)
 
@@ -45,5 +45,15 @@ class Api::V1::Accounts::Whatsapp::SessionProvidersController < Api::V1::Account
     Whatsapp::Connector::Client.new(nil).available?
   rescue Whatsapp::Session::Errors::ProviderUnavailable
     false
+  end
+
+  # Baileys runs as a separate API that the installation points at. One that never set
+  # it up, or whose API is gone, has no use for it, and a legacy provider is not
+  # something to introduce. Like the connector check, this gates the picker only: an
+  # existing Baileys inbox keeps saving while its API restarts.
+  def legacy_installed?(descriptor)
+    return true unless descriptor.key == 'baileys'
+
+    Whatsapp::Providers::WhatsappBaileysService.installed?
   end
 end
