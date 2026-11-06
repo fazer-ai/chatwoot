@@ -65,8 +65,10 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
         conn.scan_each(match: "WHATSAPP::#{name}::*").map { |key| key.split('::').last.to_i }
       end
     end.uniq
-    inboxes = Inbox.where(id: ids).to_a
-    inboxes.each { |inbox| kick(inbox) }
+    inboxes = Inbox.where(id: ids).includes(:channel).to_a
+    # An inbox with the fetch off keeps its queue for when it is turned back on, which
+    # resumes it from the settings callback; waking it here would only spin a run a minute.
+    inboxes.each { |inbox| kick(inbox) if Whatsapp::Session::HistoryMedia.enabled?(inbox.channel.provider_config) }
     (ids - inboxes.map(&:id)).each { |id| forget(Inbox.new(id: id)) }
   end
 

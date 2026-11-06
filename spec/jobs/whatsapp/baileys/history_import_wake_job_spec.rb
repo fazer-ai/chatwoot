@@ -57,6 +57,15 @@ RSpec.describe Whatsapp::Baileys::HistoryImportWakeJob do
       expect(Whatsapp::Session::HistoryMediaJob).not_to have_been_enqueued
     end
 
+    it 'leaves an inbox with the automatic fetch off alone' do
+      Redis::Alfred.zadd(Whatsapp::Session::HistoryMedia.queue_key(inbox), 1.0, 42)
+      inbox.channel.update!(provider_config: inbox.channel.provider_config.merge('history_media_fetch' => false))
+
+      described_class.perform_now
+
+      expect(Whatsapp::Session::HistoryMediaJob).not_to have_been_enqueued
+    end
+
     it 'leaves an inbox whose drain is already queued alone' do
       Redis::Alfred.zadd(Whatsapp::Session::HistoryMedia.queue_key(inbox), 1.0, 42)
       Redis::Alfred.set(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox), '1')
