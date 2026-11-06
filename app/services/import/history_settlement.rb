@@ -205,8 +205,11 @@ module Import::HistorySettlement
   # else -- the import writes clocks without firing the machinery around them -- so the one
   # part of that machinery which is itself a clock is asked for explicitly.
   #
-  # A no-op here and overridden in the Enterprise tree, where `Company` exists.
-  def roll_up(contact, at); end
+  # `record_activity_at!` is the company's own rule and already refuses to move backwards,
+  # which is what history needs: a company somebody is talking to today keeps its clock.
+  def roll_up(contact, at)
+    contact.company&.record_activity_at!(at)
+  end
 
   def newest_per_contact(rows)
     written_by_contacts(rows).group_by(&:sender_id)

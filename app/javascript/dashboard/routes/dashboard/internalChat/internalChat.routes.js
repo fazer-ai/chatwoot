@@ -2,7 +2,7 @@ import { frontendURL } from '../../../helper/URLHelper';
 import InternalChatLayout from './InternalChatLayout.vue';
 import DraftsList from './DraftsList.vue';
 
-const INTERNAL_CHAT_PERMISSIONS = ['administrator', 'agent'];
+const INTERNAL_CHAT_PERMISSIONS = ['administrator', 'agent', 'custom_role'];
 
 const EmptyComponent = {
   template: '<div />',

@@ -33,8 +33,6 @@ namespace :branding do
     # written only while it still holds its default, and one somebody changed (on that page, or
     # an earlier run of this task with another value) is left as it is. BRANDING_FORCE=true
     # writes every key from the environment again, edits included.
-    force = ENV.fetch('BRANDING_FORCE', 'false') == 'true'
-
     configurable_items.each do |config_name, default_value|
       value = if default_value.in?([true, false])
                 ENV.fetch(config_name, default_value.to_s) == 'true'
@@ -43,10 +41,8 @@ namespace :branding do
               end
 
       config = InstallationConfig.find_by!(name: config_name)
-      if !force && config.value.to_s != default_value.to_s && config.value.to_s != value.to_s
-        puts "Kept '#{config_name}' as '#{config.value}': it was changed from its default."
-        next
-      end
+      kept = config.value.to_s != default_value.to_s && config.value.to_s != value.to_s && ENV['BRANDING_FORCE'] != 'true'
+      next puts("Kept '#{config_name}' as '#{config.value}': it was changed from its default.") if kept
 
       config.update!(value: value)
       puts "Updated '#{config_name}' to '#{value}'."
