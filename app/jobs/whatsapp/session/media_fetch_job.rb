@@ -84,10 +84,13 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # rewritten away by this.
   #
   # An imported file stops waiting here too, or every later delivery of the same message
-  # would ask again for bytes the provider has just said it will not hand over.
+  # would ask again for bytes the provider has just said it will not hand over. The header
+  # of a readable history card is the exception to the flag: the card keeps its text and
+  # buttons, only without the picture.
   def give_up(message, reason)
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
-    message.update_under_lock!(is_unsupported: true)
+    readable = message.content_attributes&.dig(history_media).present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
+    message.update_under_lock!(is_unsupported: true) unless readable
     return if message.content_attributes&.dig(history_media).blank?
 
     message.with_lock { message.update!(content_attributes: message.content_attributes.except(history_media)) }

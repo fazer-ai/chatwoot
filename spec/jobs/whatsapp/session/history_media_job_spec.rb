@@ -14,6 +14,7 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     Redis::Alfred.delete(queue)
     Redis::Alfred.delete(described_class.scheduled_key(inbox))
     Redis::Alfred.delete(described_class.requeue_key(inbox))
+    Redis::Alfred.delete(described_class.run_key(inbox))
   end
 
   def pending(source_id, at)
@@ -191,6 +192,33 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect { described_class.kick(inbox) }.to raise_error(Redis::CannotConnectError)
 
     expect(Redis::Alfred.exists?(described_class.scheduled_key(inbox))).to be(false)
+  end
+
+  # The scheduling claim lapsed while the run sat in the queue, and a second run was queued
+  # behind it: only one may download.
+  it 'leaves a second run of the same inbox while one is working' do
+    queue_up(pending('TWICE1', 1.day.ago))
+    Redis::Alfred.set(described_class.run_key(inbox), 'other run')
+
+    described_class.perform_now(inbox)
+
+    expect(backend.commands).to be_empty
+    expect(Redis::Alfred.get(described_class.run_key(inbox))).to eq('other run')
+  end
+
+  # The next run can start the moment it is queued; finding this run's claim still there,
+  # it would leave, and the drain would stop.
+  it 'gives its run claim back before queuing the next run' do
+    queue_up(*Array.new(described_class::BATCH + 1) { |index| pending("C#{index}", index.hours.ago) })
+    claims = []
+    allow(described_class).to receive(:set).and_wrap_original do |original, *args|
+      claims << Redis::Alfred.exists?(described_class.run_key(inbox))
+      original.call(*args)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(claims).to eq([false])
   end
 
   # A deploy or a crash stops the worker in the middle of a download. The job goes back

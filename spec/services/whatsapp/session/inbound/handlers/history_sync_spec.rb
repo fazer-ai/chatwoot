@@ -177,6 +177,18 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(Whatsapp::Session::HistoryMediaJob).to have_been_enqueued.with(inbox).exactly(:once)
     end
 
+    # The batch wrote the row and failed before queuing its file (Redis went away), so its
+    # retry finds the row stored and would skip it for good.
+    it 'queues again a stored file a retried batch would skip' do
+      dispatch
+      Redis::Alfred.delete(queue)
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+
+      deliver(event)
+
+      expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([inbox.messages.find_by(source_id: 'HIST10').id.to_s])
+    end
+
     it 'queues nothing when the inbox turned the automatic fetch off' do
       channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
 

@@ -46,9 +46,32 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   def self.scheduled_key(inbox) = "WHATSAPP::HISTORY_MEDIA_SCHEDULED::#{inbox.id}"
   def self.requeue_key(inbox) = "WHATSAPP::HISTORY_MEDIA_REQUEUE::#{inbox.id}"
 
+  # The scheduling claim says a run is queued and lapses if the queue sits on it too long;
+  # the run claim says one is working, and is what keeps two drains of one inbox from
+  # downloading the same head. A run that finds it taken leaves: the one working queues
+  # its own continuation.
+  RUN_TTL = BATCH_TIME + 5.minutes
+
   def perform(inbox)
     @inbox = inbox
-    Redis::Alfred.expire(self.class.scheduled_key(inbox), SCHEDULED_TTL.to_i)
+    @run = SecureRandom.uuid
+    return unless Redis::Alfred.set(self.class.run_key(inbox), @run, nx: true, ex: RUN_TTL.to_i)
+
+    begin
+      Redis::Alfred.set(self.class.scheduled_key(inbox), '1', ex: SCHEDULED_TTL.to_i)
+      work
+    ensure
+      release
+    end
+  end
+
+  def self.run_key(inbox) = "WHATSAPP::HISTORY_MEDIA_RUNNING::#{inbox.id}"
+
+  private
+
+  attr_reader :inbox
+
+  def work
     return finish unless enabled?
 
     history_media.with_slot(on_full: -> { again(SLOT_WAIT) }) do
@@ -56,10 +79,6 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
       drain
     end
   end
-
-  private
-
-  attr_reader :inbox
 
   def history_media = Whatsapp::Session::HistoryMedia
   def queue_key = history_media.queue_key(inbox)
@@ -103,7 +122,14 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     again(UNAVAILABLE_WAIT)
   end
 
-  def again(wait = 0) = self.class.set(wait: wait).perform_later(inbox)
+  # Before anything queues the next run, which could otherwise start, find this run's claim
+  # and leave, stopping the drain.
+  def release = Redis::Alfred.delete_if_equals(self.class.run_key(inbox), @run)
+
+  def again(wait = 0)
+    release
+    self.class.set(wait: wait).perform_later(inbox)
+  end
 
   def newest = Redis::Alfred.with { |conn| conn.zrevrange(queue_key, 0, 0) }.first
 
@@ -128,6 +154,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # look and this line either sees the flag gone and kicks its own run, or is found here.
   def finish
     Redis::Alfred.delete(self.class.scheduled_key(inbox))
+    release
     pending = Redis::Alfred.zcard(queue_key).positive? || Redis::Alfred.exists?(self.class.requeue_key(inbox))
     self.class.kick(inbox) if pending && enabled?
   end

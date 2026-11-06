@@ -81,13 +81,18 @@ module Whatsapp::Session::HistoryMedia
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     return if media&.ref.blank?
 
-    readable_card = message.content_attributes['rich'].present? && message.content.present?
     message.with_lock do
       message.update!(content_attributes: message.content_attributes.merge(
-        'is_unsupported' => (true unless readable_card), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
+        'is_unsupported' => (true unless readable_card?(message)), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
         'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
       ).compact)
     end
+  end
+
+  # A card whose text renders without its header. It stays a card whatever happens to the
+  # header: waiting for it, or told it is gone.
+  def readable_card?(message)
+    message.content_attributes['rich'].present? && message.content.present?
   end
 
   # History work shares the instance-wide slots the import takes (Inbound::ImportSlots):

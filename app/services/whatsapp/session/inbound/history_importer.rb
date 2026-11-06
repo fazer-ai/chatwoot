@@ -125,9 +125,15 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # hundred and forty seven messages one instance sent were second copies of an id already
   # in the same dump. They happened to fall in different batches there, where the stored
   # row catches them, but nothing promises that.
+  #
+  # A row already stored may be one whose file was never queued: a retry of a batch that
+  # failed between writing it and tracking it skips it here, so it is tracked again (track
+  # only queues what is still pending and inside the window).
   def unstored(ordered)
     ordered = ordered.uniq(&:id)
-    stored = inbox.messages.where(source_id: ordered.map(&:id)).pluck(:source_id).to_set
+    rows = inbox.messages.where(source_id: ordered.map(&:id))
+    rows.where.missing(:attachments).find_each { |row| Whatsapp::Session::HistoryMedia.track(row) }
+    stored = rows.pluck(:source_id).to_set
     ordered.reject { |message| stored.include?(message.id) }
   end
 

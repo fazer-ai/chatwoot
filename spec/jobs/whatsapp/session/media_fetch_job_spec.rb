@@ -115,6 +115,18 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # A history card's header that WhatsApp no longer serves: the card's text and buttons
+  # are all there, so it stays a card, without the picture and without asking again.
+  it 'keeps a readable history card a card when its header is gone' do
+    message.update!(content: 'Pedido #4312', content_attributes: { 'history_media' => true, 'imported' => true,
+                                                                   'rich' => { 'title' => 'Pedido #4312' } })
+    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::MediaUnavailable, 'gone')
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
+  end
+
   # A file whose bytes never came with the message has no ref to carry, and the provider
   # is asked by message id alone. Refusing it for having no ref -- which is what reading
   # `ref&.served_by?` as false did -- is refusing exactly the fetch this exists for.
