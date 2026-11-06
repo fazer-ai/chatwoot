@@ -136,6 +136,15 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(described_class).to have_been_enqueued.with(inbox).exactly(:twice)
   end
 
+  it 'keeps the rescan asked for when the collection is cut short' do
+    described_class.kick(inbox, requeue: true)
+    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_raise(Interrupt)
+
+    expect { described_class.perform_now(inbox) }.to raise_error(Interrupt)
+
+    expect(Redis::Alfred.exists?(described_class.requeue_key(inbox))).to be(true)
+  end
+
   # A deploy or a crash stops the worker in the middle of a download. The job goes back
   # to Sidekiq, and the file has to be there when it runs again.
   it 'keeps the file it was working on when the worker stops mid-download' do

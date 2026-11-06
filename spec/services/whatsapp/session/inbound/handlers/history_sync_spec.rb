@@ -202,21 +202,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
                                    kind: 'messages',
                                    data: { 'messages' => [referenced.call('REF1', 2.days.ago), referenced.call('REF2', 30.days.ago)].map(&:to_h) }
                                  )))
-      fetched = ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job['job_class'] == 'Whatsapp::Session::MediaFetchJob' }
-      expect(fetched.size).to eq(1)
-      # Turned away, it still waits for the button or the conversation action, with the
-      # reference the provider finds the file by.
+      expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      # The one inside the window goes to the drain, which reads the settings again before
+      # downloading it; the one outside waits for the button or the conversation action.
+      # Both keep the reference the provider finds the file by.
+      inside = inbox.messages.find_by(source_id: 'REF1')
       deferred = inbox.messages.find_by(source_id: 'REF2')
+      expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([inside.id.to_s])
       expect(Whatsapp::Session::HistoryMedia.pending?(deferred)).to be(true)
-      expect(deferred.content_attributes.dig('pending_media', 'ref')).to be_present
+      expect([inside, deferred].map { |message| message.content_attributes.dig('pending_media', 'ref') }).to all(be_present)
 
       channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
-      expect do
-        deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages',
-                                                                  data: { 'messages' => [referenced.call(
-                                                                    'REF3', 1.day.ago
-                                                                  ).to_h] })))
-      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages',
+                                                                data: { 'messages' => [referenced.call('REF3', 1.day.ago).to_h] })))
+      expect(Redis::Alfred.zcard(queue)).to eq(1)
     end
 
     it 'measures the window the inbox chose' do

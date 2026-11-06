@@ -534,15 +534,22 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
-  # A provider whose history does carry the file's reference (uazapi) still gets it fetched.
-  it 'leaves an imported file that can still be fetched as a file' do
+  # A provider whose history does carry the file's reference (uazapi) still gets it fetched,
+  # through the inbox's drain like any other history file, reference and all.
+  it 'queues an imported file that can still be fetched, keeping its reference' do
     threads_of(a_contact, phone, %i[open])
     ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
     fetchable = historical('3EB0REF', 1.day.ago, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
 
     deliver(slice([fetchable]))
 
-    expect(inbox.messages.find_by(source_id: '3EB0REF').content_attributes['is_unsupported']).to be_nil
+    message = inbox.messages.find_by(source_id: '3EB0REF')
+    queue = Whatsapp::Session::HistoryMedia.queue_key(inbox)
+    expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([message.id.to_s])
+    expect(message.content_attributes.dig('pending_media', 'ref', 'url')).to eq('https://connector.test/media/abc')
+  ensure
+    Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+    Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
   end
 
   # The boundary is read once, when the slice is read, and handed to the job: slices of one

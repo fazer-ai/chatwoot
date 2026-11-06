@@ -23,7 +23,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # own and not an argument of the run: a drain already queued or running would otherwise
   # swallow the request, and the files the change just covered would never be queued.
   def self.kick(inbox, wait: nil, requeue: false)
-    Redis::Alfred.set(requeue_key(inbox), '1', ex: SCHEDULED_TTL.to_i) if requeue
+    Redis::Alfred.set(requeue_key(inbox), SecureRandom.uuid, ex: SCHEDULED_TTL.to_i) if requeue
     return unless Redis::Alfred.set(scheduled_key(inbox), '1', nx: true, ex: SCHEDULED_TTL.to_i)
 
     set(wait: wait).perform_later(inbox)
@@ -37,7 +37,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     Redis::Alfred.expire(self.class.scheduled_key(inbox), SCHEDULED_TTL.to_i)
     return finish unless enabled?
 
-    history_media.requeue(inbox) if Redis::Alfred.delete(self.class.requeue_key(inbox)).positive?
+    rescan
     drain
   end
 
@@ -47,6 +47,17 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
 
   def history_media = Whatsapp::Session::HistoryMedia
   def queue_key = history_media.queue_key(inbox)
+
+  # The request is cleared only once the collection went through, so a worker that stops
+  # halfway leaves it for the next run, and only if it is still the one this run read: one
+  # asked for while collecting is for files this pass may have missed.
+  def rescan
+    request = Redis::Alfred.get(self.class.requeue_key(inbox))
+    return if request.nil?
+
+    history_media.requeue(inbox)
+    Redis::Alfred.delete_if_equals(self.class.requeue_key(inbox), request)
+  end
 
   # Read from the database, not from the channel loaded with the job: a batch takes
   # minutes, and an operator who turns the option off or narrows the window in the middle

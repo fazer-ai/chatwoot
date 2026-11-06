@@ -105,25 +105,16 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
   end
 
   # A history batch is hundreds of messages under one chat lease: downloading each inline
-  # would hold the chat for the whole batch's worth of files.
-  it 'leaves an imported message to the fetch job' do
-    channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 36_500))
+  # would hold the chat for the whole batch's worth of files. A fetch job of its own would
+  # skip the inbox's switch and window, so the file waits for the drain, with the reference
+  # the provider finds it by.
+  it 'leaves an imported message to the inbox drain' do
     conversation = create(:conversation, inbox: inbox, account: inbox.account)
 
     message = Whatsapp::Session::Inbound::MessageWriter.new(conversation: conversation, inbound: inbound, imported: true).perform
 
     expect(message.attachments).to be_empty
     expect(WebMock).not_to have_requested(:post, "#{base}/message/download")
-    expect(Whatsapp::Session::MediaFetchJob).to have_been_enqueued.with(message, hash_including('kind' => 'image'), anything)
-  end
-
-  # Outside the inbox's window the file is not fetched, but it waits for the button with
-  # the reference the provider finds it by.
-  it 'marks an imported message outside the window to wait for a request' do
-    conversation = create(:conversation, inbox: inbox, account: inbox.account)
-
-    message = Whatsapp::Session::Inbound::MessageWriter.new(conversation: conversation, inbound: inbound, imported: true).perform
-
     expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
     expect(Whatsapp::Session::HistoryMedia.pending?(message.reload)).to be(true)
     expect(message.content_attributes.dig('pending_media', 'ref', 'id')).to eq('3EB0IMG1')

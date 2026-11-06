@@ -44,7 +44,7 @@ module Whatsapp::Session::HistoryMedia
   end
 
   # Whether the inbox's standing consent covers this imported message: the switch and the
-  # window. Read for every history file, with or without a reference to fetch it by.
+  # window.
   def wanted?(message)
     channel = message.inbox.channel
     enabled?(channel.provider_config) && message.created_at >= cutoff(channel)
@@ -59,19 +59,20 @@ module Whatsapp::Session::HistoryMedia
     Whatsapp::Session::HistoryMediaJob.kick(message.inbox)
   end
 
-  # Where the writer's media fetch goes. A live message's file is fetched as always; an
-  # imported one only when the inbox's consent covers it, and is marked to wait otherwise.
+  # Where the writer's media fetch goes. A live message's file is fetched as always. An
+  # imported one goes through the inbox's drain like every other history file, whether or
+  # not it came with a reference: a job queued straight away would download it even after
+  # the operator turned the option off or narrowed the window, which the drain checks
+  # before every file. The importer tracks it right after writing it.
   def route(message, inbound, imported)
-    return yield if !imported || wanted?(message)
+    return yield unless imported
 
     defer(message, inbound)
   end
 
-  # A history file that came with a reference but that the switch or the window turns
-  # away. Left as it was it would be a bubble with no file and nothing to ask for it with,
-  # so it is marked the way a reference-less one is, which is what the button and the
-  # conversation action look for. The reference is kept: it is how the provider finds the
-  # file when somebody does ask.
+  # A history file that came with a reference. It is marked the way a reference-less one
+  # is, which is what the drain, the button and the conversation action look for, and the
+  # reference is kept: it is how the provider finds the file when it is asked for.
   def defer(message, inbound)
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     return if media&.ref.blank?
