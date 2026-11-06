@@ -139,8 +139,18 @@ module Whatsapp::Session::HistoryMedia
   # Queues every pending file the inbox's consent now covers. For when it starts covering
   # more than it did: the switch turned back on, or the window widened. Files written while
   # it was off were never queued, and importing again does not write them again.
-  def requeue(inbox)
-    inbox.messages.where.missing(:attachments).where(created_at: cutoff(inbox.channel)..).find_each { |message| track(message) }
+  #
+  # Newest first and within the caller's time budget: on a large inbox it stops at the
+  # deadline and returns the id to resume from (that message included), nil once done.
+  def requeue(inbox, from: nil, deadline: nil)
+    scope = inbox.messages.history_media_pending.where.missing(:attachments).where(created_at: cutoff(inbox.channel)..)
+    scope = scope.where(id: ..from) if from
+    scope.find_each(order: :desc) do |message|
+      return message.id if deadline && Time.current >= deadline
+
+      track(message)
+    end
+    nil
   end
 
   # One download, inline. Called from the drain and the conversation job, which pace

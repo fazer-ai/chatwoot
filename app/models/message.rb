@@ -151,6 +151,8 @@ class Message < ApplicationRecord
   scope :today, -> { where("date_trunc('day', created_at) = ?", Date.current) }
   scope :not_forwarded, -> { where("(messages.content_attributes #>> '{}')::jsonb -> 'forwarded_message_id' IS NULL") }
   scope :voice_calls, -> { where(content_type: :voice_call) }
+  # Imported messages whose file has not come yet (Whatsapp::Session::HistoryMedia).
+  scope :history_media_pending, -> { where("(messages.content_attributes #>> '{}')::jsonb ->> 'history_media' = 'true'") }
   # Excludes reactions whose user-facing state is invisible (toggled off or
   # blank). Used when picking a "last meaningful message" for chat list
   # previews — a removed reaction shouldn't drive the preview text.

@@ -15,6 +15,7 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     Redis::Alfred.delete(described_class.scheduled_key(inbox))
     Redis::Alfred.delete(described_class.requeue_key(inbox))
     Redis::Alfred.delete(described_class.run_key(inbox))
+    Redis::Alfred.delete("WHATSAPP::HISTORY_MEDIA_REQUEUE_CURSOR::#{inbox.id}")
   end
 
   def pending(source_id, at)
@@ -127,9 +128,8 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
 
   it 'comes back for a rescan asked for while the last run was draining' do
     described_class.kick(inbox, requeue: true)
-    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_wrap_original do |original, *args|
-      original.call(*args)
-      described_class.kick(inbox, requeue: true)
+    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_wrap_original do |original, *args, **options|
+      original.call(*args, **options).tap { described_class.kick(inbox, requeue: true) }
     end
 
     described_class.perform_now(inbox)
@@ -219,6 +219,19 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     described_class.perform_now(inbox)
 
     expect(claims).to eq([false])
+  end
+
+  it 'picks a collection that ran out of time up where it stopped, on the next run' do
+    described_class.kick(inbox, requeue: true)
+    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_return(42, nil)
+
+    described_class.perform_now(inbox)
+    expect(Redis::Alfred.exists?(described_class.requeue_key(inbox))).to be(true)
+    described_class.perform_now(inbox)
+
+    expect(Whatsapp::Session::HistoryMedia).to have_received(:requeue).with(inbox, from: nil, deadline: anything).ordered
+    expect(Whatsapp::Session::HistoryMedia).to have_received(:requeue).with(inbox, from: 42, deadline: anything).ordered
+    expect(Redis::Alfred.exists?(described_class.requeue_key(inbox))).to be(false)
   end
 
   # A deploy or a crash stops the worker in the middle of a download. The job goes back

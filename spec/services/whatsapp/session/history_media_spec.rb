@@ -58,4 +58,32 @@ RSpec.describe Whatsapp::Session::HistoryMedia do
       expect(message.reload.content_attributes).not_to include('history_media', 'pending_media')
     end
   end
+
+  describe '.requeue' do
+    let(:queue) { described_class.queue_key(inbox) }
+
+    after do
+      Redis::Alfred.delete(queue)
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    def pending(source_id, at)
+      create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: source_id, created_at: at,
+                       content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'imported' => true,
+                                             'pending_media' => model::Content::Media.new(kind: 'image', mime: 'image/jpeg').to_h })
+    end
+
+    # On a large inbox the collection is a run's work like any other, and a run has a budget.
+    it 'stops at the deadline and says where to pick up' do
+      older = pending('R1', 2.days.ago)
+      newer = pending('R2', 1.day.ago)
+
+      from = described_class.requeue(inbox, deadline: 1.second.ago)
+      expect(from).to eq(newer.id)
+      expect(Redis::Alfred.zcard(queue)).to eq(0)
+
+      expect(described_class.requeue(inbox, from: from, deadline: 1.minute.from_now)).to be_nil
+      expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to contain_exactly(older.id.to_s, newer.id.to_s)
+    end
+  end
 end

@@ -115,6 +115,21 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # The drain and the button asked for the same file at once, and the other ask got it.
+  it 'does not hide a file another ask attached while this one failed' do
+    message.update!(content_attributes: { 'history_media' => true, 'imported' => true })
+    allow(backend).to receive(:download_media) do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      attachment.save!
+      raise Whatsapp::Session::Errors::MediaUnavailable, 'gone'
+    end
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes['is_unsupported']).to be_blank
+  end
+
   # A history card's header that WhatsApp no longer serves: the card's text and buttons
   # are all there, so it stays a card, without the picture and without asking again.
   it 'keeps a readable history card a card when its header is gone' do

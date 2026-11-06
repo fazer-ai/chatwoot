@@ -81,7 +81,13 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
     return spare_card(message) if message.content_attributes&.dig(history_media).present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
 
-    message.update_under_lock!(is_unsupported: true)
+    # The same file can be asked for twice at once (the drain and the button), and the other
+    # ask may have attached it by now: marking it unsupported would hide the file it got.
+    message.with_lock do
+      next if message.attachments.any?
+
+      message.update!(is_unsupported: true)
+    end
     return if message.content_attributes&.dig(history_media).blank?
 
     message.with_lock { message.update!(content_attributes: message.content_attributes.except(history_media)) }
@@ -92,6 +98,8 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # delivery from asking again.
   def spare_card(message)
     message.with_lock do
+      next if message.attachments.any?
+
       message.update!(content_attributes: message.content_attributes.except(history_media).merge('media_unavailable' => true))
     end
   end

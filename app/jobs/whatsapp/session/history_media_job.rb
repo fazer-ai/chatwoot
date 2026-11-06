@@ -75,6 +75,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     return finish unless enabled?
 
     history_media.with_slot(on_full: -> { again(SLOT_WAIT) }) do
+      @deadline = BATCH_TIME.from_now
       rescan
       drain
     end
@@ -86,13 +87,21 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # The request is cleared only once the collection went through, so a worker that stops
   # halfway leaves it for the next run, and only if it is still the one this run read: one
   # asked for while collecting is for files this pass may have missed.
+  #
+  # It shares the run's time budget, and one that runs out keeps its place in the cursor;
+  # the drain then finds the budget spent and queues the next run, which picks it up there.
   def rescan
     request = Redis::Alfred.get(self.class.requeue_key(inbox))
     return if request.nil?
 
-    history_media.requeue(inbox)
+    from = history_media.requeue(inbox, from: Redis::Alfred.get(cursor_key)&.to_i, deadline: @deadline)
+    return Redis::Alfred.set(cursor_key, from) if from
+
+    Redis::Alfred.delete(cursor_key)
     Redis::Alfred.delete_if_equals(self.class.requeue_key(inbox), request)
   end
+
+  def cursor_key = "WHATSAPP::HISTORY_MEDIA_REQUEUE_CURSOR::#{inbox.id}"
 
   # Read from the database, not from the channel loaded with the job: a batch takes
   # minutes, and an operator who turns the option off or narrows the window in the middle
@@ -105,9 +114,8 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # that stops in the middle of a download hands the job back, and the next run starts
   # with the same file instead of leaving it pending with nothing to ask for it.
   def drain
-    deadline = BATCH_TIME.from_now
     BATCH.times do
-      break if Time.current >= deadline
+      break if Time.current >= @deadline
       return finish unless enabled?
 
       id = newest
