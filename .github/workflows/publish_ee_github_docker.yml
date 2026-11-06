@@ -38,11 +38,10 @@ jobs:
 
       # The same image as the default one, plus the edition: with CW_EDITION=ee the entrypoint
       # fetches enterprise/ for VERSION_CW at boot (docker/entrypoints/helpers/enterprise.sh).
-      # Kept as its own tag so installations that pull `-ee` keep getting Enterprise. The marker
-      # file is what tells the helper this is that image: CW_EDITION=ee alone does not fetch.
+      # Kept as its own tag so installations that pull `-ee` keep getting Enterprise.
       - name: Set Chatwoot edition
         run: |
-          echo -en '\nENV CW_EDITION="ee"\nRUN touch /app/.enterprise_edition\n' >> docker/Dockerfile
+          echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
 
       - name: Update version in app.yml
         run: |

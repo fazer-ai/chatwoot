@@ -45,7 +45,7 @@ jobs:
 
       - name: Set Chatwoot edition
         run: |
-          echo -en '\nENV CW_EDITION="ee"\nRUN touch /app/.enterprise_edition\n' >> docker/Dockerfile
+          echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
 
       - name: Set Docker Tags
         run: |

@@ -51,10 +51,6 @@ LOCK_FILE="$APP_ROOT/.enterprise_lock"
 TARGET="$APP_ROOT/enterprise"
 CACHE_ROOT="$APP_ROOT/storage/.cw-enterprise"
 ACTIVE="$APP_ROOT/tmp/cw-enterprise"
-# Written only by the Enterprise build (the -ee tag). CW_EDITION=ee set by hand on the default
-# image did nothing while that image had no enterprise/, and it still does nothing: nobody
-# gets Enterprise downloaded without having picked the image that brings it.
-EDITION_MARKER="$APP_ROOT/.enterprise_edition"
 
 log() {
   echo "[enterprise] $*" >&2
@@ -194,13 +190,9 @@ use_published() {
 
 cmd_ensure() {
   edition=${CW_EDITION:-}
-  unbuilt=
-  if [ "$edition" = "ee" ] && [ -f "$LOCK_FILE" ] && [ ! -f "$EDITION_MARKER" ]; then
-    unbuilt=", but this is not the Enterprise image (use the -ee tag)"
-  fi
-  if [ "$edition" != "ee" ] || [ -n "${DISABLE_ENTERPRISE+set}" ] || [ -n "$unbuilt" ]; then
+  if [ "$edition" != "ee" ] || [ -n "${DISABLE_ENTERPRISE+set}" ]; then
     # ChatwootApp.enterprise? is false whenever DISABLE_ENTERPRISE is set, to any value.
-    log "edition '${edition:-unset}'${DISABLE_ENTERPRISE+, DISABLE_ENTERPRISE set}$unbuilt: not using enterprise/"
+    log "edition '${edition:-unset}'${DISABLE_ENTERPRISE+, DISABLE_ENTERPRISE set}: not using enterprise/"
     rm -f "$ACTIVE"
     if [ -L "$TARGET" ] && [ -e "$TARGET/" ]; then
       fail "$TARGET still leads to a tree"
