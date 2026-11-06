@@ -93,6 +93,8 @@ fazer.ai licenses do not include Chatwoot Enterprise features. SSO and Captain, 
 
 To use these features with the fork, purchase a license from Chatwoot Inc. and use the `ghcr.io/fazer-ai/chatwoot:latest-ee` image. The image with the `-ee` suffix does not replace the license.
 
+The `-ee` image is the default image with `CW_EDITION=ee`. At boot, the container downloads the `enterprise/` directory from the official Chatwoot tag that matches the image version, checks its contents against the hash pinned at build time, and keeps a copy in `storage/.cw-enterprise`. The first boot of each version needs access to `codeload.github.com`, and later boots use the stored copy. If the download or the check fails, the container does not start and the log says why; the tuning variables are described in `docker/entrypoints/helpers/enterprise.sh`.
+
 ## Install
 
 ### With the fazer.ai agents installer

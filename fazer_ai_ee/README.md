@@ -2,7 +2,13 @@
 
 The fork's changes to Enterprise behavior. `enterprise/` and `spec/enterprise/` stay byte-identical to the upstream release in `VERSION_CW`, which keeps upstream merges free of conflicts there; everything the fork adds or changes on top of them lives here.
 
-This directory only means something on top of `enterprise/`. It loads only when `enterprise/` is present (`config/application.rb`, `ChatwootApp.fazer_ai_ee?`), and the CE workflows strip it together with `enterprise/`.
+This directory only means something on top of `enterprise/`. It loads only when `enterprise/` is present (`config/application.rb`, `ChatwootApp.fazer_ai_ee?`). The CE spec workflows strip it together with `enterprise/`; the published images keep it and get `enterprise/` at boot (see below).
+
+## In the image
+
+No published image carries `enterprise/`. `docker/Dockerfile` downloads the official tree for `VERSION_CW` in its `enterprise-lock` stage, pins the hash of that tree in `/app/.enterprise_lock`, builds the assets with it in place (Tailwind reads its views) and drops it. A build context whose `enterprise/` differs from the official tree fails there.
+
+At boot, `docker/entrypoints/helpers/enterprise.sh ensure` runs from every entrypoint (`docker-entrypoint.sh`, `rails.sh`, `sidekiq.sh`) before anything boots Rails. With `CW_EDITION=ee` it installs the tree from the cache in `storage/.cw-enterprise` when the entry for this version and hash is intact, and otherwise downloads it from the tag, checks it against the pin, caches it and installs it. Any failure stops the container with a message; `CW_EDITION=ce` boots without Enterprise on purpose. `spec/docker/enterprise_helper_spec.rb` covers each path.
 
 ## How a change lands here
 
