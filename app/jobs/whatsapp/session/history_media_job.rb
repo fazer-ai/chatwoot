@@ -11,6 +11,11 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   queue_as :low
 
   BATCH = 20
+  # A run also stops at this, so a batch of large files hands its thread and its slot back
+  # well inside the slot's lease.
+  BATCH_TIME = 1.minute
+  # How long a run that found every history slot taken waits before trying again.
+  SLOT_WAIT = 15.seconds
   # Only a backstop for a run that died without clearing it: a live run refreshes it.
   SCHEDULED_TTL = 1.hour
   # The provider could not be reached, or asked us to slow down. The files stay queued and
@@ -23,7 +28,9 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # own and not an argument of the run: a drain already queued or running would otherwise
   # swallow the request, and the files the change just covered would never be queued.
   def self.kick(inbox, wait: nil, requeue: false)
-    Redis::Alfred.set(requeue_key(inbox), SecureRandom.uuid, ex: SCHEDULED_TTL.to_i) if requeue
+    # No expiry: a low queue that takes longer than the lease to reach the run must not
+    # lose the request, since nothing else would ever queue the files it covers.
+    Redis::Alfred.set(requeue_key(inbox), SecureRandom.uuid) if requeue
     return unless Redis::Alfred.set(scheduled_key(inbox), '1', nx: true, ex: SCHEDULED_TTL.to_i)
 
     set(wait: wait).perform_later(inbox)
@@ -37,8 +44,10 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     Redis::Alfred.expire(self.class.scheduled_key(inbox), SCHEDULED_TTL.to_i)
     return finish unless enabled?
 
-    rescan
-    drain
+    history_media.with_slot(on_full: -> { again(SLOT_WAIT) }) do
+      rescan
+      drain
+    end
   end
 
   private
@@ -70,7 +79,9 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # that stops in the middle of a download hands the job back, and the next run starts
   # with the same file instead of leaving it pending with nothing to ask for it.
   def drain
+    deadline = BATCH_TIME.from_now
     BATCH.times do
+      break if Time.current >= deadline
       return finish unless enabled?
 
       id = newest
@@ -79,11 +90,13 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
       fetch(Message.find_by(id: id))
       Redis::Alfred.with { |conn| conn.zrem(queue_key, id) }
     end
-    self.class.set(wait: 0).perform_later(inbox)
+    again
   rescue *TRANSIENT => e
     Rails.logger.warn("[WHATSAPP SESSION] history media of inbox ##{inbox.id} paused: #{e.message}")
-    self.class.set(wait: UNAVAILABLE_WAIT).perform_later(inbox)
+    again(UNAVAILABLE_WAIT)
   end
+
+  def again(wait = 0) = self.class.set(wait: wait).perform_later(inbox)
 
   def newest = Redis::Alfred.with { |conn| conn.zrevrange(queue_key, 0, 0) }.first
 

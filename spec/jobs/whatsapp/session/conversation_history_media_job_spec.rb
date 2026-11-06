@@ -52,4 +52,14 @@ RSpec.describe Whatsapp::Session::ConversationHistoryMediaJob do
     expect(backend.commands.size).to eq(described_class::BATCH + 2)
     expect(conversation.messages.where.missing(:attachments)).to be_empty
   end
+
+  it 'comes back from where it was when the instance has no history slot free' do
+    pending(conversation, 'WAIT1', 1.day.ago)
+    allow(Whatsapp::Session::Inbound::ImportSlots).to receive(:concurrency).and_return(0)
+
+    described_class.perform_now(conversation, 99)
+
+    expect(backend.commands).to be_empty
+    expect(described_class).to have_been_enqueued.with(conversation, 99)
+  end
 end

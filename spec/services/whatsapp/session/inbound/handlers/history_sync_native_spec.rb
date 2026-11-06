@@ -510,6 +510,23 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(inbox.messages.find_by(source_id: '3EB0CARD').content_attributes['is_unsupported']).to be_nil
     end
 
+    # The same card with a reference to its header: the header waits for the drain, and
+    # the card keeps rendering as a card meanwhile.
+    it 'keeps a card with text readable while its referenced header waits for the drain' do
+      ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/card', mime: 'image/jpeg')
+      card = model::Content::Rich.new(kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega',
+                                      media: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+      deliver(slice([historical('3EB0CARD2', 2.days.ago, content: card)]))
+
+      message = inbox.messages.find_by(source_id: '3EB0CARD2')
+      expect(message.content_attributes['is_unsupported']).to be_nil
+      expect(Whatsapp::Session::HistoryMedia.pending?(message)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
     # A caption edit is not the file: the bubble has to keep saying the file is missing.
     it 'keeps the picture marked missing after its caption is edited' do
       deliver(slice(messages))

@@ -145,6 +145,46 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Redis::Alfred.exists?(described_class.requeue_key(inbox))).to be(true)
   end
 
+  # Imports of several inboxes at once: the history work of the whole instance shares the
+  # import's slots, so the drains cannot take every Sidekiq thread.
+  it 'waits for a history slot when the instance has none free' do
+    queue_up(pending('SLOT1', 1.day.ago))
+    allow(Whatsapp::Session::Inbound::ImportSlots).to receive(:concurrency).and_return(0)
+
+    described_class.perform_now(inbox)
+
+    expect(backend.commands).to be_empty
+    expect(Redis::Alfred.zcard(queue)).to eq(1)
+    expect(described_class).to have_been_enqueued.with(inbox)
+  end
+
+  it 'gives the history slot back when the run ends' do
+    queue_up(pending('SLOT2', 1.day.ago))
+
+    described_class.perform_now(inbox)
+
+    expect(Whatsapp::Session::Inbound::ImportSlots.taken).to eq(0)
+  end
+
+  it 'hands the queue back once a batch has run for its time, whatever its size' do
+    queue_up(pending('SLOW1', 1.hour.ago), pending('SLOW2', 2.hours.ago))
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      travel(described_class::BATCH_TIME + 1.second)
+      original.call(command)
+    end
+
+    described_class.perform_now(inbox)
+
+    expect(backend.commands.map(&:message_id)).to eq(['SLOW1'])
+    expect(described_class).to have_been_enqueued.with(inbox)
+  end
+
+  it 'keeps a rescan request however long the queue takes to reach it' do
+    described_class.kick(inbox, requeue: true)
+
+    expect(Redis::Alfred.ttl(described_class.requeue_key(inbox))).to eq(-1)
+  end
+
   # A deploy or a crash stops the worker in the middle of a download. The job goes back
   # to Sidekiq, and the file has to be there when it runs again.
   it 'keeps the file it was working on when the worker stops mid-download' do

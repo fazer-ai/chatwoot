@@ -73,16 +73,34 @@ module Whatsapp::Session::HistoryMedia
   # A history file that came with a reference. It is marked the way a reference-less one
   # is, which is what the drain, the button and the conversation action look for, and the
   # reference is kept: it is how the provider finds the file when it is asked for.
+  #
+  # A card with readable text keeps rendering as a card while its header waits: marked
+  # unsupported, it would trade its text and buttons for the placeholder, for good if the
+  # header never comes.
   def defer(message, inbound)
     media = Whatsapp::Session::Inbound::MessageWriter.media_in(inbound)
     return if media&.ref.blank?
 
+    readable_card = message.content_attributes['rich'].present? && message.content.present?
     message.with_lock do
       message.update!(content_attributes: message.content_attributes.merge(
-        'is_unsupported' => true, Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
+        'is_unsupported' => (true unless readable_card), Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true,
         'pending_media' => media.to_h, 'pending_chat' => inbound.chat&.to_h
       ).compact)
     end
+  end
+
+  # History work shares the instance-wide slots the import takes (Inbound::ImportSlots):
+  # Sidekiq's threads are one pool, so several inboxes draining at once would otherwise hold
+  # every one of them and leave live traffic waiting, whatever queue the drains sit on. A
+  # run that finds no slot is told to come back with `on_full`; one that gave its slot back
+  # wakes an import batch that was waiting for it.
+  def with_slot(on_full:, &)
+    slots = Whatsapp::Session::Inbound::ImportSlots
+    slots.with_slot(&)
+    slots.top_up(into: Whatsapp::Session::HistoryImportJob.queue_name)
+  rescue Whatsapp::Session::Inbound::ImportSlots::Full
+    on_full.call
   end
 
   # Queues every pending file the inbox's consent now covers. For when it starts covering
