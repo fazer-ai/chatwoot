@@ -34,6 +34,13 @@ RSpec.describe MessagePolicy, type: :policy do
       it 'allows an agent bot' do
         expect(subject).to permit(agent_bot_context, message)
       end
+
+      # The id outlives the role it named when Enterprise is not loaded, or the role was deleted.
+      it 'denies an agent whose custom role id names no role in force' do
+        agent_context[:account_user].update_column(:custom_role_id, 999_999) # rubocop:disable Rails/SkipsModelValidations
+
+        expect(subject).not_to permit(agent_context, message)
+      end
     end
   end
 end

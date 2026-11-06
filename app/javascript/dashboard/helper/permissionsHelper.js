@@ -21,7 +21,12 @@ export const getUserPermissions = (user, accountId) => {
 
 export const getUserRole = (user, accountId) => {
   const currentAccount = getCurrentAccount(user, accountId) || {};
-  if (currentAccount.custom_role_id) {
+  // A role in force, as the server reports it: without Enterprise, or with the role deleted,
+  // a `custom_role_id` left on the row grants nothing and the member is a plain agent.
+  if (
+    currentAccount.custom_role_id &&
+    (currentAccount.permissions || []).includes('custom_role')
+  ) {
     return 'custom_role';
   }
 
