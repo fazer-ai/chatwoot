@@ -201,3 +201,5 @@ app/services/whatsapp/session/inbound/reaction_store.rb: Preserve subsecond orde
 app/javascript/dashboard/routes/dashboard/settings/inbox/settingsPage/WhatsappAppSecret.vue: Allow the token and app secret to be replaced together  # GHSA-xwhx PR#1
 app/models/message.rb: Clear the flag for receipts on already-delivered echoes  # PR#878
 app/models/concerns/assignment_handler.rb: Enforce working hours on initial human assignments  # PR#933
+app/javascript/dashboard/composables/useWhatsappCallSession.js: Release the call session before awaiting its recording upload  # PR#940
+app/javascript/dashboard/helper/actionCable.js: Preserve early lifecycle events for Cloud calls  # PR#940
