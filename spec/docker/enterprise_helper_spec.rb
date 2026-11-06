@@ -368,6 +368,27 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(Dir.children(cache_root).reject { |name| name == '.lock' }).to be_empty
   end
 
+  it 'recovers from a transfer cut halfway, starting the archive over instead of appending to it' do
+    bin = File.join(work_dir, 'bin')
+    FileUtils.mkdir_p(bin)
+    count = File.join(work_dir, 'curl_calls')
+    # the first call sends half of the archive and fails, as a dropped connection does
+    File.write(File.join(bin, 'curl'), <<~SH)
+      #!/bin/sh
+      n=$(cat "#{count}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "#{count}"
+      size=$(wc -c < "#{tarball}")
+      if [ "$n" -eq 1 ]; then head -c $((size / 2)) "#{tarball}"; exit 18; fi
+      cat "#{tarball}"
+    SH
+    FileUtils.chmod(0o755, File.join(bin, 'curl'))
+
+    _out, err, status = ensure_enterprise('PATH' => "#{bin}:#{ENV.fetch('PATH')}", 'CW_ENTERPRISE_FETCH_RETRIES' => '1')
+
+    expect(status).to be_success, err
+    expect(File.read(count).strip).to eq('2')
+    expect(installed).to eq(tree.keys.sort)
+  end
+
   it 'stops the boot when the source cannot be reached and nothing is cached' do
     _out, err, status = ensure_enterprise('CW_ENTERPRISE_SOURCE_URL' => unreachable)
 

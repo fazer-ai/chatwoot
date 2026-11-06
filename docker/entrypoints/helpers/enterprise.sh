@@ -124,14 +124,27 @@ download_tree() {
   top="chatwoot-$version"
 
   log "downloading enterprise/ for v$version from $url"
-  mkdir -p "$dest/extract"
-  if ! curl --fail --silent --show-error --location \
-    --connect-timeout 15 --max-time 600 \
-    --retry "$retries" --retry-delay 2 --retry-all-errors \
-    "$url" | tar -xzf - -C "$dest/extract" "$top/enterprise"; then
-    return 1
-  fi
-  [ -d "$dest/extract/$top/enterprise" ] || return 1
+  # Each attempt is the whole pipeline into a clean directory. curl's own --retry would
+  # restart the transfer into the same pipe, after tar had already read part of the first
+  # archive, and the stream would never extract.
+  attempt=0
+  while :; do
+    rm -rf "$dest/extract"
+    mkdir -p "$dest/extract"
+    if curl --fail --silent --show-error --location \
+      --connect-timeout 15 --max-time 600 \
+      "$url" | tar -xzf - -C "$dest/extract" "$top/enterprise" &&
+      [ -d "$dest/extract/$top/enterprise" ]; then
+      break
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -gt "$retries" ]; then
+      rm -rf "$dest/extract"
+      return 1
+    fi
+    log "download attempt $attempt failed, retrying ($attempt of $retries)"
+    sleep 2
+  done
   mv "$dest/extract/$top/enterprise" "$dest/enterprise"
   rm -rf "$dest/extract"
 }
