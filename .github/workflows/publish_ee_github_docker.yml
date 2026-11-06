@@ -36,6 +36,9 @@ jobs:
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
+      # The same image as the default one, plus the edition: with CW_EDITION=ee the entrypoint
+      # fetches enterprise/ for VERSION_CW at boot (docker/entrypoints/helpers/enterprise.sh).
+      # Kept as its own tag so installations that pull `-ee` keep getting Enterprise.
       - name: Set Chatwoot edition
         run: |
           echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
