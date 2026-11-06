@@ -2401,4 +2401,40 @@ RSpec.describe 'Conversations API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/fetch_history_media' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+    let(:conversation) { create(:conversation, account: account, inbox: channel.inbox) }
+    let(:url) { "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/fetch_history_media" }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    it 'queues the files of the conversation for whoever reads it' do
+      create(:inbox_member, user: agent, inbox: channel.inbox)
+
+      expect do
+        post url, headers: agent.create_new_auth_token, as: :json
+      end.to have_enqueued_job(Whatsapp::Session::ConversationHistoryMediaJob).with(conversation)
+
+      expect(response).to have_http_status(:accepted)
+    end
+
+    it 'refuses an agent who cannot see the inbox' do
+      expect do
+        post url, headers: agent.create_new_auth_token, as: :json
+      end.not_to have_enqueued_job(Whatsapp::Session::ConversationHistoryMediaJob)
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'refuses an inbox the session layer does not serve' do
+      cloud = create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', validate_provider_config: false, sync_templates: false)
+      create(:inbox_member, user: agent, inbox: cloud.inbox)
+      other = create(:conversation, account: account, inbox: cloud.inbox)
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{other.display_id}/fetch_history_media",
+           headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
 end

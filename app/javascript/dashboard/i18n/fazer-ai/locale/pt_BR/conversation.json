@@ -114,7 +114,17 @@
     "HEADER": {
       "WHATSAPP_CALL_GROUP_UNSUPPORTED": "Não é possível ligar para um grupo pelo WhatsApp"
     },
-    "WHATSAPP_NUMBER_MISSING_BANNER": "Este número não tinha WhatsApp na verificação de {date}. Mensagens enviadas para ele não são entregues."
+    "WHATSAPP_NUMBER_MISSING_BANNER": "Este número não tinha WhatsApp na verificação de {date}. Mensagens enviadas para ele não são entregues.",
+    "HISTORY_MEDIA": {
+      "PENDING": "Este arquivo do histórico importado ainda não foi baixado.",
+      "DOWNLOAD": "Baixar arquivo",
+      "REQUESTED": "Download solicitado. O arquivo aparece aqui quando chegar.",
+      "ERROR": "Não foi possível pedir o download. Tente de novo.",
+      "UNAVAILABLE": "Este arquivo não está mais disponível no WhatsApp.",
+      "DOWNLOAD_ALL": "Baixar arquivos do histórico",
+      "DOWNLOAD_ALL_REQUESTED": "Baixando os arquivos do histórico desta conversa. Eles aparecem conforme chegarem.",
+      "DOWNLOAD_ALL_ERROR": "Não foi possível pedir os arquivos do histórico. Tente de novo."
+    }
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

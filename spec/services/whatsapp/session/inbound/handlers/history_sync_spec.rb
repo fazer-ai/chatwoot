@@ -147,6 +147,55 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  # A dump carries its files without a reference, so each one waits in the inbox's history
+  # queue, under the chat the event named, to be asked for by message id.
+  describe 'the files of the archive' do
+    before { cover! }
+
+    let(:queue) { Whatsapp::Session::HistoryMedia.queue_key(inbox) }
+    let(:messages) { [photo(id: 'HIST10', at: 3.days.ago), photo(id: 'HIST11', at: 90.days.ago)] }
+
+    after do
+      Redis::Alfred.delete(queue)
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    def photo(id:, at:)
+      model::InboundMessage.new(
+        id: id, chat: chat, sender: sender, from_me: false, timestamp: (at.to_f * 1000).to_i,
+        content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', filename: 'foto.jpg')
+      )
+    end
+
+    it 'queues the files inside the window and keeps the chat each was filed under' do
+      dispatch
+
+      recent = inbox.messages.find_by(source_id: 'HIST10')
+      expect(recent.content_attributes['pending_chat']).to eq(chat.to_h)
+      queued = Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')
+      expect(queued).to eq([recent.id.to_s])
+      expect(Whatsapp::Session::HistoryMediaJob).to have_been_enqueued.with(inbox).exactly(:once)
+    end
+
+    it 'queues nothing when the inbox turned the automatic fetch off' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+
+      dispatch
+
+      expect(inbox.messages.find_by(source_id: 'HIST10').content_attributes['history_media']).to be(true)
+      expect(Redis::Alfred.zcard(queue)).to eq(0)
+      expect(Whatsapp::Session::HistoryMediaJob).not_to have_been_enqueued
+    end
+
+    it 'measures the window the inbox chose' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 120))
+
+      dispatch
+
+      expect(Redis::Alfred.zcard(queue)).to eq(2)
+    end
+  end
+
   describe 'the gap half' do
     before { cover! }
 

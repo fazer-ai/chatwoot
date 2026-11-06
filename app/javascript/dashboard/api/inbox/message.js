@@ -126,6 +126,14 @@ class MessageApi extends ApiClient {
     );
   }
 
+  // Asks the provider for the file of a history message that arrived without it. The
+  // file lands later, as an update of the message.
+  fetchMedia(conversationId, messageId) {
+    return axios.post(
+      `${this.url}/${conversationId}/messages/${messageId}/fetch_media`
+    );
+  }
+
   getPreviousMessages({ conversationId, after, before }) {
     const params = { before };
     if (after && Number(after) !== Number(before)) {

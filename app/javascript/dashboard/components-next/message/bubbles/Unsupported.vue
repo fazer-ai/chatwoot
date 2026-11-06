@@ -1,14 +1,18 @@
 <script setup>
-import { computed } from 'vue';
-import { I18nT } from 'vue-i18n';
+import { computed, ref } from 'vue';
+import { I18nT, useI18n } from 'vue-i18n';
 import { useMessageContext } from '../provider.js';
 import { useInbox } from 'dashboard/composables/useInbox';
+import { useAlert } from 'dashboard/composables';
+import MessageApi from 'dashboard/api/inbox/message';
 import BaseBubble from './Base.vue';
+import NextButton from 'dashboard/components-next/button/Button.vue';
 
 const WHATSAPP_UNSUPPORTED_MESSAGE_HELP_URL =
   'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users#linked-devices';
 
-const { inboxId, contentAttributes } = useMessageContext();
+const { id, conversationId, inboxId, contentAttributes } = useMessageContext();
+const { t } = useI18n();
 
 const {
   isAFacebookInbox,
@@ -21,6 +25,36 @@ const isMasked = computed(() => !!contentAttributes.value?.isMasked);
 const isViewOnce = computed(() => !!contentAttributes.value?.isViewOnce);
 // Both are WhatsApp withholding the content from linked devices, which no other copy explains.
 const isWithheld = computed(() => isMasked.value || isViewOnce.value);
+
+// A file of an imported history arrives without its bytes. While it waits the bubble
+// offers to fetch it; once the provider has said it no longer has it, the bubble says so
+// instead of offering a download that cannot work. The file itself replaces this bubble
+// when it lands, through the message update.
+const isPendingHistoryFile = computed(
+  () =>
+    !!contentAttributes.value?.historyMedia &&
+    !!contentAttributes.value?.pendingMedia
+);
+const isUnavailableHistoryFile = computed(
+  () =>
+    !contentAttributes.value?.historyMedia &&
+    !!contentAttributes.value?.pendingMedia
+);
+
+const requesting = ref(false);
+const requested = ref(false);
+const fetchFile = async () => {
+  requesting.value = true;
+  try {
+    await MessageApi.fetchMedia(conversationId.value, id.value);
+    requested.value = true;
+    useAlert(t('CONVERSATION.HISTORY_MEDIA.REQUESTED'));
+  } catch (error) {
+    useAlert(t('CONVERSATION.HISTORY_MEDIA.ERROR'));
+  } finally {
+    requesting.value = false;
+  }
+};
 
 const unsupportedMessageKey = computed(() => {
   // WhatsApp withholds verification codes from linked devices: the row is empty
@@ -38,8 +72,32 @@ const unsupportedMessageKey = computed(() => {
 
 <template>
   <BaseBubble class="px-4 py-3 text-sm" data-bubble-name="unsupported">
+    <div
+      v-if="isPendingHistoryFile"
+      class="flex flex-col items-start gap-2"
+      data-history-media="pending"
+    >
+      <p class="m-0">{{ $t('CONVERSATION.HISTORY_MEDIA.PENDING') }}</p>
+      <NextButton
+        faded
+        slate
+        xs
+        icon="i-lucide-download"
+        :is-loading="requesting"
+        :disabled="requesting || requested"
+        :label="$t('CONVERSATION.HISTORY_MEDIA.DOWNLOAD')"
+        @click="fetchFile"
+      />
+    </div>
+    <p
+      v-else-if="isUnavailableHistoryFile"
+      class="m-0"
+      data-history-media="unavailable"
+    >
+      {{ $t('CONVERSATION.HISTORY_MEDIA.UNAVAILABLE') }}
+    </p>
     <!-- The Coexistence copy names Meta; a paired-session provider falls back to the generic text. -->
-    <template v-if="isAWhatsAppCloudChannel && !isWithheld">
+    <template v-else-if="isAWhatsAppCloudChannel && !isWithheld">
       <p class="m-0 font-semibold">
         {{ $t('CONVERSATION.UNSUPPORTED_MESSAGE_WHATSAPP_TITLE') }}
       </p>

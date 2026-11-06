@@ -925,4 +925,63 @@ RSpec.describe 'Conversation Messages API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id/fetch_media' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+    let(:conversation) { create(:conversation, account: account, inbox: channel.inbox) }
+    let(:admin) { create(:user, account: account, role: :administrator) }
+    let(:pending_media) { Whatsapp::Session::Model::Content::Media.new(kind: 'image', mime: 'image/jpeg').to_h }
+    let(:message) do
+      create(:message, conversation: conversation, inbox: channel.inbox, account: account, source_id: 'HIST1',
+                       content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'pending_media' => pending_media })
+    end
+    let(:url) { "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}/fetch_media" }
+
+    it 'queues the download of a history file that is still missing' do
+      expect do
+        post url, headers: admin.create_new_auth_token, as: :json
+      end.to have_enqueued_job(Whatsapp::Session::MediaFetchJob).with(message, pending_media, anything)
+
+      expect(response).to have_http_status(:accepted)
+    end
+
+    it 'refuses a message that is not a missing history file' do
+      message.update!(content_attributes: {})
+
+      expect do
+        post url, headers: admin.create_new_auth_token, as: :json
+      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'refuses a history file that has already arrived' do
+      message.attachments.create!(account: account, file_type: :fallback, fallback_title: 'foto')
+
+      expect do
+        post url, headers: admin.create_new_auth_token, as: :json
+      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'refuses an agent who cannot see the inbox' do
+      agent = create(:user, account: account, role: :agent)
+
+      expect do
+        post url, headers: agent.create_new_auth_token, as: :json
+      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'answers not found for a message of another conversation' do
+      other = create(:message, account: account)
+
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{other.id}/fetch_media",
+           headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
 end

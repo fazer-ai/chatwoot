@@ -207,8 +207,11 @@ class Whatsapp::Session::Inbound::HistoryImporter
     conversation
   end
 
+  # A file the dump carried no reference for goes to the inbox's history queue, which asks
+  # for it by message id (Whatsapp::Session::HistoryMedia).
   def write(conversation, sender, message)
     inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender, imported: true).perform
+                          .tap { |stored| Whatsapp::Session::HistoryMedia.track(stored) if stored.is_a?(Message) }
   end
 
   # What the suppressed callbacks would have kept up to date, applied once per

@@ -128,6 +128,32 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  describe 'the history files settings' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+
+    it 'keeps a positive whole window and a boolean switch' do
+      channel.provider_config = channel.provider_config.merge('history_media_days' => 7, 'history_media_fetch' => false)
+
+      expect(channel).to be_valid
+    end
+
+    # A window of zero, a negative one or a string would turn the automatic fetch off
+    # without saying so.
+    it 'refuses a window that is not a positive whole number of days' do
+      [0, -5, '7', 7.5].each do |days|
+        channel.provider_config = channel.provider_config.merge('history_media_days' => days)
+
+        expect(channel).not_to be_valid, "expected #{days.inspect} to be refused"
+      end
+    end
+
+    it 'refuses a switch that is not a boolean' do
+      channel.provider_config = channel.provider_config.merge('history_media_fetch' => 'false')
+
+      expect(channel).not_to be_valid
+    end
+  end
+
   describe 'connection payload' do
     let(:channel) do
       create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false, sync_templates: false)

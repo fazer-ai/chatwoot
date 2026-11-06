@@ -93,6 +93,14 @@
               "PLACEHOLDER": "socks5://usuario:contraseña{'@'}host:puerto",
               "DESCRIPTION": "El WhatsApp de esta bandeja sale por esta dirección. Déjalo vacío para conectar directamente. Las llamadas de WhatsApp no pasan por un proxy: guardar uno desactiva las llamadas de esta bandeja.",
               "ERROR": "Usa una dirección http, https o socks5 con host"
+            },
+            "HISTORY_MEDIA": {
+              "TITLE": "Archivos del historial importado",
+              "DESCRIPTION": "El historial importado llega sin sus archivos. Con esta opción activada, las imágenes, audios y documentos se descargan en segundo plano después de la importación, de los más nuevos a los más antiguos, mientras WhatsApp todavía los tenga. Los archivos más antiguos se pueden descargar desde la conversación.",
+              "FETCH_LABEL": "Descargar los archivos automáticamente",
+              "DAYS_LABEL": "Solo archivos de los últimos (días)",
+              "DAYS_ERROR": "Ingresa un número entero de días mayor que cero.",
+              "SAVE": "Guardar"
             }
           }
         },

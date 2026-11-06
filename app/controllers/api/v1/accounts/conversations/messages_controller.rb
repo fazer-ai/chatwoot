@@ -53,6 +53,17 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     render_rescued_error(e)
   end
 
+  # Asks the provider for the file of a history message that arrived without it. The
+  # answer comes later, as an update of the message, or as the bubble saying the file is
+  # no longer available.
+  def fetch_media
+    history_media = Whatsapp::Session::HistoryMedia
+    return head :unprocessable_entity unless @conversation.inbox.channel.try(:session_provider?) && history_media.pending?(message)
+
+    history_media.enqueue(message)
+    head :accepted
+  end
+
   def translate
     return head :ok if already_translated_content_available?
 

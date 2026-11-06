@@ -73,6 +73,11 @@ class ConversationApi extends ApiClient {
     return axios.post(`${this.url}/${conversationId}/sync_history`);
   }
 
+  // Asks for every history file this conversation is still missing, whatever its age.
+  fetchHistoryMedia(conversationId) {
+    return axios.post(`${this.url}/${conversationId}/fetch_history_media`);
+  }
+
   // Asks again whether a number flagged as having no WhatsApp has registered since. The
   // server only goes to the provider when the flag is older than its recheck window, and
   // the answer arrives as a conversation update.

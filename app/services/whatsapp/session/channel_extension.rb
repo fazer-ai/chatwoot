@@ -10,6 +10,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # (`convert_provider!` pre-validates with `valid?` before it persists anything).
   def self.prepended(base)
     base.validate :validate_provider_eligible
+    base.validate :validate_history_media_settings, if: :session_provider?
     base.after_update_commit :handle_provider_config_change, if: :saved_change_to_provider_config?
     base.before_save :turn_calling_off_through_proxy, if: :session_provider?
     # Prepended so it runs before the model's own teardown callback. It is the only thing
@@ -326,6 +327,17 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # `?provider=` URL all reach this code and none of them read the dashboard. Only new
   # records and provider changes are checked, so flipping a switch back never makes an
   # inbox that already exists unsaveable.
+  # What the inbox settings page writes for the history files (Whatsapp::Session::
+  # HistoryMedia). Both are optional, and only the documented shapes are kept: a window of
+  # zero days, or a string, would turn the automatic fetch off without saying so.
+  def validate_history_media_settings
+    config = provider_config.to_h
+    fetch = config[Whatsapp::Session::HistoryMedia::FETCH_KEY]
+    days = config[Whatsapp::Session::HistoryMedia::WINDOW_KEY]
+    errors.add(:provider_config, 'history_media_fetch must be true or false') unless fetch.nil? || [true, false].include?(fetch)
+    errors.add(:provider_config, 'history_media_days must be a positive whole number') unless days.nil? || (days.is_a?(Integer) && days.positive?)
+  end
+
   def validate_provider_eligible
     return unless new_record? || provider_changed?
 

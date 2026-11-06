@@ -93,6 +93,14 @@
               "PLACEHOLDER": "socks5://usuario:senha{'@'}host:porta",
               "DESCRIPTION": "O WhatsApp desta caixa de entrada sai por este endereço. Deixe vazio para conectar direto. As ligações do WhatsApp não passam por proxy: salvar um proxy desliga as chamadas desta caixa de entrada.",
               "ERROR": "Use um endereço http, https ou socks5 com host"
+            },
+            "HISTORY_MEDIA": {
+              "TITLE": "Arquivos do histórico importado",
+              "DESCRIPTION": "O histórico importado chega sem os arquivos. Com esta opção ligada, imagens, áudios e documentos são baixados em segundo plano depois da importação, dos mais novos para os mais antigos, enquanto o WhatsApp ainda os tiver. Arquivos mais antigos podem ser baixados pela conversa.",
+              "FETCH_LABEL": "Baixar os arquivos automaticamente",
+              "DAYS_LABEL": "Só arquivos dos últimos (dias)",
+              "DAYS_ERROR": "Informe um número inteiro de dias maior que zero.",
+              "SAVE": "Salvar"
             }
           }
         },

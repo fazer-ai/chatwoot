@@ -93,6 +93,14 @@
               "PLACEHOLDER": "socks5://user:password{'@'}host:port",
               "DESCRIPTION": "WhatsApp for this inbox goes out through this address. Leave it empty to connect directly. WhatsApp calls do not go through a proxy: saving one turns calls off for this inbox.",
               "ERROR": "Use an http, https or socks5 address with a host"
+            },
+            "HISTORY_MEDIA": {
+              "TITLE": "Files from the imported history",
+              "DESCRIPTION": "Imported history arrives without its files. With this on, images, audio and documents are downloaded in the background after the import, newest first, as long as WhatsApp still has them. Older files can be downloaded from the conversation.",
+              "FETCH_LABEL": "Download the files automatically",
+              "DAYS_LABEL": "Only files from the last (days)",
+              "DAYS_ERROR": "Enter a whole number of days greater than zero.",
+              "SAVE": "Save"
             }
           }
         },
