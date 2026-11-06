@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { I18nT, useI18n } from 'vue-i18n';
 import { useMessageContext } from '../provider.js';
 import { useInbox } from 'dashboard/composables/useInbox';
@@ -42,13 +42,23 @@ const isUnavailableHistoryFile = computed(
     !!contentAttributes.value?.pendingMedia
 );
 
+// After a request is accepted the button rests for this long and then comes back: the
+// download runs in the background, and one that fails for good while the provider is
+// down leaves the file pending with nothing else to ask for it.
+const RETRY_AFTER_MS = 2 * 60 * 1000;
 const requesting = ref(false);
 const requested = ref(false);
+let retryTimer = null;
+onBeforeUnmount(() => clearTimeout(retryTimer));
 const fetchFile = async () => {
   requesting.value = true;
   try {
     await MessageApi.fetchMedia(conversationId.value, id.value);
     requested.value = true;
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      requested.value = false;
+    }, RETRY_AFTER_MS);
     useAlert(t('CONVERSATION.HISTORY_MEDIA.REQUESTED'));
   } catch (error) {
     useAlert(t('CONVERSATION.HISTORY_MEDIA.ERROR'));

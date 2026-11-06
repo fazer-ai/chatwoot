@@ -179,12 +179,24 @@ module Whatsapp::Session::HistoryMedia
   # a drain that could not be queued: the importer that tracked those files has finished,
   # and a retry of it skips the messages it already wrote, so nothing else would ever come
   # back for them. `kick` does nothing for an inbox whose drain is queued or running.
+  #
+  # The keys of an inbox that was deleted go here too: its jobs are discarded, so nothing
+  # else would ever empty them.
   def resume_stranded
     ids = Redis::Alfred.with do |conn|
       %w[HISTORY_MEDIA HISTORY_MEDIA_REQUEUE].flat_map do |name|
         conn.scan_each(match: "WHATSAPP::#{name}::*").map { |key| key.split('::').last.to_i }
       end
+    end.uniq
+    inboxes = Inbox.where(id: ids).to_a
+    inboxes.each { |inbox| Whatsapp::Session::HistoryMediaJob.kick(inbox) }
+    (ids - inboxes.map(&:id)).each { |id| forget(Inbox.new(id: id)) }
+  end
+
+  def forget(inbox)
+    job = Whatsapp::Session::HistoryMediaJob
+    [queue_key(inbox), job.requeue_key(inbox), job.cursor_key(inbox), job.scheduled_key(inbox), job.run_key(inbox)].each do |key|
+      Redis::Alfred.delete(key)
     end
-    Inbox.where(id: ids.uniq).find_each { |inbox| Whatsapp::Session::HistoryMediaJob.kick(inbox) }
   end
 end

@@ -234,6 +234,19 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Redis::Alfred.exists?(described_class.requeue_key(inbox))).to be(false)
   end
 
+  # The window widened again while a walk was half done: the new request's messages can
+  # sit above the old cursor.
+  it 'starts over for a new rescan request instead of resuming the old one' do
+    described_class.kick(inbox, requeue: true)
+    allow(Whatsapp::Session::HistoryMedia).to receive(:requeue).and_return(42, nil)
+    described_class.perform_now(inbox)
+    described_class.kick(inbox, requeue: true)
+
+    described_class.perform_now(inbox)
+
+    expect(Whatsapp::Session::HistoryMedia).to have_received(:requeue).with(inbox, from: nil, deadline: anything).twice
+  end
+
   # A deploy or a crash stops the worker in the middle of a download. The job goes back
   # to Sidekiq, and the file has to be there when it runs again.
   it 'keeps the file it was working on when the worker stops mid-download' do
@@ -246,12 +259,12 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Redis::Alfred.zcard(queue)).to eq(1)
   end
 
-  it 'reports a file that breaks for a reason of its own and goes on with the rest' do
+  it 'reports a file whose stored description cannot be read and goes on with the rest' do
     broken = pending('BAD1', 1.hour.ago)
     fine = pending('OK1', 2.hours.ago)
     queue_up(broken, fine)
     allow(backend).to receive(:download_media).and_wrap_original do |original, command|
-      raise ArgumentError, 'boom' if command.message_id == 'BAD1'
+      raise Whatsapp::Session::Errors::InvalidPayload, 'unreadable' if command.message_id == 'BAD1'
 
       original.call(command)
     end
@@ -264,6 +277,17 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(fine.reload.attachments.count).to eq(1)
     expect(broken.reload.content_attributes).to include('history_media' => true)
     expect(Redis::Alfred.zcard(queue)).to eq(0)
+  end
+
+  # Storage down or the inbox misconfigured: every file would fail the same way, and
+  # treating each as its own problem would empty the whole queue.
+  it 'fails the run and keeps the queue on a failure that is not the file' do
+    queue_up(pending('CFG1', 1.hour.ago), pending('CFG2', 2.hours.ago))
+    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::InvalidConfig, 'no session id')
+
+    expect { described_class.perform_now(inbox) }.to raise_error(Whatsapp::Session::Errors::InvalidConfig)
+
+    expect(Redis::Alfred.zcard(queue)).to eq(2)
   end
 
   # The operator changes the setting while a batch is running; the job loaded the channel

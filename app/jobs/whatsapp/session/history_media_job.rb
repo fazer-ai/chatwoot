@@ -66,6 +66,7 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   end
 
   def self.run_key(inbox) = "WHATSAPP::HISTORY_MEDIA_RUNNING::#{inbox.id}"
+  def self.cursor_key(inbox) = "WHATSAPP::HISTORY_MEDIA_REQUEUE_CURSOR::#{inbox.id}"
 
   private
 
@@ -94,14 +95,20 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     request = Redis::Alfred.get(self.class.requeue_key(inbox))
     return if request.nil?
 
-    from = history_media.requeue(inbox, from: Redis::Alfred.get(cursor_key)&.to_i, deadline: @deadline)
-    return Redis::Alfred.set(cursor_key, from) if from
+    from = history_media.requeue(inbox, from: resume_from(request), deadline: @deadline)
+    return Redis::Alfred.set(self.class.cursor_key(inbox), "#{request}:#{from}") if from
 
-    Redis::Alfred.delete(cursor_key)
+    Redis::Alfred.delete(self.class.cursor_key(inbox))
     Redis::Alfred.delete_if_equals(self.class.requeue_key(inbox), request)
   end
 
-  def cursor_key = "WHATSAPP::HISTORY_MEDIA_REQUEUE_CURSOR::#{inbox.id}"
+  # The cursor belongs to the request that left it. A new request (the window widened
+  # again mid-walk) starts from the newest message: the messages its wider window adds can
+  # sit anywhere in the id order, above the cursor as well.
+  def resume_from(request)
+    owner, from = Redis::Alfred.get(self.class.cursor_key(inbox)).to_s.split(':')
+    from.to_i if owner == request && from
+  end
 
   # Read from the database, not from the channel loaded with the job: a batch takes
   # minutes, and an operator who turns the option off or narrows the window in the middle
@@ -144,17 +151,17 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # The window is read again here and not only when the file was queued: a dump takes
   # hours to work through, and an operator may have narrowed it in between.
   #
-  # Anything the provider did not cause is this file's alone: it is reported and left
-  # pending, where the button can still ask for it, and the drain moves on. Kept at the
-  # head of the queue, it would stop every file behind it for good.
+  # A file whose stored description cannot be read is this file's problem alone: it is
+  # reported and left pending, where the button can still ask for it, and the drain moves
+  # on. Anything else (a misconfigured inbox, storage that is down) is everybody's: it
+  # fails the run with the file still at the head, and the retry, or the sweep after it,
+  # finds the whole queue where it was once the problem is fixed.
   def fetch(message)
     return if message.nil? || !history_media.pending?(message)
     return if message.created_at < history_media.cutoff(inbox.channel)
 
     history_media.fetch(message)
-  rescue *TRANSIENT
-    raise
-  rescue StandardError => e
+  rescue Whatsapp::Session::Errors::InvalidPayload => e
     ChatwootExceptionTracker.new(e, account: inbox.account).capture_exception
   end
 

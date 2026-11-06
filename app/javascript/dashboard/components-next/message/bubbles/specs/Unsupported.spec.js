@@ -1,5 +1,5 @@
-import { defineComponent, ref, computed } from 'vue';
-import { mount } from '@vue/test-utils';
+import { defineComponent, ref, computed, nextTick } from 'vue';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import Unsupported from '../Unsupported.vue';
 import MessageApi from 'dashboard/api/inbox/message';
@@ -106,6 +106,29 @@ describe('Unsupported', () => {
     await wrapper.find('button').trigger('click');
 
     expect(MessageApi.fetchMedia).toHaveBeenCalledWith(7, 42);
+  });
+
+  // The download runs in the background and can fail for good while the provider is down;
+  // the file then stays pending, and the button is the only way left to ask again.
+  it('offers the button again a while after a request was accepted', async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountUnsupported({
+        isUnsupported: true,
+        historyMedia: true,
+        pendingMedia: { kind: 'image' },
+      });
+
+      await wrapper.find('button').trigger('click');
+      await flushPromises();
+      expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+
+      vi.advanceTimersByTime(2 * 60 * 1000);
+      await nextTick();
+      expect(wrapper.find('button').attributes('disabled')).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('says a history file the provider gave up on is gone, with no button', () => {
