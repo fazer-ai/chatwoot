@@ -64,6 +64,8 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed do
 
       expect { dispatch }.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
       expect(Redis::Alfred.zrangebyscore(Whatsapp::Session::HistoryMedia.queue_key(inbox), '-inf', '+inf')).to eq([message.id.to_s])
+      # Rendered while it waits, with the button, even if the drain never gets to it.
+      expect(message.reload.content_attributes['is_unsupported']).to be(true)
     ensure
       Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
       Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
