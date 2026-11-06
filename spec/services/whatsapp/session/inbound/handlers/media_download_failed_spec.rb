@@ -71,6 +71,15 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed do
       Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
     end
 
+    it 'leaves a history file whose download landed meanwhile as it is' do
+      message.update!(content_attributes: message.content_attributes.merge('imported' => true))
+      allow(Whatsapp::Session::HistoryMedia).to receive(:settled?).and_return(true)
+
+      dispatch
+
+      expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
+    end
+
     # A message published before the writer kept a descriptor, or one that never carried
     # media at all. There is nothing to rebuild an attachment from, so asking would fetch
     # bytes nothing could attach.

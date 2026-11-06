@@ -61,6 +61,10 @@ class Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed < Whatsapp::Sess
   def wait_for_drain(message)
     Whatsapp::Session::HistoryMedia.as_history(message) do
       message.with_lock do
+        # A download may have attached the file, or the agent deleted the message, since
+        # `perform` looked.
+        next if Whatsapp::Session::HistoryMedia.settled?(message)
+
         message.update!(content_attributes: message.content_attributes.merge(
           'is_unsupported' => (true unless Whatsapp::Session::HistoryMedia.readable_card?(message)),
           Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA => true, 'pending_chat' => payload.chat&.to_h
