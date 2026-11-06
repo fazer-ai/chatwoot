@@ -10,7 +10,8 @@ RSpec.describe Message do
       conversation.update!(ai_assignee: captain_assistant)
     end
 
-    # A reaction is not a reply: the conversation stays pending and with Captain.
+    # A reaction is not a reply: the conversation stays pending and with Captain. Enterprise's
+    # override does not call super, so this rests on CE's `human_response?` refusing reactions.
     it 'leaves the conversation with Captain when a human only reacts' do
       create(:message, message_type: :outgoing, conversation: conversation, content: '👍',
                        content_attributes: { is_reaction: true })
