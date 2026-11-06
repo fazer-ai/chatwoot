@@ -176,7 +176,7 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(File).to exist(File.join(other, 'old.rb'))
   end
 
-  # Going back from the -ee tag to the default one keeps the volume, and the tree in it.
+  # Going back from CW_EDITION=ee to the default keeps the volume, and the tree in it.
   describe 'after an Enterprise boot left the tree in the volume' do
     before { ensure_enterprise }
 
