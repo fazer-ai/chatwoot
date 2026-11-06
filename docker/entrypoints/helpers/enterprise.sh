@@ -233,7 +233,7 @@ cmd_ensure_locked() {
   work=$(mktemp -d "$CACHE_ROOT/.incoming.XXXXXX")
   if ! download_tree "$VERSION" "$work"; then
     rm -rf "$work"
-    fail "could not download enterprise/ for v$VERSION (network, or a source without that tag). Not starting: set CW_EDITION=ce to run without Enterprise on purpose"
+    fail "could not download enterprise/ for v$VERSION (network, or a source without that tag). Not starting: remove CW_EDITION=ee to run without Enterprise on purpose"
   fi
   actual=$(tree_hash "$work/enterprise" 2>/dev/null || true)
   if [ "$actual" != "$PINNED" ]; then

@@ -373,7 +373,7 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
 
     expect(status).not_to be_success
     expect(err).to include('could not download enterprise/ for v4.19.0')
-    expect(err).to include('set CW_EDITION=ce')
+    expect(err).to include('remove CW_EDITION=ee')
     expect(Dir.children(cache_root).reject { |name| name == '.lock' }).to be_empty
   end
 
