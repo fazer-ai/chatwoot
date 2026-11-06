@@ -93,7 +93,7 @@ As licenças fazer.ai não incluem recursos do Chatwoot Enterprise. SSO e Captai
 
 Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e use a imagem `ghcr.io/fazer-ai/chatwoot:latest-ee`. A imagem com sufixo `-ee` não substitui a licença.
 
-A `-ee` é a imagem padrão com `CW_EDITION=ee`. No boot, o container baixa o diretório `enterprise/` da tag oficial do Chatwoot que corresponde à versão da imagem, confere o conteúdo contra o hash fixado no build e guarda uma cópia em `storage/.cw-enterprise`. O primeiro boot de cada versão precisa de acesso a `codeload.github.com`, e os seguintes usam a cópia guardada. Se o download ou a conferência falhar, o container não sobe e o log diz por quê; as variáveis de ajuste estão descritas em `docker/entrypoints/helpers/enterprise.sh`.
+A `-ee` é a imagem padrão marcada como Enterprise no build. Pôr `CW_EDITION=ee` na imagem padrão não ativa nada. No boot, o container baixa o diretório `enterprise/` da tag oficial do Chatwoot que corresponde à versão da imagem, confere o conteúdo contra o hash fixado no build e guarda uma cópia em `storage/.cw-enterprise`. O primeiro boot de cada versão precisa de acesso a `codeload.github.com`, e os seguintes usam a cópia guardada. Se o download ou a conferência falhar, o container não sobe e o log diz por quê; as variáveis de ajuste estão descritas em `docker/entrypoints/helpers/enterprise.sh`.
 
 ## Instalar
 

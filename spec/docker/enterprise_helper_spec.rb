@@ -37,6 +37,8 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     FileUtils.chmod(0o755, helper)
     File.write(File.join(app_dir, 'VERSION_CW'), "#{version}\n")
     write_lock(version, pinned)
+    # what the -ee build adds on top of the default image
+    FileUtils.touch(File.join(app_dir, '.enterprise_edition'))
     # what the image's Dockerfile leaves in place of the tree
     File.symlink('tmp/cw-enterprise', File.join(app_dir, 'enterprise'))
     build_tarball(tree)
@@ -86,6 +88,25 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     expect(status).to be_success
     expect(err).to include("edition 'unset'")
     expect(Pathname.new(app_dir).join('enterprise')).not_to exist
+  end
+
+  it 'does nothing on the default image even with CW_EDITION=ee, which only the -ee build turns on' do
+    FileUtils.rm_f(File.join(app_dir, '.enterprise_edition'))
+    _out, err, status = ensure_enterprise
+    expect(status).to be_success, err
+    expect(err).to include('not the Enterprise image')
+    expect(Dir.exist?(cache_root)).to be(false)
+    expect(installed).to be_empty
+  end
+
+  it 'turns enterprise/ off on the default image even after an Enterprise boot left the tree in the volume' do
+    _out, err, status = ensure_enterprise
+    expect(status).to be_success, err
+    expect(installed).not_to be_empty
+    FileUtils.rm_f(File.join(app_dir, '.enterprise_edition'))
+    _out, err, status = ensure_enterprise
+    expect(status).to be_success, err
+    expect(installed).to be_empty
   end
 
   it 'does nothing when DISABLE_ENTERPRISE is set, since Rails would not load it anyway' do
@@ -275,7 +296,7 @@ RSpec.describe 'docker/entrypoints/helpers/enterprise.sh', type: :script do
     before do
       FileUtils.mkdir_p(File.dirname(other_helper))
       FileUtils.cp(helper, other_helper)
-      %w[VERSION_CW .enterprise_lock].each { |name| FileUtils.cp(File.join(app_dir, name), other_app) }
+      %w[VERSION_CW .enterprise_lock .enterprise_edition].each { |name| FileUtils.cp(File.join(app_dir, name), other_app) }
       File.symlink(File.join(app_dir, 'storage'), File.join(other_app, 'storage'))
       File.symlink('tmp/cw-enterprise', File.join(other_app, 'enterprise'))
     end
