@@ -42,11 +42,17 @@ module Whatsapp::Session::HistoryMedia
       attributes['pending_media'].present? && message.attachments.none?
   end
 
-  # Called by the writer for every imported message. Only what the setting and the window
-  # let through is queued, so turning the option off means nothing is asked for.
-  def track(message)
+  # Whether the inbox's standing consent covers this imported message: the switch and the
+  # window. Read for every history file, with or without a reference to fetch it by.
+  def wanted?(message)
     channel = message.inbox.channel
-    return unless pending?(message) && enabled?(channel) && message.created_at >= cutoff(channel)
+    enabled?(channel) && message.created_at >= cutoff(channel)
+  end
+
+  # Called by the importer for every message it writes. Only what the setting and the
+  # window let through is queued, so turning the option off means nothing is asked for.
+  def track(message)
+    return unless pending?(message) && wanted?(message)
 
     Redis::Alfred.zadd(queue_key(message.inbox), message.created_at.to_f, message.id)
     Whatsapp::Session::HistoryMediaJob.kick(message.inbox)

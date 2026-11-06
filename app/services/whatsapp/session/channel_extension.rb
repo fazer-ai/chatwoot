@@ -11,6 +11,7 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   def self.prepended(base)
     base.validate :validate_provider_eligible
     base.validate :validate_history_media_settings, if: :session_provider?
+    base.after_update_commit :resume_history_media, if: :saved_change_to_provider_config?
     base.after_update_commit :handle_provider_config_change, if: :saved_change_to_provider_config?
     base.before_save :turn_calling_off_through_proxy, if: :session_provider?
     # Prepended so it runs before the model's own teardown callback. It is the only thing
@@ -327,6 +328,19 @@ module Whatsapp::Session::ChannelExtension # rubocop:disable Metrics/ModuleLengt
   # `?provider=` URL all reach this code and none of them read the dashboard. Only new
   # records and provider changes are checked, so flipping a switch back never makes an
   # inbox that already exists unsaveable.
+  # Turning the automatic fetch back on picks up the files that waited while it was off:
+  # the drain stopped without dropping them, and nothing else would wake it until the next
+  # import.
+  def resume_history_media
+    return unless session_provider?
+
+    before, = saved_change_to_provider_config
+    key = Whatsapp::Session::HistoryMedia::FETCH_KEY
+    return unless before.to_h[key] == false && Whatsapp::Session::HistoryMedia.enabled?(self)
+
+    Whatsapp::Session::HistoryMediaJob.kick(inbox)
+  end
+
   # What the inbox settings page writes for the history files (Whatsapp::Session::
   # HistoryMedia). Both are optional, and only the documented shapes are kept: a window of
   # zero days, or a string, would turn the automatic fetch off without saying so.

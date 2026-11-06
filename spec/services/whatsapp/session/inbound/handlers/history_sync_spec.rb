@@ -187,6 +187,33 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(Whatsapp::Session::HistoryMediaJob).not_to have_been_enqueued
     end
 
+    # A provider that hands the dump over with references (uazapi does) is held to the same
+    # switch and window: turning the option off must not download the archive anyway.
+    it 'holds files that came with a reference to the same switch and window' do
+      referenced = lambda do |id, at|
+        model::InboundMessage.new(
+          id: id, chat: chat, sender: sender, from_me: false, timestamp: (at.to_f * 1000).to_i,
+          content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', filename: 'foto.jpg',
+                                             ref: model::MediaRef.url('https://uazapi.test/media/x'))
+        )
+      end
+      channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 7))
+      deliver(model::Event.build(model::Events::HistorySync.new(
+                                   kind: 'messages',
+                                   data: { 'messages' => [referenced.call('REF1', 2.days.ago), referenced.call('REF2', 30.days.ago)].map(&:to_h) }
+                                 )))
+      fetched = ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job['job_class'] == 'Whatsapp::Session::MediaFetchJob' }
+      expect(fetched.size).to eq(1)
+
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+      expect do
+        deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages',
+                                                                  data: { 'messages' => [referenced.call(
+                                                                    'REF3', 1.day.ago
+                                                                  ).to_h] })))
+      end.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+    end
+
     it 'measures the window the inbox chose' do
       channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 120))
 

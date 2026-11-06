@@ -147,6 +147,24 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
       end
     end
 
+    # The drain stops without dropping the files that waited while the option was off, and
+    # nothing else would wake it until the next import.
+    it 'wakes the waiting files when the automatic fetch is turned back on' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+
+      expect do
+        channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => true))
+      end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(channel.inbox))
+    end
+
+    it 'leaves the drain alone when another setting changes' do
+      expect do
+        channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 10))
+      end.not_to have_enqueued_job(Whatsapp::Session::HistoryMediaJob)
+    end
+
     it 'refuses a switch that is not a boolean' do
       channel.provider_config = channel.provider_config.merge('history_media_fetch' => 'false')
 

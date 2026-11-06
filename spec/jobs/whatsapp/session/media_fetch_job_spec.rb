@@ -27,6 +27,23 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.content_attributes['imported']).to be(true)
   end
 
+  # The file of an archived message must not wake the bots and webhooks the import kept
+  # quiet: it is written as history, which still reaches the open dashboard.
+  it 'writes the file of an imported message as history, and a live one as live' do
+    levels = []
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      levels << [Import::SilentWrite.announce?, Import::SilentWrite.archive?]
+      original.call(command)
+    end
+    live = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA0002')
+    message.update!(content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'imported' => true })
+
+    described_class.perform_now(message, media.to_h)
+    described_class.perform_now(live, media.to_h)
+
+    expect(levels).to eq([[true, true], [false, false]])
+  end
+
   # The provider has just said these bytes are not coming, so a later delivery of the same
   # message must not ask again.
   it 'stops an imported placeholder waiting once the provider gives up on its bytes' do

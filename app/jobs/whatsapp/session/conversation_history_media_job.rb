@@ -10,9 +10,21 @@ class Whatsapp::Session::ConversationHistoryMediaJob < ApplicationJob
 
   retry_on Down::Error, Whatsapp::Session::Errors::ProviderUnavailable, wait: :polynomially_longer, attempts: 3
 
-  def perform(conversation)
-    conversation.messages.where.missing(:attachments).find_each(order: :desc) do |message|
-      Whatsapp::Session::HistoryMedia.fetch(message) if Whatsapp::Session::HistoryMedia.pending?(message)
+  # Downloads per run. An old group can hold thousands of files, and one run holding a
+  # worker for all of them is what the inbox's drain already avoids: each run takes a batch
+  # and hands the rest to the next one.
+  BATCH = Whatsapp::Session::HistoryMediaJob::BATCH
+
+  def perform(conversation, before_id = nil)
+    fetched = 0
+    scope = conversation.messages.where.missing(:attachments)
+    scope = scope.where(id: ..before_id) if before_id
+    scope.find_each(order: :desc) do |message|
+      next unless Whatsapp::Session::HistoryMedia.pending?(message)
+      return self.class.perform_later(conversation, message.id) if fetched == BATCH
+
+      Whatsapp::Session::HistoryMedia.fetch(message)
+      fetched += 1
     end
   end
 end

@@ -38,4 +38,18 @@ RSpec.describe Whatsapp::Session::ConversationHistoryMediaJob do
 
     expect(backend.commands.map(&:message_id)).to eq(['ONCE1'])
   end
+
+  # A group with thousands of files must not hold one worker for all of them.
+  it 'downloads a batch per run and hands the rest to the next one' do
+    Array.new(described_class::BATCH + 2) { |index| pending(conversation, "B#{index}", index.hours.ago) }
+
+    described_class.perform_now(conversation)
+    expect(backend.commands.size).to eq(described_class::BATCH)
+
+    continuation = ActiveJob::Base.queue_adapter.enqueued_jobs.find { |job| job['job_class'] == described_class.name }
+    described_class.perform_now(conversation, continuation['arguments'].last)
+
+    expect(backend.commands.size).to eq(described_class::BATCH + 2)
+    expect(conversation.messages.where.missing(:attachments)).to be_empty
+  end
 end

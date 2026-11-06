@@ -13,6 +13,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # event carried.
   def perform(message, content, chat = nil)
     return if message.attachments.any?
+    return as_history { perform(message, content, chat) } if imported?(message)
 
     channel = message.inbox.channel
     media = Whatsapp::Session::Model::Content.from_h(content)
@@ -40,6 +41,15 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   end
 
   private
+
+  # The file of an imported message is written as history, as the message was: it reaches
+  # the open dashboard and nothing else, no bot, webhook or automation. Archived traffic
+  # replayed to them because its file arrived later is what the import suppressed.
+  def imported?(message)
+    message.content_attributes&.dig('imported').present? && !Import::SilentWrite.on?
+  end
+
+  def as_history(&) = Import::SilentWrite.wrap(announce: true, archive: true, &)
 
   # One question in two halves, both about a queue entry that outlived a conversion: can
   # the inbox this message belongs to still fetch these bytes?
