@@ -171,6 +171,11 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   def again(wait = 0)
     release
     self.class.set(wait: wait).perform_later(inbox)
+  rescue StandardError
+    # As in `kick`: nothing was queued, so the scheduling claim must not outlive this run,
+    # or the sweep could not start the next one for the claim's whole hour.
+    Redis::Alfred.delete(self.class.scheduled_key(inbox))
+    raise
   end
 
   def newest = Redis::Alfred.with { |conn| conn.zrevrange(queue_key, 0, 0) }.first

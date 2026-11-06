@@ -247,6 +247,16 @@ RSpec.describe Whatsapp::Session::HistoryMediaJob do
     expect(Whatsapp::Session::HistoryMedia).to have_received(:requeue).with(inbox, from: nil, deadline: anything).twice
   end
 
+  it 'leaves the claim free when its own continuation could not be queued' do
+    queue_up(*Array.new(described_class::BATCH + 1) { |index| pending("E#{index}", index.hours.ago) })
+    described_class.kick(inbox)
+    allow(described_class).to receive(:set).and_raise(Redis::CannotConnectError)
+
+    expect { described_class.perform_now(inbox) }.to raise_error(Redis::CannotConnectError)
+
+    expect(Redis::Alfred.exists?(described_class.scheduled_key(inbox))).to be(false)
+  end
+
   # A deploy or a crash stops the worker in the middle of a download. The job goes back
   # to Sidekiq, and the file has to be there when it runs again.
   it 'keeps the file it was working on when the worker stops mid-download' do
