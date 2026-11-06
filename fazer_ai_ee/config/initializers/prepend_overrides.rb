@@ -10,6 +10,7 @@ Rails.application.config.to_prepare do
   %w[
     Api::V1::Accounts::WhatsappCallsController
     Call
+    Enterprise::Billing::CreateStripeCustomerService
     Internal::ReconcilePlanConfigService
     SamlUserBuilder
     Voice::Conference::Manager
@@ -22,4 +23,6 @@ Rails.application.config.to_prepare do
   ].each do |name|
     name.constantize.prepend("FazerAiEe::#{name}".constantize)
   end
+
+  FazerAiEe::RequestCeilings.install!
 end

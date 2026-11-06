@@ -30,6 +30,7 @@ RSpec.describe 'fazer_ai_ee overrides of upstream Enterprise code' do # rubocop:
       sla_missed_resolution: 'f4bbbb4845d83cef'
     },
     'enterprise/app/services/voice/outbound_call_builder.rb' => { perform!: '2bfecf7dd5e964e3' },
+    'enterprise/app/services/enterprise/billing/create_stripe_customer_service.rb' => { perform: 'aafaa1e52efd2e4e' },
     'enterprise/app/controllers/api/v1/accounts/whatsapp_calls_controller.rb' => { create_outbound_call: '3f772e2a424aa6ff' }
   }
 

@@ -10,6 +10,7 @@ This directory only means something on top of `enterprise/`. It loads only when 
 - **A change to a CE class that Enterprise extends** (the class calls `prepend_mod_with`): write `FazerAiEe::<same name>` under `fazer_ai_ee/app/<type>/fazer_ai_ee/`. `ChatwootApp.extensions` lists `fazer_ai_ee` right after `enterprise`, so the hook prepends it over the Enterprise module.
 - **A change to an Enterprise-only class** (no hook): write `FazerAiEe::<same name>` the same way and add the class to `config/initializers/prepend_overrides.rb`.
 - **A view**: copy it to `fazer_ai_ee/app/views/` at the same path. That view path comes before `enterprise/app/views`.
+- **A timeout or retry policy on an Enterprise HTTP call**: list the method in `fazer_ai_ee/lib/fazer_ai_ee/request_ceilings.rb`. Inside a listed method HTTParty gets the ceiling as default options (the call's own options still win); outside, nothing changes. `spec/lib/request_ceilings_spec.rb` fails when `enterprise/` has an HTTParty call outside every listed method.
 - **Config Enterprise reads from a fixed path** (`enterprise/config/*.yml`): keep the fork's additions in `fazer_ai_ee/config/` and merge them in from the service that reads the file, as `FazerAiEe::Internal::ReconcilePlanConfigService` does.
 - **Specs**: under `fazer_ai_ee/spec/`, mirroring the `spec/` layout. Run them with `bundle exec rspec fazer_ai_ee/spec`. An upstream example under `spec/enterprise` that cannot pass on the fork is skipped by name in `spec/support/superseded_upstream_examples.rb`, next to the spec here that replaces it.
 
