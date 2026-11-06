@@ -141,7 +141,7 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 
 - **A change reaches Pro through the CE → Pro sync, never through a port of its own.** No cherry-pick, no parallel PR opened on the Pro repo, however small the diff and however tempting the Pro-only CI is. Every CE delivery in Pro's history arrived as `Merge branch 'main' into <pro trunk>` (flow B of the `sync-fork` skill), and that merge is what makes the CE commit an ancestor of Pro. A cherry-picked copy is a second commit carrying the same diff with no ancestry, so the next sync replays those hunks and hands them back as conflicts: measured at 18 conflicting files on the i18n stack (#364/#365). "This also has to be in Pro" says where the change ends up, not that it is delivered twice.
 - **Pro's trunk is `main`.** The local branch in the shared checkout is conventionally called `chatwoot-pro-main` so it does not collide with CE's `main`, and the push is `git push chatwoot-pro HEAD:main`. Pushing that local branch **by name** is what created a stray remote `chatwoot-pro-main` in 2026-08, which then collected every push for a month while remote `main` went stale; that branch is gone and must not come back.
-- **Pro is where `spec/enterprise` runs in CI.** `run_ee_spec.yml` exists in Pro and not in CE, and it runs `spec/enterprise` on pull requests with the Pro overlay loaded. CE's `run_foss_spec.yml` deletes `enterprise` and `spec/enterprise` before its suite, so a change under `enterprise/` ships from CE with no CI evidence at all: run those specs locally before merging in CE, and let the Pro run after the sync be the workflow that measures them.
+- **Pro is where `spec/enterprise` runs in CI.** `run_ee_spec.yml` exists in Pro and not in CE, and it runs `spec/enterprise` (and should run `fazer_ai_ee/spec`) on pull requests with the Pro overlay loaded. CE's `run_foss_spec.yml` deletes `enterprise` and `spec/enterprise` before its suite, so a change under `fazer_ai_ee/` ships from CE with no CI evidence at all: run `spec/enterprise` and `fazer_ai_ee/spec` locally before merging in CE, and let the Pro run after the sync be the workflow that measures them.
 
 ## CI: the CE spec workflow
 
@@ -181,21 +181,22 @@ When unsure, be explicit: `gh pr create --repo fazer-ai/chatwoot` (for Pro PRs, 
 ## Enterprise Edition Notes
 
 - Chatwoot has an Enterprise overlay under `enterprise/` that extends/overrides OSS code.
-- **Code under `enterprise/` does not run on CE installs.** The CE image workflow (`publish_github_docker.yml`) runs `rm -rf enterprise` before it builds, and premium features such as `channel_voice` stay off on the community pricing plan. In this fork, what turns them on is Pro's `fazer_ai/` hub layer, which sets the pricing plan. So a defect in `enterprise/` only shows up for Pro customers. The fix still lands here in CE, because the file is shared and Pro receives it through the sync. An issue about `enterprise/` code must say that it only affects Pro and which feature has to be on for it to happen, so nobody triages it as affecting every install.
-- When you add or modify core functionality, always check for corresponding files in `enterprise/` and keep behavior compatible.
+- **`enterprise/` and `spec/enterprise/` are upstream's and stay byte-identical to the release in `VERSION_CW`.** The fork's changes to Enterprise behavior live in `fazer_ai_ee/` (overrides prepended over the Enterprise classes, views with precedence, specs in `fazer_ai_ee/spec`); `fazer_ai_ee/README.md` says how each kind of change lands there. `bin/validate_enterprise_parity` enforces it in CI and in the pre-commit hook, and `.claude/settings.json` denies agent edits under `enterprise/`.
+- **Code under `enterprise/` does not run on CE installs.** The CE image workflow (`publish_github_docker.yml`) runs `rm -rf enterprise` before it builds, and premium features such as `channel_voice` stay off on the community pricing plan. In this fork, what turns them on is Pro's `fazer_ai/` hub layer, which sets the pricing plan. So a defect in `enterprise/` only shows up for Pro customers. The fix still lands here in CE, in `fazer_ai_ee/`, and Pro receives it through the sync. An issue about `enterprise/` code must say that it only affects Pro and which feature has to be on for it to happen, so nobody triages it as affecting every install.
+- When you add or modify core functionality, always check for corresponding files in `enterprise/` and `fazer_ai_ee/` and keep behavior compatible.
 - Follow the Enterprise development practices documented here:
   - https://chatwoot.help/hc/handbook/articles/developing-enterprise-edition-features-38
 
 Practical checklist for any change impacting core logic or public APIs
 - Search for related files in both trees before editing (e.g., `rg -n "FooService|ControllerName|ModelName" app enterprise`).
 - If adding new endpoints, services, or models, consider whether Enterprise needs:
-  - An override (e.g., `enterprise/app/...`), or
+  - An override (in `fazer_ai_ee/app/...`, never by editing `enterprise/`), or
   - An extension point (e.g., `prepend_mod_with`, hooks, configuration) to avoid hard forks.
 - Avoid hardcoding instance- or plan-specific behavior in OSS; prefer configuration, feature flags, or extension points consumed by Enterprise.
 - Keep request/response contracts stable across OSS and Enterprise; update both sets of routes/controllers when introducing new APIs.
-- When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
-- Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
-- When modifying existing OSS features for Enterprise-only behavior, add an Enterprise module (via `prepend_mod_with`/`include_mod_with`) instead of editing OSS files directly—especially for policies, controllers, and services. For Enterprise-exclusive features, place code directly under `enterprise/`.
+- When renaming/moving shared code, mirror the change in `fazer_ai_ee/` to prevent drift; `fazer_ai_ee/spec/upstream_overrides_spec.rb` fails when an override no longer reaches the method it wraps.
+- Tests: Add Enterprise-specific specs under `fazer_ai_ee/spec`, mirroring OSS spec layout where applicable. `spec/enterprise` is upstream's.
+- When modifying existing OSS features for Enterprise-only behavior, add a `FazerAiEe::` module under `fazer_ai_ee/` (picked up by `prepend_mod_with`/`include_mod_with`) instead of editing OSS files directly, especially for policies, controllers, and services. For Enterprise-exclusive features, place code under `fazer_ai_ee/app/`.
 
 ## Fork translations
 
