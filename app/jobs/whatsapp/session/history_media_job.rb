@@ -28,6 +28,9 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # own and not an argument of the run: a drain already queued or running would otherwise
   # swallow the request, and the files the change just covered would never be queued.
   def self.kick(inbox, wait: nil, requeue: false)
+    held = ActiveSupport::IsolatedExecutionState[HOLD]
+    return held << inbox if held && !requeue
+
     # No expiry: a low queue that takes longer than the lease to reach the run must not
     # lose the request, since nothing else would ever queue the files it covers.
     Redis::Alfred.set(requeue_key(inbox), SecureRandom.uuid) if requeue
@@ -41,6 +44,20 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
       Redis::Alfred.delete(scheduled_key(inbox))
       raise
     end
+  end
+
+  # A slice is written oldest first. A drain started while it is being written takes the
+  # newest file written so far, so the import holds the kicks of its files until the slice
+  # is in and kicks once (Inbound::HistoryImporter#perform).
+  HOLD = :whatsapp_history_media_hold
+
+  def self.holding(inbox)
+    previous = ActiveSupport::IsolatedExecutionState[HOLD]
+    ActiveSupport::IsolatedExecutionState[HOLD] = held = []
+    yield
+  ensure
+    ActiveSupport::IsolatedExecutionState[HOLD] = previous
+    kick(inbox) if held.present?
   end
 
   def self.scheduled_key(inbox) = "WHATSAPP::HISTORY_MEDIA_SCHEDULED::#{inbox.id}"

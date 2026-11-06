@@ -63,8 +63,10 @@ class Whatsapp::Session::Inbound::HistoryImporter
     # against the same boundary, or the first imported message would move the line the
     # rest of its own batch is measured against.
     watermark = @watermark.equal?(UNREAD) ? inbound::Coverage.watermark(inbox) : @watermark
-    Import::SilentWrite.wrap do
-      batches.each_value { |batch| import_chat(batch, watermark) }
+    Whatsapp::Session::HistoryMediaJob.holding(inbox) do
+      Import::SilentWrite.wrap do
+        batches.each_value { |batch| import_chat(batch, watermark) }
+      end
     end
     # After the messages, so a slice that is both the last of a chat and the first this
     # inbox sees of it marks the thread its own messages just opened.

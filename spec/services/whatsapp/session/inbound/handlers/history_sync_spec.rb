@@ -189,6 +189,24 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([inbox.messages.find_by(source_id: 'HIST10').id.to_s])
     end
 
+    # The slice is written oldest first: a drain started halfway would take the newest of
+    # what is written so far before the newest of the slice.
+    context 'with several files inside the window' do
+      let(:messages) { [photo(id: 'HIST20', at: 3.days.ago), photo(id: 'HIST21', at: 2.days.ago)] }
+
+      it 'starts the drain only once the whole slice is written' do
+        written = nil
+        allow(Whatsapp::Session::HistoryMediaJob).to receive(:set).and_wrap_original do |original, *args, **options|
+          written ||= inbox.messages.where(source_id: %w[HIST20 HIST21]).count
+          original.call(*args, **options)
+        end
+
+        dispatch
+
+        expect(written).to eq(2)
+      end
+    end
+
     it 'queues nothing when the inbox turned the automatic fetch off' do
       channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
 
