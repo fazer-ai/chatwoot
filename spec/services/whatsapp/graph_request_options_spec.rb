@@ -14,7 +14,6 @@ describe Whatsapp::GraphRequestOptions do
       app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb
       app/services/whatsapp/business_profile_service.rb
       app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb
-      enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb
     ]
   end
 
@@ -39,10 +38,10 @@ describe Whatsapp::GraphRequestOptions do
     }
   end
 
-  # Where a WhatsApp service lives. Both trees, because the enterprise one is not a copy of the other
-  # and has Graph calls of its own.
+  # Where a WhatsApp service lives. The enterprise tree is not fenced: it is upstream's code, kept
+  # identical to the release we track, and its Graph calls carry upstream's options.
   let(:whatsapp_service_trees) do
-    %w[app/services/whatsapp enterprise/app/services/enterprise/whatsapp]
+    %w[app/services/whatsapp]
   end
 
   # Reads a call the way the parser would, not the way a line-oriented grep would: `HTTParty.get(`
@@ -125,8 +124,7 @@ describe Whatsapp::GraphRequestOptions do
       'app/services/whatsapp/csat_template_service.rb' => 3,
       'app/services/whatsapp/incoming_message_whatsapp_cloud_service.rb' => 1,
       'app/services/whatsapp/business_profile_service.rb' => 1,
-      'app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb' => 1,
-      'enterprise/app/services/enterprise/whatsapp/providers/whatsapp_cloud_service.rb' => 4
+      'app/services/whatsapp/providers/whatsapp_cloud_contact_info_request_service.rb' => 1
     }
     present = present_sources(guarded_sources)
     counts = present.index_with { |path| graph_calls(Rails.root.join(path).read).size }

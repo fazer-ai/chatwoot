@@ -8,9 +8,7 @@ class Internal::AccountAnalysis::DiscordNotifierService
     HTTParty.post(
       webhook_url,
       body: build_message(account).to_json,
-      headers: { 'Content-Type' => 'application/json' },
-      timeout: 10,
-      max_retries: 0
+      headers: { 'Content-Type' => 'application/json' }
     )
 
     Rails.logger.info("Discord notification sent for flagged account #{account.id}")

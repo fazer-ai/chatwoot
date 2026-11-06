@@ -18,7 +18,7 @@ class Twilio::VoiceWebhookSetupService
   def sync_twiml_app!
     return create_twiml_app! if channel.twiml_app_sid.blank?
 
-    channel.client.applications(channel.twiml_app_sid).update( # rubocop:disable Rails/SaveBang
+    channel.client.applications(channel.twiml_app_sid).update(
       voice_url: channel.voice_call_webhook_url,
       voice_method: HTTP_METHOD
     )
@@ -40,7 +40,7 @@ class Twilio::VoiceWebhookSetupService
 
     channel.client
            .incoming_phone_numbers(numbers.first.sid)
-           .update( # rubocop:disable Rails/SaveBang
+           .update(
              voice_url: channel.voice_call_webhook_url,
              voice_method: HTTP_METHOD,
              status_callback: channel.voice_status_webhook_url,
@@ -62,13 +62,11 @@ class Twilio::VoiceWebhookSetupService
 
   def create_twiml_app!
     friendly_name = "Chatwoot Voice #{channel.phone_number}"
-    # rubocop:disable Rails/SaveBang
     app = channel.client.applications.create(
       friendly_name: friendly_name,
       voice_url: channel.voice_call_webhook_url,
       voice_method: HTTP_METHOD
     )
-    # rubocop:enable Rails/SaveBang
     app.sid
   rescue StandardError => e
     log_twilio_error('TWIML_APP_CREATE', e)

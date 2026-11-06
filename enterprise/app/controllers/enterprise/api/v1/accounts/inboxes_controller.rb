@@ -1,4 +1,4 @@
-module Enterprise::Api::V1::Accounts::InboxesController # rubocop:disable Metrics/ModuleLength
+module Enterprise::Api::V1::Accounts::InboxesController
   extend ActiveSupport::Concern
   include Concerns::TwilioVoiceCredentials
 
@@ -13,11 +13,6 @@ module Enterprise::Api::V1::Accounts::InboxesController # rubocop:disable Metric
     head :ok
   rescue StandardError => e
     render_could_not_create_error(e.message)
-  end
-
-  # Live, not in the cached inbox payload: a redeploy that opens the call port writes no inbox row.
-  def whatsapp_calling_status
-    render json: { voice_calls_carried: @inbox.channel.voice_calls_carried? } if ensure_whatsapp_calling_supported
   end
 
   def disable_whatsapp_calling

@@ -41,7 +41,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
 
       before do
         account_user = AccountUser.find_by(user: user, account: account)
-        account_user.update!(role: :agent, custom_role: custom_role)
+        account_user.update(role: :agent, custom_role: custom_role)
       end
 
       it 'returns true' do
@@ -56,7 +56,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
 
       before do
         account_user = AccountUser.find_by(user: user, account: account)
-        account_user.update!(role: :agent, custom_role: custom_role)
+        account_user.update(role: :agent, custom_role: custom_role)
       end
 
       it 'returns true' do
@@ -71,7 +71,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
 
       before do
         account_user = AccountUser.find_by(user: user, account: account)
-        account_user.update!(role: :agent, custom_role: custom_role)
+        account_user.update(role: :agent, custom_role: custom_role)
       end
 
       it 'returns true' do
@@ -86,7 +86,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
 
       before do
         account_user = AccountUser.find_by(user: user, account: account)
-        account_user.update!(role: :agent, custom_role: custom_role)
+        account_user.update(role: :agent, custom_role: custom_role)
       end
 
       it 'returns false' do
@@ -182,7 +182,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
 
       before do
         create(:inbox_member, user: user, inbox: inbox)
-        AccountUser.find_by(user: user, account: account).update!(role: :agent, custom_role: custom_role)
+        AccountUser.find_by(user: user, account: account).update(role: :agent, custom_role: custom_role)
       end
 
       it 'returns not found message for a conversation they neither own nor participate in' do
@@ -190,7 +190,7 @@ RSpec.describe Captain::Tools::Copilot::GetConversationService do
       end
 
       it 'returns the conversation when it is assigned to them' do
-        conversation.update!(assignee: user)
+        conversation.update(assignee: user)
         expect(service.execute(conversation_id: conversation.display_id)).to eq(conversation.to_llm_text)
       end
     end

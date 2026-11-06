@@ -144,8 +144,8 @@ RSpec.describe 'Applied SLAs API', type: :request do
       it 'returns a CSV file with breached conversations' do
         create(:applied_sla, sla_policy: sla_policy1, conversation: conversation1, sla_status: 'missed')
         create(:applied_sla, sla_policy: sla_policy1, conversation: conversation2, sla_status: 'missed')
-        conversation1.update!(status: 'open')
-        conversation2.update!(status: 'resolved')
+        conversation1.update(status: 'open')
+        conversation2.update(status: 'resolved')
 
         get "/api/v1/accounts/#{account.id}/applied_slas/download",
             headers: administrator.create_new_auth_token
@@ -159,20 +159,6 @@ RSpec.describe 'Applied SLAs API', type: :request do
         expect(csv_data.size).to eq(3)
         conversation_ids = csv_data.drop(1).map { |row| row[0].to_i }
         expect(conversation_ids).to contain_exactly(conversation1.display_id, conversation2.display_id)
-      end
-
-      # This export was the one CSV template still on plain CSV.generate_line, so a name
-      # starting with `=` reached the spreadsheet as a live formula.
-      it 'defuses a formula and leaves the rest of the name alone' do
-        conversation1.assignee.update!(name: "=cmd|calc O'Keefe")
-        create(:applied_sla, sla_policy: sla_policy1, conversation: conversation1, sla_status: 'missed')
-
-        get "/api/v1/accounts/#{account.id}/applied_slas/download",
-            headers: administrator.create_new_auth_token
-
-        expect(response).to have_http_status(:success)
-        expect(response.body).to include(%('=cmd|calc O'Keefe))
-        expect(response.body).not_to include('&#39;')
       end
 
       it 'excludes conversations with blocked contacts from the CSV file' do

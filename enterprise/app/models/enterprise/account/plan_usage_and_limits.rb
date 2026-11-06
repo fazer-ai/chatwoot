@@ -107,7 +107,7 @@ module Enterprise::Account::PlanUsageAndLimits # rubocop:disable Metrics/ModuleL
   end
 
   def get_captain_limits(type)
-    total_count = [captain_monthly_limit[type.to_s].to_i, 0].max
+    total_count = captain_monthly_limit[type.to_s].to_i
 
     consumed = if type == :documents
                  custom_attributes[CAPTAIN_DOCUMENTS_USAGE].to_i || 0

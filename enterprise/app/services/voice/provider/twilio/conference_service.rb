@@ -101,15 +101,11 @@ class Voice::Provider::Twilio::ConferenceService
 
   # Existing assignments win — manual reassignment and pre-call assignment
   # (e.g., lock_to_single_conversation) shouldn't be stomped on pickup.
-  # A call answered while the inbox holds assignment for being closed is answered unclaimed,
-  # including when it closes between the check and the save.
   def assign_conversation!(user)
     conversation = call.conversation
-    return if conversation.assigned_entity.present? || conversation.inbox.assignment_closed?
+    return if conversation.assigned_entity.present?
 
     Conversations::AssignmentService.new(conversation: conversation, assignee_id: user.id).perform
     remember_claim_assignment(user.id)
-  rescue CustomExceptions::Conversation::OutsideWorkingHours
-    conversation.restore_attributes
   end
 end

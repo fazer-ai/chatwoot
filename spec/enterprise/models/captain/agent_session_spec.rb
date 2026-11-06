@@ -35,7 +35,7 @@ RSpec.describe Captain::AgentSession, type: :model do
     it 'returns nil when the subject record no longer exists' do
       conversation = create(:conversation, account: account)
       session = create(:captain_agent_session, account: account, assistant: assistant, subject: conversation)
-      conversation.destroy!
+      conversation.destroy
 
       expect(session.reload.subject).to be_nil
     end

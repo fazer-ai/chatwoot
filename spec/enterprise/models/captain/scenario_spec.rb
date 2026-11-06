@@ -37,7 +37,7 @@ RSpec.describe Captain::Scenario, type: :model do
       it 'calls resolve_tool_references before saving' do
         scenario = build(:captain_scenario, assistant: assistant, account: account)
         expect(scenario).to receive(:resolve_tool_references)
-        scenario.save!
+        scenario.save
       end
     end
   end

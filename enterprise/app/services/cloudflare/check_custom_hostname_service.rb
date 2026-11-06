@@ -6,8 +6,7 @@ class Cloudflare::CheckCustomHostnameService < Cloudflare::BaseCloudflareZoneSer
     return { errors: ['No custom domain found'] } if @portal.custom_domain.blank?
 
     response = HTTParty.get(
-      "#{BASE_URI}/zones/#{zone_id}/custom_hostnames?hostname=#{@portal.custom_domain}", headers: headers,
-                                                                                         timeout: 10, max_retries: 0
+      "#{BASE_URI}/zones/#{zone_id}/custom_hostnames?hostname=#{@portal.custom_domain}", headers: headers
     )
 
     return { errors: response.parsed_response['errors'] } unless response.success?

@@ -26,7 +26,10 @@ class Voice::OutboundCallBuilder
       conversation = @existing_conversation || create_conversation!(contact_inbox)
       # Dial before locking so the Twilio round-trip doesn't hold the conversation row lock.
       call_sid = initiate_call!
-      claim_reused_conversation! if claim_for_caller
+      if claim_for_caller
+        @existing_conversation.lock!
+        @existing_conversation.update!(assignee: user)
+      end
       call = create_call!(conversation, call_sid)
       message = Voice::CallMessageBuilder.new(call).perform!
       call.update!(message_id: message.id)
@@ -37,18 +40,6 @@ class Voice::OutboundCallBuilder
   end
 
   private
-
-  # Runs after the dial, which cannot be undone: an inbox that holds assignment while closed keeps
-  # the call and stays unassigned, including when it closes while the row lock is awaited and the
-  # save itself is refused.
-  def claim_reused_conversation!
-    return if @existing_conversation.inbox.assignment_closed?
-
-    @existing_conversation.lock!
-    @existing_conversation.update!(assignee: user)
-  rescue CustomExceptions::Conversation::OutsideWorkingHours
-    @existing_conversation.restore_attributes
-  end
 
   def ensure_contact_inbox!
     ContactInbox.find_or_create_by!(

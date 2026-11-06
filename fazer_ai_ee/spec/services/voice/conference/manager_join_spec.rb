@@ -1,0 +1,41 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+RSpec.describe Voice::Conference::Manager do
+  let(:account) { create(:account) }
+  let(:agent) { create(:user, account: account, role: :agent) }
+  let(:channel) { create(:channel_twilio_sms, :with_voice, account: account, phone_number: '+15551239999') }
+  let(:conversation) { create(:conversation, account: account, inbox: channel.inbox, assignee: agent) }
+  let(:call) { create(:call, conversation: conversation, status: 'ringing') }
+  let(:agent_label) { "agent-#{agent.id}-account-#{account.id}" }
+
+  before do
+    allow(Twilio::VoiceWebhookSetupService).to receive(:new)
+      .and_return(instance_double(Twilio::VoiceWebhookSetupService, perform: "AP#{SecureRandom.hex(8)}"))
+  end
+
+  it 'answers without claiming the conversation while the inbox holds assignment' do
+    channel.inbox.update!(working_hours_enabled: true, restrict_assignment_to_working_hours: true)
+    conversation.update!(assignee: nil)
+
+    travel_to(Time.utc(2026, 11, 8, 12)) do
+      described_class.new(call: call, event: 'join', participant_label: agent_label).process
+    end
+
+    expect(call.reload.status).to eq('in_progress')
+    expect(conversation.reload.assignee).to be_nil
+  end
+
+  it 'answers when the claim itself is refused for business hours' do
+    conversation.update!(assignee: nil)
+    refused = instance_double(Conversations::AssignmentService)
+    allow(refused).to receive(:perform).and_raise(CustomExceptions::Conversation::OutsideWorkingHours.new({}))
+    allow(Conversations::AssignmentService).to receive(:new).and_return(refused)
+
+    expect { described_class.new(call: call, event: 'join', participant_label: agent_label).process }.not_to raise_error
+
+    expect(call.reload.status).to eq('in_progress')
+    expect(conversation.reload.assignee).to be_nil
+  end
+end
