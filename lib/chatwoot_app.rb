@@ -37,14 +37,22 @@ module ChatwootApp
     ENV.fetch('HELPCENTER_URL', nil) || ENV.fetch('FRONTEND_URL', nil)
   end
 
+  # The fork's overrides of Enterprise code (fazer_ai_ee/), active only on top of enterprise/.
+  def self.fazer_ai_ee?
+    enterprise? && root.join('fazer_ai_ee').exist?
+  end
+
   def self.extensions
-    if custom?
-      %w[enterprise custom]
-    elsif enterprise?
-      %w[enterprise]
-    else
-      %w[]
-    end
+    extensions = if custom?
+                   %w[enterprise custom]
+                 elsif enterprise?
+                   %w[enterprise]
+                 else
+                   %w[]
+                 end
+    # Right after enterprise, so its modules are prepended over the Enterprise ones they refine.
+    extensions.insert(extensions.index('enterprise') + 1, 'fazer_ai_ee') if fazer_ai_ee?
+    extensions
   end
 
   def self.advanced_search_allowed?

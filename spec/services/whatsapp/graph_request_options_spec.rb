@@ -97,8 +97,39 @@ describe Whatsapp::GraphRequestOptions do
     present
   end
 
+  # enterprise/ is upstream's code, kept identical to the release we track, so its calls carry no
+  # options of their own: the fork puts the ceiling on the methods that hold them
+  # (FazerAiEe::RequestCeilings). A call there passes when its method is one of those.
+  def fork_graph_methods
+    return [] unless defined?(FazerAiEe::RequestCeilings)
+
+    FazerAiEe::RequestCeilings.ceilings.fetch('Whatsapp::Providers::WhatsappCloudService')
+                              .select { |_name, ceiling| ceiling == described_class::GRAPH_REQUEST_OPTIONS }.keys
+  end
+
+  # Each HTTParty call in the file, with the name of the method it sits in.
+  def httparty_calls_by_method(path)
+    require 'prism'
+    stack = [[Prism.parse(Rails.root.join(path).read).value, nil]]
+    calls = []
+    until stack.empty?
+      node, method = stack.pop
+      method = node.name if node.is_a?(Prism::DefNode)
+      stack.concat(node.compact_child_nodes.map { |child| [child, method] })
+      calls << [node.location.start_line, method] if node.is_a?(Prism::CallNode) && node.receiver.try(:name) == :HTTParty
+    end
+    calls
+  end
+
+  def calls_outside_fork_ceilings(path)
+    httparty_calls_by_method(path).reject { |_line, method| fork_graph_methods.include?(method) }
+                                  .map { |line, method| "#{path}:#{line} (#{method})" }
+  end
+
   it 'leaves no Graph call in the guarded files without the ceiling' do
     without_ceiling = present_sources(guarded_sources).flat_map do |path|
+      next calls_outside_fork_ceilings(path) if path.start_with?('enterprise/')
+
       graph_calls(Rails.root.join(path).read)
         .reject { |call| call.include?('GRAPH_REQUEST_OPTIONS') }
         .map { |call| "#{path}: #{call.lines.first.strip} #{call.lines[1].to_s.strip}" }

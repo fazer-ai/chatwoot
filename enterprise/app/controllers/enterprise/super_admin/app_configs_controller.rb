@@ -45,9 +45,7 @@ module Enterprise::SuperAdmin::AppConfigsController
       LOGO_THUMBNAIL
       LOGO
       LOGO_DARK
-      LOGO_EMAIL
       BRAND_NAME
-      BRAND_COLOR
       INSTALLATION_NAME
       BRAND_URL
       WIDGET_BRAND_URL

@@ -31,9 +31,7 @@ class Cloudflare::CreateCustomHostnameService < Cloudflare::BaseCloudflareZoneSe
           method: 'http',
           type: 'dv'
         }
-      }.to_json,
-      timeout: 10,
-      max_retries: 0
+      }.to_json
     )
   end
 end

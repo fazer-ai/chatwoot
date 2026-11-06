@@ -33,9 +33,7 @@ class Internal::Accounts::MarketingConversionTrackingService
       body: {
         destinations: [destination_payload],
         events: [conversion_payload]
-      }.to_json,
-      timeout: 10,
-      max_retries: 0
+      }.to_json
     )
 
     raise "Marketing conversion upload failed: #{response.body}" unless response.success?

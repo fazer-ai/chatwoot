@@ -33,6 +33,8 @@ require 'test_prof/recipes/rspec/let_it_be'
 # rubocop:disable  Rails/FilePath
 Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
 # rubocop:enable  Rails/FilePath
+# The fork's Enterprise overrides bring their own spec support, loaded only where they load.
+Dir[Rails.root.join('fazer_ai_ee/spec/support/**/*.rb')].each { |f| require f } if ChatwootApp.fazer_ai_ee?
 
 # Checks for pending migrations and applies them before tests are run.
 # If you are not using ActiveRecord, you can remove these lines.

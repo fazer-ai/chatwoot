@@ -123,6 +123,8 @@ Process:
 4. For complex hunks: `git show HEAD:<path>` and `git show MERGE_HEAD:<path>` to see each full file.
 5. Decide KC/AI/CO/DEL based on intent, not just diff.
 
+**`enterprise/` and `spec/enterprise/` in an upstream → CE sync are always AI.** They stay byte-identical to the upstream release (`bin/validate_enterprise_parity`, run by CI and the pre-commit hook); the fork's changes to them live in `fazer_ai_ee/`. After the merge, `git diff v<new> HEAD -- enterprise spec/enterprise` must be empty, and `bundle exec rspec fazer_ai_ee/spec` tells you which override needs a second look (a fingerprint failure in `upstream_overrides_spec.rb` means upstream changed a method the fork copies). In a CE → Pro sync these paths cannot conflict at all, since neither side edits them.
+
 ## Recurring patterns in this repo
 
 ### Style/SaveBang noise

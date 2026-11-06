@@ -18,7 +18,7 @@ class Api::V1::Accounts::Captain::ScenariosController < Api::V1::Accounts::BaseC
   end
 
   def destroy
-    @scenario.destroy!
+    @scenario.destroy
     head :no_content
   end
 

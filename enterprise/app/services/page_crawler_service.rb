@@ -3,9 +3,7 @@ class PageCrawlerService
 
   def initialize(external_link)
     @external_link = external_link
-    # An address nobody here controls, fetched in the constructor, so every caller pays
-    # this wait before it has a chance to do anything about it.
-    @doc = Nokogiri::HTML(HTTParty.get(external_link, timeout: 15, max_retries: 0).body)
+    @doc = Nokogiri::HTML(HTTParty.get(external_link).body)
   end
 
   def page_links

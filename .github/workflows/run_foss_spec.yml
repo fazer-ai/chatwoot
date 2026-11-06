@@ -104,7 +104,7 @@ jobs:
             specs=""
             while IFS=$'\t' read -r _status f; do
               case "$f" in
-                spec/enterprise/*|enterprise/*) continue ;;   # stripped before the suite runs
+                spec/enterprise/*|enterprise/*|fazer_ai_ee/*) continue ;;   # stripped before the suite runs
                 spec/*_spec.rb) [ -f "$f" ] && specs+="$f"$'\n' ;;
                 app/javascript/*) continue ;;
                 docker/entrypoints/*|docker/Dockerfile)
@@ -266,6 +266,7 @@ jobs:
         run: |
           rm -rf enterprise
           rm -rf spec/enterprise
+          rm -rf fazer_ai_ee
 
       # The deploy image installs ffmpeg (docker/Dockerfile), and the runner image does not.
       # Without it here the specs that decode audio are filtered out rather than failed, so

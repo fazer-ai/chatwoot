@@ -21,7 +21,7 @@ class Api::V1::Accounts::Captain::BulkActionsController < Api::V1::Accounts::Bas
   end
 
   def type_matches?
-    return false if MODEL_TYPE.include?(params[:type])
+    return if MODEL_TYPE.include?(params[:type])
 
     render json: { success: false }, status: :unprocessable_content
   end

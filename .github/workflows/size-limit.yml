@@ -41,6 +41,7 @@ jobs:
         run: |
           rm -rf enterprise
           rm -rf spec/enterprise
+          rm -rf fazer_ai_ee
 
       - name: setup env
         run: |

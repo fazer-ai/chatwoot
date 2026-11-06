@@ -24,6 +24,7 @@ const tailwindConfig = {
   darkMode: 'class',
   content: [
     './enterprise/app/views/**/*.erb',
+    './fazer_ai_ee/app/views/**/*.erb',
     './app/javascript/widget/**/*.vue',
     './app/javascript/v3/**/*.vue',
     './app/javascript/dashboard/**/*.vue',

@@ -53,6 +53,19 @@ module Chatwoot
     enterprise_initializers = Rails.root.join('enterprise/config/initializers')
     Dir[enterprise_initializers.join('**/*.rb')].each { |f| require f } if enterprise_initializers.exist?
 
+    # The fork's own changes to Enterprise behavior live in fazer_ai_ee/, so that enterprise/ stays
+    # identical to upstream. It only means something on top of enterprise/, so it loads only with it,
+    # and after it: its views win over enterprise's, and ChatwootApp.extensions puts it next in line.
+    fazer_ai_ee_root = Rails.root.join('fazer_ai_ee')
+    if fazer_ai_ee_root.exist? && Rails.root.join('enterprise').exist?
+      config.eager_load_paths << fazer_ai_ee_root.join('lib')
+      config.eager_load_paths += Dir["#{fazer_ai_ee_root}/app/**"]
+      config.paths['app/views'].unshift(fazer_ai_ee_root.join('app/views').to_s)
+
+      fazer_ai_ee_initializers = fazer_ai_ee_root.join('config/initializers')
+      Dir[fazer_ai_ee_initializers.join('**/*.rb')].each { |f| require f } if fazer_ai_ee_initializers.exist?
+    end
+
     # Settings in config/environments/* take precedence over those specified here.
     # Application configuration can go into files in config/initializers
     # -- all .rb files in that directory are automatically loaded after loading

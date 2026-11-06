@@ -247,7 +247,7 @@ class Call < ApplicationRecord
     Rails.application.routes.url_helpers.rails_blob_url(recording)
   end
 
-  def push_event_data # rubocop:disable Metrics/MethodLength
+  def push_event_data
     {
       id: id,
       provider_call_id: provider_call_id,
@@ -265,8 +265,7 @@ class Call < ApplicationRecord
       from_number: from_number,
       to_number: to_number,
       recording_url: recording_url,
-      transcript: transcript,
-      voice_agent: meta&.dig('voice_agent') == true
+      transcript: transcript
     }
   end
 

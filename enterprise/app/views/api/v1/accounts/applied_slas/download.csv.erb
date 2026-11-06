@@ -8,12 +8,12 @@
   I18n.t('reports.sla_csv.conversation_link'),
   I18n.t('reports.sla_csv.breached_events')
 ] %>
-<%= CSVSafe.generate_line headers %>
+<%= CSV.generate_line headers %>
 
 <% @missed_applied_slas.each do |sla| %>
   <% missed_events = sla.sla_events.map(&:event_type).join(', ') %>
   <% conversation = sla.conversation %>
-  <%= CSVSafe.generate_line([
+  <%= CSV.generate_line([
     conversation.display_id,
     sla.sla_policy.name,
     conversation.assignee&.name,

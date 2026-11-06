@@ -1,0 +1,5 @@
+# Added to enterprise/config/premium_installation_config.yml by FazerAiEe::Internal::ReconcilePlanConfigService.
+- name: LOGO_EMAIL
+  value: ''
+- name: BRAND_COLOR
+  value: '#1f93ff'
