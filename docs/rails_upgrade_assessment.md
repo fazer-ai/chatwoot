@@ -165,6 +165,8 @@ See the official [Rails 7.2 release notes](https://guides.rubyonrails.org/7_2_re
 
 ### Rails 8.0 interface changes
 
+Where a finding below sits in `enterprise/` (the Enterprise enums, for one), the fork does not edit it. `enterprise/` only changes through a sync with the upstream release that already carries the fix; the fork's part is to keep CE compatible with it and run the Enterprise suite against it.
+
 | Interface | Repo finding | Migration |
 | --- | --- | --- |
 | Enum declaration | Rails 8 removes keyword-form enum declarations. Chatwoot has 39 declarations in 31 files: 23 OSS and 8 Enterprise files. | Change `enum status: ...` to `enum :status, ...`; preserve prefixes, suffixes, defaults, scopes, and serialized values; run model/API specs. |

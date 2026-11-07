@@ -97,6 +97,8 @@ With `CW_EDITION=ee`, the container downloads at boot the `enterprise/` director
 
 With `CW_EDITION=ee`, the Enterprise code runs exactly as Chatwoot Inc. publishes it for that version, without any modifications or patches from the fork. The fork's super admin “Branding” page is only available without Enterprise; with Enterprise enabled, branding follows its own rules: customization is a premium feature, and the community plan resets the branding keys to their defaults. See [CUSTOM_BRANDING.md](CUSTOM_BRANDING.md) for details.
 
+This applies to the Docker image. In an installation run from source, the checkout's `enterprise/` directory is loaded whenever it exists, with or without `CW_EDITION`; to run the Community edition, remove the directory.
+
 ## Install
 
 ### With the fazer.ai agents installer

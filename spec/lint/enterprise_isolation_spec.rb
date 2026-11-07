@@ -6,52 +6,64 @@ require 'open3'
 # adds what only the loaded app can tell, because a prepend aimed at a CE class can still
 # land on a method Enterprise put there (Attachment's audio transcription is one).
 RSpec.describe 'Enterprise isolation' do # rubocop:disable RSpec/DescribeClass
-  enterprise_root = Rails.root.join('enterprise').to_s
-
   it 'finds no overlay, no reopened Enterprise constant and no patch aimed at one' do
     output, status = Open3.capture2e(Rails.root.join('bin/validate_enterprise_isolation').to_s)
 
     expect(status).to be_success, output
   end
 
-  context 'with enterprise/ loaded', if: ChatwootApp.enterprise? do
-    # The method a prepended module's own definition stands in front of, which is the one that
-    # runs when it calls `super`.
-    def overridden(klass, mod, name)
-      method = klass.instance_method(name)
-      method = method.super_method while method && method.owner != mod
-      method&.super_method
-    end
+  it 'prepends nothing from CE code over a method Enterprise defines', if: ChatwootApp.enterprise? do
+    Rails.application.eager_load!
 
-    def from_enterprise?(source, root)
-      source.present? && source.first.start_with?("#{root}/")
-    end
+    expect(EnterpriseIsolationDetector.violations(root: Rails.root.join('enterprise').to_s)).to be_empty
+  end
 
-    it 'prepends nothing from CE code over a method Enterprise defines' do
-      Rails.application.eager_load!
-      # Read through Module's own methods: a class is free to define `name` or `ancestors`
-      # of its own, and some in the bundle do.
-      name_of = Module.instance_method(:name)
-      ancestors_of = Module.instance_method(:ancestors)
+  # The runtime check is only as good as its detector, so it is pointed at a fixture tree here:
+  # a class defined in a file under a temporary "Enterprise" root, and modules defined in this
+  # file prepended over each kind of method.
+  describe EnterpriseIsolationDetector do
+    let(:root) { Dir.mktmpdir }
+    let(:class_name) { "IsolationProbe#{SecureRandom.hex(4)}" }
+    let(:probe) { Object.const_get(class_name) }
 
-      overrides = ObjectSpace.each_object(Module).flat_map do |klass|
-        next([]) if klass.singleton_class? || name_of.bind_call(klass).nil?
+    before do
+      # Stubbed so RSpec removes it afterwards; the file below reopens it.
+      stub_const(class_name, Class.new)
+      File.write(File.join(root, 'probe.rb'), <<~RUBY)
+        class #{class_name}
+          def self.class_level; end
+          def instance_level; end
 
-        ancestors_of.bind_call(klass).take_while { |ancestor| ancestor != klass }.flat_map do |mod|
-          next([]) if name_of.bind_call(mod).to_s.start_with?('Enterprise::')
+          protected
 
-          (mod.instance_methods(false) + mod.private_instance_methods(false)).filter_map do |method_name|
-            next if from_enterprise?(mod.instance_method(method_name).source_location, enterprise_root)
+          def protected_level; end
 
-            target = overridden(klass, mod, method_name)
-            next unless target && from_enterprise?(target.source_location, enterprise_root)
+          private
 
-            "#{name_of.bind_call(mod) || mod.inspect}##{method_name} over #{target.owner}"
-          end
+          def private_level; end
         end
-      end
+      RUBY
+      load File.join(root, 'probe.rb')
+    end
 
-      expect(overrides.uniq).to be_empty
+    after { FileUtils.remove_entry(root) }
+
+    it 'flags a prepend over an instance, class, protected or private method of the Enterprise tree' do
+      probe.prepend(Module.new { def instance_level = :patched })
+      probe.singleton_class.prepend(Module.new { def class_level = :patched })
+      probe.prepend(Module.new { protected def protected_level = :patched })
+      probe.prepend(Module.new { private def private_level = :patched })
+
+      found = described_class.violations(root: root, modules: [probe])
+
+      expect(found.map { |entry| entry[/[#.]\w+/] }).to contain_exactly('#instance_level', '.class_level', '#protected_level', '#private_level')
+    end
+
+    it 'leaves alone a prepend over a method defined outside that tree' do
+      probe.class_eval { def outside_level; end }
+      probe.prepend(Module.new { def outside_level = :patched })
+
+      expect(described_class.violations(root: root, modules: [probe])).to be_empty
     end
   end
 end
