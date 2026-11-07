@@ -115,6 +115,16 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
   end
 
+  # The other way round: the other ask gave up first, then this one got the file.
+  it 'shows a file this ask got after another ask gave up on it' do
+    message.update!(content_attributes: { 'imported' => true, 'is_unsupported' => true })
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.attachments.count).to eq(1)
+    expect(message.content_attributes).not_to include('is_unsupported')
+  end
+
   # The drain and the button asked for the same file at once, and the other ask got it.
   it 'does not hide a file another ask attached while this one failed' do
     message.update!(content_attributes: { 'history_media' => true, 'imported' => true })

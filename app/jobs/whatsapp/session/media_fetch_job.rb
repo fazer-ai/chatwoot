@@ -123,9 +123,12 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
 
   def attach(message, media, payload)
     Whatsapp::Session::Inbound::MediaAttachment.build(message, media, payload)
-    # An imported file that was only waiting for its reference is a file again.
-    if message.content_attributes&.dig(history_media).present?
-      message.content_attributes = message.content_attributes.except('is_unsupported', history_media)
+    # An imported file that was only waiting for its reference is a file again, and so is
+    # one another ask had just given up on: two asks for the same file can overlap (the
+    # drain and the button), and the one that lost must not leave the file hidden.
+    attributes = message.content_attributes || {}
+    if attributes[history_media].present? || attributes['imported'].present?
+      message.content_attributes = attributes.except('is_unsupported', history_media, 'media_unavailable')
     end
     # Adding an attachment changes no column on the message, and
     # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so
