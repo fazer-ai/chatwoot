@@ -48,18 +48,10 @@ class Migration::NativeCallPolicyJob < ApplicationJob
     OpenCall.where(inbox_id: inbox_ids, status: %w[ringing in_progress]).find_each { |call| end_call(call) }
   end
 
-  # Ringing never answered is a missed call; one under way lasted until now.
   def end_call(call)
-    status = call.status == 'in_progress' ? 'completed' : 'no_answer'
-    duration = [(Time.current - call.started_at).to_i, 0].max if status == 'completed' && call.started_at
-    # rubocop:disable Rails/SkipsModelValidations
-    call.update_columns(status: status, end_reason: END_REASON, duration_seconds: duration, updated_at: Time.current)
-    # rubocop:enable Rails/SkipsModelValidations
-    display_status = status.tr('_', '-')
-    call.message&.update!(content_attributes: (call.message.content_attributes || {}).deep_merge(
-      'data' => { 'status' => display_status, 'duration_seconds' => duration }.compact
-    ))
-    call.conversation.update!(additional_attributes: (call.conversation.additional_attributes || {}).merge('call_status' => display_status))
+    call.end!(reason: END_REASON)
+  rescue ActiveRecord::ActiveRecordError => e
+    Rails.logger.warn("[native-call-policy] call ##{call.id} left open: #{e.message}")
   end
 
   # Written past the callbacks: a save would run the provider-config change hooks, which

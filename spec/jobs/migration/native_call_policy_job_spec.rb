@@ -88,5 +88,25 @@ RSpec.describe Migration::NativeCallPolicyJob do
       expect(cloud.reload.status).to eq('in_progress')
       expect(cloud.message.reload.content_attributes['data']['status']).to eq('in-progress')
     end
+
+    # On CE nothing removes a deleted conversation's calls, so the call is all that is left.
+    it 'ends a call whose conversation was deleted' do
+      orphan = open_call(native_inbox, 'ringing')
+      orphan.message.delete
+      Conversation.where(id: orphan.conversation_id).delete_all
+
+      described_class.perform_now
+
+      expect(orphan.reload.status).to eq('no_answer')
+    end
+
+    it 'leaves a call open for the next run when what shows it cannot be written' do
+      call = open_call(native_inbox, 'ringing')
+      allow_any_instance_of(Message).to receive(:update!).and_raise(ActiveRecord::RecordInvalid) # rubocop:disable RSpec/AnyInstance
+
+      described_class.perform_now
+
+      expect(call.reload.status).to eq('ringing')
+    end
   end
 end
