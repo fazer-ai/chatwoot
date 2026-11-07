@@ -507,7 +507,30 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
 
       deliver(slice([historical('3EB0CARD', 2.days.ago, content: card)]))
 
-      expect(inbox.messages.find_by(source_id: '3EB0CARD').content_attributes['is_unsupported']).to be_nil
+      # Still a card, and its header still waits for the drain like any other history file.
+      message = inbox.messages.find_by(source_id: '3EB0CARD')
+      expect(message.content_attributes['is_unsupported']).to be_nil
+      expect(Whatsapp::Session::HistoryMedia.pending?(message)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    # The same card with a reference to its header: the header waits for the drain, and
+    # the card keeps rendering as a card meanwhile.
+    it 'keeps a card with text readable while its referenced header waits for the drain' do
+      ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/card', mime: 'image/jpeg')
+      card = model::Content::Rich.new(kind: 'button', title: 'Pedido #4312', body: 'Seu pedido saiu para entrega',
+                                      media: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+      deliver(slice([historical('3EB0CARD2', 2.days.ago, content: card)]))
+
+      message = inbox.messages.find_by(source_id: '3EB0CARD2')
+      expect(message.content_attributes['is_unsupported']).to be_nil
+      expect(Whatsapp::Session::HistoryMedia.pending?(message)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
     end
 
     # A caption edit is not the file: the bubble has to keep saying the file is missing.
@@ -529,20 +552,51 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
       again = historical('3EB0M2', 3.days.ago + 1.minute, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
 
+      # Through the inbox's drain, which reads the switch and the window before asking,
+      # with the reference this delivery brought kept for the ask.
       expect { Whatsapp::Session::Inbound::MessageWriter.fetch_media_for(image, again) }
-        .to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+        .not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      queued = Redis::Alfred.zrangebyscore(Whatsapp::Session::HistoryMedia.queue_key(inbox), '-inf', '+inf')
+      expect(queued).to eq([image.id.to_s])
+      expect(image.reload.content_attributes.dig('pending_media', 'ref', 'url')).to eq('https://connector.test/media/abc')
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    it 'asks for nothing on a redelivery once the inbox turned the automatic fetch off' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+      deliver(slice(messages))
+      image = inbox.messages.find_by(source_id: '3EB0M2')
+      ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
+      again = historical('3EB0M2', 3.days.ago + 1.minute, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
+
+      expect { Whatsapp::Session::Inbound::MessageWriter.fetch_media_for(image, again) }
+        .not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      expect(Redis::Alfred.zcard(Whatsapp::Session::HistoryMedia.queue_key(inbox))).to eq(0)
+      expect(Whatsapp::Session::HistoryMedia.pending?(image.reload)).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
     end
   end
 
-  # A provider whose history does carry the file's reference (uazapi) still gets it fetched.
-  it 'leaves an imported file that can still be fetched as a file' do
+  # A provider whose history does carry the file's reference (uazapi) still gets it fetched,
+  # through the inbox's drain like any other history file, reference and all.
+  it 'queues an imported file that can still be fetched, keeping its reference' do
     threads_of(a_contact, phone, %i[open])
     ref = model::MediaRef.new(kind: 'url', url: 'https://connector.test/media/abc', mime: 'image/jpeg')
     fetchable = historical('3EB0REF', 1.day.ago, content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', ref: ref))
 
     deliver(slice([fetchable]))
 
-    expect(inbox.messages.find_by(source_id: '3EB0REF').content_attributes['is_unsupported']).to be_nil
+    message = inbox.messages.find_by(source_id: '3EB0REF')
+    queue = Whatsapp::Session::HistoryMedia.queue_key(inbox)
+    expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([message.id.to_s])
+    expect(message.content_attributes.dig('pending_media', 'ref', 'url')).to eq('https://connector.test/media/abc')
+  ensure
+    Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+    Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
   end
 
   # The boundary is read once, when the slice is read, and handed to the job: slices of one

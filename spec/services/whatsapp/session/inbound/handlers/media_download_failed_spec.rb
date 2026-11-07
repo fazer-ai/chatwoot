@@ -55,6 +55,31 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MediaDownloadFailed do
       expect(message.reload.content_attributes['is_unsupported']).to be_nil
     end
 
+    # A file of an imported history is held to the inbox's switch and window like any
+    # other: it goes to the drain, which reads them before asking.
+    # Also the placeholder recovered live, which keeps `imported` but was rewritten without
+    # the history mark.
+    it 'hands a history file to the drain instead of asking at once' do
+      message.update!(content_attributes: message.content_attributes.merge('imported' => true))
+
+      expect { dispatch }.not_to have_enqueued_job(Whatsapp::Session::MediaFetchJob)
+      expect(Redis::Alfred.zrangebyscore(Whatsapp::Session::HistoryMedia.queue_key(inbox), '-inf', '+inf')).to eq([message.id.to_s])
+      # Rendered while it waits, with the button, even if the drain never gets to it.
+      expect(message.reload.content_attributes['is_unsupported']).to be(true)
+    ensure
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMedia.queue_key(inbox))
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    it 'leaves a history file whose download landed meanwhile as it is' do
+      message.update!(content_attributes: message.content_attributes.merge('imported' => true))
+      allow(Whatsapp::Session::HistoryMedia).to receive(:settled?).and_return(true)
+
+      dispatch
+
+      expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
+    end
+
     # A message published before the writer kept a descriptor, or one that never carried
     # media at all. There is nothing to rebuild an attachment from, so asking would fetch
     # bytes nothing could attach.

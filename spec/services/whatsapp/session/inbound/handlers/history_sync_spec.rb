@@ -147,6 +147,134 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
     end
   end
 
+  # A dump carries its files without a reference, so each one waits in the inbox's history
+  # queue, under the chat the event named, to be asked for by message id.
+  describe 'the files of the archive' do
+    before { cover! }
+
+    let(:queue) { Whatsapp::Session::HistoryMedia.queue_key(inbox) }
+    let(:messages) { [photo(id: 'HIST10', at: 3.days.ago), photo(id: 'HIST11', at: 90.days.ago)] }
+
+    after do
+      Redis::Alfred.delete(queue)
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+    end
+
+    def photo(id:, at:)
+      model::InboundMessage.new(
+        id: id, chat: chat, sender: sender, from_me: false, timestamp: (at.to_f * 1000).to_i,
+        content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', filename: 'foto.jpg')
+      )
+    end
+
+    it 'queues the files inside the window and keeps the chat each was filed under' do
+      dispatch
+
+      recent = inbox.messages.find_by(source_id: 'HIST10')
+      expect(recent.content_attributes['pending_chat']).to eq(chat.to_h)
+      queued = Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')
+      expect(queued).to eq([recent.id.to_s])
+      expect(Whatsapp::Session::HistoryMediaJob).to have_been_enqueued.with(inbox).exactly(:once)
+    end
+
+    # The batch wrote the row and failed before queuing its file (Redis went away), so its
+    # retry finds the row stored and would skip it for good.
+    it 'queues again a stored file a retried batch would skip' do
+      dispatch
+      Redis::Alfred.delete(queue)
+      Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(inbox))
+
+      deliver(event)
+
+      expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([inbox.messages.find_by(source_id: 'HIST10').id.to_s])
+    end
+
+    # The slice is written oldest first: a drain started halfway would take the newest of
+    # what is written so far before the newest of the slice.
+    context 'with several files inside the window' do
+      let(:messages) { [photo(id: 'HIST20', at: 3.days.ago), photo(id: 'HIST21', at: 2.days.ago)] }
+
+      it 'starts the drain only once the whole slice is written' do
+        written = nil
+        allow(Whatsapp::Session::HistoryMediaJob).to receive(:set).and_wrap_original do |original, *args, **options|
+          written ||= inbox.messages.where(source_id: %w[HIST20 HIST21]).count
+          original.call(*args, **options)
+        end
+
+        dispatch
+
+        expect(written).to eq(2)
+      end
+    end
+
+    # A file left waiting by an import from before the drain existed, or queued when nothing
+    # could run it: the next slice is what comes back for it, whatever that slice carries.
+    it 'asks for the files already waiting in the inbox once a slice is in, at most every few minutes' do
+      rescanned = "WHATSAPP::HISTORY_MEDIA_RESCANNED::#{inbox.id}"
+      requeue = Whatsapp::Session::HistoryMediaJob.requeue_key(inbox)
+      Redis::Alfred.delete(rescanned)
+
+      dispatch
+      expect(Redis::Alfred.exists?(requeue)).to be(true)
+
+      Redis::Alfred.delete(requeue)
+      deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages', data: { 'messages' => [photo(id: 'HIST12', at: 1.day.ago).to_h] })))
+      expect(Redis::Alfred.exists?(requeue)).to be(false)
+    ensure
+      Redis::Alfred.delete(rescanned)
+      Redis::Alfred.delete(requeue)
+    end
+
+    it 'queues nothing when the inbox turned the automatic fetch off' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+
+      dispatch
+
+      expect(inbox.messages.find_by(source_id: 'HIST10').content_attributes['history_media']).to be(true)
+      expect(Redis::Alfred.zcard(queue)).to eq(0)
+      expect(Whatsapp::Session::HistoryMediaJob).not_to have_been_enqueued
+    end
+
+    # A provider that hands the dump over with references (uazapi does) is held to the same
+    # switch and window: turning the option off must not download the archive anyway.
+    it 'holds files that came with a reference to the same switch and window' do
+      referenced = lambda do |id, at|
+        model::InboundMessage.new(
+          id: id, chat: chat, sender: sender, from_me: false, timestamp: (at.to_f * 1000).to_i,
+          content: model::Content::Media.new(kind: 'image', mime: 'image/jpeg', filename: 'foto.jpg',
+                                             ref: model::MediaRef.url('https://uazapi.test/media/x'))
+        )
+      end
+      channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 7))
+      deliver(model::Event.build(model::Events::HistorySync.new(
+                                   kind: 'messages',
+                                   data: { 'messages' => [referenced.call('REF1', 2.days.ago), referenced.call('REF2', 30.days.ago)].map(&:to_h) }
+                                 )))
+      expect(Whatsapp::Session::MediaFetchJob).not_to have_been_enqueued
+      # The one inside the window goes to the drain, which reads the settings again before
+      # downloading it; the one outside waits for the button or the conversation action.
+      # Both keep the reference the provider finds the file by.
+      inside = inbox.messages.find_by(source_id: 'REF1')
+      deferred = inbox.messages.find_by(source_id: 'REF2')
+      expect(Redis::Alfred.zrangebyscore(queue, '-inf', '+inf')).to eq([inside.id.to_s])
+      expect(Whatsapp::Session::HistoryMedia.pending?(deferred)).to be(true)
+      expect([inside, deferred].map { |message| message.content_attributes.dig('pending_media', 'ref') }).to all(be_present)
+
+      channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+      deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages',
+                                                                data: { 'messages' => [referenced.call('REF3', 1.day.ago).to_h] })))
+      expect(Redis::Alfred.zcard(queue)).to eq(1)
+    end
+
+    it 'measures the window the inbox chose' do
+      channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 120))
+
+      dispatch
+
+      expect(Redis::Alfred.zcard(queue)).to eq(2)
+    end
+  end
+
   describe 'the gap half' do
     before { cover! }
 

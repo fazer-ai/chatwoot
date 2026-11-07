@@ -201,6 +201,7 @@ Rails.application.routes.draw do
                   post :translate
                   post :retry
                   patch :edit_content
+                  post :fetch_media
                 end
                 resources :attachments, only: [:update]
                 scope module: :messages do
@@ -238,6 +239,7 @@ Rails.application.routes.draw do
               get :attachments
               get :inbox_assistant
               post :sync_history
+              post :fetch_history_media
               post :recheck_whatsapp_number
               get :reporting_events if ChatwootApp.enterprise?
             end

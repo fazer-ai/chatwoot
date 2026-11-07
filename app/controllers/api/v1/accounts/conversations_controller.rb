@@ -300,6 +300,18 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     head :ok
   end
 
+  # Asks for every history file this conversation is still missing, whatever its age: the
+  # inbox's automatic fetch stops at its window, and an old group is often the one somebody
+  # needs. The files arrive as updates of their messages.
+  def fetch_history_media
+    unless @conversation.inbox.channel.try(:session_provider?)
+      render json: { error: 'Inbox does not support history media' }, status: :unprocessable_entity and return
+    end
+
+    Whatsapp::Session::ConversationHistoryMediaJob.perform_later(@conversation)
+    head :accepted
+  end
+
   # Asked by the dashboard when it opens a conversation whose number was flagged as having no
   # WhatsApp. Only a flag older than the recheck window goes back to the provider, so opening
   # the same conversation again and again costs one lookup per window, not one per open. The

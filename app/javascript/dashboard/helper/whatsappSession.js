@@ -9,6 +9,17 @@
 export const SESSION_PROVIDERS = ['baileys', 'zapi', 'native', 'uazapi'];
 
 /**
+ * The providers this app serves through its own session layer, as opposed to the legacy
+ * ones it only labels. Mirrors `Whatsapp::Session::Registry.session_provider?`, which is
+ * what the history-file endpoints check: only this layer files a history message whose
+ * file is still to be fetched.
+ */
+export const SESSION_LAYER_PROVIDERS = ['native', 'uazapi'];
+
+export const isSessionLayerProvider = provider =>
+  SESSION_LAYER_PROVIDERS.includes(provider);
+
+/**
  * What a provider can actually do. Mirrors `Whatsapp::Session::Capabilities::ALL`, which
  * is what the server declares per provider and serves on the inbox payload.
  *

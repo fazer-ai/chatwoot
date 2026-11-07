@@ -50,7 +50,7 @@ class Whatsapp::Session::Inbound::MessageWriter
     return if media.nil? || media.ref.blank?
     return if message.attachments.any? || Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)
 
-    Whatsapp::Session::MediaFetchJob.perform_later(message, media.to_h, inbound.chat&.to_h)
+    Whatsapp::Session::HistoryMedia.route(message, inbound, media)
   end
 
   # Replaces the placeholder a message left behind with the message itself.

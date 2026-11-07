@@ -14,8 +14,12 @@ class Whatsapp::Session::Inbound::MessageAttributes
   HISTORY_MEDIA = 'history_media'.freeze
 
   # Unsupported for good, as opposed to an imported file that is still waiting for its bytes.
+  # A history card whose header is gone is marked apart (`media_unavailable`), since the
+  # card itself still reads.
   def self.given_up?(message)
     attributes = message.content_attributes || {}
+    return true if attributes['media_unavailable'].present?
+
     attributes['is_unsupported'].present? && attributes[HISTORY_MEDIA].blank?
   end
 
@@ -99,10 +103,23 @@ class Whatsapp::Session::Inbound::MessageAttributes
       unsupported_reason: (content.reason if content_type == 'unsupported'),
       # What arrived in the body's place, for whoever investigates the placeholder later.
       unsupported_detail: (content.detail if content_type == 'unsupported'),
-      # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
-      history_media: (true if imported && unfetchable_media?),
-      pending_media: pending_media,
       rich: (content.to_content_attribute if content_type == 'rich')
+    }.merge(history_file)
+  end
+
+  # What a history file whose bytes did not come needs to be asked for later. The header of
+  # a card with readable text counts too: the card is not marked unsupported, but the header
+  # is still worth asking for.
+  def history_file
+    pending = imported && pending_media.present?
+    {
+      # The key is HISTORY_MEDIA, spelled out so the hash keeps one syntax.
+      history_media: (true if pending),
+      pending_media: pending_media,
+      # The chat the file is asked for under: the provider files a history message in the
+      # chat the event named, which for a direct chat is not always the address the
+      # contact was resolved to (see Whatsapp::Session::HistoryMedia.chat_for).
+      pending_chat: (inbound.chat&.to_h if pending)
     }
   end
 

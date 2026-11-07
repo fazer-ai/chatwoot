@@ -13,6 +13,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # event carried.
   def perform(message, content, chat = nil)
     return if message.attachments.any?
+    return Whatsapp::Session::HistoryMedia.as_history(message) { perform(message, content, chat) } if imported?(message)
 
     channel = message.inbox.channel
     media = Whatsapp::Session::Model::Content.from_h(content)
@@ -40,6 +41,10 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   end
 
   private
+
+  def imported?(message)
+    message.content_attributes&.dig('imported').present? && !Import::SilentWrite.on?
+  end
 
   # One question in two halves, both about a queue entry that outlived a conversion: can
   # the inbox this message belongs to still fetch these bytes?
@@ -69,13 +74,34 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # rewritten away by this.
   #
   # An imported file stops waiting here too, or every later delivery of the same message
-  # would ask again for bytes the provider has just said it will not hand over.
+  # would ask again for bytes the provider has just said it will not hand over. The header
+  # of a readable history card is the exception to the flag: the card keeps its text and
+  # buttons, only without the picture.
   def give_up(message, reason)
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
-    message.update_under_lock!(is_unsupported: true)
+    return spare_card(message) if message.content_attributes&.dig('imported').present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
+
+    # The same file can be asked for twice at once (the drain and the button), and the other
+    # ask may have attached it by now: marking it unsupported would hide the file it got.
+    message.with_lock do
+      next if message.attachments.any?
+
+      message.update!(is_unsupported: true)
+    end
     return if message.content_attributes&.dig(history_media).blank?
 
     message.with_lock { message.update!(content_attributes: message.content_attributes.except(history_media)) }
+  end
+
+  # A history card whose header is gone keeps its text and buttons, so it is not marked
+  # unsupported; its own mark, which `given_up?` reads in place of that flag, keeps a later
+  # delivery from asking again.
+  def spare_card(message)
+    message.with_lock do
+      next if message.attachments.any?
+
+      message.update!(content_attributes: message.content_attributes.except(history_media).merge('media_unavailable' => true))
+    end
   end
 
   def history_media = Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA
@@ -97,9 +123,12 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
 
   def attach(message, media, payload)
     Whatsapp::Session::Inbound::MediaAttachment.build(message, media, payload)
-    # An imported file that was only waiting for its reference is a file again.
-    if message.content_attributes&.dig(history_media).present?
-      message.content_attributes = message.content_attributes.except('is_unsupported', history_media)
+    # An imported file that was only waiting for its reference is a file again, and so is
+    # one another ask had just given up on: two asks for the same file can overlap (the
+    # drain and the button), and the one that lost must not leave the file hidden.
+    attributes = message.content_attributes || {}
+    if attributes[history_media].present? || attributes['imported'].present?
+      message.content_attributes = attributes.except('is_unsupported', history_media, 'media_unavailable')
     end
     # Adding an attachment changes no column on the message, and
     # `Message#dispatch_update_event` returns early on an empty `previous_changes`, so

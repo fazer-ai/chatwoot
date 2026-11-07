@@ -27,6 +27,28 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     expect(message.content_attributes['imported']).to be(true)
   end
 
+  # The file of an archived message must not wake the bots and webhooks the import kept
+  # quiet: it is written as history, which still reaches the open dashboard.
+  it 'writes the file of an imported message as history, and a live one as live' do
+    levels = []
+    allow(backend).to receive(:download_media).and_wrap_original do |original, command|
+      levels << [Import::SilentWrite.announce?, Import::SilentWrite.archive?]
+      original.call(command)
+    end
+    live = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA0002')
+    gap = create(:message, conversation: conversation, inbox: inbox, account: channel.account, source_id: '3EB0AAAA0003',
+                           content_attributes: { 'imported' => true })
+    message.update!(content_attributes: { 'is_unsupported' => true, 'history_media' => true, 'imported' => true, 'history_archive' => true })
+
+    described_class.perform_now(message, media.to_h)
+    described_class.perform_now(gap, media.to_h)
+    described_class.perform_now(live, media.to_h)
+
+    # The archive stays archive; the gap, unread work recovered late, keeps what a live
+    # arrival sets off apart from the bots and webhooks.
+    expect(levels).to eq([[true, true], [true, false], [false, false]])
+  end
+
   # The provider has just said these bytes are not coming, so a later delivery of the same
   # message must not ask again.
   it 'stops an imported placeholder waiting once the provider gives up on its bytes' do
@@ -91,6 +113,56 @@ RSpec.describe Whatsapp::Session::MediaFetchJob do
     described_class.perform_now(message, media.to_h)
 
     expect(message.reload.attachments.first).to have_attributes(file_type: 'image')
+  end
+
+  # The other way round: the other ask gave up first, then this one got the file.
+  it 'shows a file this ask got after another ask gave up on it' do
+    message.update!(content_attributes: { 'imported' => true, 'is_unsupported' => true })
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.attachments.count).to eq(1)
+    expect(message.content_attributes).not_to include('is_unsupported')
+  end
+
+  # The drain and the button asked for the same file at once, and the other ask got it.
+  it 'does not hide a file another ask attached while this one failed' do
+    message.update!(content_attributes: { 'history_media' => true, 'imported' => true })
+    allow(backend).to receive(:download_media) do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      attachment.save!
+      raise Whatsapp::Session::Errors::MediaUnavailable, 'gone'
+    end
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes['is_unsupported']).to be_blank
+  end
+
+  # A history card's header that WhatsApp no longer serves: the card's text and buttons
+  # are all there, so it stays a card, without the picture and without asking again.
+  it 'keeps a readable history card a card when its header is gone' do
+    message.update!(content: 'Pedido #4312', content_attributes: { 'history_media' => true, 'imported' => true,
+                                                                   'rich' => { 'title' => 'Pedido #4312' } })
+    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::MediaUnavailable, 'gone')
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes).not_to include('is_unsupported', 'history_media')
+    # Gone for good all the same: a later delivery with the header's reference asks for nothing.
+    expect(Whatsapp::Session::Inbound::MessageAttributes.given_up?(message)).to be(true)
+  end
+
+  # Two asks were queued for the header; the second fails after the first already gave up.
+  it 'keeps a readable history card a card when a second ask for its header fails too' do
+    message.update!(content: 'Pedido #4312', content_attributes: { 'imported' => true, 'media_unavailable' => true,
+                                                                   'rich' => { 'title' => 'Pedido #4312' } })
+    allow(backend).to receive(:download_media).and_raise(Whatsapp::Session::Errors::MediaUnavailable, 'gone')
+
+    described_class.perform_now(message, media.to_h)
+
+    expect(message.reload.content_attributes).not_to include('is_unsupported')
   end
 
   # A file whose bytes never came with the message has no ref to carry, and the provider

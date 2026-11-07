@@ -63,8 +63,10 @@ class Whatsapp::Session::Inbound::HistoryImporter
     # against the same boundary, or the first imported message would move the line the
     # rest of its own batch is measured against.
     watermark = @watermark.equal?(UNREAD) ? inbound::Coverage.watermark(inbox) : @watermark
-    Import::SilentWrite.wrap do
-      batches.each_value { |batch| import_chat(batch, watermark) }
+    Whatsapp::Session::HistoryMediaJob.holding(inbox) do
+      Import::SilentWrite.wrap do
+        batches.each_value { |batch| import_chat(batch, watermark) }
+      end
     end
     # After the messages, so a slice that is both the last of a chat and the first this
     # inbox sees of it marks the thread its own messages just opened.
@@ -125,9 +127,15 @@ class Whatsapp::Session::Inbound::HistoryImporter
   # hundred and forty seven messages one instance sent were second copies of an id already
   # in the same dump. They happened to fall in different batches there, where the stored
   # row catches them, but nothing promises that.
+  #
+  # A row already stored may be one whose file was never queued: a retry of a batch that
+  # failed between writing it and tracking it skips it here, so it is tracked again (track
+  # only queues what is still pending and inside the window).
   def unstored(ordered)
     ordered = ordered.uniq(&:id)
-    stored = inbox.messages.where(source_id: ordered.map(&:id)).pluck(:source_id).to_set
+    rows = inbox.messages.where(source_id: ordered.map(&:id))
+    rows.where.missing(:attachments).find_each { |row| Whatsapp::Session::HistoryMedia.track(row) }
+    stored = rows.pluck(:source_id).to_set
     ordered.reject { |message| stored.include?(message.id) }
   end
 
@@ -207,8 +215,11 @@ class Whatsapp::Session::Inbound::HistoryImporter
     conversation
   end
 
+  # A file the dump carried no reference for goes to the inbox's history queue, which asks
+  # for it by message id (Whatsapp::Session::HistoryMedia).
   def write(conversation, sender, message)
     inbound::MessageWriter.new(conversation: conversation, inbound: message, sender: sender, imported: true).perform
+                          .tap { |stored| Whatsapp::Session::HistoryMedia.track(stored) if stored.is_a?(Message) }
   end
 
   # What the suppressed callbacks would have kept up to date, applied once per

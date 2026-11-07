@@ -12,6 +12,8 @@ import EmailTranscriptModal from './EmailTranscriptModal.vue';
 import ResolveAction from '../../buttons/ResolveAction.vue';
 import ButtonV4 from 'dashboard/components-next/button/Button.vue';
 import DropdownMenu from 'dashboard/components-next/dropdown-menu/DropdownMenu.vue';
+import ConversationApi from 'dashboard/api/inbox/conversation';
+import { isSessionLayerProvider } from 'dashboard/helper/whatsappSession';
 
 import {
   CMD_MUTE_CONVERSATION,
@@ -64,6 +66,22 @@ useKeyboardEvents({
   'Alt+KeyI': { action: togglePin },
 });
 
+// The files of an imported history that the inbox's automatic fetch left behind, for one
+// conversation: somebody reading an old group is who needs them.
+const canFetchHistoryMedia = computed(() => {
+  const inbox = store.getters['inboxes/getInbox'](currentChat.value.inbox_id);
+  return isSessionLayerProvider(inbox?.provider);
+});
+
+const fetchHistoryMedia = async () => {
+  try {
+    await ConversationApi.fetchHistoryMedia(currentChat.value.id);
+    useAlert(t('CONVERSATION.HISTORY_MEDIA.DOWNLOAD_ALL_REQUESTED'));
+  } catch (error) {
+    useAlert(t('CONVERSATION.HISTORY_MEDIA.DOWNLOAD_ALL_ERROR'));
+  }
+};
+
 const actionMenuItems = computed(() => {
   const items = [];
 
@@ -101,6 +119,15 @@ const actionMenuItems = computed(() => {
     value: 'send_transcript',
   });
 
+  if (canFetchHistoryMedia.value) {
+    items.push({
+      icon: 'i-lucide-download',
+      label: t('CONVERSATION.HISTORY_MEDIA.DOWNLOAD_ALL'),
+      action: 'fetch_history_media',
+      value: 'fetch_history_media',
+    });
+  }
+
   return items;
 });
 
@@ -117,6 +144,8 @@ const handleActionClick = ({ action }) => {
     togglePin();
   } else if (action === 'send_transcript') {
     toggleEmailModal();
+  } else if (action === 'fetch_history_media') {
+    fetchHistoryMedia();
   }
 };
 

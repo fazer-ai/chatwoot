@@ -111,7 +111,17 @@
         }
       }
     },
-    "WHATSAPP_NUMBER_MISSING_BANNER": "This number had no WhatsApp when checked on {date}. Messages sent to it are not delivered."
+    "WHATSAPP_NUMBER_MISSING_BANNER": "This number had no WhatsApp when checked on {date}. Messages sent to it are not delivered.",
+    "HISTORY_MEDIA": {
+      "PENDING": "This file from the imported history has not been downloaded yet.",
+      "DOWNLOAD": "Download file",
+      "REQUESTED": "Download requested. The file will show up here when it arrives.",
+      "ERROR": "Could not request the download. Try again.",
+      "UNAVAILABLE": "This file is no longer available on WhatsApp.",
+      "DOWNLOAD_ALL": "Download history files",
+      "DOWNLOAD_ALL_REQUESTED": "Downloading the history files of this conversation. They will show up as they arrive.",
+      "DOWNLOAD_ALL_ERROR": "Could not request the history files. Try again."
+    }
   },
   "CONVERSATION_SIDEBAR": {
     "ACCORDION": {

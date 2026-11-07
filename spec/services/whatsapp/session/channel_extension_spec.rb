@@ -128,6 +128,66 @@ RSpec.describe Whatsapp::Session::ChannelExtension do
     end
   end
 
+  describe 'the history files settings' do
+    let(:channel) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+
+    it 'keeps a positive whole window and a boolean switch' do
+      channel.provider_config = channel.provider_config.merge('history_media_days' => 7, 'history_media_fetch' => false)
+
+      expect(channel).to be_valid
+    end
+
+    # A window of zero, a negative one or a string would turn the automatic fetch off
+    # without saying so.
+    it 'refuses a window that is not a positive whole number of days' do
+      [0, -5, '7', 7.5].each do |days|
+        channel.provider_config = channel.provider_config.merge('history_media_days' => days)
+
+        expect(channel).not_to be_valid, "expected #{days.inspect} to be refused"
+      end
+    end
+
+    # The drain stops without dropping the files that waited while the option was off, and
+    # nothing else would wake it until the next import.
+    context 'when the automatic fetch comes to cover more' do
+      let(:rescan) { Whatsapp::Session::HistoryMediaJob.requeue_key(channel.inbox) }
+
+      after do
+        Redis::Alfred.delete(Whatsapp::Session::HistoryMediaJob.scheduled_key(channel.inbox))
+        Redis::Alfred.delete(rescan)
+      end
+
+      it 'collects the files it now covers when it is turned back on' do
+        channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
+
+        expect do
+          channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => true))
+        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox)
+        expect(Redis::Alfred.exists?(rescan)).to be(true)
+      end
+
+      it 'collects the files a wider window now covers' do
+        expect do
+          channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 90))
+        end.to have_enqueued_job(Whatsapp::Session::HistoryMediaJob).with(channel.inbox)
+        expect(Redis::Alfred.exists?(rescan)).to be(true)
+      end
+    end
+
+    it 'leaves the drain alone when the window narrows or another setting changes' do
+      expect do
+        channel.update!(provider_config: channel.provider_config.merge('history_media_days' => 10))
+        channel.update!(provider_config: channel.provider_config.merge('mark_as_read' => false))
+      end.not_to have_enqueued_job(Whatsapp::Session::HistoryMediaJob)
+    end
+
+    it 'refuses a switch that is not a boolean' do
+      channel.provider_config = channel.provider_config.merge('history_media_fetch' => 'false')
+
+      expect(channel).not_to be_valid
+    end
+  end
+
   describe 'connection payload' do
     let(:channel) do
       create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false, sync_templates: false)
