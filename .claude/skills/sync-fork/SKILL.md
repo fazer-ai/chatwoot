@@ -27,7 +27,7 @@ Switch to the local `chatwoot-pro-main` branch, pull it even with `chatwoot-pro/
 
 ⚠️ Pro's trunk is `main` on the `chatwoot-pro` remote; `chatwoot-pro-main` is only the local branch name, so it does not collide with CE's `main` (see **Pro repo gotchas** in `AGENTS.md`). **Never push the local branch by name**: `git push chatwoot-pro chatwoot-pro-main` recreates a stray remote `chatwoot-pro-main`, which is what collected every push for a month in 2026-08 while `main` went stale. Always `HEAD:main`.
 
-- HEAD = Pro (`chatwoot-pro-main`), MERGE_HEAD = CE (`main`).
+- HEAD = Pro's trunk, MERGE_HEAD = CE (`main`).
 - Pro is a strict superset of CE: every conflict is either "CE changed something we overrode" (usually KC/CO to preserve Pro behavior) or "CE added new code next to our additions" (usually CO).
 - Recurring patterns below tagged **[Pro]** list files that conflict on almost every CE→Pro merge.
 
@@ -90,10 +90,9 @@ git remote -v               # should show `chatwoot-pro` remote pointing at faze
 >
 > ```sh
 > gh repo set-default fazer-ai/chatwoot       # CE merge → PR/CI on the CE fork
-> gh repo set-default fazer-ai/chatwoot-pro   # Pro merge → PR/CI on the Pro repo
 > ```
 >
-> Or pass `--repo` explicitly on every `gh pr create` / `gh workflow run`.
+> Or pass `--repo` explicitly on every `gh pr create` / `gh workflow run`. The Pro repo is on the Forgejo (`git.fazer.ai`) since 2026-11-05, so `gh` does not reach it at all: for the Pro merge use `forja` (fazer-ai-tools plugin, same syntax as `gh`) with `--repo git.fazer.ai/fazer-ai/chatwoot-pro` on every command.
 
 Terminology used in this skill:
 - **HEAD / current / ours** = the branch you're sitting on (the one receiving the merge).
@@ -404,7 +403,7 @@ gh run list --workflow=run_foss_spec.yml --branch chore/merge-upstream-X.Y.Z --l
 gh run watch <run-id>                                                                    # or poll with `gh run view <run-id>`
 ```
 
-For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and runs on a staging branch before `main` moves: push the merge to the `chatwoot-pro` remote as `sync/ce-<tag>`, then dispatch both suites on it, since a branch push alone triggers neither (`gh workflow run run_foss_spec.yml --repo fazer-ai/chatwoot-pro --ref sync/ce-<tag> -f full=true` and `gh workflow run run_ee_spec.yml --repo fazer-ai/chatwoot-pro --ref sync/ce-<tag>`; the second is the only CI that runs `spec/enterprise`). Only after both are green, `git push chatwoot-pro HEAD:main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
+For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo on the Forgejo and runs on the Forgejo runners (`.forgejo/workflows/`), on a staging branch before `main` moves: push the merge to the `chatwoot-pro` remote as `sync/ce-<tag>`, then dispatch both suites on it, since a branch push alone triggers neither (`forja workflow run run_foss_spec.yml --repo git.fazer.ai/fazer-ai/chatwoot-pro --ref sync/ce-<tag> -f full=true` and `forja workflow run run_ee_spec.yml --repo git.fazer.ai/fazer-ai/chatwoot-pro --ref sync/ce-<tag>`; the second is the only CI that runs `spec/enterprise`). Follow them with `forja run list --repo git.fazer.ai/fazer-ai/chatwoot-pro --workflow <file> --branch sync/ce-<tag> --limit 1` and `forja run view <id> --repo git.fazer.ai/fazer-ai/chatwoot-pro --json status,conclusion` (`forja` has no `run watch`), and read a failure with `forja run view <id> --repo git.fazer.ai/fazer-ai/chatwoot-pro --log-failed`. Only after both are green, `git push chatwoot-pro HEAD:main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
 
 ## Merging the sync PR: merge commit, NEVER squash
 
