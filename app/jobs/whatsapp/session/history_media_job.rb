@@ -49,7 +49,13 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
   # A slice is written oldest first. A drain started while it is being written takes the
   # newest file written so far, so the import holds the kicks of its files until the slice
   # is in and kicks once (Inbound::HistoryImporter#perform).
+  #
+  # The end of a slice also collects the files already waiting in the inbox, at most once
+  # per RESCAN_EVERY: a file is queued when it is written, and one written before this
+  # existed, or queued when nothing could run it, would otherwise wait for a change of the
+  # settings to be asked for.
   HOLD = :whatsapp_history_media_hold
+  RESCAN_EVERY = 10.minutes
 
   def self.holding(inbox)
     previous = ActiveSupport::IsolatedExecutionState[HOLD]
@@ -57,7 +63,14 @@ class Whatsapp::Session::HistoryMediaJob < ApplicationJob
     yield
   ensure
     ActiveSupport::IsolatedExecutionState[HOLD] = previous
-    kick(inbox) if held.present?
+    after_slice(inbox, held)
+  end
+
+  def self.after_slice(inbox, held)
+    return unless Whatsapp::Session::HistoryMedia.enabled?(inbox.channel.provider_config)
+
+    rescan = Redis::Alfred.set("WHATSAPP::HISTORY_MEDIA_RESCANNED::#{inbox.id}", '1', nx: true, ex: RESCAN_EVERY.to_i)
+    kick(inbox, requeue: rescan.present?) if held.present? || rescan
   end
 
   def self.scheduled_key(inbox) = "WHATSAPP::HISTORY_MEDIA_SCHEDULED::#{inbox.id}"

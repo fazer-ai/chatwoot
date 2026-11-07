@@ -207,6 +207,24 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::HistorySync do
       end
     end
 
+    # A file left waiting by an import from before the drain existed, or queued when nothing
+    # could run it: the next slice is what comes back for it, whatever that slice carries.
+    it 'asks for the files already waiting in the inbox once a slice is in, at most every few minutes' do
+      rescanned = "WHATSAPP::HISTORY_MEDIA_RESCANNED::#{inbox.id}"
+      requeue = Whatsapp::Session::HistoryMediaJob.requeue_key(inbox)
+      Redis::Alfred.delete(rescanned)
+
+      dispatch
+      expect(Redis::Alfred.exists?(requeue)).to be(true)
+
+      Redis::Alfred.delete(requeue)
+      deliver(model::Event.build(model::Events::HistorySync.new(kind: 'messages', data: { 'messages' => [photo(id: 'HIST12', at: 1.day.ago).to_h] })))
+      expect(Redis::Alfred.exists?(requeue)).to be(false)
+    ensure
+      Redis::Alfred.delete(rescanned)
+      Redis::Alfred.delete(requeue)
+    end
+
     it 'queues nothing when the inbox turned the automatic fetch off' do
       channel.update!(provider_config: channel.provider_config.merge('history_media_fetch' => false))
 
