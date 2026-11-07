@@ -162,6 +162,35 @@ describe('WhatsappHistorySync', () => {
       });
     });
 
+    // The switch is saved on click and the inbox reloads with what the server holds; a
+    // window typed meanwhile must survive that reload and be what the next save sends.
+    it('keeps a window typed while the switch was being saved', async () => {
+      const wrapper = await mountSection(NATIVE);
+      wrapper.vm.editWindowDays(7);
+
+      await wrapper.setProps({
+        inbox: {
+          ...NATIVE,
+          provider_config: {
+            ...NATIVE.provider_config,
+            history_media_fetch: false,
+          },
+        },
+      });
+      expect(wrapper.vm.windowDays).toBe(7);
+      expect(wrapper.vm.fetchMedia).toBe(false);
+
+      await wrapper.vm.saveWindowDays();
+      expect(mockDispatch).toHaveBeenLastCalledWith(
+        'inboxes/updateInbox',
+        expect.objectContaining({
+          channel: {
+            provider_config: expect.objectContaining({ history_media_days: 7 }),
+          },
+        })
+      );
+    });
+
     // Each save sends the whole config, so a second one sent while the first is still
     // out would carry the switch from before it and turn the fetch back on.
     it('holds a second save until the first one comes back', async () => {

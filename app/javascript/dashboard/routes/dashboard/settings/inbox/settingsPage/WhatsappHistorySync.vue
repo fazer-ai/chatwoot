@@ -57,11 +57,19 @@ const historyMediaSupported = computed(
 );
 const fetchMedia = ref(true);
 const windowDays = ref(DEFAULT_HISTORY_MEDIA_DAYS);
+// A window typed and not saved yet is the operator's: the inbox reloading after the switch
+// was saved must not put the stored value back over it.
+const windowEdited = ref(false);
 const readHistoryMedia = config => {
   fetchMedia.value = config?.history_media_fetch !== false;
-  windowDays.value = config?.history_media_days ?? DEFAULT_HISTORY_MEDIA_DAYS;
+  if (!windowEdited.value)
+    windowDays.value = config?.history_media_days ?? DEFAULT_HISTORY_MEDIA_DAYS;
 };
 watch(() => props.inbox.provider_config, readHistoryMedia, { immediate: true });
+const editWindowDays = value => {
+  windowEdited.value = true;
+  windowDays.value = value;
+};
 
 const windowDaysValid = computed(
   () => Number.isInteger(windowDays.value) && windowDays.value > 0
@@ -108,11 +116,14 @@ const saveFetchMedia = () =>
     readHistoryMedia(props.inbox.provider_config)
   );
 
-const saveWindowDays = () => {
+const saveWindowDays = async () => {
   if (!windowDaysValid.value) return;
-  saveConfig({ history_media_days: windowDays.value }, () =>
-    readHistoryMedia(props.inbox.provider_config)
-  );
+  await saveConfig({ history_media_days: windowDays.value }, () => {
+    windowEdited.value = false;
+    readHistoryMedia(props.inbox.provider_config);
+  });
+  if (props.inbox.provider_config?.history_media_days === windowDays.value)
+    windowEdited.value = false;
 };
 </script>
 
@@ -162,7 +173,7 @@ const saveWindowDays = () => {
         <div class="flex items-end gap-2">
           <Input
             id="history_media_days"
-            v-model="windowDays"
+            :model-value="windowDays"
             type="number"
             min="1"
             class="w-48"
@@ -180,6 +191,7 @@ const saveWindowDays = () => {
                   )
             "
             :message-type="windowDaysValid ? 'info' : 'error'"
+            @update:model-value="editWindowDays"
             @enter="saveWindowDays"
           />
           <NextButton
