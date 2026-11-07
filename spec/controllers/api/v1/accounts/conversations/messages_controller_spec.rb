@@ -987,7 +987,9 @@ RSpec.describe 'Conversation Messages API', type: :request do
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
              params: { content: 'x', message_type: message_type, content_attributes: forged }, headers: admin.create_new_auth_token, as: :json
         written = conversation.messages.find(response.parsed_body['id'])
-        expect(written.content_attributes).to include('history_media' => true)
+        # Set afterwards, as if a client could still get them in: provenance has to hold alone.
+        expect(written.content_attributes).not_to include('history_media', 'pending_media')
+        written.update!(content_attributes: written.content_attributes.merge(forged), source_id: 'FAKE1')
 
         expect do
           post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{written.id}/fetch_media",
@@ -996,6 +998,18 @@ RSpec.describe 'Conversation Messages API', type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
       end
+    end
+
+    # An author deleted later leaves the message with no sender, which is what a message sent
+    # from the phone looks like: the marks must never get in from a client to begin with.
+    it 'drops the history marks a client sends with a new message' do
+      sent = { 'history_media' => true, 'imported' => true, 'pending_media' => pending_media, 'in_reply_to' => message.id }
+      post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
+           params: { content: 'x', source_id: 'FAKE2', content_attributes: sent }, headers: admin.create_new_auth_token, as: :json
+
+      written = conversation.messages.find(response.parsed_body['id'])
+      expect(written.content_attributes).not_to include('history_media', 'imported', 'pending_media')
+      expect(written.content_attributes['in_reply_to']).to eq(message.id)
     end
 
     it 'answers not found for a message of another conversation' do

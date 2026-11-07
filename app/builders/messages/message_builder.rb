@@ -48,12 +48,17 @@ class Messages::MessageBuilder
   def content_attributes
     params = convert_to_hash(@params)
     content_attributes = params.fetch(:content_attributes, {})
+    content_attributes = safe_parse_json(content_attributes) if content_attributes.is_a?(String)
+    return {} unless content_attributes.is_a?(Hash)
 
-    return safe_parse_json(content_attributes) if content_attributes.is_a?(String)
-    return content_attributes if content_attributes.is_a?(Hash)
-
-    {}
+    content_attributes.with_indifferent_access.except(*SERVER_CONTENT_ATTRIBUTES)
   end
+
+  # Written by the WhatsApp session layer on the messages of an imported history, and read
+  # as proof that a file is waiting to be downloaded from the provider. A client that could
+  # set them would have the provider download a URL of its choosing with the connector's
+  # token (Whatsapp::Session::HistoryMedia).
+  SERVER_CONTENT_ATTRIBUTES = %w[history_media pending_media pending_chat imported history_archive media_unavailable].freeze
 
   def process_attachments
     (Array(@attachments) + forwarded_attachments).each do |uploaded_attachment|
