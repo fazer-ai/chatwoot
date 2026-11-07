@@ -25,7 +25,7 @@ bundle exec rails branding:update
 
 ### With `CW_EDITION=ee`
 
-With Enterprise loaded, the Branding page is not offered. Enterprise runs exactly as upstream publishes it, and it owns these keys: custom branding is one of its premium features, and on an installation whose Chatwoot plan is `community` its plan reconciliation (`Internal::ReconcilePlanConfigService`) puts every key in `enterprise/config/premium_installation_config.yml` back to its default whenever a Rails process boots and once a day. The fork does not change that behavior, so on that plan a brand set through the database does not last.
+With Enterprise loaded, the Branding page is not offered. Enterprise runs exactly as upstream publishes it, and it owns these keys: custom branding is one of its premium features, and on an installation whose Chatwoot plan is `community` its plan reconciliation (`Internal::ReconcilePlanConfigService`) puts every key in `enterprise/config/premium_installation_config.yml` back to its default whenever a Rails process boots and once a day. The fork does not change that behavior, so on that plan a brand set through the database does not last. That includes a brand saved on the Branding page: turning Enterprise on resets it, and turning Enterprise off again does not bring it back. To restore it, save it again on the Branding page, or run `branding:update` with `BRANDING_FORCE=true`.
 
 | Environment variable | Default Value                               | Description                                                           |
 | :--------------------| :------------------------------------------ | :-------------------------------------------------------------------- |
@@ -70,7 +70,7 @@ The public survey page a contact opens from a CSAT request wears the same brand,
 | Brand color   | The confirm and submit buttons, the selected rating, and the focus rings  |
 | Email logo    | The footer mark, and the top of the page when the inbox has no avatar     |
 
-Enable `disable_branding` on the account to drop the footer line entirely, the same way the widget and the help center portal already honour it.
+Enable `disable_branding` on the account (a premium Chatwoot Enterprise feature, which needs a Chatwoot Enterprise license and `CW_EDITION=ee`) to drop the footer line entirely, the same way the widget and the help center portal already honour it.
 
 > [!NOTE]
 > This covers what a customer of the account sees: their email, and the public survey page. The dashboard, the login page, the favicon, the PWA manifest and the widget are the installation's own surfaces and always use the installation branding.

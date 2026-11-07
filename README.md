@@ -97,6 +97,8 @@ Com `CW_EDITION=ee`, o container baixa no boot o diretório `enterprise/` da tag
 
 Com `CW_EDITION=ee`, o código Enterprise roda exatamente como a Chatwoot Inc. o publica para aquela versão, sem alterações ou patches do fork. A página “Marca” do super admin do fork só existe sem Enterprise; com Enterprise ativo, a marca segue as regras dele: a personalização é um recurso premium, e o plano community restaura as configurações de marca aos valores padrão. Consulte [CUSTOM_BRANDING.md](CUSTOM_BRANDING.md) para os detalhes.
 
+Isso vale para a imagem Docker. Numa instalação a partir do código-fonte, o diretório `enterprise/` do checkout é carregado sempre que existe, com ou sem `CW_EDITION`; para rodar a edição Community, remova o diretório.
+
 ## Instalar
 
 ### Com o instalador do fazer.ai agents

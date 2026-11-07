@@ -1,5 +1,7 @@
 # Captain V1 retirement for self-hosted installations
 
+Captain is a Chatwoot Enterprise feature: it needs a Chatwoot Enterprise license and `CW_EDITION=ee` on web and Sidekiq.
+
 Captain uses the V2 runtime after this change. Existing assistants, inbox links, and knowledge sources remain in place. Legacy `config.instructions` is retained as migration source data, but the runtime no longer reads it. Move any behavior that depends on those instructions before installing the release that removes V1.
 
 The conversion task is optional. Installations with no V1 instructions do not need it. Teams can also configure V2 manually. Existing V1 instructions must be reviewed and moved into V2 settings by one of these paths to preserve their behavior. Keeping the V1 runtime as an opt-in is not supported.
