@@ -93,4 +93,15 @@ RSpec.describe Whatsapp::Session::ConversationHistoryMediaJob do
     expect(backend.commands.map(&:message_id)).to eq(['T2'])
     expect(described_class).to have_been_enqueued.with(conversation, second.id)
   end
+
+  # The query finds the marks; only the check that the message came from WhatsApp keeps a
+  # row an agent wrote out of the provider's download.
+  it 'leaves out a message with the marks that an agent wrote' do
+    agent_row = pending(conversation, 'AGENT1', 1.hour.ago)
+    agent_row.update!(message_type: :outgoing, sender: create(:user, account: channel.account))
+
+    described_class.perform_now(conversation)
+
+    expect(backend.commands).to be_empty
+  end
 end
