@@ -79,7 +79,7 @@ class Whatsapp::Session::MediaFetchJob < ApplicationJob
   # buttons, only without the picture.
   def give_up(message, reason)
     Rails.logger.warn("[WHATSAPP SESSION] media unavailable for message #{message.id}: #{reason}")
-    return spare_card(message) if message.content_attributes&.dig(history_media).present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
+    return spare_card(message) if message.content_attributes&.dig('imported').present? && Whatsapp::Session::HistoryMedia.readable_card?(message)
 
     # The same file can be asked for twice at once (the drain and the button), and the other
     # ask may have attached it by now: marking it unsupported would hide the file it got.
