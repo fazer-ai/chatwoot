@@ -55,4 +55,38 @@ RSpec.describe Migration::NativeCallPolicyJob do
       expect(Time.zone.parse(scheduled[channels.last.id]) - Time.zone.parse(first_four.first)).to eq(10)
     end
   end
+
+  # Nothing reads a connector call's end any more, so one ringing or under way at the upgrade
+  # would stay open, block the next call and ring again whenever its message loads.
+  describe 'connector calls still open' do
+    let(:native_inbox) { create(:inbox, channel: native('connection' => 'close')) }
+    let(:cloud_inbox) do
+      create(:inbox, channel: create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false))
+    end
+
+    def open_call(inbox, status, started_at: nil)
+      conversation = create(:conversation, account: inbox.account, inbox: inbox)
+      message = create(:message, account: inbox.account, inbox: inbox, conversation: conversation, content_type: :voice_call,
+                                 content_attributes: { 'data' => { 'status' => status.tr('_', '-') } })
+      described_class::OpenCall.create!(account_id: inbox.account_id, inbox_id: inbox.id, conversation_id: conversation.id,
+                                        contact_id: conversation.contact_id, message_id: message.id, provider: 1, direction: 0,
+                                        provider_call_id: SecureRandom.hex(6), status: status, started_at: started_at)
+    end
+
+    it 'ends them, in the record, the message and the conversation, and leaves a Cloud call alone' do
+      ringing = open_call(native_inbox, 'ringing')
+      talking = open_call(native_inbox, 'in_progress', started_at: 2.minutes.ago)
+      cloud = open_call(cloud_inbox, 'in_progress', started_at: 2.minutes.ago)
+
+      described_class.perform_now
+
+      expect(ringing.reload).to have_attributes(status: 'no_answer', end_reason: described_class::END_REASON)
+      expect(ringing.message.reload.content_attributes['data']['status']).to eq('no-answer')
+      expect(talking.reload).to have_attributes(status: 'completed', duration_seconds: be_within(5).of(120))
+      expect(talking.message.reload.content_attributes['data']).to include('status' => 'completed')
+      expect(talking.conversation.reload.additional_attributes['call_status']).to eq('completed')
+      expect(cloud.reload.status).to eq('in_progress')
+      expect(cloud.message.reload.content_attributes['data']['status']).to eq('in-progress')
+    end
+  end
 end

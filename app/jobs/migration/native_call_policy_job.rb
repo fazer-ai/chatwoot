@@ -9,6 +9,11 @@
 # nobody here takes. The `calling_enabled` flag such an inbox kept is cleared first, so the
 # record no longer says calls are on.
 #
+# A connector call still ringing or under way at the upgrade is ended here too: nothing
+# reads its `call.terminate` any more, so it would stay open for good, block the next call
+# and come back as ringing whenever its message is loaded. Only calls of the session inboxes:
+# a Cloud API call is Enterprise's, and its end still arrives through Meta.
+#
 # Each inbox goes through ApplyProxyJob, which sends the whole desired state and retries while
 # the connector is down. They are spread a few at a time, the pacing of the
 # `whatsapp:session:reassert` rake: `wa:control` is one stream for the whole fleet, and every
@@ -20,9 +25,11 @@ class Migration::NativeCallPolicyJob < ApplicationJob
 
   BATCH = 4
   PAUSE = 10.seconds
+  END_REASON = 'connector_calling_withdrawn'.freeze
 
   def perform
     clear_calling_flags
+    end_open_calls
 
     channels = Channel::Whatsapp.where(provider: 'native').select(&:resumable_session?)
 
@@ -34,6 +41,26 @@ class Migration::NativeCallPolicyJob < ApplicationJob
   end
 
   private
+
+  def end_open_calls
+    inbox_ids = Inbox.where(channel_type: 'Channel::Whatsapp',
+                            channel_id: Channel::Whatsapp.where(provider: Whatsapp::Session::PROVIDERS).select(:id)).select(:id)
+    OpenCall.where(inbox_id: inbox_ids, status: %w[ringing in_progress]).find_each { |call| end_call(call) }
+  end
+
+  # Ringing never answered is a missed call; one under way lasted until now.
+  def end_call(call)
+    status = call.status == 'in_progress' ? 'completed' : 'no_answer'
+    duration = [(Time.current - call.started_at).to_i, 0].max if status == 'completed' && call.started_at
+    # rubocop:disable Rails/SkipsModelValidations
+    call.update_columns(status: status, end_reason: END_REASON, duration_seconds: duration, updated_at: Time.current)
+    # rubocop:enable Rails/SkipsModelValidations
+    display_status = status.tr('_', '-')
+    call.message&.update!(content_attributes: (call.message.content_attributes || {}).deep_merge(
+      'data' => { 'status' => display_status, 'duration_seconds' => duration }.compact
+    ))
+    call.conversation.update!(additional_attributes: (call.conversation.additional_attributes || {}).merge('call_status' => display_status))
+  end
 
   # Written past the callbacks: a save would run the provider-config change hooks, which
   # connect the inbox on their own, and this job already does that, paced.

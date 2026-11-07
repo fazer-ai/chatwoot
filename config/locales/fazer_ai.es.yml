@@ -182,6 +182,9 @@ es:
       avg_customer_waiting_time: Tiempo promedio de espera del cliente
       resolution_count: Recuento de resoluciones
   super_admin:
+    accounts:
+      agent_restrictions: 'Restricciones de agente'
+      agent_restrictions_hint: 'Se guardan junto con el formulario de arriba.'
     settings:
       pages:
         branding: 'Marca'
