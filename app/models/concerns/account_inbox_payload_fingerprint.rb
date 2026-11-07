@@ -18,7 +18,9 @@ module AccountInboxPayloadFingerprint
   # no inbox was written, and every warm cache keeps serving the list from before the
   # deploy. The dashboard then hides the controls the new capability was added to unlock,
   # until something happens to write the inbox row.
-  PAYLOAD_VERSION = 4
+  # 5: the connector's `voice_calls` capability and its calling flag were withdrawn, which a
+  # cached payload would go on offering.
+  PAYLOAD_VERSION = 5
 
   def cache_keys
     keys = super

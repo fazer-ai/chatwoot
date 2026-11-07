@@ -42,12 +42,6 @@ pt_BR:
       messaging_window_closed: A janela de resposta da Meta para este contato fechou. Ela reabre quando o contato enviar uma nova mensagem.
       messaging_window_closed_for_automation: A Meta só aceita resposta automática até 24 horas depois da última mensagem do contato. Assuma a conversa para responder como agente.
     whatsapp:
-      calls:
-        group_not_supported: Não é possível ligar para um grupo
-        proxy_unsupported: 'As ligações do WhatsApp não passam por proxy. Remova o proxy desta caixa de entrada para ligar as chamadas.'
-        connector_without_calls: 'O conector de WhatsApp desta instalação não leva a voz das ligações: ele precisa de WAC_CALLS_UDP_PORT definido e dessa porta publicada em UDP.'
-        provider_unsupported: 'Este provedor de WhatsApp não faz ligações.'
-        channel_voice_required: 'As ligações não estão disponíveis no plano desta conta.'
       group_announcement_only: Somente administradores podem enviar mensagens neste grupo
       group_description_cannot_be_removed: O WhatsApp não permite remover a descrição de um grupo depois que ela existe. Substitua o texto em vez de apagá-lo.
     inboxes:
@@ -187,3 +181,48 @@ pt_BR:
       handled_count: Conversas atendidas
       avg_customer_waiting_time: Tempo médio de espera do cliente
       resolution_count: Contagem de Resolução
+  super_admin:
+    settings:
+      pages:
+        branding: 'Marca'
+        branding_description: 'O nome, os logos e os links que esta instalação mostra. Salvos aqui, eles têm prioridade sobre as variáveis de marca do ambiente.'
+    app_configs:
+      branding:
+        invalid_color: 'A cor da marca precisa ser uma cor hexadecimal, como #1f93ff.'
+      fields:
+        INSTALLATION_NAME:
+          title: 'Nome da instalação'
+          description: 'O nome mostrado no painel, no título da página e nos e-mails.'
+        LOGO_THUMBNAIL:
+          title: 'Miniatura do logo'
+          description: 'A imagem quadrada usada como favicon (512 × 512 px).'
+        LOGO:
+          title: 'Logo'
+          description: 'O logo do painel e da tela de login.'
+        LOGO_DARK:
+          title: 'Logo para o modo escuro'
+          description: 'O logo do painel e da tela de login no modo escuro.'
+        LOGO_EMAIL:
+          title: 'Logo dos e-mails'
+          description: 'O logo no topo dos e-mails enviados. Só PNG, JPG ou GIF: os clientes de e-mail não exibem SVG. Se ficar vazio, usa o logo acima quando ele estiver num desses formatos.'
+        BRAND_NAME:
+          title: 'Nome da marca'
+          description: 'O nome usado nos e-mails e no widget.'
+        BRAND_URL:
+          title: 'URL da marca'
+          description: 'Para onde aponta a linha "Powered by" dos e-mails.'
+        WIDGET_BRAND_URL:
+          title: 'URL da marca no widget'
+          description: 'Para onde aponta a linha "Powered by" do widget.'
+        BRAND_COLOR:
+          title: 'Cor da marca'
+          description: 'Cor hexadecimal usada nos e-mails e no tema do app, como #1f93ff.'
+        TERMS_URL:
+          title: 'URL dos termos de uso'
+          description: 'Aparece na tela de cadastro.'
+        PRIVACY_URL:
+          title: 'URL da política de privacidade'
+          description: 'Aparece no app.'
+        DISPLAY_MANIFEST:
+          title: 'Metadados do Chatwoot'
+          description: 'Mostra os favicons padrão do Chatwoot e os avisos de atualização.'

@@ -95,6 +95,8 @@ Para usar esses recursos com o fork, contrate a licença com a Chatwoot Inc. e d
 
 Com `CW_EDITION=ee`, o container baixa no boot o diretório `enterprise/` da tag oficial do Chatwoot que corresponde à versão da imagem, confere o conteúdo contra o hash fixado no build e guarda uma cópia em `storage/.cw-enterprise`. O primeiro boot de cada versão precisa de acesso a `codeload.github.com`, e os seguintes usam a cópia guardada. Se o download ou a conferência falhar, o container não sobe e o log diz por quê; as variáveis de ajuste estão descritas em `docker/entrypoints/helpers/enterprise.sh`.
 
+Com `CW_EDITION=ee`, o código Enterprise roda exatamente como a Chatwoot Inc. o publica para aquela versão, sem alterações ou patches do fork. A página “Marca” do super admin do fork só existe sem Enterprise; com Enterprise ativo, a marca segue as regras dele: a personalização é um recurso premium, e o plano community restaura as configurações de marca aos valores padrão. Consulte [CUSTOM_BRANDING.md](CUSTOM_BRANDING.md) para os detalhes.
+
 ## Instalar
 
 ### Com o instalador do fazer.ai agents

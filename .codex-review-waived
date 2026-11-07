@@ -200,8 +200,10 @@ app/controllers/api/v1/accounts/conversations/messages_controller.rb: Keep pendi
 app/services/whatsapp/session/inbound/reaction_store.rb: Preserve subsecond ordering when comparing reaction removals  # PR#772
 app/javascript/dashboard/routes/dashboard/settings/inbox/settingsPage/WhatsappAppSecret.vue: Allow the token and app secret to be replaced together  # GHSA-xwhx PR#1
 app/models/message.rb: Clear the flag for receipts on already-delivered echoes  # PR#878
-fazer_ai_ee/app/services/whatsapp/connector_ai_call_service.rb: Make AI acceptance dismissal reversible on stream failure  # PR#887
 app/models/concerns/assignment_handler.rb: Enforce working hours on initial human assignments  # PR#933
+app/javascript/dashboard/composables/useWhatsappCallSession.js: Release the call session before awaiting its recording upload  # PR#940
+app/javascript/dashboard/helper/actionCable.js: Preserve early lifecycle events for Cloud calls  # PR#940
+fazer_ai_ee/app/services/fazer_ai_ee/whatsapp/incoming_call_service.rb: Normalize incoming-call conversation IDs in the CE consumer  # PR#940
 # PR#939: the history slot is a lease, not a hard cap, by design. It is the chat lock's TTL, the
 # time a history import batch is allowed to run, and an import batch has the same exposure. A
 # drain run checks its one-minute budget between files, and one file is at most MAX_MEDIA_BYTES

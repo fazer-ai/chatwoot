@@ -2,10 +2,10 @@
 
 ## Brand configuration
 
-Set the variables in the environment of every Rails and Sidekiq container (the `environment:` block of your `docker-compose.yml`, or the equivalent in Coolify, Portainer or Easypanel), keep them there, and run `bundle exec rails branding:update` when the container starts, for example in a `post_start` hook.
+The brand lives in the installation config, and there are two ways to set it:
 
-> [!IMPORTANT]
-> Unset environment variables are reset to default values.
+- **The super admin:** **Settings → Branding** (`/super_admin/app_config?config=branding`) edits every key in the table below. What is saved there is what the installation shows, and it stays when the containers restart.
+- **The environment:** set the variables on the Rails container and run `bundle exec rails branding:update`, for example in a `post_start` hook. This seeds the brand: until the Branding page is saved for the first time, the task writes every key from the environment, and an unset variable puts its key back to the default. Once the page is saved, the installation records it (`BRANDING_EDITED_IN_SUPER_ADMIN`) and the task leaves the whole brand as the page left it, so the next container start never undoes it.
 
 ```yaml
 environment:
@@ -15,22 +15,17 @@ environment:
   LOGO: "https://fazer.ai/logo.svg"
 ```
 
-The rake task copies the variables into the database, and the database is what the Community Edition image reads, so on that image a one-off run works too:
+To apply the environment again over the saved values, run the task once with `BRANDING_FORCE=true`. It writes every key from the environment and hands the brand back to it, until the page is saved again:
 
 ```bash
-INSTALLATION_NAME="Chatwoot fazer.ai" \
+BRANDING_FORCE=true \
 BRAND_NAME="My Company" \
 bundle exec rails branding:update
 ```
 
-### On the Pro image
+### With `CW_EDITION=ee`
 
-The Pro image ships `enterprise/`, and on an installation whose Chatwoot plan is `community` the Enterprise plan reconciliation (`Internal::ReconcilePlanConfigService`) puts every key in `enterprise/config/premium_installation_config.yml` back to its default. It runs whenever a Rails process boots and once a day, so a value that exists only in the database, such as one written by a one-off `branding:update` from a shell, is undone within minutes.
-
-The Pro image reads the branding variables from the process environment before the database (`GlobalConfig.branding_env_override`), which is what keeps the brand in place. Two consequences:
-
-- The variables have to be in the container environment, not just exported in a shell, and in every container that renders something branded: Rails for the dashboard and the login page, Sidekiq for emails.
-- A variable set to its default value is ignored and the database value is used, so leaving one at the default changes nothing.
+With Enterprise loaded, the Branding page is not offered. Enterprise runs exactly as upstream publishes it, and it owns these keys: custom branding is one of its premium features, and on an installation whose Chatwoot plan is `community` its plan reconciliation (`Internal::ReconcilePlanConfigService`) puts every key in `enterprise/config/premium_installation_config.yml` back to its default whenever a Rails process boots and once a day. The fork does not change that behavior, so on that plan a brand set through the database does not last.
 
 | Environment variable | Default Value                               | Description                                                           |
 | :--------------------| :------------------------------------------ | :-------------------------------------------------------------------- |

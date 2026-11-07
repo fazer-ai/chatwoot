@@ -9,7 +9,6 @@ import { useCallsStore } from 'dashboard/stores/calls';
 import {
   applyOutboundAnswer,
   armOutboundRecorder,
-  noteEarlyOutboundOutcome,
   handleWhatsappRemoteEnd,
   isLocalWhatsappCall,
 } from 'dashboard/composables/useWhatsappCallSession';
@@ -758,11 +757,7 @@ class ActionCableConnector extends BaseActionCableConnector {
   onVoiceCallOutboundAccepted = data => {
     if (data?.provider !== VOICE_CALL_PROVIDERS.WHATSAPP) return;
     const store = useCallsStore();
-    if (!store.calls.some(c => c.callSid === data.call_id)) {
-      // Picked up before this tab added the call it placed; applied when it does.
-      noteEarlyOutboundOutcome(data.id, 'accepted');
-      return;
-    }
+    if (!store.calls.some(c => c.callSid === data.call_id)) return;
     store.setCallActive(data.call_id);
     armOutboundRecorder();
   };
@@ -773,11 +768,6 @@ class ActionCableConnector extends BaseActionCableConnector {
     // A still-queued ringing message.created (see onVoiceCallAccepted) must not
     // resurrect a call that has already ended.
     markCallDismissed(data.call_id);
-    if (data.provider === VOICE_CALL_PROVIDERS.WHATSAPP) {
-      // Ended before this tab knew the call it placed, whether or not a message added it
-      // already: kept until the tab adds it, so it is not added back as ringing then.
-      noteEarlyOutboundOutcome(data.id, 'ended');
-    }
     // The store entry should always be removed for this account-wide broadcast,
     // but the WebRTC/recorder teardown must only run for the call this tab owns
     // — otherwise an unrelated agent's call ending would stop this tab's

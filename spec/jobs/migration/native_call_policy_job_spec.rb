@@ -24,6 +24,21 @@ RSpec.describe Migration::NativeCallPolicyJob do
     expect(Whatsapp::Session::ApplyProxyJob).to have_been_enqueued.with(down.id)
   end
 
+  # An inbox that had calling on through the connector keeps the flag in its config after the
+  # feature was withdrawn; the job clears it on the session inboxes and leaves a Cloud inbox's,
+  # whose calls go through Meta, as it was.
+  it 'clears the calling flag of every session inbox and of no Cloud inbox' do
+    paired = native('connection' => 'open')
+    paired.update_column(:provider_config, paired.provider_config.merge('calling_enabled' => true)) # rubocop:disable Rails/SkipsModelValidations
+    cloud = create(:channel_whatsapp, provider: 'whatsapp_cloud', sync_templates: false, validate_provider_config: false)
+    cloud.update_column(:provider_config, cloud.provider_config.merge('calling_enabled' => true)) # rubocop:disable Rails/SkipsModelValidations
+
+    described_class.perform_now
+
+    expect(paired.reload.provider_config).not_to have_key('calling_enabled')
+    expect(cloud.reload.provider_config['calling_enabled']).to be(true)
+  end
+
   # `wa:control` is one stream for the whole fleet, and every account asked dials: a deploy that
   # asks them all in the same second is the stampede the rake's pacing exists to avoid.
   it 'spreads the inboxes over time, a few at a time' do

@@ -13,6 +13,8 @@ class Api::V1::Accounts::AssignableAgentsController < Api::V1::Accounts::BaseCon
     agents = Current.account.users.where(id: agent_ids)
     @assignable_agents = (agents + Current.account.administrators).uniq
     @agent_bots = @include_ai_assignees ? AgentBot.accessible_to(Current.account) : []
+    # The fork narrows the bots offered to the ones that fit these inboxes (config/initializers/agent_bot_assignment.rb).
+    @agent_bots = AgentBotAssignment::DropdownOffersNoForeignBot.offered(@agent_bots, @inboxes, Current.account)
   end
 
   private

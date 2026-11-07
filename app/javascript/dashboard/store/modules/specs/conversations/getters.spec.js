@@ -674,7 +674,7 @@ describe('#getters', () => {
             {
               id: 1,
               custom_role_id: 5,
-              permissions: ['conversation_manage'],
+              permissions: ['conversation_manage', 'custom_role'],
             },
           ],
         },
@@ -709,7 +709,7 @@ describe('#getters', () => {
             {
               id: 1,
               custom_role_id: 5,
-              permissions: ['conversation_unassigned_manage'],
+              permissions: ['conversation_unassigned_manage', 'custom_role'],
             },
           ],
         },
@@ -741,7 +741,7 @@ describe('#getters', () => {
             {
               id: 1,
               custom_role_id: 5,
-              permissions: ['conversation_participating_manage'],
+              permissions: ['conversation_participating_manage', 'custom_role'],
             },
           ],
         },
@@ -773,7 +773,7 @@ describe('#getters', () => {
             {
               id: 1,
               custom_role_id: 5,
-              permissions: [],
+              permissions: ['custom_role'],
             },
           ],
         },
@@ -812,7 +812,7 @@ describe('#getters', () => {
             {
               id: 1,
               custom_role_id: 5,
-              permissions: ['conversation_participating_manage'],
+              permissions: ['conversation_participating_manage', 'custom_role'],
             },
           ],
         },
