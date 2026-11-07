@@ -291,7 +291,9 @@ class Conversation < ApplicationRecord
 
   # Virtual attribute till we switch completely to polymorphic assignee
   def assignee_type
-    return ai_assignee_type if ai_assignee_type.present?
+    # Only for an assignee that resolves: a type naming a class this install does not have
+    # (an assistant, without enterprise/) assigns nothing.
+    return ai_assignee_type if ai_assignee_type.present? && ai_assignee.present?
     return 'User' if assignee_id.present?
 
     nil
