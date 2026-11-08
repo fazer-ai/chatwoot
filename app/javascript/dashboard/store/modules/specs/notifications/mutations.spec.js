@@ -214,4 +214,23 @@ describe('#mutations', () => {
       expect(state.records).toEqual({});
     });
   });
+
+  describe('#REMOVE_NOTIFICATIONS_OF_TYPES', () => {
+    it('drops only the notifications of the given types', () => {
+      const state = {
+        records: {
+          1: { id: 1, notification_type: 'internal_chat_mention' },
+          2: { id: 2, notification_type: 'conversation_assignment' },
+          3: { id: 3, notification_type: 'internal_chat_new_message' },
+        },
+      };
+
+      mutations.REMOVE_NOTIFICATIONS_OF_TYPES(state, [
+        'internal_chat_mention',
+        'internal_chat_new_message',
+      ]);
+
+      expect(Object.keys(state.records)).toEqual(['2']);
+    });
+  });
 });

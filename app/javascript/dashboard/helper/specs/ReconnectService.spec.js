@@ -380,7 +380,17 @@ describe('ReconnectService', () => {
 
       await reconnectService.enforceRouteAccess();
 
-      expect(calls).toEqual(['setUser', 'replace', 'internalChat/reset']);
+      expect(calls).toEqual([
+        'setUser',
+        'replace',
+        'internalChat/reset',
+        'internalChatTypingStatus/reset',
+        'notifications/removeOfTypes',
+      ]);
+      expect(storeMock.dispatch).toHaveBeenCalledWith(
+        'notifications/removeOfTypes',
+        ['internal_chat_mention', 'internal_chat_new_message']
+      );
     });
 
     it('keeps the data of a feature the member still has', async () => {

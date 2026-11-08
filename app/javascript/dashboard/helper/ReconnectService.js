@@ -150,10 +150,12 @@ class ReconnectService {
     if (redirect) await this.router.replace(frontendURL(redirect));
 
     // Only once the screen is gone, so it cannot fetch the data back.
-    Object.entries(FEATURE_ACCESS_RESETS).forEach(([capability, action]) => {
-      if (!hasFeatureAccess(user, route.params.accountId, capability)) {
-        this.store.dispatch(action);
-      }
+    Object.entries(FEATURE_ACCESS_RESETS).forEach(([capability, resets]) => {
+      if (hasFeatureAccess(user, route.params.accountId, capability)) return;
+
+      resets.forEach(([action, payload]) =>
+        this.store.dispatch(action, payload)
+      );
     });
   };
 
