@@ -1,14 +1,16 @@
 import InternalChatMessagesAPI from '../../../api/internalChatMessages';
 import { throwErrorMessage } from 'dashboard/store/utils/api';
 
-const state = {
+const initialState = () => ({
   records: {},
   threadReplies: {},
   uiFlags: {
     isFetching: false,
     isSending: false,
   },
-};
+});
+
+const state = initialState();
 
 const getters = {
   getMessages: _state => channelId => {
@@ -260,6 +262,9 @@ const actions = {
 };
 
 const mutations = {
+  RESET(_state) {
+    Object.assign(_state, initialState());
+  },
   SET_MESSAGES(_state, { channelId, messages }) {
     _state.records = {
       ..._state.records,

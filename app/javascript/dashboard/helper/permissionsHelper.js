@@ -19,6 +19,18 @@ export const getUserPermissions = (user, accountId) => {
   return currentAccount.permissions || [];
 };
 
+// Features this member may use (`FeatureAccess` on the server), kept apart from the native
+// `permissions` so that granting one never opens a native page.
+export const getFeatureAccess = (user, accountId) => {
+  const currentAccount = getCurrentAccount(user, accountId) || {};
+  return currentAccount.feature_access || [];
+};
+
+export const hasFeatureAccess = (user, accountId, capability) => {
+  if (!capability) return true;
+  return getFeatureAccess(user, accountId).includes(capability);
+};
+
 export const getUserRole = (user, accountId) => {
   const currentAccount = getCurrentAccount(user, accountId) || {};
   // A role in force, as the server reports it: without Enterprise, or with the role deleted,

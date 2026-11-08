@@ -9,6 +9,7 @@ require:
   - ./rubocop/custom_cop_location.rb
   - ./rubocop/attachment_download.rb
   - ./rubocop/one_class_per_file.rb
+  - ./rubocop/feature_access_role_check.rb
 
 Layout/LineLength:
   Max: 150
@@ -220,6 +221,15 @@ UseFromEmail:
 
 CustomCopLocation:
   Enabled: true
+
+# Authorization code of the features gated by FeatureAccess (app/models/feature_access.rb).
+Chatwoot/FeatureAccessRoleCheck:
+  Enabled: true
+  Include:
+    - 'app/policies/internal_chat/**/*'
+    - 'app/controllers/api/v1/accounts/internal_chat/**/*'
+    - 'app/listeners/internal_chat_listener.rb'
+    - 'app/services/internal_chat/**/*'
 
 Style/OneClassPerFile:
   Enabled: true

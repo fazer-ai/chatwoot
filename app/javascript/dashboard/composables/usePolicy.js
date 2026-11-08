@@ -4,6 +4,7 @@ import { useAccount } from 'dashboard/composables/useAccount';
 import { useConfig } from 'dashboard/composables/useConfig';
 import {
   getUserPermissions,
+  hasFeatureAccess,
   hasPermissions,
 } from 'dashboard/helper/permissionsHelper';
 import {
@@ -38,6 +39,9 @@ export function usePolicy() {
     const userPermissions = getUserPermissionsForAccount();
     return hasPermissions(requiredPermissions, userPermissions);
   };
+
+  const checkFeatureAccess = capability =>
+    hasFeatureAccess(user.value, accountId.value, capability);
 
   const checkInstallationType = config => {
     if (Array.isArray(config) && config.length > 0) {
@@ -142,6 +146,7 @@ export function usePolicy() {
 
   return {
     checkPermissions,
+    checkFeatureAccess,
     checkInstallationType,
     shouldShowPaywall,
     isFeatureFlagEnabled,

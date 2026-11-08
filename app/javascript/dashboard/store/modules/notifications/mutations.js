@@ -7,6 +7,13 @@ export const mutations = {
       ...data,
     };
   },
+  REMOVE_NOTIFICATIONS_OF_TYPES: ($state, notificationTypes) => {
+    Object.values($state.records).forEach(item => {
+      if (notificationTypes.includes(item.notification_type)) {
+        delete $state.records[item.id];
+      }
+    });
+  },
   [types.CLEAR_NOTIFICATIONS]: $state => {
     $state.records = {};
     $state.uiFlags.isAllNotificationsLoaded = false;

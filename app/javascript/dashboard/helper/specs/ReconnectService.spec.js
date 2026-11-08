@@ -4,6 +4,7 @@ import { differenceInSeconds } from 'date-fns';
 import {
   isAConversationRoute,
   isAInboxViewRoute,
+  validateLoggedInRoutes,
 } from 'dashboard/helper/routeHelpers';
 import ReconnectService from 'dashboard/helper/ReconnectService';
 
@@ -22,6 +23,7 @@ vi.mock('date-fns', () => ({
 vi.mock('dashboard/helper/routeHelpers', () => ({
   isAConversationRoute: vi.fn(),
   isAInboxViewRoute: vi.fn(),
+  validateLoggedInRoutes: vi.fn(),
 }));
 
 const storeMock = {
@@ -316,6 +318,100 @@ describe('ReconnectService', () => {
       reconnectService.onDisconnect();
       expect(reconnectService.disconnectTime).toBeInstanceOf(Date);
       expect(reconnectService.setConversationLastMessageId).toHaveBeenCalled();
+    });
+  });
+
+  describe('enforceRouteAccess', () => {
+    const accessRoute = {
+      name: 'internal_chat_home',
+      params: { accountId: 1 },
+      meta: {},
+    };
+
+    let previousRoute;
+
+    beforeEach(() => {
+      previousRoute = routerMock.currentRoute.value;
+      routerMock.currentRoute.value = accessRoute;
+      routerMock.replace = vi.fn();
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: ['internal_chat.access'] }],
+      };
+    });
+
+    afterEach(() => {
+      routerMock.currentRoute.value = previousRoute;
+      delete routerMock.replace;
+      delete storeMock.getters.getCurrentUser;
+      storeMock.dispatch.mockReset();
+    });
+
+    it('reads the user again and leaves a route it no longer reaches', async () => {
+      validateLoggedInRoutes.mockReturnValue('accounts/1/dashboard');
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(storeMock.dispatch).toHaveBeenCalledWith('setUser');
+      expect(validateLoggedInRoutes).toHaveBeenCalledWith(
+        accessRoute,
+        storeMock.getters.getCurrentUser
+      );
+      expect(routerMock.replace).toHaveBeenCalledWith(
+        '/app/accounts/1/dashboard'
+      );
+    });
+
+    it('stays on a route the member still reaches', async () => {
+      validateLoggedInRoutes.mockReturnValue(null);
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(routerMock.replace).not.toHaveBeenCalled();
+    });
+
+    it('drops the data of a feature the member lost, after leaving its route', async () => {
+      const calls = [];
+      validateLoggedInRoutes.mockReturnValue('accounts/1/dashboard');
+      routerMock.replace = vi.fn(() => calls.push('replace'));
+      storeMock.dispatch.mockImplementation(action => calls.push(action));
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: [] }],
+      };
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(calls).toEqual([
+        'setUser',
+        'replace',
+        'internalChat/reset',
+        'internalChatTypingStatus/reset',
+        'notifications/removeOfTypes',
+      ]);
+      expect(storeMock.dispatch).toHaveBeenCalledWith(
+        'notifications/removeOfTypes',
+        ['internal_chat_mention', 'internal_chat_new_message']
+      );
+    });
+
+    it('keeps the data of a feature the member still has', async () => {
+      validateLoggedInRoutes.mockReturnValue(null);
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: ['internal_chat.access'] }],
+      };
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(storeMock.dispatch).not.toHaveBeenCalledWith('internalChat/reset');
+    });
+
+    it('runs on every reconnect', async () => {
+      reconnectService.enforceRouteAccess = vi.fn();
+      reconnectService.handleRouteSpecificFetch = vi.fn();
+      reconnectService.revalidateCaches = vi.fn();
+
+      await reconnectService.onReconnect();
+
+      expect(reconnectService.enforceRouteAccess).toHaveBeenCalled();
     });
   });
 

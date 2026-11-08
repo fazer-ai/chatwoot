@@ -2,12 +2,16 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   include Events::Types
 
   def notification_created(event)
+    return unless event.data[:notification].visible_to_recipient?
+
     notification, account, unread_count, count = extract_notification_and_account(event)
     tokens = [event.data[:notification].user.pubsub_token]
     broadcast(account, tokens, NOTIFICATION_CREATED, { notification: notification.push_event_data, unread_count: unread_count, count: count })
   end
 
   def notification_updated(event)
+    return unless event.data[:notification].visible_to_recipient?
+
     notification, account, unread_count, count = extract_notification_and_account(event)
     tokens = [event.data[:notification].user.pubsub_token]
     broadcast(account, tokens, NOTIFICATION_UPDATED, { notification: notification.push_event_data, unread_count: unread_count, count: count })

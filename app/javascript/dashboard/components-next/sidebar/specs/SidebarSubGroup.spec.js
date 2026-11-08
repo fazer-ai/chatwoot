@@ -11,6 +11,7 @@ vi.mock('dashboard/composables/store', () => ({
 vi.mock('dashboard/composables/usePolicy', () => ({
   usePolicy: () => ({
     shouldShow: () => true,
+    checkFeatureAccess: () => true,
   }),
 }));
 

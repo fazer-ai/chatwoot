@@ -12,7 +12,9 @@ class InternalChat::NotificationService
   private
 
   def channel_members_to_notify
-    message.channel.channel_members.includes(:user)
+    message.channel.channel_members
+           .where(user_id: FeatureAccess.new(message.account).users_with('internal_chat.access').select(:id))
+           .includes(:user)
   end
 
   def mentioned_user_ids
