@@ -166,6 +166,39 @@ describe('#validateLoggedInRoutes', () => {
           ).toEqual(`accounts/1/dashboard`);
         });
       });
+      describe('when route needs a feature the member may not use', () => {
+        const route = {
+          name: 'internal_chat_home',
+          params: { accountId: 1 },
+          meta: {
+            permissions: ['agent'],
+            featureAccess: 'internal_chat.access',
+          },
+        };
+        const userWith = featureAccess => ({
+          accounts: [
+            {
+              id: 1,
+              role: 'agent',
+              permissions: ['agent'],
+              feature_access: featureAccess,
+              status: 'active',
+            },
+          ],
+        });
+
+        it('returns dashboard url without the feature', () => {
+          expect(validateLoggedInRoutes(route, userWith([]))).toEqual(
+            'accounts/1/dashboard'
+          );
+        });
+
+        it('returns null with the feature', () => {
+          expect(
+            validateLoggedInRoutes(route, userWith(['internal_chat.access']))
+          ).toBeNull();
+        });
+      });
       describe('when route is suspended route', () => {
         it('returns dashboard url', () => {
           expect(

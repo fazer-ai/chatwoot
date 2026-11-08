@@ -4,6 +4,7 @@ import { differenceInSeconds } from 'date-fns';
 import {
   isAConversationRoute,
   isAInboxViewRoute,
+  validateLoggedInRoutes,
 } from 'dashboard/helper/routeHelpers';
 import ReconnectService from 'dashboard/helper/ReconnectService';
 
@@ -22,6 +23,7 @@ vi.mock('date-fns', () => ({
 vi.mock('dashboard/helper/routeHelpers', () => ({
   isAConversationRoute: vi.fn(),
   isAInboxViewRoute: vi.fn(),
+  validateLoggedInRoutes: vi.fn(),
 }));
 
 const storeMock = {
@@ -316,6 +318,60 @@ describe('ReconnectService', () => {
       reconnectService.onDisconnect();
       expect(reconnectService.disconnectTime).toBeInstanceOf(Date);
       expect(reconnectService.setConversationLastMessageId).toHaveBeenCalled();
+    });
+  });
+
+  describe('enforceRouteAccess', () => {
+    const accessRoute = {
+      name: 'internal_chat_home',
+      params: { accountId: 1 },
+      meta: {},
+    };
+
+    let previousRoute;
+
+    beforeEach(() => {
+      previousRoute = routerMock.currentRoute.value;
+      routerMock.currentRoute.value = accessRoute;
+      routerMock.replace = vi.fn();
+    });
+
+    afterEach(() => {
+      routerMock.currentRoute.value = previousRoute;
+      delete routerMock.replace;
+    });
+
+    it('reads the user again and leaves a route it no longer reaches', async () => {
+      validateLoggedInRoutes.mockReturnValue('accounts/1/dashboard');
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(storeMock.dispatch).toHaveBeenCalledWith('setUser');
+      expect(validateLoggedInRoutes).toHaveBeenCalledWith(
+        accessRoute,
+        storeMock.getters.getCurrentUser
+      );
+      expect(routerMock.replace).toHaveBeenCalledWith(
+        '/app/accounts/1/dashboard'
+      );
+    });
+
+    it('stays on a route the member still reaches', async () => {
+      validateLoggedInRoutes.mockReturnValue(null);
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(routerMock.replace).not.toHaveBeenCalled();
+    });
+
+    it('runs on every reconnect', async () => {
+      reconnectService.enforceRouteAccess = vi.fn();
+      reconnectService.handleRouteSpecificFetch = vi.fn();
+      reconnectService.revalidateCaches = vi.fn();
+
+      await reconnectService.onReconnect();
+
+      expect(reconnectService.enforceRouteAccess).toHaveBeenCalled();
     });
   });
 

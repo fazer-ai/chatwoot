@@ -120,4 +120,20 @@ RSpec.describe InternalChat::NotificationService do
       end
     end
   end
+
+  context 'when the recipient lacks internal_chat.access' do
+    it 'does not notify them, even when mentioned' do
+      channel = create(:internal_chat_channel, :public_channel, account: account)
+      mentioned_user = create(:user, account: account, role: :agent)
+      create(:internal_chat_channel_member, channel: channel, user: sender)
+      create(:internal_chat_channel_member, channel: channel, user: mentioned_user)
+      message = create(
+        :internal_chat_message, account: account, channel: channel, sender: sender,
+                                content: "Hey (mention://user/#{mentioned_user.id}/#{mentioned_user.name})"
+      )
+      stub_const('FeatureAccess::CAPABILITIES', { 'internal_chat.access' => { agent_default: false } })
+
+      expect { described_class.new(message: message).perform }.not_to change(Notification, :count)
+    end
+  end
 end

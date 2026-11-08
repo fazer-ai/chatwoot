@@ -4,7 +4,9 @@ import { differenceInSeconds } from 'date-fns';
 import {
   isAConversationRoute,
   isAInboxViewRoute,
+  validateLoggedInRoutes,
 } from 'dashboard/helper/routeHelpers';
+import { frontendURL } from 'dashboard/helper/URLHelper';
 
 const MAX_DISCONNECT_SECONDS = 10800;
 
@@ -133,6 +135,21 @@ class ReconnectService {
     }
   };
 
+  // What the member may reach can change while the socket was down (access to a gated feature,
+  // for one), so the user is read again and a route it no longer reaches is left the way the
+  // router guard would leave it.
+  enforceRouteAccess = async () => {
+    await this.store.dispatch('setUser');
+    const route = this.router.currentRoute.value;
+    if (!route.params?.accountId) return;
+
+    const redirect = validateLoggedInRoutes(
+      route,
+      this.store.getters.getCurrentUser
+    );
+    if (redirect) await this.router.replace(frontendURL(redirect));
+  };
+
   onDisconnect = () => {
     this.disconnectTime = new Date();
     this.setConversationLastMessageId();
@@ -142,6 +159,7 @@ class ReconnectService {
     // A billing change while the cable was down loses its account.billing_updated
     // broadcast, and the focus listener never fires if the tab stayed focused.
     await this.store.dispatch('accounts/get', { silent: true });
+    await this.enforceRouteAccess();
     await this.handleRouteSpecificFetch();
     await this.revalidateCaches();
     // Pin events that fired while the socket was down are lost, so the map is rebuilt from the server.

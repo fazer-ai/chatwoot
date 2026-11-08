@@ -26,6 +26,7 @@ const {
   resolvePath,
   resolvePermissions,
   resolveFeatureFlag,
+  resolveFeatureAccess,
   isAllowed,
   isCollapsed,
   isResizing,
@@ -246,6 +247,7 @@ watch(
     v-if="!hasChildren || hasAccessibleChildren"
     :permissions="resolvePermissions(to)"
     :feature-flag="resolveFeatureFlag(to)"
+    :feature-access="resolveFeatureAccess(to)"
     as="li"
     class="grid gap-1 text-sm cursor-pointer select-none min-w-0"
   >

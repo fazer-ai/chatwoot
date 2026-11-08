@@ -15,6 +15,7 @@ export default {
       name: 'internal_chat',
       meta: {
         permissions: INTERNAL_CHAT_PERMISSIONS,
+        featureAccess: 'internal_chat.access',
       },
       component: InternalChatLayout,
       children: [
