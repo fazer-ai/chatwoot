@@ -281,4 +281,27 @@ RSpec.describe 'Notifications API', type: :request do
       end
     end
   end
+
+  context 'when the member lacks internal_chat.access' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:channel) { create(:internal_chat_channel, :dm, account: account) }
+    let(:message) { create(:internal_chat_message, account: account, channel: channel, sender: create(:user, account: account)) }
+    let!(:notification) do
+      create(:notification, account: account, user: agent, notification_type: 'internal_chat_new_message',
+                            primary_actor: channel, secondary_actor: message)
+    end
+
+    before { stub_const('FeatureAccess::CAPABILITIES', { 'internal_chat.access' => { agent_default: false } }) }
+
+    it 'does not find their internal chat notification on any member action' do
+      base = "/api/v1/accounts/#{account.id}/notifications/#{notification.id}"
+      headers = agent.create_new_auth_token
+
+      patch base, headers: headers, as: :json
+      expect(response).to have_http_status(:not_found)
+      post "#{base}/snooze", params: { snoozed_until: 1.day.from_now }, headers: headers, as: :json
+      expect(response).to have_http_status(:not_found)
+      expect(notification.reload.read_at).to be_nil
+    end
+  end
 end

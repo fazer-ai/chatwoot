@@ -32,20 +32,13 @@ class NotificationFinder
 
   def set_up
     find_all_notifications
-    filter_internal_chat_notifications
     filter_snoozed_notifications
     filter_read_notifications
   end
 
   def find_all_notifications
-    @notifications = current_user.notifications.where(account_id: @current_account.id)
-  end
-
-  def filter_internal_chat_notifications
     account_user = @current_account.account_users.find_by(user: current_user)
-    return if FeatureAccess.new(@current_account).allows?(account_user, 'internal_chat.access')
-
-    @notifications = @notifications.where.not(notification_type: Notification::INTERNAL_CHAT_NOTIFICATION_TYPES)
+    @notifications = current_user.notifications.where(account_id: @current_account.id).visible_to(account_user)
   end
 
   def filter_snoozed_notifications

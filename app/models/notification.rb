@@ -63,6 +63,19 @@ class Notification < ApplicationRecord
 
   PRIMARY_ACTORS = ['Conversation', 'InternalChat::Channel'].freeze
 
+  # A member without internal chat access keeps their internal chat notifications stored, but they are
+  # not listed, fetched or delivered while the access is off.
+  scope :visible_to, lambda { |account_user|
+    next all if account_user && FeatureAccess.new(account_user.account).allows?(account_user, 'internal_chat.access')
+
+    where.not(notification_type: INTERNAL_CHAT_NOTIFICATION_TYPES)
+  }
+
+  def visible_to_recipient?
+    INTERNAL_CHAT_NOTIFICATION_TYPES.exclude?(notification_type) ||
+      FeatureAccess.new(account).allows?(account.account_users.find_by(user: user), 'internal_chat.access')
+  end
+
   def push_event_data
     # Secondary actor could be nil for cases like system assigning conversation
     payload = {

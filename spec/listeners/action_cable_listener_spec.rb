@@ -786,4 +786,25 @@ describe ActionCableListener do
       listener.conversation_unread_count_changed(event)
     end
   end
+
+  describe 'internal chat notifications of a member without internal_chat.access' do
+    let(:channel) { create(:internal_chat_channel, :dm, account: account) }
+    let(:message) { create(:internal_chat_message, account: account, channel: channel, sender: admin) }
+    let(:notification) do
+      create(:notification, account: account, user: agent, notification_type: 'internal_chat_new_message',
+                            primary_actor: channel, secondary_actor: message)
+    end
+
+    before do
+      notification
+      stub_const('FeatureAccess::CAPABILITIES', { 'internal_chat.access' => { agent_default: false } })
+      allow(ActionCableBroadcastJob).to receive(:perform_later)
+    end
+
+    it 'does not deliver their update' do
+      listener.notification_updated(Events::Base.new(:'notification.updated', Time.zone.now, notification: notification))
+
+      expect(ActionCableBroadcastJob).not_to have_received(:perform_later)
+    end
+  end
 end
