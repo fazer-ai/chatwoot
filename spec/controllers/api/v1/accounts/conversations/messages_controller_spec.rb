@@ -281,6 +281,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(conversation.messages.count).to eq(1)
         expect(conversation.messages.first.content_type).to eq(params[:content_type])
       end
+
+      it 'answers an activity message with no sender and leaves the contact last activity alone' do
+        create(:agent_bot_inbox, inbox: inbox, agent_bot: agent_bot)
+        conversation.contact.update!(last_activity_at: 3.days.ago)
+
+        expect do
+          post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+               params: { content: 'Order shipped', message_type: 'activity' },
+               headers: { api_access_token: agent_bot.access_token.token },
+               as: :json
+        end.not_to(change { conversation.contact.reload.last_activity_at })
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['message_type']).to eq(2)
+        expect(response.parsed_body).not_to have_key('sender')
+      end
     end
   end
 
@@ -978,8 +994,8 @@ RSpec.describe 'Conversation Messages API', type: :request do
     # The messages API stores whatever content_attributes a client sends, so the marks of a
     # history file are not proof that one is waiting: a descriptor an agent wrote would have
     # the provider download any URL with the connector's token.
-    # An activity written through the API gets the contact as its sender, which is why the
-    # author alone is not enough either.
+    # An activity written through the API has no sender, like a message sent from the phone,
+    # which is why the author alone is not enough either.
     %w[outgoing activity].each do |message_type|
       it "refuses #{message_type} message an agent wrote with the marks of a history file" do
         forged = { 'is_unsupported' => true, 'history_media' => true, 'imported' => true,

@@ -294,7 +294,11 @@ class Messages::MessageBuilder
     @message_type
   end
 
+  # An activity is a system line with no author, like the ones Chatwoot writes itself for a status or an
+  # assignment. Falling through to the contact would save it as their message and mark them as active.
   def sender
+    return if message_type == 'activity'
+
     agent_side? ? (message_sender || @user) : @conversation.contact
   end
 

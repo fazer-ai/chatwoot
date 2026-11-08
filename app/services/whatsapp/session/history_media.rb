@@ -41,9 +41,8 @@ module Whatsapp::Session::HistoryMedia
   # The marks count only on a message that came from WhatsApp, carrying the WhatsApp id it
   # was stored under: an incoming one (the API writes those only on API inboxes), or an
   # outgoing one sent from the phone, which has no sender. Content attributes alone prove nothing, since the messages
-  # API stores whatever a client puts in them (and gives an activity it writes the
-  # contact as sender), and a descriptor an agent wrote would have the provider download
-  # any URL with the connector's token.
+  # API stores whatever a client puts in them, and a descriptor an agent wrote would have
+  # the provider download any URL with the connector's token.
   def pending?(message)
     attributes = message.content_attributes || {}
     from_whatsapp?(message) && attributes[Whatsapp::Session::Inbound::MessageAttributes::HISTORY_MEDIA].present? &&
