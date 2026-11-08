@@ -334,11 +334,16 @@ describe('ReconnectService', () => {
       previousRoute = routerMock.currentRoute.value;
       routerMock.currentRoute.value = accessRoute;
       routerMock.replace = vi.fn();
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: ['internal_chat.access'] }],
+      };
     });
 
     afterEach(() => {
       routerMock.currentRoute.value = previousRoute;
       delete routerMock.replace;
+      delete storeMock.getters.getCurrentUser;
+      storeMock.dispatch.mockReset();
     });
 
     it('reads the user again and leaves a route it no longer reaches', async () => {
@@ -362,6 +367,31 @@ describe('ReconnectService', () => {
       await reconnectService.enforceRouteAccess();
 
       expect(routerMock.replace).not.toHaveBeenCalled();
+    });
+
+    it('drops the data of a feature the member lost, after leaving its route', async () => {
+      const calls = [];
+      validateLoggedInRoutes.mockReturnValue('accounts/1/dashboard');
+      routerMock.replace = vi.fn(() => calls.push('replace'));
+      storeMock.dispatch.mockImplementation(action => calls.push(action));
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: [] }],
+      };
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(calls).toEqual(['setUser', 'replace', 'internalChat/reset']);
+    });
+
+    it('keeps the data of a feature the member still has', async () => {
+      validateLoggedInRoutes.mockReturnValue(null);
+      storeMock.getters.getCurrentUser = {
+        accounts: [{ id: 1, feature_access: ['internal_chat.access'] }],
+      };
+
+      await reconnectService.enforceRouteAccess();
+
+      expect(storeMock.dispatch).not.toHaveBeenCalledWith('internalChat/reset');
     });
 
     it('runs on every reconnect', async () => {

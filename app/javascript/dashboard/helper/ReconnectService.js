@@ -7,6 +7,8 @@ import {
   validateLoggedInRoutes,
 } from 'dashboard/helper/routeHelpers';
 import { frontendURL } from 'dashboard/helper/URLHelper';
+import { hasFeatureAccess } from 'dashboard/helper/permissionsHelper';
+import { FEATURE_ACCESS_RESETS } from 'dashboard/constants/featureAccess';
 
 const MAX_DISCONNECT_SECONDS = 10800;
 
@@ -143,11 +145,16 @@ class ReconnectService {
     const route = this.router.currentRoute.value;
     if (!route.params?.accountId) return;
 
-    const redirect = validateLoggedInRoutes(
-      route,
-      this.store.getters.getCurrentUser
-    );
+    const user = this.store.getters.getCurrentUser;
+    const redirect = validateLoggedInRoutes(route, user);
     if (redirect) await this.router.replace(frontendURL(redirect));
+
+    // Only once the screen is gone, so it cannot fetch the data back.
+    Object.entries(FEATURE_ACCESS_RESETS).forEach(([capability, action]) => {
+      if (!hasFeatureAccess(user, route.params.accountId, capability)) {
+        this.store.dispatch(action);
+      }
+    });
   };
 
   onDisconnect = () => {
