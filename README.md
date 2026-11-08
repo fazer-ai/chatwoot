@@ -87,6 +87,8 @@ Veja as mudanças de cada versão nas [notas de release](https://fazer.ai/chatwo
 
 Conheça o [Kanban do Pro](https://fazer.ai/kanban) e ative sua licença em [app.fazer.ai](https://app.fazer.ai). A licença do Chatwoot fazer.ai Pro vem de graça com a assinatura Pro da [Comunidade Lucas Moreira](https://www.lucasmoreira.ai).
 
+A licença do Chatwoot fazer.ai Pro cobre uma instalação (um domínio), sem limite de usuários, e vale para todas as contas dessa instalação. Você pode atender seus próprios clientes em contas da sua instalação, inclusive dando a eles acesso ao painel. Cada instalação separada precisa de licença própria; veja os [termos de uso](https://fazer.ai/termos-kanban).
+
 ### Chatwoot Enterprise
 
 As licenças fazer.ai não incluem recursos do Chatwoot Enterprise. SSO e Captain, assim como logs de auditoria e funções personalizadas, são licenciados pela Chatwoot Inc.
