@@ -84,6 +84,28 @@ describe Messages::MessageBuilder do
     end
   end
 
+  # An activity is a system line, like the ones Chatwoot writes for a status or an assignment, so
+  # the contact did not write it: with the contact as sender, saving it marked them as active.
+  describe 'when message_type is activity' do
+    let(:contact) { create(:contact, account: account, last_activity_at: 3.days.ago) }
+    let(:conversation) { create(:conversation, inbox: inbox, account: account, contact: contact) }
+
+    it 'saves it with no sender and leaves the contact last activity where it was' do
+      message = nil
+
+      expect { message = described_class.new(user, conversation, { content: 'Order shipped', message_type: 'activity' }).perform }
+        .not_to(change { contact.reload.last_activity_at })
+      expect(message).to be_activity
+      expect(message.sender).to be_nil
+    end
+
+    it 'does not take the bot a caller names as sender either' do
+      params = { content: 'Order shipped', message_type: 'activity', sender_type: 'AgentBot', sender_id: create(:agent_bot).id }
+
+      expect(described_class.new(user, conversation, params).perform.sender).to be_nil
+    end
+  end
+
   describe '#content_attributes' do
     context 'when content_attributes is a JSON string' do
       let(:params) do
