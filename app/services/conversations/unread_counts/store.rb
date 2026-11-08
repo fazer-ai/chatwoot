@@ -177,10 +177,12 @@ class Conversations::UnreadCounts::Store
       end
     end
 
+    # Keys are collected before any is deleted: a scan that sees its own deletions can skip keys
+    # (MockRedis does, its cursor being an index into the current key list).
     def delete_matching(pattern)
-      Redis::Alfred.scan_each(match: pattern, count: 1000) do |key|
-        Redis::Alfred.delete(key)
-      end
+      keys = []
+      Redis::Alfred.scan_each(match: pattern, count: 1000) { |key| keys << key }
+      keys.each { |key| Redis::Alfred.delete(key) }
     end
 
     def assignment_key_patterns(account_id)
