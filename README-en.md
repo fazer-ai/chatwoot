@@ -87,6 +87,8 @@ See changes for each version in the [release notes](https://fazer.ai/chatwoot-re
 
 Explore the [Pro Kanban](https://fazer.ai/kanban) and activate your license at [app.fazer.ai](https://app.fazer.ai). A Chatwoot fazer.ai Pro license is included at no extra charge with a Pro subscription to the [Comunidade Lucas Moreira](https://www.lucasmoreira.ai).
 
+A Chatwoot fazer.ai Pro license covers one installation (one domain), with no user limit, and applies to all accounts within that installation. You can serve your own clients through accounts in your installation, including giving them access to the dashboard. Each separate installation needs its own license; see the [terms of use](https://fazer.ai/termos-kanban).
+
 ### Chatwoot Enterprise
 
 fazer.ai licenses do not include Chatwoot Enterprise features. SSO and Captain, along with audit logs and custom roles, are licensed by Chatwoot Inc.
