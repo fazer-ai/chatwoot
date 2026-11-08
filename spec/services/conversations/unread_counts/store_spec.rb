@@ -176,6 +176,24 @@ RSpec.describe Conversations::UnreadCounts::Store do
       expect(described_class.counts_for_keys(base_keys).values).to all(eq(0))
       expect(described_class.counts_for_keys(assignment_keys).values).to all(eq(0))
     end
+
+    it 'clears account memberships that straddle a scan page' do
+      filler_keys = Array.new(997) { |index| "FILLER::948::#{index}" }
+      filler_keys.each { |key| Redis::Alfred.set(key, 1) }
+      described_class.add_base_membership(
+        account_id: account_id, inbox_id: inbox_id, label_ids: [label_id], team_id: team_id, conversation_id: conversation_id
+      )
+      described_class.add_assignment_membership(
+        account_id: account_id, inbox_id: inbox_id, label_ids: [label_id], assignee_id: user_id, team_id: team_id,
+        conversation_id: conversation_id
+      )
+
+      described_class.clear_account!(account_id)
+
+      expect(described_class.counts_for_keys(base_keys + assignment_keys).values).to all(eq(0))
+    ensure
+      filler_keys.each { |key| Redis::Alfred.delete(key) }
+    end
   end
 
   def base_keys
