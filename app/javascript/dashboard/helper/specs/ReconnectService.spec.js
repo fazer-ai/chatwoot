@@ -79,6 +79,13 @@ describe('ReconnectService', () => {
         reconnectService.onDisconnect
       );
     });
+
+    it('enforces route access when the server says the features changed', () => {
+      expect(emitter.on).toHaveBeenCalledWith(
+        BUS_EVENTS.FEATURE_ACCESS_CHANGED,
+        reconnectService.enforceRouteAccess
+      );
+    });
   });
 
   describe('disconnect', () => {

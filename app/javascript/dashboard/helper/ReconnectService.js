@@ -27,12 +27,14 @@ class ReconnectService {
     window.addEventListener('online', this.handleOnlineEvent);
     emitter.on(BUS_EVENTS.WEBSOCKET_RECONNECT, this.onReconnect);
     emitter.on(BUS_EVENTS.WEBSOCKET_DISCONNECT, this.onDisconnect);
+    emitter.on(BUS_EVENTS.FEATURE_ACCESS_CHANGED, this.enforceRouteAccess);
   };
 
   removeEventListeners = () => {
     window.removeEventListener('online', this.handleOnlineEvent);
     emitter.off(BUS_EVENTS.WEBSOCKET_RECONNECT, this.onReconnect);
     emitter.off(BUS_EVENTS.WEBSOCKET_DISCONNECT, this.onDisconnect);
+    emitter.off(BUS_EVENTS.FEATURE_ACCESS_CHANGED, this.enforceRouteAccess);
   };
 
   getSecondsSinceDisconnect = () =>
@@ -139,7 +141,7 @@ class ReconnectService {
 
   // What the member may reach can change while the socket was down (access to a gated feature,
   // for one), so the user is read again and a route it no longer reaches is left the way the
-  // router guard would leave it.
+  // router guard would leave it. Also run when the server says the member's features changed.
   enforceRouteAccess = async () => {
     await this.store.dispatch('setUser');
     const route = this.router.currentRoute.value;
