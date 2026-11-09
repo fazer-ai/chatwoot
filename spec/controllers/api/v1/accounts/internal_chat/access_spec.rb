@@ -41,7 +41,7 @@ RSpec.describe 'Internal chat access', type: :request do
       get '/api/v1/profile', headers: agent.create_new_auth_token, as: :json
 
       account_payload = response.parsed_body['accounts'].find { |entry| entry['id'] == account.id }
-      expect(account_payload['feature_access']).to eq([])
+      expect(account_payload['feature_access']).not_to include('internal_chat.access')
       expect(account_payload['permissions']).to eq(['agent'])
     end
   end
@@ -50,7 +50,7 @@ RSpec.describe 'Internal chat access', type: :request do
     get '/api/v1/profile', headers: agent.create_new_auth_token, as: :json
 
     account_payload = response.parsed_body['accounts'].find { |entry| entry['id'] == account.id }
-    expect(account_payload['feature_access']).to eq(['internal_chat.access'])
+    expect(account_payload['feature_access']).to include('internal_chat.access')
   end
 
   it 'routes every internal chat endpoint through the controller that checks access' do

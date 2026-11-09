@@ -85,6 +85,7 @@ class ActionCableConnector extends BaseActionCableConnector {
         this.onInboxProviderConnectionUpdated,
       'account.enrichment_completed': this.onEnrichmentCompleted,
       'account.billing_updated': this.onBillingUpdated,
+      'feature_access.changed': this.onFeatureAccessChanged,
       'copilot.message.created': this.onCopilotMessageCreated,
       'scheduled_message.created': this.onScheduledMessageCreated,
       'scheduled_message.updated': this.onScheduledMessageUpdated,
@@ -555,6 +556,13 @@ class ActionCableConnector extends BaseActionCableConnector {
       accountId: data.account_id,
       silent: true,
     });
+  };
+
+  // The features this member may use changed (an access profile was edited or assigned):
+  // ReconnectService reads the user again and leaves what is no longer reachable.
+  // eslint-disable-next-line class-methods-use-this
+  onFeatureAccessChanged = () => {
+    emitter.emit(BUS_EVENTS.FEATURE_ACCESS_CHANGED);
   };
 
   onCacheInvalidate = data => {

@@ -222,6 +222,19 @@ describe('ActionCableConnector - Copilot Tests', () => {
     });
   });
 
+  describe('feature_access.changed', () => {
+    it('asks the dashboard to read the member features again', () => {
+      actionCable.onReceived({
+        event: 'feature_access.changed',
+        data: { account_id: 1 },
+      });
+
+      expect(emitter.emit).toHaveBeenCalledWith(
+        BUS_EVENTS.FEATURE_ACCESS_CHANGED
+      );
+    });
+  });
+
   describe('monitor.updated', () => {
     it('forwards updates for the active account', () => {
       const data = { account_id: 1, monitor_id: 2, data_revision: 3 };

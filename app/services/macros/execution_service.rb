@@ -68,12 +68,18 @@ class Macros::ExecutionService < ActionService
   end
 
   def send_webhook_event(webhook_url)
-    payload = @conversation.webhook_data.merge(
+    payload = webhook_conversation_data.merge(
       event: 'macro.executed',
       macro: { id: @macro.id, name: @macro.name },
       executed_by: @user&.webhook_data
     )
     WebhookJob.perform_later(webhook_url.first, payload)
+  end
+
+  # The conversation as this macro's webhook sends it. A personal macro is set up by whoever runs
+  # it, so an extension can narrow what that person could not read otherwise.
+  def webhook_conversation_data
+    @conversation.webhook_data
   end
 end
 

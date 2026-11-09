@@ -50,9 +50,14 @@ const validateActiveAccountRoutes = (to, user) => {
 
   const userPermissions = getUserPermissions(user, to.params.accountId);
 
+  const { permissions, featureAccess } = to.meta || {};
+  // A route gated only by a feature (no native permissions) is decided by the feature alone.
+  const hasNativeAccess =
+    (featureAccess && !permissions) ||
+    routeIsAccessibleFor(to, userPermissions);
   const isAccessible =
-    routeIsAccessibleFor(to, userPermissions) &&
-    hasFeatureAccess(user, to.params.accountId, to.meta?.featureAccess);
+    hasNativeAccess &&
+    hasFeatureAccess(user, to.params.accountId, featureAccess);
   // If the route is not accessible for the user, return to dashboard screen
   return isAccessible ? null : defaultRedirectPage(to, userPermissions);
 };

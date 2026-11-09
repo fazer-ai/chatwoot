@@ -236,6 +236,22 @@ RSpec.describe Macros::ExecutionService, type: :service do
 
       service.send(:send_webhook_event, ['https://example.com/webhook'])
     end
+
+    it 'sends the conversation as webhook_data by default' do
+      expect(service.send(:webhook_conversation_data)).to eq(conversation.webhook_data)
+    end
+
+    # An extension narrows what the macro sends by overriding webhook_conversation_data alone.
+    it 'builds the conversation part of the payload from webhook_conversation_data' do
+      allow(service).to receive(:webhook_conversation_data).and_return({ marker: 951 })
+
+      expect(WebhookJob).to receive(:perform_later) do |_url, payload|
+        expect(payload).to include(marker: 951, event: 'macro.executed', macro: { id: macro.id, name: macro.name })
+        expect(payload).not_to have_key(:id)
+      end
+
+      service.send(:send_webhook_event, ['https://example.com/webhook'])
+    end
   end
 
   describe 'conversation variables in the text of an action' do
