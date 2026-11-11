@@ -108,6 +108,41 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
     expect(Thread.new { adapter.shutdown }.join(2)).to be_truthy
   end
 
+  it 'confirms a channel that rejoins after a drop that caught a departed confirmation still pending' do
+    swallowed = { done: false }
+    allow(adapter).to receive(:redis_connection_for_subscriptions).and_wrap_original do |original|
+      attempts << :attempt
+      raise Redis::CannotConnectError, 'simulated outage' if outage[:on]
+
+      original.call.tap do |connection|
+        # The first SUBSCRIBE for the room never reaches Redis, so its confirmation is still pending
+        # when the subscriber leaves, as when it leaves before the reply is read.
+        connection.singleton_class.prepend(Module.new do
+          define_method(:subscribe) do |*channels, &block|
+            if block.nil? && !swallowed[:done] && channels.first.to_s.end_with?(':room')
+              swallowed[:done] = true
+              next nil
+            end
+            super(*channels, &block)
+          end
+        end)
+      end
+    end
+    subscribe('other', :ready)
+    expect(events.pop(timeout: 5)).to eq([:ready, :confirmed])
+    adapter.unsubscribe('room', subscribe('room', :left))
+    attempts.clear
+
+    outage[:on] = true
+    kill_listener_connection
+    wait_for_failed_attempts(1)
+    outage[:on] = false
+    expect(broadcast_until_delivered('other')).to match([:ready, /\Aping-\d+\z/])
+    subscribe('room', :rejoined)
+
+    expect(events.pop(timeout: 5)).to eq([:rejoined, :confirmed])
+  end
+
   it 'confirms a channel re-added during the outage, not the subscription that left' do
     outage[:on] = true
     left = subscribe('room', :left)

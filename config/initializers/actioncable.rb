@@ -28,13 +28,6 @@ module ActionCableRedisListenerRecovery
     super
   end
 
-  def remove_channel(channel)
-    # While disconnected no SUBSCRIBE is in flight, so a pending confirmation for a channel that
-    # left would otherwise be handed the reply meant for the next subscription to that channel.
-    @subscription_lock.synchronize { @subscribe_callbacks.delete(channel) unless @subscribed_client }
-    super
-  end
-
   private
 
   # Keeps retrying past the configured list, at its last interval, until the server shuts down.
@@ -54,6 +47,17 @@ module ActionCableRedisListenerRecovery
       @subscribed_client = nil
       @when_connected.clear
     end
+  end
+
+  # Runs right after a reconnect, under the subscription lock and before any reply is read. The new
+  # connection answers each subscribed channel once, so only the newest pending confirmation of a
+  # channel still subscribed may stay: older ones, and those of channels that left, belong to
+  # subscribers that are gone and would otherwise take the reply meant for the current one.
+  def resubscribe
+    channels = @sync.synchronize { @subscribers.keys }
+    @subscribe_callbacks.select! { |channel, _| channels.include?(channel) }
+    @subscribe_callbacks.transform_values! { |callbacks| callbacks.last(1) }
+    super
   end
 end
 
