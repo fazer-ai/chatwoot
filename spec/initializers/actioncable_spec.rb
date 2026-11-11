@@ -8,7 +8,8 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
     ActionCable::Server::Base.new(config: ActionCable::Server::Configuration.new).tap do |cable_server|
       cable_server.config.cable = {
         adapter: 'redis',
-        url: ENV.fetch('REDIS_URL'),
+        url: Redis::Config.app[:url],
+        password: Redis::Config.app[:password],
         channel_prefix: "spec_cable_listener_#{SecureRandom.hex(4)}",
         # A budget of two retries: stock Rails gives up on the third consecutive failure.
         reconnect_attempts: [0, 0.05]
@@ -20,7 +21,7 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
   let(:events) { Queue.new }
   let(:attempts) { Queue.new }
   let(:outage) { { on: false } }
-  let(:control) { Redis.new(url: ENV.fetch('REDIS_URL')) }
+  let(:control) { Redis.new(Redis::Config.app) }
 
   before do
     allow(adapter).to receive(:redis_connection_for_subscriptions).and_wrap_original do |original|
@@ -64,6 +65,28 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
       return event if event
     end
     nil
+  end
+
+  it 'asks every connected client to reconnect once the listener is back after losing Redis' do
+    closed = Queue.new
+    connection = Struct.new(:name, :on_close) { def close(**options) = on_close.call(self, options) }
+    %i[first second].each do |name|
+      stream = subscribe("room-#{name}", name)
+      expect(events.pop(timeout: 5)).to eq([name, :confirmed])
+      # Like a real connection, closing stops its streams, which reaches back into the listener, and
+      # the close handshake can drop it from the server's list while the others are still being closed.
+      server.add_connection(connection.new(name, lambda do |closing, options|
+        adapter.unsubscribe("room-#{name}", stream)
+        server.remove_connection(closing)
+        closed << [closing.name, options[:reconnect]]
+      end))
+    end
+    # The first connection at boot follows no outage, so nobody missed anything.
+    expect(closed.pop(timeout: 0.5)).to be_nil
+
+    kill_listener_connection
+
+    expect(Array.new(2) { closed.pop(timeout: 5) }).to contain_exactly([:first, true], [:second, true])
   end
 
   it 'confirms a subscription made while Redis stays unreachable past the retry budget' do

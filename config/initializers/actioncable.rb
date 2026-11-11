@@ -65,6 +65,18 @@ module ActionCableRedisListenerRecovery
     @subscribe_callbacks.select! { |channel, _| channels.include?(channel) }
     @subscribe_callbacks.transform_values! { |callbacks| callbacks.last(1) }
     super
+    reconnect_clients
+  end
+
+  # Redis pub/sub keeps nothing, so whatever was broadcast while the listener was cut off is gone, and
+  # the browsers never noticed: their WebSocket to this process stayed up the whole time. Asking them
+  # to reconnect runs the dashboard's reconnect path, which refetches what the outage hid. Posted to
+  # the event loop because closing a connection unsubscribes it, which takes the lock held here. The
+  # list is copied first: a close handshake that completes mid-loop removes its connection from it.
+  def reconnect_clients
+    @event_loop.post do
+      @adapter.server.connections.dup.each { |connection| connection.close(reason: 'pubsub_reconnected', reconnect: true) }
+    end
   end
 end
 
