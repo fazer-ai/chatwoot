@@ -8,7 +8,8 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
     ActionCable::Server::Base.new(config: ActionCable::Server::Configuration.new).tap do |cable_server|
       cable_server.config.cable = {
         adapter: 'redis',
-        url: ENV.fetch('REDIS_URL'),
+        url: Redis::Config.app[:url],
+        password: Redis::Config.app[:password],
         channel_prefix: "spec_cable_listener_#{SecureRandom.hex(4)}",
         # A budget of two retries: stock Rails gives up on the third consecutive failure.
         reconnect_attempts: [0, 0.05]
@@ -20,7 +21,7 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
   let(:events) { Queue.new }
   let(:attempts) { Queue.new }
   let(:outage) { { on: false } }
-  let(:control) { Redis.new(url: ENV.fetch('REDIS_URL')) }
+  let(:control) { Redis.new(Redis::Config.app) }
 
   before do
     allow(adapter).to receive(:redis_connection_for_subscriptions).and_wrap_original do |original|
