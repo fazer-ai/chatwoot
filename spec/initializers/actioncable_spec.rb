@@ -67,21 +67,26 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
     nil
   end
 
-  it 'asks the connected clients to reconnect once the listener is back after losing Redis' do
+  it 'asks every connected client to reconnect once the listener is back after losing Redis' do
     closed = Queue.new
-    room = subscribe('room', :first)
-    # Like a real connection, closing stops its streams, which reaches back into the listener.
-    server.add_connection(Struct.new(:on_close) { def close(**options) = on_close.call(options) }.new(lambda do |options|
-      adapter.unsubscribe('room', room)
-      closed << options
-    end))
-    expect(events.pop(timeout: 5)).to eq([:first, :confirmed])
+    connection = Struct.new(:name, :on_close) { def close(**options) = on_close.call(self, options) }
+    %i[first second].each do |name|
+      stream = subscribe("room-#{name}", name)
+      expect(events.pop(timeout: 5)).to eq([name, :confirmed])
+      # Like a real connection, closing stops its streams, which reaches back into the listener, and
+      # the close handshake can drop it from the server's list while the others are still being closed.
+      server.add_connection(connection.new(name, lambda do |closing, options|
+        adapter.unsubscribe("room-#{name}", stream)
+        server.remove_connection(closing)
+        closed << [closing.name, options[:reconnect]]
+      end))
+    end
     # The first connection at boot follows no outage, so nobody missed anything.
     expect(closed.pop(timeout: 0.5)).to be_nil
 
     kill_listener_connection
 
-    expect(closed.pop(timeout: 5)).to include(reconnect: true)
+    expect(Array.new(2) { closed.pop(timeout: 5) }).to contain_exactly([:first, true], [:second, true])
   end
 
   it 'confirms a subscription made while Redis stays unreachable past the retry budget' do
