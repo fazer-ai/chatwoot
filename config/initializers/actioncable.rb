@@ -28,6 +28,13 @@ module ActionCableRedisListenerRecovery
     super
   end
 
+  def remove_channel(channel)
+    # While disconnected no SUBSCRIBE is in flight, so the pending confirmations of a channel that
+    # leaves can go now instead of piling up, with their subscribers, until Redis comes back.
+    @subscription_lock.synchronize { @subscribe_callbacks.delete(channel) unless @subscribed_client }
+    super
+  end
+
   private
 
   # Keeps retrying past the configured list, at its last interval, until the server shuts down.

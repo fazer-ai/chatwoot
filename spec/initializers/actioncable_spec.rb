@@ -4,7 +4,8 @@ require 'rails_helper'
 # config/initializers/actioncable.rb, exercised through the adapter against a real Redis.
 describe 'Action Cable Redis listener recovery', :redis_streams do
   let(:server) do
-    ActionCable::Server::Base.new.tap do |cable_server|
+    # A configuration of its own: the default is the class-level one, shared with ActionCable.server.
+    ActionCable::Server::Base.new(config: ActionCable::Server::Configuration.new).tap do |cable_server|
       cable_server.config.cable = {
         adapter: 'redis',
         url: ENV.fetch('REDIS_URL'),
@@ -141,6 +142,14 @@ describe 'Action Cable Redis listener recovery', :redis_streams do
     subscribe('room', :rejoined)
 
     expect(events.pop(timeout: 5)).to eq([:rejoined, :confirmed])
+  end
+
+  it 'releases the confirmations of subscribers that leave while Redis is unreachable' do
+    outage[:on] = true
+    50.times { |i| adapter.unsubscribe("room-#{i}", subscribe("room-#{i}", :left)) }
+    wait_for_failed_attempts(3)
+
+    expect(adapter.send(:listener).instance_variable_get(:@subscribe_callbacks)).to be_empty
   end
 
   it 'confirms a channel re-added during the outage, not the subscription that left' do
