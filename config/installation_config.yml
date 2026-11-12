@@ -102,6 +102,12 @@
   display_title: 'Attachment size limit (MB)'
   description: 'Maximum attachment size in MB allowed for uploads'
   locked: false
+- name: MESSAGE_SEARCH_MIN_QUERY_LENGTH
+  value: 0
+  display_title: 'Minimum message search term length'
+  description: 'Message search ignores shorter terms; contacts and conversations still search them. Terms under 3 characters cannot use the message content index. 0 means no minimum.'
+  locked: false
+  type: number
 # ------- End of Account Related Config ------- #
 
 # ------- Email Related Config ------- #

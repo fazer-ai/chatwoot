@@ -48,6 +48,8 @@ class SearchService
   end
 
   def filter_messages
+    return @messages = Message.none.page(params[:page]).per(15) if message_query_below_minimum?
+
     @messages = if use_gin_search
                   filter_messages_with_gin
                 elsif should_run_advanced_search?
@@ -55,6 +57,13 @@ class SearchService
                 else
                   filter_messages_with_like
                 end
+  end
+
+  # A term shorter than the trigram size cannot use the index on messages.content, so it walks every
+  # message of the account; the operator can set a minimum (0, the default, means none).
+  def message_query_below_minimum?
+    minimum = GlobalConfig.get_value('MESSAGE_SEARCH_MIN_QUERY_LENGTH').to_i
+    search_query.present? && search_query.length < minimum
   end
 
   def advanced_search_with_fallback
