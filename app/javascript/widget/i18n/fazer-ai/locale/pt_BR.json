@@ -13,7 +13,8 @@
     "CANCEL": "Cancelar",
     "SEND": "Enviar",
     "EXPORT_ERROR": "Não foi possível preparar a imagem. Tente uma imagem menor.",
-    "DONE": "Concluir"
+    "DONE": "Concluir",
+    "TOO_LARGE": "A imagem editada passa de {size} MB. Recorte uma área menor."
   },
   "SCREEN_CAPTURE": {
     "BUTTON": "Capturar tela",

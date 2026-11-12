@@ -282,6 +282,7 @@ export default {
       :key="editedCount"
       :file="imageToEdit"
       :confirm-class="confirmClass"
+      :max-size-mb="fileUploadSizeLimit"
       :confirm-label="
         sendAttachmentsWithMessage ? $t('IMAGE_EDITOR.DONE') : ''
       "

@@ -200,6 +200,9 @@ export default {
       attachedFiles: [],
       attachmentToEdit: null,
       fileToEdit: null,
+      // Staged images whose edited version is still uploading. Sending now would send the
+      // original, without the blur or crop the agent just applied.
+      pendingReplacements: [],
       // Bumped whenever the composer's privacy or conversation changes. A capture
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
@@ -458,6 +461,7 @@ export default {
     },
     isReplyButtonDisabled() {
       if (this.isEditorDisabled) return true;
+      if (this.pendingReplacements.length) return true;
       if (this.isATwitterInbox) return true;
       if (this.hasAttachments || this.hasRecordedAudio) return false;
 
@@ -935,6 +939,7 @@ export default {
       this.resetAudioRecorderInput();
       // Reset attached files
       this.attachedFiles = [];
+      this.pendingReplacements = [];
       this.closeAttachmentEditor();
     },
     saveDraft(conversationId, replyType) {
@@ -1178,6 +1183,7 @@ export default {
           });
     },
     async onSendReply() {
+      if (this.pendingReplacements.length) return;
       const undefinedVariables = getUndefinedVariablesInMessage({
         message: this.message,
         variables: this.messageVariables,
@@ -1275,6 +1281,7 @@ export default {
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
+      this.pendingReplacements = [];
       this.closeAttachmentEditor();
       this.isRecordingAudio = false;
       this.resetReplyToMessage();
@@ -1472,7 +1479,18 @@ export default {
         const replaced = this.attachedFiles.indexOf(file?.replacesAttachment);
         if (replaced === -1) this.attachedFiles.push(staged);
         else this.attachedFiles.splice(replaced, 1, staged);
+        this.settleReplacement(file);
       };
+    },
+    // Called by fileUploadMixin when it refuses a file or its upload fails.
+    onFileUploadRefused(file) {
+      this.settleReplacement(file);
+    },
+    settleReplacement(file) {
+      if (!file?.replacesAttachment) return;
+      this.pendingReplacements = this.pendingReplacements.filter(
+        original => original !== file.replacesAttachment
+      );
     },
     removeAttachment(attachments) {
       this.attachedFiles = attachments;
@@ -1493,6 +1511,7 @@ export default {
     // stays until the edited one is accepted, so a size limit or a failed upload keeps it.
     onAttachmentEdited(file) {
       if (file !== this.fileToEdit) {
+        this.pendingReplacements.push(this.attachmentToEdit);
         this.stageFile({
           file,
           name: file.name,
@@ -1856,6 +1875,7 @@ export default {
             v-if="fileToEdit"
             :file="fileToEdit"
             :confirm-label="$t('IMAGE_EDITOR.DONE')"
+            :max-size-mb="maxSizeFor('image/png')"
             @save="onAttachmentEdited"
             @cancel="closeAttachmentEditor"
           />

@@ -14,6 +14,7 @@
     "SEND": "Send",
     "EXPORT_ERROR": "Could not prepare the image. Try a smaller image.",
     "EDIT_ATTACHMENT": "Edit image",
-    "DONE": "Done"
+    "DONE": "Done",
+    "TOO_LARGE": "The edited image is over {size} MB. Crop a smaller area."
   }
 }

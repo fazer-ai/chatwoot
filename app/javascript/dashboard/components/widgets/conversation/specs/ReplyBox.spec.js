@@ -684,12 +684,15 @@ describe('ReplyBox', () => {
 
     const edited = new File(['edited'], 'photo.png', { type: 'image/png' });
     wrapper.vm.onAttachmentEdited(edited);
+    // Until the edited image lands, a send would carry the original.
+    expect(wrapper.vm.isReplyButtonDisabled).toBe(true);
     await vi.waitUntil(
       () => wrapper.vm.attachedFiles[0]?.resource.name === 'photo.png'
     );
 
     expect(wrapper.vm.attachedFiles).toHaveLength(1);
     expect(wrapper.vm.fileToEdit).toBeNull();
+    expect(wrapper.vm.isReplyButtonDisabled).toBe(false);
   });
 
   it('keeps the staged image when the edited one is refused', async () => {
@@ -713,6 +716,7 @@ describe('ReplyBox', () => {
     await flushPromises();
 
     expect(wrapper.vm.attachedFiles).toEqual([staged]);
+    expect(wrapper.vm.isReplyButtonDisabled).toBe(false);
   });
 
   it('closes the image editor when the composer resets', async () => {

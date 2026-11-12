@@ -199,6 +199,23 @@ describe('ImageEditor', () => {
     );
   });
 
+  it('stays open with the drawing when the edit is over the size limit', async () => {
+    wrapper = mount(ImageEditor, {
+      props: { file, maxSizeMb: 0.000001 },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    await drag([10, 10], [200, 150]);
+    await click(button('IMAGE_EDITOR.SEND'));
+
+    expect(wrapper.emitted('save')).toBeUndefined();
+    expect(control('IMAGE_EDITOR.UNDO').disabled).toBe(false);
+    expect(document.querySelector('[role="alert"]').textContent).toContain(
+      'IMAGE_EDITOR.TOO_LARGE'
+    );
+  });
+
   it('drops an image that finishes decoding after the editor closed', async () => {
     let finishDecode;
     const bitmap = { width: 800, height: 600, close: vi.fn() };

@@ -24,6 +24,8 @@ const props = defineProps({
   isDark: { type: Boolean, default: false },
   // "Send" when the image goes out on confirm; "Done" when it goes back to a composer.
   confirmLabel: { type: String, default: '' },
+  // Upload limit in MB. An edit above it keeps the editor open, so the user can crop more.
+  maxSizeMb: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['save', 'cancel']);
@@ -61,7 +63,7 @@ const operations = ref([]);
 const redoStack = ref([]);
 const activeTool = ref('arrow');
 const isSaving = ref(false);
-const exportFailed = ref(false);
+const exportError = ref('');
 
 const canUndo = computed(() => operations.value.length > 0);
 const canRedo = computed(() => redoStack.value.length > 0);
@@ -139,7 +141,12 @@ const save = () => {
     // The browser returns null when it cannot encode the canvas, such as when memory runs out.
     if (!blob) {
       isSaving.value = false;
-      exportFailed.value = true;
+      exportError.value = t('IMAGE_EDITOR.EXPORT_ERROR');
+      return;
+    }
+    if (props.maxSizeMb && blob.size > props.maxSizeMb * 1024 * 1024) {
+      isSaving.value = false;
+      exportError.value = t('IMAGE_EDITOR.TOO_LARGE', { size: props.maxSizeMb });
       return;
     }
     emit(
@@ -270,11 +277,11 @@ onBeforeUnmount(() => {
           class="flex items-center justify-end gap-2 px-3 py-3 border-t border-n-weak"
         >
           <p
-            v-if="exportFailed"
+            v-if="exportError"
             role="alert"
             class="me-auto text-sm text-n-ruby-11"
           >
-            {{ t('IMAGE_EDITOR.EXPORT_ERROR') }}
+            {{ exportError }}
           </p>
           <button
             type="button"
