@@ -83,6 +83,31 @@ describe('ChatInputWrap', () => {
     expect(wrapper.find('li').exists()).toBe(false);
   });
 
+  it('removes an attachment with Enter instead of sending the message', async () => {
+    window.chatwootWebChannel.sendAttachmentsWithMessage = true;
+    const wrapper = mount(ChatInputWrap, {
+      props: { onSendAttachment, onSendMessage },
+      attachTo: document.body,
+      global: {
+        plugins: [store],
+        stubs: { ChatAttachmentButton: true, ChatSendButton: true },
+        directives: { onClickaway: {} },
+      },
+    });
+    await attach(wrapper, photo);
+
+    const remove = wrapper.find('li button').element;
+    remove.dispatchEvent(
+      new KeyboardEvent('keypress', { keyCode: 13, bubbles: true })
+    );
+    remove.click();
+    await flushPromises();
+
+    expect(onSendAttachment).not.toHaveBeenCalled();
+    expect(wrapper.find('li').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('waits for an attachment still uploading before it sends', async () => {
     window.chatwootWebChannel.sendAttachmentsWithMessage = true;
     const wrapper = mountInput();
