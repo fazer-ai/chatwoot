@@ -9,22 +9,22 @@ import {
 } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getContrastingTextColor } from '@chatwoot/utils';
-import { IFrameHelper } from 'widget/helpers/utils';
-import { emitter } from 'shared/helpers/mitt';
-import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   drawOperation,
   editedFileName,
   isMeaningfulOperation,
   renderOperations,
   toCanvasPoint,
-} from '../helpers/imageEditor';
+} from 'shared/helpers/imageEditor';
 
 const props = defineProps({
   file: { type: File, required: true },
-  // The inbox color and the dark mode of the widget; the teleported editor does not inherit them.
-  widgetColor: { type: String, required: true },
+  // The widget passes the inbox color and its dark mode, which the teleported editor does not
+  // inherit. The dashboard uses neither: its dark class is on the body.
+  accentColor: { type: String, default: '' },
   isDark: { type: Boolean, default: false },
+  // "Send" when the image goes out on confirm; "Done" when it goes back to a composer.
+  confirmLabel: { type: String, default: '' },
 });
 
 const emit = defineEmits(['save', 'cancel']);
@@ -62,11 +62,16 @@ const operations = ref([]);
 const redoStack = ref([]);
 const activeTool = ref('arrow');
 const isSaving = ref(false);
+const exportFailed = ref(false);
 
-const sendButtonStyle = computed(() => ({
-  backgroundColor: props.widgetColor,
-  color: getContrastingTextColor(props.widgetColor),
-}));
+const sendButtonStyle = computed(() =>
+  props.accentColor
+    ? {
+        backgroundColor: props.accentColor,
+        color: getContrastingTextColor(props.accentColor),
+      }
+    : {}
+);
 const canUndo = computed(() => operations.value.length > 0);
 const canRedo = computed(() => redoStack.value.length > 0);
 
@@ -143,9 +148,7 @@ const save = () => {
     // The browser returns null when it cannot encode the canvas, such as when memory runs out.
     if (!blob) {
       isSaving.value = false;
-      emitter.emit(BUS_EVENTS.SHOW_ALERT, {
-        message: t('IMAGE_EDITOR.EXPORT_ERROR'),
-      });
+      exportFailed.value = true;
       return;
     }
     emit(
@@ -169,18 +172,11 @@ const onKeydown = event => {
 };
 
 // The chat input takes the focus again when the widget reopens after a capture.
-const setFullscreen = isFullscreen => {
-  if (IFrameHelper.isIFrame()) {
-    IFrameHelper.sendMessage({ event: 'setFullscreen', isFullscreen });
-  }
-};
-
 const keepFocus = event => {
   if (!dialogRef.value.contains(event.target)) dialogRef.value.focus();
 };
 
 onMounted(async () => {
-  setFullscreen(true);
   // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
   dialogRef.value.focus();
   document.addEventListener('focusin', keepFocus);
@@ -203,7 +199,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   isUnmounted = true;
-  setFullscreen(false);
   document.removeEventListener('focusin', keepFocus);
   image.value?.close();
 });
@@ -212,93 +207,103 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div :class="{ dark: isDark }">
-    <div
-      ref="dialogRef"
-      tabindex="-1"
-      class="fixed inset-0 z-50 flex flex-col outline-none bg-n-background text-n-slate-12"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="t('IMAGE_EDITOR.TITLE')"
-      @keydown="onKeydown"
-      @keypress.stop
-    >
       <div
-        class="flex items-center justify-between gap-2 px-2 py-2 border-b border-n-weak"
+        ref="dialogRef"
+        tabindex="-1"
+        class="fixed inset-0 z-50 flex flex-col outline-none bg-n-background text-n-slate-12"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('IMAGE_EDITOR.TITLE')"
+        @keydown="onKeydown"
+        @keypress.stop
       >
-        <div class="flex items-center gap-1">
-          <button
-            v-for="tool in tools"
-            :key="tool.id"
-            type="button"
-            class="flex items-center justify-center h-9 gap-1.5 px-2 text-sm rounded-lg min-w-9 transition-colors"
-            :class="
-              activeTool === tool.id
-                ? 'bg-n-alpha-2 text-n-ruby-9'
-                : 'hover:bg-n-alpha-1'
-            "
-            :aria-label="tool.label"
-            :title="tool.label"
-            :aria-pressed="activeTool === tool.id"
-            @click="activeTool = tool.id"
+        <div
+          class="flex items-center justify-between gap-2 px-2 py-2 border-b border-n-weak"
+        >
+          <div class="flex items-center gap-1">
+            <button
+              v-for="tool in tools"
+              :key="tool.id"
+              type="button"
+              class="flex items-center justify-center h-9 gap-1.5 px-2 text-sm rounded-lg min-w-9 transition-colors"
+              :class="
+                activeTool === tool.id
+                  ? 'bg-n-alpha-2 text-n-ruby-9'
+                  : 'hover:bg-n-alpha-1'
+              "
+              :aria-label="tool.label"
+              :title="tool.label"
+              :aria-pressed="activeTool === tool.id"
+              @click="activeTool = tool.id"
+            >
+              <span class="size-5" :class="tool.icon" />
+              <span class="hidden sm:inline">{{ tool.label }}</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="flex items-center justify-center rounded-lg size-9 hover:bg-n-alpha-1 disabled:opacity-40 disabled:hover:bg-transparent"
+              :aria-label="t('IMAGE_EDITOR.UNDO')"
+              :title="t('IMAGE_EDITOR.UNDO')"
+              :disabled="!canUndo"
+              @click="undo"
+            >
+              <span class="i-lucide-undo-2 size-5" />
+            </button>
+            <button
+              type="button"
+              class="flex items-center justify-center rounded-lg size-9 hover:bg-n-alpha-1 disabled:opacity-40 disabled:hover:bg-transparent"
+              :aria-label="t('IMAGE_EDITOR.REDO')"
+              :title="t('IMAGE_EDITOR.REDO')"
+              :disabled="!canRedo"
+              @click="redo"
+            >
+              <span class="i-lucide-redo-2 size-5" />
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex items-center justify-center flex-1 min-h-0 p-3 bg-n-alpha-1"
+        >
+          <canvas
+            ref="canvasRef"
+            class="max-w-full max-h-full shadow-md touch-none cursor-crosshair"
+            @pointerdown="onPointerDown"
+            @pointermove="onPointerMove"
+            @pointerup="onPointerUp"
+            @pointercancel="onPointerCancel"
+          />
+        </div>
+        <div
+          class="flex items-center justify-end gap-2 px-3 py-3 border-t border-n-weak"
+        >
+          <p
+            v-if="exportFailed"
+            role="alert"
+            class="me-auto text-sm text-n-ruby-11"
           >
-            <span class="size-5" :class="tool.icon" />
-            <span class="hidden sm:inline">{{ tool.label }}</span>
+            {{ t('IMAGE_EDITOR.EXPORT_ERROR') }}
+          </p>
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-n-alpha-2"
+            @click="emit('cancel')"
+          >
+            {{ t('IMAGE_EDITOR.CANCEL') }}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-60"
+            :class="{ 'bg-n-brand text-white': !accentColor }"
+            :style="sendButtonStyle"
+            :disabled="isSaving"
+            @click="save"
+          >
+            {{ confirmLabel || t('IMAGE_EDITOR.SEND') }}
           </button>
         </div>
-        <div class="flex items-center gap-1">
-          <button
-            type="button"
-            class="flex items-center justify-center rounded-lg size-9 hover:bg-n-alpha-1 disabled:opacity-40 disabled:hover:bg-transparent"
-            :aria-label="t('IMAGE_EDITOR.UNDO')"
-            :title="t('IMAGE_EDITOR.UNDO')"
-            :disabled="!canUndo"
-            @click="undo"
-          >
-            <span class="i-lucide-undo-2 size-5" />
-          </button>
-          <button
-            type="button"
-            class="flex items-center justify-center rounded-lg size-9 hover:bg-n-alpha-1 disabled:opacity-40 disabled:hover:bg-transparent"
-            :aria-label="t('IMAGE_EDITOR.REDO')"
-            :title="t('IMAGE_EDITOR.REDO')"
-            :disabled="!canRedo"
-            @click="redo"
-          >
-            <span class="i-lucide-redo-2 size-5" />
-          </button>
-        </div>
       </div>
-      <div
-        class="flex items-center justify-center flex-1 min-h-0 p-3 bg-n-alpha-1"
-      >
-        <canvas
-          ref="canvasRef"
-          class="max-w-full max-h-full shadow-md touch-none cursor-crosshair"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="onPointerUp"
-          @pointercancel="onPointerCancel"
-        />
-      </div>
-      <div class="flex justify-end gap-2 px-3 py-3 border-t border-n-weak">
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-n-alpha-2"
-          @click="emit('cancel')"
-        >
-          {{ t('IMAGE_EDITOR.CANCEL') }}
-        </button>
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-60"
-          :style="sendButtonStyle"
-          :disabled="isSaving"
-          @click="save"
-        >
-          {{ t('IMAGE_EDITOR.SEND') }}
-        </button>
-      </div>
-    </div>
     </div>
   </Teleport>
 </template>

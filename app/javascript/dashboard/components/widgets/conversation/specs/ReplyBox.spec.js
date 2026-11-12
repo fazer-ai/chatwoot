@@ -666,6 +666,32 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.attachedFiles).toHaveLength(1);
   });
 
+  it('replaces a staged image with the edited one', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const original = new File(['png'], 'photo.jpg', { type: 'image/jpeg' });
+    wrapper.vm.stageFile({
+      name: 'photo.jpg',
+      type: original.type,
+      file: original,
+    });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    wrapper.vm.editAttachment(wrapper.vm.attachedFiles[0]);
+    expect(wrapper.vm.fileToEdit.name).toBe('photo.jpg');
+
+    const edited = new File(['edited'], 'photo.png', { type: 'image/png' });
+    wrapper.vm.onAttachmentEdited(edited);
+    await vi.waitUntil(
+      () => wrapper.vm.attachedFiles[0]?.resource.name === 'photo.png'
+    );
+
+    expect(wrapper.vm.attachedFiles).toHaveLength(1);
+    expect(wrapper.vm.fileToEdit).toBeNull();
+  });
+
   // The three drops above are not the same event to the agent. Leaving note mode is the one
   // nothing they did causes -- a bot releases the conversation, the messaging window
   // reopens, a restriction lifts -- so the recording goes with the composer looking exactly

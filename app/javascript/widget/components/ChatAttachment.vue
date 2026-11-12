@@ -14,8 +14,9 @@ import { emitter } from 'shared/helpers/mitt';
 import { useAttachments } from '../composables/useAttachments';
 import { useScreenCapture } from '../composables/useScreenCapture';
 import { useDarkMode } from '../composables/useDarkMode';
-import { isEditableImage } from '../helpers/imageEditor';
-import ImageEditor from './ImageEditor.vue';
+import { isEditableImage } from 'shared/helpers/imageEditor';
+import ImageEditor from 'shared/components/ImageEditor.vue';
+import { IFrameHelper } from 'widget/helpers/utils';
 
 export default {
   components: { FluentIcon, FileUpload, ImageEditor, Spinner },
@@ -33,6 +34,7 @@ export default {
       attachmentEditorEnabled,
       screenCaptureEnabled,
       screenCaptureEditorEnabled,
+      sendAttachmentsWithMessage,
     } = window.chatwootWebChannel;
     return {
       canHandleAttachments,
@@ -40,6 +42,7 @@ export default {
       prefersDarkMode,
       attachmentEditorEnabled,
       screenCaptureEditorEnabled,
+      sendAttachmentsWithMessage,
       showCaptureButton: isScreenCaptureSupported && screenCaptureEnabled,
     };
   },
@@ -62,6 +65,17 @@ export default {
     },
     imageToEdit() {
       return this.imageQueue[0];
+    },
+    hasImageToEdit() {
+      return Boolean(this.imageToEdit);
+    },
+  },
+  watch: {
+    // The page shows the widget full screen while the editor is open.
+    hasImageToEdit(isFullscreen) {
+      if (IFrameHelper.isIFrame()) {
+        IFrameHelper.sendMessage({ event: 'setFullscreen', isFullscreen });
+      }
     },
   },
   mounted() {
@@ -205,6 +219,7 @@ export default {
       return {
         thumbUrl: window.URL.createObjectURL(file.file),
         fileType: this.getFileType(file.type),
+        fileName: file.name,
       };
     },
   },
@@ -241,7 +256,10 @@ export default {
       v-if="imageToEdit"
       :key="editedCount"
       :file="imageToEdit"
-      :widget-color="widgetColor"
+      :accent-color="widgetColor"
+      :confirm-label="
+        sendAttachmentsWithMessage ? $t('IMAGE_EDITOR.DONE') : ''
+      "
       :is-dark="prefersDarkMode"
       @save="onEditorSave"
       @cancel="onEditorCancel"

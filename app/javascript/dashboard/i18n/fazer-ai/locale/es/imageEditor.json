@@ -1,0 +1,19 @@
+{
+  "IMAGE_EDITOR": {
+    "TITLE": "Editar imagen",
+    "TOOLS": {
+      "ARROW": "Flecha",
+      "RECTANGLE": "Rectángulo",
+      "ELLIPSE": "Elipse",
+      "BLUR": "Desenfocar",
+      "CROP": "Recortar"
+    },
+    "UNDO": "Deshacer",
+    "REDO": "Rehacer",
+    "CANCEL": "Cancelar",
+    "SEND": "Enviar",
+    "EXPORT_ERROR": "No se pudo preparar la imagen. Prueba con una imagen más pequeña.",
+    "EDIT_ATTACHMENT": "Editar imagen",
+    "DONE": "Listo"
+  }
+}

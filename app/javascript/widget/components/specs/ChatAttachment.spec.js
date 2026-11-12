@@ -3,6 +3,11 @@ import { createStore } from 'vuex';
 import FileUpload from 'vue-upload-component';
 import ChatAttachment from '../ChatAttachment.vue';
 import { useScreenCapture } from '../../composables/useScreenCapture';
+import { IFrameHelper } from 'widget/helpers/utils';
+
+vi.mock('widget/helpers/utils', () => ({
+  IFrameHelper: { isIFrame: () => true, sendMessage: vi.fn() },
+}));
 
 vi.mock('../../composables/useScreenCapture', () => ({
   useScreenCapture: vi.fn(),
@@ -47,6 +52,7 @@ describe('ChatAttachment', () => {
 
   beforeEach(() => {
     onAttach = vi.fn();
+    IFrameHelper.sendMessage.mockClear();
     window.URL.createObjectURL = vi.fn(() => 'blob:preview');
     window.chatwootWebChannel = {
       attachmentEditorEnabled: true,
@@ -82,13 +88,17 @@ describe('ChatAttachment', () => {
 
   it('discards the image when the editor is cancelled', async () => {
     const wrapper = mountAttachment();
+    const fullscreen = () =>
+      IFrameHelper.sendMessage.mock.calls.map(([m]) => m.isFullscreen);
 
     await selectFile(wrapper, photo);
+    expect(fullscreen()).toEqual([true]);
     wrapper.findComponent({ name: 'ImageEditor' }).vm.$emit('cancel');
     await flushPromises();
 
     expect(wrapper.findComponent({ name: 'ImageEditor' }).exists()).toBe(false);
     expect(onAttach).not.toHaveBeenCalled();
+    expect(fullscreen()).toEqual([true, false]);
   });
 
   it('shows the images of a multi-file paste one after the other', async () => {

@@ -1,4 +1,5 @@
 import {
+  dataUrlToFile,
   editedFileName,
   isEditableImage,
   isMeaningfulOperation,
@@ -155,5 +156,15 @@ describe('imageEditor', () => {
   it('editedFileName swaps the extension for png', () => {
     expect(editedFileName('photo.final.jpeg')).toBe('photo.final.png');
     expect(editedFileName('clipboard')).toBe('clipboard.png');
+  });
+
+  it('dataUrlToFile rebuilds the staged file', () => {
+    const file = dataUrlToFile('data:image/png;base64,aGVsbG8=', 'shot.png');
+
+    expect([file.name, file.type, file.size]).toEqual([
+      'shot.png',
+      'image/png',
+      'hello'.length,
+    ]);
   });
 });

@@ -152,3 +152,11 @@ export const renderOperations = (image, operations) => {
 };
 
 export const editedFileName = name => `${name.replace(/\.[^.]+$/, '')}.png`;
+
+// The dashboard keeps a staged attachment as a data URL, so the editor gets a File back from it.
+export const dataUrlToFile = (dataUrl, name) => {
+  const [header, data] = dataUrl.split(',');
+  const type = header.match(/^data:([^;]+)/)[1];
+  const bytes = Uint8Array.from(atob(data), char => char.charCodeAt(0));
+  return new File([bytes], name, { type });
+};

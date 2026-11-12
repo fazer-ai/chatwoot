@@ -1,10 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils';
-import { IFrameHelper } from 'widget/helpers/utils';
 import ImageEditor from '../ImageEditor.vue';
-
-vi.mock('widget/helpers/utils', () => ({
-  IFrameHelper: { isIFrame: () => true, sendMessage: vi.fn() },
-}));
 
 const file = new File(['original'], 'photo.jpg', { type: 'image/jpeg' });
 
@@ -56,7 +51,7 @@ describe('ImageEditor', () => {
 
   const mountEditor = async () => {
     wrapper = mount(ImageEditor, {
-      props: { file, widgetColor: '#ffd600', isDark: true },
+      props: { file, accentColor: '#ffd600', isDark: true },
       attachTo: document.body,
     });
     await flushPromises();
@@ -65,7 +60,6 @@ describe('ImageEditor', () => {
   const savedFiles = () => (wrapper.emitted('save') || []).map(([f]) => f);
 
   beforeEach(() => {
-    IFrameHelper.sendMessage.mockClear();
     window.createImageBitmap = vi.fn(async () => ({
       width: 800,
       height: 600,
@@ -88,20 +82,7 @@ describe('ImageEditor', () => {
 
   afterEach(() => wrapper.unmount());
 
-  it('asks the page to show the widget full screen while it is open', async () => {
-    await mountEditor();
-    const calls = () => IFrameHelper.sendMessage.mock.calls.map(([m]) => m);
-
-    expect(calls()).toEqual([{ event: 'setFullscreen', isFullscreen: true }]);
-    wrapper.unmount();
-    expect(calls().at(-1)).toEqual({
-      event: 'setFullscreen',
-      isFullscreen: false,
-    });
-    wrapper = mount({ render: () => null });
-  });
-
-  it('follows the inbox color and the dark mode of the widget', async () => {
+  it('uses the accent color and the dark mode it receives', async () => {
     await mountEditor();
     const send = button('IMAGE_EDITOR.SEND');
 
@@ -213,6 +194,9 @@ describe('ImageEditor', () => {
 
     expect(wrapper.emitted('save')).toBeUndefined();
     expect(button('IMAGE_EDITOR.SEND').disabled).toBe(false);
+    expect(document.querySelector('[role="alert"]').textContent).toContain(
+      'IMAGE_EDITOR.EXPORT_ERROR'
+    );
   });
 
   it('drops an image that finishes decoding after the editor closed', async () => {

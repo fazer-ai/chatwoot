@@ -72,6 +72,8 @@ import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { LocalStorage } from 'shared/helpers/localStorage';
 import { emitter } from 'shared/helpers/mitt';
+import { dataUrlToFile } from 'shared/helpers/imageEditor';
+import ImageEditor from 'shared/components/ImageEditor.vue';
 const EmojiIconPicker = defineAsyncComponent(
   () =>
     import('dashboard/components-next/emoji-icon-picker/EmojiIconPicker.vue')
@@ -82,6 +84,7 @@ export default {
     ArticleSearchPopover,
     AttachmentPreview,
     AudioRecorder,
+    ImageEditor,
     ReplyBoxBanner,
     EmojiIconPicker,
     MessageSignatureMissingAlert,
@@ -195,6 +198,8 @@ export default {
       isFocused: false,
       showEmojiPicker: false,
       attachedFiles: [],
+      attachmentToEdit: null,
+      fileToEdit: null,
       // Bumped whenever the composer's privacy or conversation changes. A capture
       // stamps it on the way in, so an upload that lands afterwards can tell that
       // it outlived what the agent was composing under.
@@ -1001,6 +1006,8 @@ export default {
     onPaste(e) {
       // Don't handle paste if compose new conversation modal is open
       if (this.newConversationModalActive) return;
+      // The image editor is open over the composer; a paste would stage a file unseen.
+      if (this.fileToEdit) return;
 
       // Don't handle paste if editor is disabled
       if (this.isEditorDisabled) return;
@@ -1464,6 +1471,33 @@ export default {
     removeAttachment(attachments) {
       this.attachedFiles = attachments;
     },
+    editAttachment(attachment) {
+      const { resource } = attachment;
+      this.attachmentToEdit = attachment;
+      this.fileToEdit = dataUrlToFile(
+        attachment.thumb,
+        resource.filename || resource.name
+      );
+    },
+    closeAttachmentEditor() {
+      this.attachmentToEdit = null;
+      this.fileToEdit = null;
+    },
+    // The edited image replaces the staged one and goes through the same upload as a new file.
+    onAttachmentEdited(file) {
+      if (file !== this.fileToEdit) {
+        this.attachedFiles = this.attachedFiles.filter(
+          staged => staged !== this.attachmentToEdit
+        );
+        this.stageFile({
+          file,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        });
+      }
+      this.closeAttachmentEditor();
+    },
     setReplyToInPayload(payload) {
       if (this.inReplyTo?.id) {
         return {
@@ -1811,6 +1845,14 @@ export default {
             class="mt-2"
             :attachments="attachedFiles"
             @remove-attachment="removeAttachment"
+            @edit-attachment="editAttachment"
+          />
+          <ImageEditor
+            v-if="fileToEdit"
+            :file="fileToEdit"
+            :confirm-label="$t('IMAGE_EDITOR.DONE')"
+            @save="onAttachmentEdited"
+            @cancel="closeAttachmentEditor"
           />
         </div>
         <MessageSignatureMissingAlert
