@@ -81,12 +81,13 @@ export default {
       }
     },
     async handleSendAttachment(attachments, content = '') {
-      await this.sendAttachment({
+      const sent = await this.sendAttachment({
         attachments,
         content,
         replyTo: this.inReplyTo ? this.inReplyTo.id : null,
       });
       this.inReplyTo = null;
+      return sent;
     },
     startNewConversation() {
       this.router.replace({ name: 'prechat-form' });

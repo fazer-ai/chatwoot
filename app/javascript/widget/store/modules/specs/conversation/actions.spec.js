@@ -155,6 +155,23 @@ describe('#actions', () => {
   });
 
   describe('#sendAttachment', () => {
+    it('tells the caller whether the message went out', async () => {
+      const state = { pendingCustomAttributes: {}, pendingLabels: [] };
+      const params = {
+        attachments: [{ file: 'signed-id', thumbUrl: '', fileType: 'file' }],
+      };
+
+      API.post.mockRejectedValueOnce(new Error('offline'));
+      expect(
+        await actions.sendAttachment({ commit, dispatch, state }, params)
+      ).toBe(false);
+
+      API.post.mockResolvedValueOnce({ data: { id: 1 } });
+      expect(
+        await actions.sendAttachment({ commit, dispatch, state }, params)
+      ).toBe(true);
+    });
+
     it('sends correct mutations', () => {
       const mockDate = new Date(1466424490000);
       getUuid.mockImplementationOnce(() => '1111');

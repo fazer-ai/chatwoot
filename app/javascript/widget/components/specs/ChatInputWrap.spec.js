@@ -83,7 +83,7 @@ describe('ChatInputWrap', () => {
     expect(wrapper.find('li').exists()).toBe(false);
   });
 
-  it('removes an attachment with Enter instead of sending the message', async () => {
+  it('lets Enter on a button act on that button instead of sending', async () => {
     window.chatwootWebChannel.sendAttachmentsWithMessage = true;
     const wrapper = mount(ChatInputWrap, {
       props: { onSendAttachment, onSendMessage },
@@ -106,6 +106,20 @@ describe('ChatInputWrap', () => {
     expect(onSendAttachment).not.toHaveBeenCalled();
     expect(wrapper.find('li').exists()).toBe(false);
     wrapper.unmount();
+  });
+
+  it('puts the files and the text back when the grouped message fails', async () => {
+    window.chatwootWebChannel.sendAttachmentsWithMessage = true;
+    onSendAttachment.mockResolvedValue(false);
+    const wrapper = mountInput();
+
+    await attach(wrapper, photo);
+    await wrapper.find('textarea').setValue('see the screen');
+    wrapper.findComponent({ name: 'ChatSendButton' }).vm.$emit('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('li')).toHaveLength(1);
+    expect(wrapper.find('textarea').element.value).toBe('see the screen');
   });
 
   it('waits for an attachment still uploading before it sends', async () => {

@@ -111,6 +111,7 @@ export const actions = {
         tempId: tempMessage.id,
       });
       commit('pushMessageToConversation', { ...data, status: 'sent' });
+      return true;
     } catch (error) {
       commit('pushMessageToConversation', { ...tempMessage, status: 'failed' });
       commit('updateMessageMeta', {
@@ -118,6 +119,7 @@ export const actions = {
         meta: { ...meta, error: '' },
       });
       // Show error
+      return false;
     }
   },
   fetchOldConversations: async ({ commit }, { before } = {}) => {

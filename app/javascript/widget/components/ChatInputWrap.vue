@@ -102,13 +102,23 @@ export default {
       // An attachment still uploading belongs to this message; sending now would leave it out.
       if (this.sendAttachmentsWithMessage && this.uploadsInFlight) return;
       if (this.pendingAttachments.length) {
-        this.onSendAttachment(this.pendingAttachments, this.userInput.trim());
-        this.pendingAttachments = [];
+        this.sendPendingAttachments();
       } else if (this.userInput && this.userInput.trim()) {
         this.onSendMessage(this.userInput);
       }
       this.userInput = '';
       this.focusInput();
+    },
+    // A failed message with attachments has no retry, so the files and the text come back to
+    // the composer for the visitor to send again.
+    async sendPendingAttachments() {
+      const attachments = this.pendingAttachments;
+      const content = this.userInput.trim();
+      this.pendingAttachments = [];
+      const sent = await this.onSendAttachment(attachments, content);
+      if (sent !== false) return;
+      this.pendingAttachments = [...attachments, ...this.pendingAttachments];
+      if (!this.userInput) this.userInput = content;
     },
     onAttach(attachment) {
       if (this.sendAttachmentsWithMessage) {
@@ -121,6 +131,8 @@ export default {
       this.pendingAttachments.splice(index, 1);
     },
     handleEnterKeyPress(e) {
+      // Enter on a button, such as a remove or capture button, activates that button.
+      if (e.target.closest?.('button')) return;
       if (e.keyCode === 13 && !e.shiftKey) {
         e.preventDefault();
         this.handleButtonClick();

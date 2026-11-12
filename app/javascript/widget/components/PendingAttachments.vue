@@ -12,8 +12,7 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <!-- Enter on a remove button must not reach the composer's send listener on the document. -->
-  <ul class="flex flex-wrap gap-2 pt-2 pe-1" @keypress.stop>
+  <ul class="flex flex-wrap gap-2 pt-2 pe-1">
     <li
       v-for="(attachment, index) in attachments"
       :key="attachment.thumbUrl"
