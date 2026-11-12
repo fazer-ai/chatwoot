@@ -1,0 +1,20 @@
+{
+  "IMAGE_EDITOR": {
+    "TITLE": "Editar imagen",
+    "TOOLS": {
+      "ARROW": "Flecha",
+      "RECTANGLE": "Rectángulo",
+      "ELLIPSE": "Elipse",
+      "BLUR": "Desenfocar",
+      "CROP": "Recortar"
+    },
+    "UNDO": "Deshacer",
+    "REDO": "Rehacer",
+    "CANCEL": "Cancelar",
+    "SEND": "Enviar"
+  },
+  "SCREEN_CAPTURE": {
+    "BUTTON": "Capturar pantalla",
+    "ERROR": "No se pudo capturar la pantalla. Inténtalo de nuevo."
+  }
+}

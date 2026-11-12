@@ -1,0 +1,20 @@
+{
+  "IMAGE_EDITOR": {
+    "TITLE": "Edit image",
+    "TOOLS": {
+      "ARROW": "Arrow",
+      "RECTANGLE": "Rectangle",
+      "ELLIPSE": "Ellipse",
+      "BLUR": "Blur",
+      "CROP": "Crop"
+    },
+    "UNDO": "Undo",
+    "REDO": "Redo",
+    "CANCEL": "Cancel",
+    "SEND": "Send"
+  },
+  "SCREEN_CAPTURE": {
+    "BUTTON": "Capture screen",
+    "ERROR": "Couldn't capture the screen. Please try again."
+  }
+}

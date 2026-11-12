@@ -18,10 +18,11 @@ require 'fileutils'
 
 # Each frontend bundle carries its own translations, so the fork has one overlay per
 # bundle. They differ in layout: the dashboard ships a folder per language (one file per
-# namespace), the survey a single file, since it is one small namespace.
+# namespace), the survey and the widget a single file each, since each is one small namespace.
 FE_TREES = [
   { upstream: 'app/javascript/dashboard/i18n/locale', fork: 'app/javascript/dashboard/i18n/fazer-ai/locale', layout: :directory },
-  { upstream: 'app/javascript/survey/i18n/locale', fork: 'app/javascript/survey/i18n/fazer-ai/locale', layout: :file }
+  { upstream: 'app/javascript/survey/i18n/locale', fork: 'app/javascript/survey/i18n/fazer-ai/locale', layout: :file },
+  { upstream: 'app/javascript/widget/i18n/locale', fork: 'app/javascript/widget/i18n/fazer-ai/locale', layout: :file }
 ].freeze
 FE_UPSTREAM = FE_TREES.first[:upstream]
 FE_FORK = FE_TREES.first[:fork]
