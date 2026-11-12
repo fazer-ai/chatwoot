@@ -172,6 +172,20 @@ describe('ImageEditor', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1);
   });
 
+  it('gives the focus back to the composer when it closes', async () => {
+    const composer = document.body.appendChild(
+      document.createElement('textarea')
+    );
+    composer.focus();
+    await mountEditor();
+
+    wrapper.unmount();
+
+    expect(document.activeElement).toBe(composer);
+    composer.remove();
+    wrapper = mount({ render: () => null });
+  });
+
   it('keeps Enter presses inside the editor, away from the chat composer', async () => {
     await mountEditor();
     const composer = vi.fn();

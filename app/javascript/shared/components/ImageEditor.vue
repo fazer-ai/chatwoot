@@ -72,6 +72,7 @@ const canRedo = computed(() => redoStack.value.length > 0);
 let rendered = null;
 let draft = null;
 let isUnmounted = false;
+let previousFocus = null;
 
 const paint = () => {
   const canvas = canvasRef.value;
@@ -175,7 +176,9 @@ const keepFocus = event => {
 };
 
 onMounted(async () => {
-  // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
+  // Focus leaves the chat input, so typed keys and Escape do not reach the composer. It goes
+  // back there when the editor closes, so the next typed text is not lost.
+  previousFocus = document.activeElement;
   dialogRef.value.focus();
   document.addEventListener('focusin', keepFocus);
   let bitmap;
@@ -198,6 +201,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   isUnmounted = true;
   document.removeEventListener('focusin', keepFocus);
+  if (previousFocus?.isConnected) previousFocus.focus();
   image.value?.close();
 });
 </script>

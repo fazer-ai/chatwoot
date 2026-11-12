@@ -459,9 +459,16 @@ export default {
     charactersRemaining() {
       return this.maxLength - this.message.length;
     },
+    // Only an image still staged can go out without its edit. One the agent removed while
+    // its edit uploaded does not hold the send.
+    hasPendingReplacement() {
+      return this.pendingReplacements.some(original =>
+        this.attachedFiles.includes(original)
+      );
+    },
     isReplyButtonDisabled() {
       if (this.isEditorDisabled) return true;
-      if (this.pendingReplacements.length) return true;
+      if (this.hasPendingReplacement) return true;
       if (this.isATwitterInbox) return true;
       if (this.hasAttachments || this.hasRecordedAudio) return false;
 
@@ -1183,7 +1190,7 @@ export default {
           });
     },
     async onSendReply() {
-      if (this.pendingReplacements.length) return;
+      if (this.hasPendingReplacement) return;
       const undefinedVariables = getUndefinedVariablesInMessage({
         message: this.message,
         variables: this.messageVariables,

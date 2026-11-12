@@ -760,6 +760,8 @@ describe('ReplyBox', () => {
       new File(['edited'], 'photo.png', { type: 'image/png' })
     );
     wrapper.vm.removeAttachment([]);
+    // The removed image no longer holds the send while its edit finishes uploading.
+    expect(wrapper.vm.hasPendingReplacement).toBe(false);
     await vi.waitUntil(() => wrapper.vm.pendingReplacements.length === 0);
 
     expect(wrapper.vm.attachedFiles).toEqual([]);
