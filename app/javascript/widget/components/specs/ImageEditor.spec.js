@@ -135,17 +135,20 @@ describe('ImageEditor', () => {
     expect(control('IMAGE_EDITOR.REDO').disabled).toBe(true);
   });
 
-  it('undoes with Ctrl+Z and cancels with Escape', async () => {
+  it('takes the focus, undoes with Ctrl+Z and cancels with Escape', async () => {
     await mountEditor();
+    const press = init =>
+      document.activeElement.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, ...init })
+      );
 
+    expect(document.activeElement.getAttribute('role')).toBe('dialog');
     await drag([10, 10], [200, 150]);
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true })
-    );
+    press({ key: 'z', ctrlKey: true });
     await flushPromises();
     expect(control('IMAGE_EDITOR.UNDO').disabled).toBe(true);
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    press({ key: 'Escape' });
     expect(wrapper.emitted('cancel')).toHaveLength(1);
   });
 

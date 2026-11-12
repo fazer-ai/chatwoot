@@ -48,6 +48,7 @@ const tools = computed(() => [
   { id: 'crop', icon: 'i-lucide-crop', label: t('IMAGE_EDITOR.TOOLS.CROP') },
 ]);
 
+const dialogRef = useTemplateRef('dialogRef');
 const canvasRef = useTemplateRef('canvasRef');
 const image = shallowRef(null);
 const operations = ref([]);
@@ -148,7 +149,8 @@ const onKeydown = event => {
 };
 
 onMounted(async () => {
-  document.addEventListener('keydown', onKeydown);
+  // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
+  dialogRef.value.focus();
   try {
     image.value = await createImageBitmap(props.file);
   } catch {
@@ -160,7 +162,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onKeydown);
   image.value?.close();
 });
 </script>
@@ -168,10 +169,13 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex flex-col bg-n-background text-n-slate-12"
+      ref="dialogRef"
+      tabindex="-1"
+      class="fixed inset-0 z-50 flex flex-col outline-none bg-n-background text-n-slate-12"
       role="dialog"
       aria-modal="true"
       :aria-label="t('IMAGE_EDITOR.TITLE')"
+      @keydown="onKeydown"
     >
       <div
         class="flex items-center justify-between gap-2 px-2 py-2 border-b border-n-weak"
