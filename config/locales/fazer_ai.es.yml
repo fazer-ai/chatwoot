@@ -192,6 +192,8 @@ es:
     app_configs:
       branding:
         invalid_color: 'El color de la marca debe ser un color hexadecimal, como #1f93ff.'
+      general:
+        invalid_message_search_min_query_length: 'La longitud mínima del término en la búsqueda de mensajes debe ser un número entero, 0 o mayor.'
       fields:
         INSTALLATION_NAME:
           title: 'Nombre de la instalación'

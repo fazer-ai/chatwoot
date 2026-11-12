@@ -1,5 +1,6 @@
 import SearchAPI from '../../api/search';
 import types from '../mutation-types';
+import { isBelowMessageSearchMinimum } from '../../modules/search/helpers/messageSearchMinimum';
 
 const PER_PAGE = 15;
 
@@ -130,8 +131,14 @@ export const actions = {
       commit(types.CONVERSATION_SEARCH_SET_UI_FLAG, { isFetching: false });
     }
   },
-  async messageSearch({ commit }, payload) {
+  async messageSearch({ commit, rootGetters }, payload) {
     const { page = 1, ...searchParams } = payload;
+    const minimum =
+      rootGetters?.['globalConfig/get']?.messageSearchMinQueryLength;
+    if (isBelowMessageSearchMinimum(searchParams.q, minimum)) {
+      commit(types.MESSAGE_SEARCH_SET_UI_FLAG, { hasMore: false });
+      return true;
+    }
     commit(types.MESSAGE_SEARCH_SET_UI_FLAG, { isFetching: true });
     try {
       const { data } = await SearchAPI.messages({ ...searchParams, page });
