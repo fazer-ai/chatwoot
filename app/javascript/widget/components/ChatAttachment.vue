@@ -30,7 +30,8 @@ export default {
     return { canHandleAttachments, isScreenCaptureSupported, captureScreen };
   },
   data() {
-    return { isUploading: false, imageToEdit: null };
+    // A paste can hold several images; the editor shows them one at a time.
+    return { isUploading: false, imageQueue: [], editedCount: 0 };
   },
   computed: {
     ...mapGetters({
@@ -44,6 +45,9 @@ export default {
     allowedFileTypes() {
       return ALLOWED_FILE_TYPES;
     },
+    imageToEdit() {
+      return this.imageQueue[0];
+    },
   },
   mounted() {
     document.addEventListener('paste', this.handleClipboardPaste);
@@ -55,7 +59,7 @@ export default {
     handleClipboardPaste(e) {
       // If file picker is not enabled, do not allow paste
       if (!this.canHandleAttachments) return;
-      // The editor already holds an image; a paste would replace it unseen.
+      // The editor is open; a paste would queue an image the user does not see.
       if (this.imageToEdit) return;
 
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -74,13 +78,17 @@ export default {
     },
     onFileUpload(file) {
       if (file && isEditableImage(file.type)) {
-        this.imageToEdit = file.file;
+        this.imageQueue.push(file.file);
         return;
       }
       this.uploadFile(file);
     },
+    nextImage() {
+      this.imageQueue.shift();
+      this.editedCount += 1;
+    },
     onEditorSave(file) {
-      this.imageToEdit = null;
+      this.nextImage();
       this.uploadFile({
         file,
         name: file.name,
@@ -89,12 +97,12 @@ export default {
       });
     },
     onEditorCancel() {
-      this.imageToEdit = null;
+      this.nextImage();
     },
     async onCaptureScreen() {
       try {
         const file = await this.captureScreen();
-        if (file) this.imageToEdit = file;
+        if (file) this.imageQueue.push(file);
       } catch (error) {
         emitter.emit(BUS_EVENTS.SHOW_ALERT, {
           message: this.$t('SCREEN_CAPTURE.ERROR'),
@@ -211,6 +219,7 @@ export default {
     </button>
     <ImageEditor
       v-if="imageToEdit"
+      :key="editedCount"
       :file="imageToEdit"
       @save="onEditorSave"
       @cancel="onEditorCancel"

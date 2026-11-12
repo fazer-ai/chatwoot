@@ -71,6 +71,25 @@ describe('ChatAttachment', () => {
     expect(onAttach).not.toHaveBeenCalled();
   });
 
+  it('shows the images of a multi-file paste one after the other', async () => {
+    const wrapper = mountAttachment();
+    const second = new File(['png'], 'second.png', { type: 'image/png' });
+    const editor = () => wrapper.findComponent({ name: 'ImageEditor' });
+
+    await selectFile(wrapper, photo);
+    await selectFile(wrapper, second);
+    expect(editor().props('file')).toBe(photo);
+
+    editor().vm.$emit('cancel');
+    await flushPromises();
+    expect(editor().props('file')).toBe(second);
+
+    editor().vm.$emit('save', second);
+    await flushPromises();
+    expect(editor().exists()).toBe(false);
+    expect(onAttach.mock.calls.map(([{ file }]) => file)).toEqual([second]);
+  });
+
   it('uploads documents and GIFs without the editor', async () => {
     const wrapper = mountAttachment();
     const pdf = new File(['pdf'], 'invoice.pdf', { type: 'application/pdf' });
