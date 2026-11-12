@@ -15,6 +15,9 @@ const fakeContext = canvas => ({
   drawImage(...args) {
     this.calls.push(['drawImage', args, this.imageSmoothingEnabled]);
   },
+  clearRect(...args) {
+    this.calls.push(['clearRect', args]);
+  },
   strokeRect(...args) {
     this.calls.push(['strokeRect', args]);
   },
@@ -136,12 +139,13 @@ describe('imageEditor', () => {
       expect(rect).toEqual(['strokeRect', [0, 0, 20, 20]]);
     });
 
-    it('pixelates a blur region by drawing it back without smoothing', () => {
+    it('replaces a blur region with its pixelated copy, without smoothing', () => {
       const canvas = renderOperations(image, [
         { type: 'blur', start: { x: 100, y: 100 }, end: { x: 200, y: 150 } },
       ]);
-      const [, pixelated] = canvas.getContext('2d').calls;
+      const [, cleared, pixelated] = canvas.getContext('2d').calls;
 
+      expect(cleared).toEqual(['clearRect', [100, 100, 100, 50]]);
       expect(pixelated[1].slice(5)).toEqual([100, 100, 100, 50]);
       expect(pixelated[2]).toBe(false);
       expect(canvas.getContext('2d').imageSmoothingEnabled).toBe(true);

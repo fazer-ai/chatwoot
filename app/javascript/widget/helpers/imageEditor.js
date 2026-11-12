@@ -103,6 +103,8 @@ const pixelate = (canvas, { x, y, width, height }) => {
     .getContext('2d')
     .drawImage(canvas, x, y, width, height, 0, 0, small.width, small.height);
   const ctx = canvas.getContext('2d');
+  // Clears first: on a transparent PNG, drawing over the region keeps the original detail.
+  ctx.clearRect(x, y, width, height);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(small, 0, 0, small.width, small.height, x, y, width, height);
   ctx.imageSmoothingEnabled = true;
