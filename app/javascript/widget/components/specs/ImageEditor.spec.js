@@ -55,7 +55,10 @@ describe('ImageEditor', () => {
   let wrapper;
 
   const mountEditor = async () => {
-    wrapper = mount(ImageEditor, { props: { file }, attachTo: document.body });
+    wrapper = mount(ImageEditor, {
+      props: { file, widgetColor: '#ffd600', isDark: true },
+      attachTo: document.body,
+    });
     await flushPromises();
   };
 
@@ -96,6 +99,17 @@ describe('ImageEditor', () => {
       isFullscreen: false,
     });
     wrapper = mount({ render: () => null });
+  });
+
+  it('follows the inbox color and the dark mode of the widget', async () => {
+    await mountEditor();
+    const send = button('IMAGE_EDITOR.SEND');
+
+    expect(send.style.backgroundColor).toBe('rgb(255, 214, 0)');
+    expect(send.style.color).toBe('rgb(0, 0, 0)');
+    expect(
+      document.querySelector('[role="dialog"]').closest('.dark')
+    ).not.toBeNull();
   });
 
   it('sends the original file untouched when nothing was drawn', async () => {

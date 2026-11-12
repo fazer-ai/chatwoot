@@ -13,6 +13,7 @@ import { mapGetters } from 'vuex';
 import { emitter } from 'shared/helpers/mitt';
 import { useAttachments } from '../composables/useAttachments';
 import { useScreenCapture } from '../composables/useScreenCapture';
+import { useDarkMode } from '../composables/useDarkMode';
 import { isEditableImage } from '../helpers/imageEditor';
 import ImageEditor from './ImageEditor.vue';
 
@@ -27,6 +28,7 @@ export default {
   setup() {
     const { canHandleAttachments } = useAttachments();
     const { isScreenCaptureSupported, captureScreen } = useScreenCapture();
+    const { prefersDarkMode } = useDarkMode();
     const {
       attachmentEditorEnabled,
       screenCaptureEnabled,
@@ -35,6 +37,7 @@ export default {
     return {
       canHandleAttachments,
       captureScreen,
+      prefersDarkMode,
       attachmentEditorEnabled,
       screenCaptureEditorEnabled,
       showCaptureButton: isScreenCaptureSupported && screenCaptureEnabled,
@@ -47,6 +50,7 @@ export default {
   computed: {
     ...mapGetters({
       globalConfig: 'globalConfig/get',
+      widgetColor: 'appConfig/getWidgetColor',
     }),
     fileUploadSizeLimit() {
       return resolveMaximumFileUploadSize(
@@ -237,6 +241,8 @@ export default {
       v-if="imageToEdit"
       :key="editedCount"
       :file="imageToEdit"
+      :widget-color="widgetColor"
+      :is-dark="prefersDarkMode"
       @save="onEditorSave"
       @cancel="onEditorCancel"
     />

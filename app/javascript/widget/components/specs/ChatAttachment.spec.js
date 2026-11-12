@@ -18,7 +18,11 @@ const store = createStore({
     },
     appConfig: {
       namespaced: true,
-      getters: { getShouldShowFilePicker: () => true },
+      getters: {
+        getShouldShowFilePicker: () => true,
+        getWidgetColor: () => '#1f93ff',
+        darkMode: () => 'light',
+      },
     },
   },
 });

@@ -8,6 +8,7 @@ import {
   useTemplateRef,
 } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { getContrastingTextColor } from '@chatwoot/utils';
 import { IFrameHelper } from 'widget/helpers/utils';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
@@ -21,6 +22,9 @@ import {
 
 const props = defineProps({
   file: { type: File, required: true },
+  // The inbox color and the dark mode of the widget; the teleported editor does not inherit them.
+  widgetColor: { type: String, required: true },
+  isDark: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['save', 'cancel']);
@@ -59,6 +63,10 @@ const redoStack = ref([]);
 const activeTool = ref('arrow');
 const isSaving = ref(false);
 
+const sendButtonStyle = computed(() => ({
+  backgroundColor: props.widgetColor,
+  color: getContrastingTextColor(props.widgetColor),
+}));
 const canUndo = computed(() => operations.value.length > 0);
 const canRedo = computed(() => redoStack.value.length > 0);
 
@@ -203,6 +211,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
+    <div :class="{ dark: isDark }">
     <div
       ref="dialogRef"
       tabindex="-1"
@@ -281,13 +290,15 @@ onBeforeUnmount(() => {
         </button>
         <button
           type="button"
-          class="px-4 py-2 text-sm font-medium text-white rounded-lg bg-n-brand disabled:opacity-60"
+          class="px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-60"
+          :style="sendButtonStyle"
           :disabled="isSaving"
           @click="save"
         >
           {{ t('IMAGE_EDITOR.SEND') }}
         </button>
       </div>
+    </div>
     </div>
   </Teleport>
 </template>
