@@ -58,6 +58,18 @@ describe('useScreenCapture', () => {
     expect(file.name).toMatch(/^screenshot-\d+\.png$/);
   });
 
+  it('rejects and reopens the widget when the frame cannot be encoded', async () => {
+    HTMLCanvasElement.prototype.toBlob = callback => callback(null);
+    const { captureScreen } = useScreenCapture();
+
+    const result = captureScreen();
+    const assertion = expect(result).rejects.toThrow('Could not encode');
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(calls.at(-1)).toBe('toggleBubble');
+  });
+
   it('resolves with null and leaves the widget alone when the picker is closed', async () => {
     navigator.mediaDevices.getDisplayMedia.mockRejectedValue(
       new DOMException('Permission denied', 'NotAllowedError')

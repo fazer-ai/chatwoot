@@ -11,7 +11,8 @@
     "UNDO": "Deshacer",
     "REDO": "Rehacer",
     "CANCEL": "Cancelar",
-    "SEND": "Enviar"
+    "SEND": "Enviar",
+    "EXPORT_ERROR": "No se pudo preparar la imagen. Prueba con una imagen más pequeña."
   },
   "SCREEN_CAPTURE": {
     "BUTTON": "Capturar pantalla",

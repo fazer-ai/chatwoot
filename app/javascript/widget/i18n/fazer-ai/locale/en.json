@@ -11,7 +11,8 @@
     "UNDO": "Undo",
     "REDO": "Redo",
     "CANCEL": "Cancel",
-    "SEND": "Send"
+    "SEND": "Send",
+    "EXPORT_ERROR": "Could not prepare the image. Try a smaller image."
   },
   "SCREEN_CAPTURE": {
     "BUTTON": "Capture screen",

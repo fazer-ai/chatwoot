@@ -177,6 +177,49 @@ describe('ImageEditor', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1);
   });
 
+  it('keeps Enter presses inside the editor, away from the chat composer', async () => {
+    await mountEditor();
+    const composer = vi.fn();
+    document.addEventListener('keypress', composer);
+
+    control('IMAGE_EDITOR.UNDO').dispatchEvent(
+      new KeyboardEvent('keypress', { key: 'Enter', bubbles: true })
+    );
+
+    document.removeEventListener('keypress', composer);
+    expect(composer).not.toHaveBeenCalled();
+  });
+
+  it('stays open and sends nothing when the browser cannot encode the image', async () => {
+    HTMLCanvasElement.prototype.toBlob = callback => callback(null);
+    await mountEditor();
+
+    await drag([10, 10], [200, 150]);
+    await click(button('IMAGE_EDITOR.SEND'));
+
+    expect(wrapper.emitted('save')).toBeUndefined();
+    expect(button('IMAGE_EDITOR.SEND').disabled).toBe(false);
+  });
+
+  it('drops an image that finishes decoding after the editor closed', async () => {
+    let finishDecode;
+    const bitmap = { width: 800, height: 600, close: vi.fn() };
+    window.createImageBitmap = vi.fn(
+      () =>
+        new Promise(resolve => {
+          finishDecode = resolve;
+        })
+    );
+    await mountEditor();
+
+    wrapper.unmount();
+    finishDecode(bitmap);
+    await flushPromises();
+
+    expect(bitmap.close).toHaveBeenCalled();
+    wrapper = mount({ render: () => null });
+  });
+
   it('discards the image on cancel', async () => {
     await mountEditor();
 

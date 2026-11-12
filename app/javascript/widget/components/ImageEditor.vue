@@ -9,6 +9,8 @@ import {
 } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IFrameHelper } from 'widget/helpers/utils';
+import { emitter } from 'shared/helpers/mitt';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 import {
   drawOperation,
   editedFileName,
@@ -63,6 +65,7 @@ const canRedo = computed(() => redoStack.value.length > 0);
 // The committed result is cached, so a drag only repaints it plus the shape in progress.
 let rendered = null;
 let draft = null;
+let isUnmounted = false;
 
 const paint = () => {
   const canvas = canvasRef.value;
@@ -129,6 +132,14 @@ const save = () => {
   }
   isSaving.value = true;
   rendered.toBlob(blob => {
+    // The browser returns null when it cannot encode the canvas, such as when memory runs out.
+    if (!blob) {
+      isSaving.value = false;
+      emitter.emit(BUS_EVENTS.SHOW_ALERT, {
+        message: t('IMAGE_EDITOR.EXPORT_ERROR'),
+      });
+      return;
+    }
     emit(
       'save',
       new File([blob], editedFileName(props.file.name), { type: 'image/png' })
@@ -165,17 +176,25 @@ onMounted(async () => {
   // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
   dialogRef.value.focus();
   document.addEventListener('focusin', keepFocus);
+  let bitmap;
   try {
-    image.value = await createImageBitmap(props.file);
+    bitmap = await createImageBitmap(props.file);
   } catch {
     // A format the browser cannot decode, such as HEIC, is sent as it is.
-    emit('save', props.file);
+    if (!isUnmounted) emit('save', props.file);
     return;
   }
+  // The visitor can close the editor while a large image is still decoding.
+  if (isUnmounted) {
+    bitmap.close();
+    return;
+  }
+  image.value = bitmap;
   commit();
 });
 
 onBeforeUnmount(() => {
+  isUnmounted = true;
   setFullscreen(false);
   document.removeEventListener('focusin', keepFocus);
   image.value?.close();
@@ -192,6 +211,7 @@ onBeforeUnmount(() => {
       aria-modal="true"
       :aria-label="t('IMAGE_EDITOR.TITLE')"
       @keydown="onKeydown"
+      @keypress.stop
     >
       <div
         class="flex items-center justify-between gap-2 px-2 py-2 border-b border-n-weak"

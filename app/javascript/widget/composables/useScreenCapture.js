@@ -21,8 +21,12 @@ const frameToFile = video => {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
+      if (!blob) {
+        reject(new Error('Could not encode the screen frame'));
+        return;
+      }
       resolve(
         new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' })
       );
