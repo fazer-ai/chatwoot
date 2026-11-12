@@ -148,9 +148,15 @@ const onKeydown = event => {
   else undo();
 };
 
+// The chat input takes the focus again when the widget reopens after a capture.
+const keepFocus = event => {
+  if (!dialogRef.value.contains(event.target)) dialogRef.value.focus();
+};
+
 onMounted(async () => {
   // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
   dialogRef.value.focus();
+  document.addEventListener('focusin', keepFocus);
   try {
     image.value = await createImageBitmap(props.file);
   } catch {
@@ -162,6 +168,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener('focusin', keepFocus);
   image.value?.close();
 });
 </script>

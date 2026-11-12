@@ -135,7 +135,7 @@ describe('ImageEditor', () => {
     expect(control('IMAGE_EDITOR.REDO').disabled).toBe(true);
   });
 
-  it('takes the focus, undoes with Ctrl+Z and cancels with Escape', async () => {
+  it('keeps the focus, undoes with Ctrl+Z and cancels with Escape', async () => {
     await mountEditor();
     const press = init =>
       document.activeElement.dispatchEvent(
@@ -143,6 +143,12 @@ describe('ImageEditor', () => {
       );
 
     expect(document.activeElement.getAttribute('role')).toBe('dialog');
+    const chatInput = document.body.appendChild(
+      document.createElement('textarea')
+    );
+    chatInput.focus();
+    expect(document.activeElement.getAttribute('role')).toBe('dialog');
+    chatInput.remove();
     await drag([10, 10], [200, 150]);
     press({ key: 'z', ctrlKey: true });
     await flushPromises();
