@@ -1,3 +1,4 @@
+import { useStore } from 'vuex';
 import { IFrameHelper } from 'widget/helpers/utils';
 
 // Time the host page needs to repaint without the widget before the frame is taken.
@@ -35,6 +36,7 @@ const frameToFile = video => {
 };
 
 export function useScreenCapture() {
+  const store = useStore();
   const isScreenCaptureSupported = Boolean(
     navigator.mediaDevices?.getDisplayMedia
   );
@@ -70,7 +72,11 @@ export function useScreenCapture() {
       return await frameToFile(video);
     } finally {
       stream.getTracks().forEach(track => track.stop());
-      if (isEmbedded) IFrameHelper.sendMessage({ event: 'toggleBubble' });
+      // toggleBubble inverts the state, so it is sent only when the widget is still closed:
+      // the visitor can reopen it from the launcher during the capture.
+      if (isEmbedded && !store.getters['appConfig/getIsWidgetOpen']) {
+        IFrameHelper.sendMessage({ event: 'toggleBubble' });
+      }
     }
   };
 

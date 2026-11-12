@@ -5,6 +5,9 @@ vi.mock('widget/helpers/utils', () => ({
   IFrameHelper: { isIFrame: vi.fn(), sendMessage: vi.fn() },
 }));
 
+const getters = { 'appConfig/getIsWidgetOpen': false };
+vi.mock('vuex', () => ({ useStore: () => ({ getters }) }));
+
 describe('useScreenCapture', () => {
   const track = { stop: vi.fn() };
   const stream = { getTracks: () => [track] };
@@ -12,6 +15,7 @@ describe('useScreenCapture', () => {
 
   beforeEach(() => {
     calls.length = 0;
+    getters['appConfig/getIsWidgetOpen'] = false;
     vi.useFakeTimers();
     IFrameHelper.isIFrame.mockReturnValue(true);
     IFrameHelper.sendMessage.mockImplementation(({ event }) =>
@@ -68,6 +72,17 @@ describe('useScreenCapture', () => {
     await assertion;
 
     expect(calls.at(-1)).toBe('toggleBubble');
+  });
+
+  it('leaves the widget open when the visitor reopened it during the capture', async () => {
+    const { captureScreen } = useScreenCapture();
+
+    const result = captureScreen();
+    getters['appConfig/getIsWidgetOpen'] = true;
+    await vi.runAllTimersAsync();
+    await result;
+
+    expect(calls).not.toContain('toggleBubble');
   });
 
   it('resolves with null and leaves the widget alone when the picker is closed', async () => {
