@@ -79,18 +79,15 @@ export const actions = {
   },
 
   sendAttachment: async ({ commit, state: conversationState }, params) => {
-    const {
-      attachment: { thumbUrl, fileType },
-      meta = {},
-    } = params;
-    const attachment = {
-      thumb_url: thumbUrl,
-      data_url: thumbUrl,
-      file_type: fileType,
-      status: 'in_progress',
-    };
+    const { attachments, content, meta = {} } = params;
     const tempMessage = createTemporaryMessage({
-      attachments: [attachment],
+      attachments: attachments.map(({ thumbUrl, fileType }) => ({
+        thumb_url: thumbUrl,
+        data_url: thumbUrl,
+        file_type: fileType,
+        status: 'in_progress',
+      })),
+      content,
       replyTo: params.replyTo,
     });
     const { pendingCustomAttributes, pendingLabels } = conversationState;

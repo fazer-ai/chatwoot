@@ -58,6 +58,7 @@ if resource.web_widget?
   json.attachment_editor_enabled resource.channel.attachment_editor_enabled
   json.screen_capture_enabled resource.channel.screen_capture_enabled
   json.screen_capture_editor_enabled resource.channel.screen_capture_editor_enabled
+  json.send_attachments_with_message resource.channel.send_attachments_with_message
 end
 
 ## Facebook Attributes

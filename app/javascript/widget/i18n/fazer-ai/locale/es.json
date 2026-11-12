@@ -12,10 +12,14 @@
     "REDO": "Rehacer",
     "CANCEL": "Cancelar",
     "SEND": "Enviar",
-    "EXPORT_ERROR": "No se pudo preparar la imagen. Prueba con una imagen más pequeña."
+    "EXPORT_ERROR": "No se pudo preparar la imagen. Prueba con una imagen más pequeña.",
+    "DONE": "Listo"
   },
   "SCREEN_CAPTURE": {
     "BUTTON": "Capturar pantalla",
     "ERROR": "No se pudo capturar la pantalla. Inténtalo de nuevo."
+  },
+  "PENDING_ATTACHMENTS": {
+    "REMOVE": "Quitar {name}"
   }
 }

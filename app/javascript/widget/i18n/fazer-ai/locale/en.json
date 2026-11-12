@@ -12,10 +12,14 @@
     "REDO": "Redo",
     "CANCEL": "Cancel",
     "SEND": "Send",
-    "EXPORT_ERROR": "Could not prepare the image. Try a smaller image."
+    "EXPORT_ERROR": "Could not prepare the image. Try a smaller image.",
+    "DONE": "Done"
   },
   "SCREEN_CAPTURE": {
     "BUTTON": "Capture screen",
     "ERROR": "Couldn't capture the screen. Please try again."
+  },
+  "PENDING_ATTACHMENTS": {
+    "REMOVE": "Remove {name}"
   }
 }

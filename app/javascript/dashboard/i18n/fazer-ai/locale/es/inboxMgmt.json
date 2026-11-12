@@ -271,7 +271,8 @@
     "FEATURES": {
       "ATTACHMENT_EDITOR": "Abrir un editor antes de enviar una imagen",
       "SCREEN_CAPTURE": "Mostrar un botón para capturar la pantalla (navegadores de escritorio)",
-      "SCREEN_CAPTURE_EDITOR": "Abrir el editor en las capturas de pantalla"
+      "SCREEN_CAPTURE_EDITOR": "Abrir el editor en las capturas de pantalla",
+      "SEND_ATTACHMENTS_WITH_MESSAGE": "Enviar los adjuntos junto con el mensaje (el visitante agrega archivos y texto y los envía de una vez)"
     }
   }
 }

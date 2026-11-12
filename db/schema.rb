@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_11_12_141040) do
+ActiveRecord::Schema[7.2].define(version: 2026_11_12_144127) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -769,6 +769,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_11_12_141040) do
     t.boolean "attachment_editor_enabled", default: true, null: false
     t.boolean "screen_capture_enabled", default: false, null: false
     t.boolean "screen_capture_editor_enabled", default: true, null: false
+    t.boolean "send_attachments_with_message", default: false, null: false
     t.index ["hmac_token"], name: "index_channel_web_widgets_on_hmac_token", unique: true
     t.index ["website_token"], name: "index_channel_web_widgets_on_website_token", unique: true
   end

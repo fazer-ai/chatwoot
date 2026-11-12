@@ -4,6 +4,7 @@ import { mapGetters } from 'vuex';
 
 import ChatAttachmentButton from 'widget/components/ChatAttachment.vue';
 import ChatSendButton from 'widget/components/ChatSendButton.vue';
+import PendingAttachments from 'widget/components/PendingAttachments.vue';
 import { useAttachments } from '../composables/useAttachments';
 import FluentIcon from 'shared/components/FluentIcon/Index.vue';
 import ResizableTextArea from 'shared/components/ResizableTextArea.vue';
@@ -19,6 +20,7 @@ export default {
     ChatSendButton,
     EmojiPicker,
     FluentIcon,
+    PendingAttachments,
     ResizableTextArea,
   },
   props: {
@@ -41,11 +43,15 @@ export default {
       canHandleAttachments,
       shouldShowEmojiPicker,
       hasEmojiPickerEnabled,
+      // The inbox can hold attachments until the visitor sends them with the text.
+      sendAttachmentsWithMessage:
+        window.chatwootWebChannel.sendAttachmentsWithMessage,
     };
   },
   data() {
     return {
       userInput: '',
+      pendingAttachments: [],
       showEmojiPicker: false,
       isFocused: false,
     };
@@ -58,10 +64,13 @@ export default {
       shouldShowEmojiPicker: 'appConfig/getShouldShowEmojiPicker',
     }),
     showAttachment() {
-      return this.canHandleAttachments && this.userInput.length === 0;
+      return (
+        this.canHandleAttachments &&
+        (this.sendAttachmentsWithMessage || this.userInput.length === 0)
+      );
     },
     showSendButton() {
-      return this.userInput.length > 0;
+      return this.userInput.length > 0 || this.pendingAttachments.length > 0;
     },
   },
   watch: {
@@ -89,11 +98,24 @@ export default {
       this.isFocused = true;
     },
     handleButtonClick() {
-      if (this.userInput && this.userInput.trim()) {
+      if (this.pendingAttachments.length) {
+        this.onSendAttachment(this.pendingAttachments, this.userInput.trim());
+        this.pendingAttachments = [];
+      } else if (this.userInput && this.userInput.trim()) {
         this.onSendMessage(this.userInput);
       }
       this.userInput = '';
       this.focusInput();
+    },
+    onAttach(attachment) {
+      if (this.sendAttachmentsWithMessage) {
+        this.pendingAttachments.push(attachment);
+        return;
+      }
+      this.onSendAttachment([attachment]);
+    },
+    removePendingAttachment(index) {
+      this.pendingAttachments.splice(index, 1);
     },
     handleEnterKeyPress(e) {
       if (e.keyCode === 13 && !e.shiftKey) {
@@ -134,13 +156,19 @@ export default {
 
 <template>
   <div
-    class="items-center flex ltr:pl-3 rtl:pr-3 ltr:pr-2 rtl:pl-2 rounded-[7px] transition-all duration-200 bg-n-background !shadow-[0_0_0_1px,0_0_2px_3px]"
+    class="flex flex-col ltr:pl-3 rtl:pr-3 ltr:pr-2 rtl:pl-2 rounded-[7px] transition-all duration-200 bg-n-background !shadow-[0_0_0_1px,0_0_2px_3px]"
     :class="{
       '!shadow-[var(--widget-color,#2781f6)]': isFocused,
       '!shadow-n-strong dark:!shadow-n-strong': !isFocused,
     }"
     @keydown.esc="hideEmojiPicker"
   >
+    <PendingAttachments
+      v-if="pendingAttachments.length"
+      :attachments="pendingAttachments"
+      @remove="removePendingAttachment"
+    />
+    <div class="flex items-center">
     <ResizableTextArea
       id="chat-input"
       ref="chatInput"
@@ -158,7 +186,7 @@ export default {
       <ChatAttachmentButton
         v-if="showAttachment"
         class="text-n-slate-12"
-        :on-attach="onSendAttachment"
+        :on-attach="onAttach"
       />
       <button
         v-if="shouldShowEmojiPicker && hasEmojiPickerEnabled"
@@ -187,6 +215,7 @@ export default {
         :color="widgetColor"
         @click="handleButtonClick"
       />
+    </div>
     </div>
   </div>
 </template>

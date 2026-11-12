@@ -662,7 +662,8 @@ RSpec.describe 'Inboxes API', type: :request do
       end
 
       it 'updates inbox when administrator' do
-        image_options = { attachment_editor_enabled: false, screen_capture_enabled: true, screen_capture_editor_enabled: false }
+        image_options = { attachment_editor_enabled: false, screen_capture_enabled: true, screen_capture_editor_enabled: false,
+                          send_attachments_with_message: true }
         patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
               headers: admin.create_new_auth_token,
               params: valid_params.merge(channel: image_options),

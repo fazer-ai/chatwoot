@@ -160,17 +160,20 @@ describe('#actions', () => {
       getUuid.mockImplementationOnce(() => '1111');
       const spy = vi.spyOn(global, 'Date').mockImplementation(() => mockDate);
       const thumbUrl = '';
-      const attachment = { thumbUrl, fileType: 'file' };
+      const attachments = [
+        { thumbUrl, fileType: 'file' },
+        { thumbUrl: 'blob:photo', fileType: 'image' },
+      ];
       const state = { pendingCustomAttributes: {}, pendingLabels: [] };
 
       actions.sendAttachment(
         { commit, dispatch, state },
-        { attachment, replyTo: 135 }
+        { attachments, content: 'see the screen', replyTo: 135 }
       );
       spy.mockRestore();
       expect(commit).toBeCalledWith('pushMessageToConversation', {
         id: '1111',
-        content: undefined,
+        content: 'see the screen',
         status: 'in_progress',
         created_at: 1466424490,
         message_type: 0,
@@ -180,6 +183,12 @@ describe('#actions', () => {
             thumb_url: '',
             data_url: '',
             file_type: 'file',
+            status: 'in_progress',
+          },
+          {
+            thumb_url: 'blob:photo',
+            data_url: 'blob:photo',
+            file_type: 'image',
             status: 'in_progress',
           },
         ],

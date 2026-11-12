@@ -8,6 +8,10 @@ const { t } = useI18n();
 
 const rows = computed(() => [
   {
+    key: 'send_attachments_with_message',
+    label: t('INBOX_MGMT.FEATURES.SEND_ATTACHMENTS_WITH_MESSAGE'),
+  },
+  {
     key: 'attachment_editor_enabled',
     label: t('INBOX_MGMT.FEATURES.ATTACHMENT_EDITOR'),
   },

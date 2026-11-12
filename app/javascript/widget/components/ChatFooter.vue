@@ -80,9 +80,10 @@ export default {
         this.getAttributes();
       }
     },
-    async handleSendAttachment(attachment) {
+    async handleSendAttachment(attachments, content = '') {
       await this.sendAttachment({
-        attachment,
+        attachments,
+        content,
         replyTo: this.inReplyTo ? this.inReplyTo.id : null,
       });
       this.inReplyTo = null;
