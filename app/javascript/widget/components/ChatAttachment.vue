@@ -12,9 +12,12 @@ import { DirectUpload } from 'activestorage';
 import { mapGetters } from 'vuex';
 import { emitter } from 'shared/helpers/mitt';
 import { useAttachments } from '../composables/useAttachments';
+import { useScreenCapture } from '../composables/useScreenCapture';
+import { isEditableImage } from '../helpers/imageEditor';
+import ImageEditor from './ImageEditor.vue';
 
 export default {
-  components: { FluentIcon, FileUpload, Spinner },
+  components: { FluentIcon, FileUpload, ImageEditor, Spinner },
   props: {
     onAttach: {
       type: Function,
@@ -23,10 +26,11 @@ export default {
   },
   setup() {
     const { canHandleAttachments } = useAttachments();
-    return { canHandleAttachments };
+    const { isScreenCaptureSupported, captureScreen } = useScreenCapture();
+    return { canHandleAttachments, isScreenCaptureSupported, captureScreen };
   },
   data() {
-    return { isUploading: false };
+    return { isUploading: false, imageToEdit: null };
   },
   computed: {
     ...mapGetters({
@@ -51,6 +55,8 @@ export default {
     handleClipboardPaste(e) {
       // If file picker is not enabled, do not allow paste
       if (!this.canHandleAttachments) return;
+      // The editor already holds an image; a paste would replace it unseen.
+      if (this.imageToEdit) return;
 
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
       // items is a DataTransferItemList object which does not have forEach method
@@ -66,7 +72,36 @@ export default {
     getFileType(fileType) {
       return fileType.includes('image') ? 'image' : 'file';
     },
-    async onFileUpload(file) {
+    onFileUpload(file) {
+      if (file && isEditableImage(file.type)) {
+        this.imageToEdit = file.file;
+        return;
+      }
+      this.uploadFile(file);
+    },
+    onEditorSave(file) {
+      this.imageToEdit = null;
+      this.uploadFile({
+        file,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+    },
+    onEditorCancel() {
+      this.imageToEdit = null;
+    },
+    async onCaptureScreen() {
+      try {
+        const file = await this.captureScreen();
+        if (file) this.imageToEdit = file;
+      } catch (error) {
+        emitter.emit(BUS_EVENTS.SHOW_ALERT, {
+          message: this.$t('SCREEN_CAPTURE.ERROR'),
+        });
+      }
+    },
+    async uploadFile(file) {
       if (this.globalConfig.directUploadsEnabled) {
         await this.onDirectFileUpload(file);
       } else {
@@ -149,19 +184,36 @@ export default {
 </script>
 
 <template>
-  <FileUpload
-    ref="upload"
-    :size="4096 * 2048"
-    :accept="allowedFileTypes"
-    :data="{
-      direct_upload_url: '/api/v1/widget/direct_uploads',
-      direct_upload: true,
-    }"
-    @input-file="onFileUpload"
-  >
-    <button class="min-h-8 min-w-8 flex items-center justify-center">
-      <FluentIcon v-if="!isUploading.image" icon="attach" />
-      <Spinner v-if="isUploading" size="small" />
+  <div class="flex items-center">
+    <FileUpload
+      ref="upload"
+      :size="4096 * 2048"
+      :accept="allowedFileTypes"
+      :data="{
+        direct_upload_url: '/api/v1/widget/direct_uploads',
+        direct_upload: true,
+      }"
+      @input-file="onFileUpload"
+    >
+      <button class="min-h-8 min-w-8 flex items-center justify-center">
+        <FluentIcon v-if="!isUploading.image" icon="attach" />
+        <Spinner v-if="isUploading" size="small" />
+      </button>
+    </FileUpload>
+    <button
+      v-if="isScreenCaptureSupported"
+      class="min-h-8 min-w-8 flex items-center justify-center"
+      :aria-label="$t('SCREEN_CAPTURE.BUTTON')"
+      :title="$t('SCREEN_CAPTURE.BUTTON')"
+      @click="onCaptureScreen"
+    >
+      <span class="i-lucide-camera size-5" />
     </button>
-  </FileUpload>
+    <ImageEditor
+      v-if="imageToEdit"
+      :file="imageToEdit"
+      @save="onEditorSave"
+      @cancel="onEditorCancel"
+    />
+  </div>
 </template>
