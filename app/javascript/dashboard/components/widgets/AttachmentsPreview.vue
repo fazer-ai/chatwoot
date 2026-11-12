@@ -11,6 +11,11 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  // Attachments whose edited version is still uploading.
+  lockedAttachments: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['removeAttachment', 'editAttachment']);
@@ -87,6 +92,7 @@ const fileName = file => {
           slate
           xs
           icon="i-lucide-pencil"
+          :disabled="lockedAttachments.includes(attachment)"
           :title="t('IMAGE_EDITOR.EDIT_ATTACHMENT')"
           :aria-label="t('IMAGE_EDITOR.EDIT_ATTACHMENT')"
           @click="emit('editAttachment', attachment)"

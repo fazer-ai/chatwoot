@@ -1475,10 +1475,14 @@ export default {
           blobSignedId: blob ? blob.signed_id : undefined,
           isVoiceMessage: file?.isVoiceMessage || false,
         };
-        // An edited image takes the place of the one it was made from.
-        const replaced = this.attachedFiles.indexOf(file?.replacesAttachment);
-        if (replaced === -1) this.attachedFiles.push(staged);
-        else this.attachedFiles.splice(replaced, 1, staged);
+        // An edited image takes the place of the one it was made from. If the agent removed
+        // that one while the edit uploaded, the edit is dropped too.
+        if (file?.replacesAttachment) {
+          const replaced = this.attachedFiles.indexOf(file.replacesAttachment);
+          if (replaced !== -1) this.attachedFiles.splice(replaced, 1, staged);
+        } else {
+          this.attachedFiles.push(staged);
+        }
         this.settleReplacement(file);
       };
     },
@@ -1496,6 +1500,8 @@ export default {
       this.attachedFiles = attachments;
     },
     editAttachment(attachment) {
+      // One edit at a time per image: a second one could land before the first.
+      if (this.pendingReplacements.includes(attachment)) return;
       const { resource } = attachment;
       this.attachmentToEdit = attachment;
       this.fileToEdit = dataUrlToFile(
@@ -1868,6 +1874,7 @@ export default {
           <AttachmentPreview
             class="mt-2"
             :attachments="attachedFiles"
+            :locked-attachments="pendingReplacements"
             @remove-attachment="removeAttachment"
             @edit-attachment="editAttachment"
           />

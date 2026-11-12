@@ -719,6 +719,52 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.isReplyButtonDisabled).toBe(false);
   });
 
+  it('blocks a second edit of an image until the first one lands', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const original = new File(['png'], 'photo.jpg', { type: 'image/jpeg' });
+    wrapper.vm.stageFile({
+      name: 'photo.jpg',
+      type: original.type,
+      file: original,
+    });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    const staged = wrapper.vm.attachedFiles[0];
+
+    wrapper.vm.editAttachment(staged);
+    wrapper.vm.onAttachmentEdited(
+      new File(['edited'], 'photo.png', { type: 'image/png' })
+    );
+    wrapper.vm.editAttachment(staged);
+
+    expect(wrapper.vm.fileToEdit).toBeNull();
+  });
+
+  it('drops an edit whose original the agent removed while it uploaded', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const original = new File(['png'], 'photo.jpg', { type: 'image/jpeg' });
+    wrapper.vm.stageFile({
+      name: 'photo.jpg',
+      type: original.type,
+      file: original,
+    });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+
+    wrapper.vm.editAttachment(wrapper.vm.attachedFiles[0]);
+    wrapper.vm.onAttachmentEdited(
+      new File(['edited'], 'photo.png', { type: 'image/png' })
+    );
+    wrapper.vm.removeAttachment([]);
+    await vi.waitUntil(() => wrapper.vm.pendingReplacements.length === 0);
+
+    expect(wrapper.vm.attachedFiles).toEqual([]);
+  });
+
   it('closes the image editor when the composer resets', async () => {
     const { wrapper } = mountWith({
       inbox: { channel_type: 'Channel::Whatsapp' },
