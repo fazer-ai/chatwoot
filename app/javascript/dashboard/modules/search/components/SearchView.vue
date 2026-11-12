@@ -7,6 +7,7 @@ import { useAccount } from 'dashboard/composables/useAccount';
 import { useI18n } from 'vue-i18n';
 import { useCamelCase } from 'dashboard/composables/useTransformKeys';
 import { generateURLParams, parseURLParams } from '../helpers/searchHelper';
+import { isBelowMessageSearchMinimum } from '../helpers/messageSearchMinimum';
 import {
   ROLES,
   CONVERSATION_PERMISSIONS,
@@ -48,6 +49,13 @@ const conversationRecords = useMapGetter(
 const messageRecords = useMapGetter('conversationSearch/getMessageRecords');
 const articleRecords = useMapGetter('conversationSearch/getArticleRecords');
 const uiFlags = useMapGetter('conversationSearch/getUIFlags');
+const globalConfig = useMapGetter('globalConfig/get');
+const messageMinimumLength = computed(
+  () => globalConfig.value?.messageSearchMinQueryLength
+);
+const isBelowMessageMinimum = computed(() =>
+  isBelowMessageSearchMinimum(query.value, messageMinimumLength.value)
+);
 
 const addTypeToRecords = (records, type) =>
   records.value.map(item => ({ ...useCamelCase(item, { deep: true }), type }));
@@ -519,6 +527,16 @@ onUnmounted(() => {
             <fluent-icon icon="info" size="16px" class="text-n-slate-11" />
             <p class="m-2 text-center text-n-slate-11">
               {{ t('SEARCH.EMPTY_STATE_FULL', { query }) }}
+            </p>
+            <p
+              v-if="isBelowMessageMinimum"
+              class="m-0 text-center text-n-slate-11"
+            >
+              {{
+                t('SEARCH.MESSAGE_MIN_QUERY_LENGTH', {
+                  count: messageMinimumLength,
+                })
+              }}
             </p>
           </div>
           <div
