@@ -186,17 +186,22 @@ describe('ImageEditor', () => {
     wrapper = mount({ render: () => null });
   });
 
-  it('keeps Enter presses inside the editor, away from the chat composer', async () => {
+  it('keeps key presses inside the editor, away from page shortcuts', async () => {
     await mountEditor();
-    const composer = vi.fn();
-    document.addEventListener('keypress', composer);
+    const page = vi.fn();
+    document.addEventListener('keypress', page);
+    document.addEventListener('keydown', page);
 
     control('IMAGE_EDITOR.UNDO').dispatchEvent(
       new KeyboardEvent('keypress', { key: 'Enter', bubbles: true })
     );
+    control('IMAGE_EDITOR.UNDO').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', altKey: true, bubbles: true })
+    );
 
-    document.removeEventListener('keypress', composer);
-    expect(composer).not.toHaveBeenCalled();
+    document.removeEventListener('keypress', page);
+    document.removeEventListener('keydown', page);
+    expect(page).not.toHaveBeenCalled();
   });
 
   it('stays open and sends nothing when the browser cannot encode the image', async () => {

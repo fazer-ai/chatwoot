@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
         role="dialog"
         aria-modal="true"
         :aria-label="t('IMAGE_EDITOR.TITLE')"
-        @keydown="onKeydown"
+        @keydown.stop="onKeydown"
         @keypress.stop
       >
         <div
