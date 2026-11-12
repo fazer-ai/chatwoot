@@ -53,7 +53,7 @@ const state = {
   displayManifest,
   gitSha,
   maximumFileUploadSize: resolveMaximumFileUploadSize(maximumFileUploadSize),
-  messageSearchMinQueryLength: Number(messageSearchMinQueryLength) || 0,
+  messageSearchMinQueryLength: parseInt(messageSearchMinQueryLength, 10) || 0,
   hCaptchaSiteKey,
   installationName,
   logo,

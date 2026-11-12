@@ -22,6 +22,7 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
     BRAND_COLOR TERMS_URL PRIVACY_URL DISPLAY_MANIFEST
   ].freeze
   BRAND_COLOR_FORMAT = /\A#(?:\h{3}|\h{6})\z/
+  NON_NEGATIVE_INTEGER_FORMAT = /\A\d+\z/
   BRANDING_EDITED_FLAG = 'BRANDING_EDITED_IN_SUPER_ADMIN'.freeze
 
   before_action :set_config
@@ -40,7 +41,7 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
   end
 
   def create
-    errors = shopify_partner_config_errors + stripe_config_errors + branding_config_errors
+    errors = submitted_config_errors
     params['app_config'].each do |key, value|
       break if errors.any?
       next unless @allowed_configs.include?(key)
@@ -56,12 +57,25 @@ class SuperAdmin::AppConfigsController < SuperAdmin::ApplicationController
 
   private
 
+  def submitted_config_errors
+    shopify_partner_config_errors + stripe_config_errors + branding_config_errors + message_search_config_errors
+  end
+
   def stripe_config_errors
     return [] unless @config == 'stripe'
 
     values = InstallationConfig.where(name: @allowed_configs).to_h { |config| [config.name, config.value] }
     values.merge!(params.fetch('app_config', {}).permit(*@allowed_configs).to_h)
     Integrations::Stripe::Oauth.configuration_errors(url: values['STRIPE_APP_AUTHORIZE_URL'], key: values['STRIPE_APP_SECRET_KEY'])
+  end
+
+  # SearchService reads the minimum with to_i and the dashboard with parseInt, so anything but a
+  # whole number would be read differently on each side. Blank means no minimum.
+  def message_search_config_errors
+    value = params.dig('app_config', 'MESSAGE_SEARCH_MIN_QUERY_LENGTH')
+    return [] if value.blank? || value.to_s.strip.match?(NON_NEGATIVE_INTEGER_FORMAT)
+
+    [I18n.t('super_admin.app_configs.general.invalid_message_search_min_query_length')]
   end
 
   # Emails and the PWA manifest put the colour straight into CSS and HTML attributes.
