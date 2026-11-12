@@ -692,6 +692,49 @@ describe('ReplyBox', () => {
     expect(wrapper.vm.fileToEdit).toBeNull();
   });
 
+  it('keeps the staged image when the edited one is refused', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const original = new File(['png'], 'photo.jpg', { type: 'image/jpeg' });
+    wrapper.vm.stageFile({
+      name: 'photo.jpg',
+      type: original.type,
+      file: original,
+    });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    const staged = wrapper.vm.attachedFiles[0];
+
+    wrapper.vm.editAttachment(staged);
+    wrapper.vm.onAttachmentEdited(
+      new File([], 'photo.png', { type: 'image/png' })
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.attachedFiles).toEqual([staged]);
+  });
+
+  it('closes the image editor when the composer resets', async () => {
+    const { wrapper } = mountWith({
+      inbox: { channel_type: 'Channel::Whatsapp' },
+    });
+    await nextTick();
+    const original = new File(['png'], 'photo.jpg', { type: 'image/jpeg' });
+    wrapper.vm.stageFile({
+      name: 'photo.jpg',
+      type: original.type,
+      file: original,
+    });
+    await vi.waitUntil(() => wrapper.vm.attachedFiles.length > 0);
+    wrapper.vm.editAttachment(wrapper.vm.attachedFiles[0]);
+
+    wrapper.vm.resetRecorderAndClearAttachments();
+
+    expect(wrapper.vm.fileToEdit).toBeNull();
+    expect(wrapper.vm.attachmentToEdit).toBeNull();
+  });
+
   // The three drops above are not the same event to the agent. Leaving note mode is the one
   // nothing they did causes -- a bot releases the conversation, the messaging window
   // reopens, a restriction lifts -- so the recording goes with the composer looking exactly

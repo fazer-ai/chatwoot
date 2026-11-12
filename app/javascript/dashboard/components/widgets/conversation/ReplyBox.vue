@@ -935,6 +935,7 @@ export default {
       this.resetAudioRecorderInput();
       // Reset attached files
       this.attachedFiles = [];
+      this.closeAttachmentEditor();
     },
     saveDraft(conversationId, replyType) {
       if (this.message || this.message === '') {
@@ -1274,6 +1275,7 @@ export default {
       this.message = '';
       this.clearCopilotAcceptedMessage();
       this.attachedFiles = [];
+      this.closeAttachmentEditor();
       this.isRecordingAudio = false;
       this.resetReplyToMessage();
       this.resetAudioRecorderInput();
@@ -1458,14 +1460,18 @@ export default {
           return;
         }
 
-        this.attachedFiles.push({
+        const staged = {
           currentChatId: this.currentChat.id,
           resource: blob || file,
           isPrivate: this.isPrivate,
           thumb: reader.result,
           blobSignedId: blob ? blob.signed_id : undefined,
           isVoiceMessage: file?.isVoiceMessage || false,
-        });
+        };
+        // An edited image takes the place of the one it was made from.
+        const replaced = this.attachedFiles.indexOf(file?.replacesAttachment);
+        if (replaced === -1) this.attachedFiles.push(staged);
+        else this.attachedFiles.splice(replaced, 1, staged);
       };
     },
     removeAttachment(attachments) {
@@ -1483,17 +1489,16 @@ export default {
       this.attachmentToEdit = null;
       this.fileToEdit = null;
     },
-    // The edited image replaces the staged one and goes through the same upload as a new file.
+    // The edited image goes through the same checks and upload as a new file. The staged one
+    // stays until the edited one is accepted, so a size limit or a failed upload keeps it.
     onAttachmentEdited(file) {
       if (file !== this.fileToEdit) {
-        this.attachedFiles = this.attachedFiles.filter(
-          staged => staged !== this.attachmentToEdit
-        );
         this.stageFile({
           file,
           name: file.name,
           type: file.type,
           size: file.size,
+          replacesAttachment: this.attachmentToEdit,
         });
       }
       this.closeAttachmentEditor();
