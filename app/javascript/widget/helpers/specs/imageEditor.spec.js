@@ -92,9 +92,9 @@ describe('imageEditor', () => {
     });
   });
 
-  it('strokeWidthFor keeps a 2px minimum and grows with the image', () => {
-    expect(strokeWidthFor(300, 200)).toBe(2);
-    expect(strokeWidthFor(3840, 2160)).toBe(11);
+  it('strokeWidthFor keeps a 3px minimum and grows with the image', () => {
+    expect(strokeWidthFor(300, 200)).toBe(3);
+    expect(strokeWidthFor(3840, 2160)).toBe(18);
   });
 
   it('isMeaningfulOperation treats a click as no operation', () => {

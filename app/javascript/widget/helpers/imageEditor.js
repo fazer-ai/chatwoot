@@ -13,7 +13,7 @@ export const isEditableImage = type =>
   type.startsWith('image/') && !NON_EDITABLE_TYPES.includes(type);
 
 export const strokeWidthFor = (width, height) =>
-  Math.max(2, Math.round(Math.min(width, height) / 200));
+  Math.max(3, Math.round(Math.min(width, height) / 120));
 
 const pixelSizeFor = (width, height) =>
   Math.max(8, Math.round(Math.min(width, height) / 60));
