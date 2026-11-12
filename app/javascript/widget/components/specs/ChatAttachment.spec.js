@@ -13,12 +13,22 @@ vi.mock('../../composables/useScreenCapture', () => ({
   useScreenCapture: vi.fn(),
 }));
 
+const globalConfig = { directUploadsEnabled: false, maximumFileUploadSize: 40 };
+let finishUpload;
+vi.mock('activestorage', () => ({
+  DirectUpload: vi.fn(() => ({
+    create: callback => {
+      finishUpload = callback;
+    },
+  })),
+}));
+
 const store = createStore({
   modules: {
     globalConfig: {
       namespaced: true,
       getters: {
-        get: () => ({ directUploadsEnabled: false, maximumFileUploadSize: 40 }),
+        get: () => globalConfig,
       },
     },
     appConfig: {
@@ -52,12 +62,14 @@ describe('ChatAttachment', () => {
 
   beforeEach(() => {
     onAttach = vi.fn();
+    globalConfig.directUploadsEnabled = false;
     IFrameHelper.sendMessage.mockClear();
     window.URL.createObjectURL = vi.fn(() => 'blob:preview');
     window.chatwootWebChannel = {
       attachmentEditorEnabled: true,
       screenCaptureEnabled: true,
       screenCaptureEditorEnabled: true,
+      websiteToken: 'token',
     };
     useScreenCapture.mockReturnValue({
       isScreenCaptureSupported: true,
@@ -118,6 +130,33 @@ describe('ChatAttachment', () => {
     await flushPromises();
     expect(editor().exists()).toBe(false);
     expect(onAttach.mock.calls.map(([{ file }]) => file)).toEqual([second]);
+  });
+
+  it('leaves full screen when it goes away with the editor open', async () => {
+    const wrapper = mountAttachment();
+
+    await selectFile(wrapper, photo);
+    wrapper.unmount();
+
+    expect(
+      IFrameHelper.sendMessage.mock.calls.map(([m]) => m.isFullscreen)
+    ).toEqual([true, false]);
+  });
+
+  it('reports a direct upload as in flight until it finishes', async () => {
+    globalConfig.directUploadsEnabled = true;
+    const pdf = new File(['pdf'], 'invoice.pdf', { type: 'application/pdf' });
+    const wrapper = mountAttachment();
+
+    await selectFile(wrapper, pdf);
+    expect(wrapper.emitted('uploadsChange')).toEqual([[1]]);
+
+    finishUpload(null, { signed_id: 'signed' });
+    await flushPromises();
+    expect(wrapper.emitted('uploadsChange')).toEqual([[1], [0]]);
+    expect(onAttach).toHaveBeenCalledWith(
+      expect.objectContaining({ file: 'signed' })
+    );
   });
 
   it('uploads documents and GIFs without the editor', async () => {

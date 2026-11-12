@@ -1,5 +1,6 @@
 <script>
 import FileUpload from 'vue-upload-component';
+import { getContrastingTextColor } from '@chatwoot/utils';
 import Spinner from 'shared/components/Spinner.vue';
 import {
   checkFileSizeLimit,
@@ -20,6 +21,7 @@ import { IFrameHelper } from 'widget/helpers/utils';
 
 export default {
   components: { FluentIcon, FileUpload, ImageEditor, Spinner },
+  emits: ['uploadsChange'],
   props: {
     onAttach: {
       type: Function,
@@ -48,7 +50,12 @@ export default {
   },
   data() {
     // A paste can hold several images; the editor shows them one at a time.
-    return { isUploading: false, imageQueue: [], editedCount: 0 };
+    return {
+      isUploading: false,
+      uploadsInFlight: 0,
+      imageQueue: [],
+      editedCount: 0,
+    };
   },
   computed: {
     ...mapGetters({
@@ -66,11 +73,23 @@ export default {
     imageToEdit() {
       return this.imageQueue[0];
     },
+    // App.vue sets --widget-color on the document root, which the teleported editor also sees.
+    confirmClass() {
+      const isDarkText = getContrastingTextColor(this.widgetColor) === '#000000';
+      return [
+        'bg-[var(--widget-color)]',
+        isDarkText ? 'text-n-black' : 'text-white',
+      ];
+    },
     hasImageToEdit() {
       return Boolean(this.imageToEdit);
     },
   },
   watch: {
+    // A direct upload calls onAttach only when it finishes; the composer waits for it.
+    uploadsInFlight(count) {
+      this.$emit('uploadsChange', count);
+    },
     // The page shows the widget full screen while the editor is open.
     hasImageToEdit(isFullscreen) {
       if (IFrameHelper.isIFrame()) {
@@ -83,6 +102,10 @@ export default {
   },
   unmounted() {
     document.removeEventListener('paste', this.handleClipboardPaste);
+    // The footer can go away with the editor open, such as when the conversation is resolved.
+    if (this.hasImageToEdit && IFrameHelper.isIFrame()) {
+      IFrameHelper.sendMessage({ event: 'setFullscreen', isFullscreen: false });
+    }
   },
   methods: {
     handleClipboardPaste(e) {
@@ -168,7 +191,9 @@ export default {
             }
           );
 
+          this.uploadsInFlight += 1;
           upload.create((error, blob) => {
+            this.uploadsInFlight -= 1;
             if (error) {
               emitter.emit(BUS_EVENTS.SHOW_ALERT, {
                 message: error,
@@ -256,7 +281,7 @@ export default {
       v-if="imageToEdit"
       :key="editedCount"
       :file="imageToEdit"
-      :accent-color="widgetColor"
+      :confirm-class="confirmClass"
       :confirm-label="
         sendAttachmentsWithMessage ? $t('IMAGE_EDITOR.DONE') : ''
       "

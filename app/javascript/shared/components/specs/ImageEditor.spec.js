@@ -51,7 +51,7 @@ describe('ImageEditor', () => {
 
   const mountEditor = async () => {
     wrapper = mount(ImageEditor, {
-      props: { file, accentColor: '#ffd600', isDark: true },
+      props: { file, confirmClass: 'bg-[var(--widget-color)]', isDark: true },
       attachTo: document.body,
     });
     await flushPromises();
@@ -82,12 +82,12 @@ describe('ImageEditor', () => {
 
   afterEach(() => wrapper.unmount());
 
-  it('uses the accent color and the dark mode it receives', async () => {
+  it('uses the confirm classes and the dark mode it receives', async () => {
     await mountEditor();
     const send = button('IMAGE_EDITOR.SEND');
 
-    expect(send.style.backgroundColor).toBe('rgb(255, 214, 0)');
-    expect(send.style.color).toBe('rgb(0, 0, 0)');
+    expect(send.classList.contains('bg-[var(--widget-color)]')).toBe(true);
+    expect(send.getAttribute('style')).toBeNull();
     expect(
       document.querySelector('[role="dialog"]').closest('.dark')
     ).not.toBeNull();

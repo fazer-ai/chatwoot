@@ -53,7 +53,7 @@ onMounted(async () => {
       <ImageEditor
         v-else-if="screenshot"
         :file="screenshot"
-        accent-color="#1f93ff"
+        confirm-class="bg-n-brand text-white"
         @save="file => onSave('desktop', file)"
         @cancel="logEvent('cancel')"
       />
@@ -63,7 +63,7 @@ onMounted(async () => {
       <ImageEditor
         v-else-if="phonePhoto"
         :file="phonePhoto"
-        accent-color="#ffd600"
+        confirm-class="bg-n-amber-9 text-n-black"
         is-dark
         @save="file => onSave('phone', file)"
         @cancel="logEvent('cancel')"

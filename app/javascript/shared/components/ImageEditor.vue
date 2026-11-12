@@ -8,7 +8,6 @@ import {
   useTemplateRef,
 } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { getContrastingTextColor } from '@chatwoot/utils';
 import {
   drawOperation,
   editedFileName,
@@ -19,9 +18,9 @@ import {
 
 const props = defineProps({
   file: { type: File, required: true },
-  // The widget passes the inbox color and its dark mode, which the teleported editor does not
-  // inherit. The dashboard uses neither: its dark class is on the body.
-  accentColor: { type: String, default: '' },
+  // The widget passes classes for the inbox color and its dark mode, which the teleported
+  // editor does not inherit. The dashboard keeps the defaults: its dark class is on the body.
+  confirmClass: { type: String, default: 'bg-n-brand text-white' },
   isDark: { type: Boolean, default: false },
   // "Send" when the image goes out on confirm; "Done" when it goes back to a composer.
   confirmLabel: { type: String, default: '' },
@@ -64,14 +63,6 @@ const activeTool = ref('arrow');
 const isSaving = ref(false);
 const exportFailed = ref(false);
 
-const sendButtonStyle = computed(() =>
-  props.accentColor
-    ? {
-        backgroundColor: props.accentColor,
-        color: getContrastingTextColor(props.accentColor),
-      }
-    : {}
-);
 const canUndo = computed(() => operations.value.length > 0);
 const canRedo = computed(() => redoStack.value.length > 0);
 
@@ -295,8 +286,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-60"
-            :class="{ 'bg-n-brand text-white': !accentColor }"
-            :style="sendButtonStyle"
+            :class="confirmClass"
             :disabled="isSaving"
             @click="save"
           >

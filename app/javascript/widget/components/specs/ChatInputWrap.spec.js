@@ -82,4 +82,20 @@ describe('ChatInputWrap', () => {
     expect(onSendMessage).not.toHaveBeenCalled();
     expect(wrapper.find('li').exists()).toBe(false);
   });
+
+  it('waits for an attachment still uploading before it sends', async () => {
+    window.chatwootWebChannel.sendAttachmentsWithMessage = true;
+    const wrapper = mountInput();
+    const attachment = wrapper.findComponent({ name: 'ChatAttachmentButton' });
+
+    attachment.vm.$emit('uploadsChange', 1);
+    await wrapper.find('textarea').setValue('see the invoice');
+    wrapper.findComponent({ name: 'ChatSendButton' }).vm.$emit('click');
+    expect(onSendMessage).not.toHaveBeenCalled();
+
+    attachment.vm.$emit('uploadsChange', 0);
+    await attach(wrapper, invoice);
+    wrapper.findComponent({ name: 'ChatSendButton' }).vm.$emit('click');
+    expect(onSendAttachment).toHaveBeenCalledWith([invoice], 'see the invoice');
+  });
 });

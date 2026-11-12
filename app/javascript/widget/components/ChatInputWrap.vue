@@ -52,6 +52,7 @@ export default {
     return {
       userInput: '',
       pendingAttachments: [],
+      uploadsInFlight: 0,
       showEmojiPicker: false,
       isFocused: false,
     };
@@ -98,6 +99,8 @@ export default {
       this.isFocused = true;
     },
     handleButtonClick() {
+      // An attachment still uploading belongs to this message; sending now would leave it out.
+      if (this.sendAttachmentsWithMessage && this.uploadsInFlight) return;
       if (this.pendingAttachments.length) {
         this.onSendAttachment(this.pendingAttachments, this.userInput.trim());
         this.pendingAttachments = [];
@@ -187,6 +190,7 @@ export default {
         v-if="showAttachment"
         class="text-n-slate-12"
         :on-attach="onAttach"
+        @uploads-change="uploadsInFlight = $event"
       />
       <button
         v-if="shouldShowEmojiPicker && hasEmojiPickerEnabled"
