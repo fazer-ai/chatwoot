@@ -8,6 +8,7 @@ import {
   useTemplateRef,
 } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { IFrameHelper } from 'widget/helpers/utils';
 import {
   drawOperation,
   editedFileName,
@@ -149,11 +150,18 @@ const onKeydown = event => {
 };
 
 // The chat input takes the focus again when the widget reopens after a capture.
+const setFullscreen = isFullscreen => {
+  if (IFrameHelper.isIFrame()) {
+    IFrameHelper.sendMessage({ event: 'setFullscreen', isFullscreen });
+  }
+};
+
 const keepFocus = event => {
   if (!dialogRef.value.contains(event.target)) dialogRef.value.focus();
 };
 
 onMounted(async () => {
+  setFullscreen(true);
   // Focus leaves the chat input, so typed keys and Escape do not reach the composer.
   dialogRef.value.focus();
   document.addEventListener('focusin', keepFocus);
@@ -168,6 +176,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  setFullscreen(false);
   document.removeEventListener('focusin', keepFocus);
   image.value?.close();
 });
@@ -192,7 +201,7 @@ onBeforeUnmount(() => {
             v-for="tool in tools"
             :key="tool.id"
             type="button"
-            class="flex items-center justify-center rounded-lg size-9 transition-colors"
+            class="flex items-center justify-center h-9 gap-1.5 px-2 text-sm rounded-lg min-w-9 transition-colors"
             :class="
               activeTool === tool.id
                 ? 'bg-n-alpha-2 text-n-ruby-9'
@@ -204,6 +213,7 @@ onBeforeUnmount(() => {
             @click="activeTool = tool.id"
           >
             <span class="size-5" :class="tool.icon" />
+            <span class="hidden sm:inline">{{ tool.label }}</span>
           </button>
         </div>
         <div class="flex items-center gap-1">

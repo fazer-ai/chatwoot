@@ -1,5 +1,10 @@
 import { mount, flushPromises } from '@vue/test-utils';
+import { IFrameHelper } from 'widget/helpers/utils';
 import ImageEditor from '../ImageEditor.vue';
+
+vi.mock('widget/helpers/utils', () => ({
+  IFrameHelper: { isIFrame: () => true, sendMessage: vi.fn() },
+}));
 
 const file = new File(['original'], 'photo.jpg', { type: 'image/jpeg' });
 
@@ -57,6 +62,7 @@ describe('ImageEditor', () => {
   const savedFiles = () => (wrapper.emitted('save') || []).map(([f]) => f);
 
   beforeEach(() => {
+    IFrameHelper.sendMessage.mockClear();
     window.createImageBitmap = vi.fn(async () => ({
       width: 800,
       height: 600,
@@ -78,6 +84,19 @@ describe('ImageEditor', () => {
   });
 
   afterEach(() => wrapper.unmount());
+
+  it('asks the page to show the widget full screen while it is open', async () => {
+    await mountEditor();
+    const calls = () => IFrameHelper.sendMessage.mock.calls.map(([m]) => m);
+
+    expect(calls()).toEqual([{ event: 'setFullscreen', isFullscreen: true }]);
+    wrapper.unmount();
+    expect(calls().at(-1)).toEqual({
+      event: 'setFullscreen',
+      isFullscreen: false,
+    });
+    wrapper = mount({ render: () => null });
+  });
 
   it('sends the original file untouched when nothing was drawn', async () => {
     await mountEditor();
