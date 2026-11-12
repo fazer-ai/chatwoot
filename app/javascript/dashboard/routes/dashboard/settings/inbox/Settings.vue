@@ -39,6 +39,7 @@ import { consumePairingRequest } from 'dashboard/helper/whatsappPairingRequest';
 import { useWhatsappSessionProviders } from 'dashboard/composables/useWhatsappSessionProviders';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
+import WidgetImageOptions from './components/WidgetImageOptions.vue';
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import SpinnerLoader from 'dashboard/components-next/spinner/Spinner.vue';
@@ -75,6 +76,7 @@ export default {
     SettingsFieldSection,
     SettingsAccordion,
     WeeklyAvailability,
+    WidgetImageOptions,
     SenderNameExamplePreview,
     LockToSingleConversationPreview,
     MicrosoftReauthorize,
@@ -129,6 +131,7 @@ export default {
       channelWelcomeTitle: '',
       channelWelcomeTagline: '',
       selectedFeatureFlags: [],
+      widgetImageOptions: {},
       replyTime: '',
       selectedTabIndex: 0,
       selectedPortalSlug: '',
@@ -648,6 +651,11 @@ export default {
       this.channelWelcomeTitle = this.inbox.welcome_title;
       this.channelWelcomeTagline = this.inbox.welcome_tagline || '';
       this.selectedFeatureFlags = this.inbox.selected_feature_flags || [];
+      this.widgetImageOptions = {
+        attachment_editor_enabled: this.inbox.attachment_editor_enabled,
+        screen_capture_enabled: this.inbox.screen_capture_enabled,
+        screen_capture_editor_enabled: this.inbox.screen_capture_editor_enabled,
+      };
       this.replyTime = this.inbox.reply_time;
       this.locktoSingleConversation = this.inbox.lock_to_single_conversation;
       this.selectedPortalSlug = this.inbox.help_center
@@ -818,6 +826,7 @@ export default {
             welcome_title: this.channelWelcomeTitle || '',
             welcome_tagline: this.channelWelcomeTagline || '',
             selectedFeatureFlags: this.selectedFeatureFlags,
+            ...this.widgetImageOptions,
             reply_time: this.replyTime || 'in_a_few_minutes',
             continuity_via_email:
               this.isInboundEmailEnabled && this.continuityViaEmail,
@@ -1445,6 +1454,7 @@ export default {
                       {{ $t('INBOX_MGMT.FEATURES.USE_INBOX_AVATAR_FOR_BOT') }}
                     </label>
                   </div>
+                  <WidgetImageOptions v-model="widgetImageOptions" />
                 </div>
               </SettingsFieldSection>
             </SettingsAccordion>

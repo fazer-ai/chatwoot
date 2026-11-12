@@ -2,6 +2,11 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import FileUpload from 'vue-upload-component';
 import ChatAttachment from '../ChatAttachment.vue';
+import { useScreenCapture } from '../../composables/useScreenCapture';
+
+vi.mock('../../composables/useScreenCapture', () => ({
+  useScreenCapture: vi.fn(),
+}));
 
 const store = createStore({
   modules: {
@@ -20,6 +25,7 @@ const store = createStore({
 
 const upload = file => ({ file, name: file.name, type: file.type });
 const photo = new File(['png'], 'photo.png', { type: 'image/png' });
+const screenshot = new File(['png'], 'screenshot.png', { type: 'image/png' });
 
 describe('ChatAttachment', () => {
   let onAttach;
@@ -38,8 +44,18 @@ describe('ChatAttachment', () => {
   beforeEach(() => {
     onAttach = vi.fn();
     window.URL.createObjectURL = vi.fn(() => 'blob:preview');
-    navigator.mediaDevices = undefined;
+    window.chatwootWebChannel = {
+      attachmentEditorEnabled: true,
+      screenCaptureEnabled: true,
+      screenCaptureEditorEnabled: true,
+    };
+    useScreenCapture.mockReturnValue({
+      isScreenCaptureSupported: true,
+      captureScreen: vi.fn(async () => screenshot),
+    });
   });
+
+  const captureButton = '[aria-label="SCREEN_CAPTURE.BUTTON"]';
 
   it('opens the editor for an image and uploads the edited file on save', async () => {
     const wrapper = mountAttachment();
@@ -102,11 +118,44 @@ describe('ChatAttachment', () => {
     expect(onAttach.mock.calls.map(([{ file }]) => file)).toEqual([pdf, gif]);
   });
 
-  it('shows the capture button only when the browser can capture the screen', () => {
-    const label = '[aria-label="SCREEN_CAPTURE.BUTTON"]';
-    expect(mountAttachment().find(label).exists()).toBe(false);
+  it('uploads images directly when the inbox turns the editor off', async () => {
+    window.chatwootWebChannel.attachmentEditorEnabled = false;
+    const wrapper = mountAttachment();
 
-    navigator.mediaDevices = { getDisplayMedia: vi.fn() };
-    expect(mountAttachment().find(label).exists()).toBe(true);
+    await selectFile(wrapper, photo);
+
+    expect(wrapper.findComponent({ name: 'ImageEditor' }).exists()).toBe(false);
+    expect(onAttach).toHaveBeenCalledWith(
+      expect.objectContaining({ file: photo })
+    );
+  });
+
+  it('shows the capture button only when the inbox and the browser allow it', () => {
+    expect(mountAttachment().find(captureButton).exists()).toBe(true);
+
+    window.chatwootWebChannel.screenCaptureEnabled = false;
+    expect(mountAttachment().find(captureButton).exists()).toBe(false);
+
+    window.chatwootWebChannel.screenCaptureEnabled = true;
+    useScreenCapture.mockReturnValue({ isScreenCaptureSupported: false });
+    expect(mountAttachment().find(captureButton).exists()).toBe(false);
+  });
+
+  it('opens the screenshot in the editor, or sends it when the inbox turns the editor off', async () => {
+    const wrapper = mountAttachment();
+    await wrapper.find(captureButton).trigger('click');
+    await flushPromises();
+    expect(wrapper.findComponent({ name: 'ImageEditor' }).props('file')).toBe(
+      screenshot
+    );
+
+    window.chatwootWebChannel.screenCaptureEditorEnabled = false;
+    const direct = mountAttachment();
+    await direct.find(captureButton).trigger('click');
+    await flushPromises();
+    expect(direct.findComponent({ name: 'ImageEditor' }).exists()).toBe(false);
+    expect(onAttach).toHaveBeenCalledWith(
+      expect.objectContaining({ file: screenshot })
+    );
   });
 });

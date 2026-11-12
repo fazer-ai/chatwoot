@@ -267,6 +267,11 @@
     "BUSINESS_HOURS": {
       "RESTRICT_ASSIGNMENT": "Só atribuir conversas dentro do horário de funcionamento",
       "RESTRICT_ASSIGNMENT_HELP": "Fora do horário acima, os agentes não conseguem atribuir conversas desta caixa, nem a si mesmos nem a outras pessoas, e a atribuição automática não as distribui. Com a atribuição V2, o que chegou com a caixa fechada é distribuído quando ela abre. Administradores continuam podendo atribuir a qualquer hora."
+    },
+    "FEATURES": {
+      "ATTACHMENT_EDITOR": "Abrir um editor antes de enviar uma imagem",
+      "SCREEN_CAPTURE": "Exibir um botão para capturar a tela (navegadores de computador)",
+      "SCREEN_CAPTURE_EDITOR": "Abrir o editor nas capturas de tela"
     }
   }
 }

@@ -27,7 +27,18 @@ export default {
   setup() {
     const { canHandleAttachments } = useAttachments();
     const { isScreenCaptureSupported, captureScreen } = useScreenCapture();
-    return { canHandleAttachments, isScreenCaptureSupported, captureScreen };
+    const {
+      attachmentEditorEnabled,
+      screenCaptureEnabled,
+      screenCaptureEditorEnabled,
+    } = window.chatwootWebChannel;
+    return {
+      canHandleAttachments,
+      captureScreen,
+      attachmentEditorEnabled,
+      screenCaptureEditorEnabled,
+      showCaptureButton: isScreenCaptureSupported && screenCaptureEnabled,
+    };
   },
   data() {
     // A paste can hold several images; the editor shows them one at a time.
@@ -77,7 +88,7 @@ export default {
       return fileType.includes('image') ? 'image' : 'file';
     },
     onFileUpload(file) {
-      if (file && isEditableImage(file.type)) {
+      if (file && this.attachmentEditorEnabled && isEditableImage(file.type)) {
         this.imageQueue.push(file.file);
         return;
       }
@@ -89,6 +100,9 @@ export default {
     },
     onEditorSave(file) {
       this.nextImage();
+      this.uploadRawFile(file);
+    },
+    uploadRawFile(file) {
       this.uploadFile({
         file,
         name: file.name,
@@ -102,7 +116,9 @@ export default {
     async onCaptureScreen() {
       try {
         const file = await this.captureScreen();
-        if (file) this.imageQueue.push(file);
+        if (!file) return;
+        if (this.screenCaptureEditorEnabled) this.imageQueue.push(file);
+        else this.uploadRawFile(file);
       } catch (error) {
         emitter.emit(BUS_EVENTS.SHOW_ALERT, {
           message: this.$t('SCREEN_CAPTURE.ERROR'),
@@ -209,7 +225,7 @@ export default {
       </button>
     </FileUpload>
     <button
-      v-if="isScreenCaptureSupported"
+      v-if="showCaptureButton"
       class="min-h-8 min-w-8 flex items-center justify-center"
       :aria-label="$t('SCREEN_CAPTURE.BUTTON')"
       :title="$t('SCREEN_CAPTURE.BUTTON')"

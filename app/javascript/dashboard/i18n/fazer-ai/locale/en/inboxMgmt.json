@@ -267,6 +267,11 @@
     "BUSINESS_HOURS": {
       "RESTRICT_ASSIGNMENT": "Only assign conversations during business hours",
       "RESTRICT_ASSIGNMENT_HELP": "Outside the hours above, agents cannot assign this inbox's conversations, to themselves or to anyone else, and automatic assignment does not hand them out. With assignment V2, what arrived while closed is handed out once the inbox opens. Administrators can still assign at any time."
+    },
+    "FEATURES": {
+      "ATTACHMENT_EDITOR": "Open an editor before an image is sent",
+      "SCREEN_CAPTURE": "Show a button to capture the screen (desktop browsers)",
+      "SCREEN_CAPTURE_EDITOR": "Open the editor for screen captures"
     }
   }
 }

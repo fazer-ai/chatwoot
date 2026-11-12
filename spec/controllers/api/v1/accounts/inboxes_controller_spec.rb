@@ -662,9 +662,10 @@ RSpec.describe 'Inboxes API', type: :request do
       end
 
       it 'updates inbox when administrator' do
+        image_options = { attachment_editor_enabled: false, screen_capture_enabled: true, screen_capture_editor_enabled: false }
         patch "/api/v1/accounts/#{account.id}/inboxes/#{inbox.id}",
               headers: admin.create_new_auth_token,
-              params: valid_params,
+              params: valid_params.merge(channel: image_options),
               as: :json
 
         expect(response).to have_http_status(:success)
@@ -672,6 +673,8 @@ RSpec.describe 'Inboxes API', type: :request do
         expect(inbox.reload.enable_auto_assignment).to be_falsey
         expect(inbox.reload.portal_id).to eq(portal.id)
         expect(response.parsed_body['name']).to eq 'new test inbox'
+        expect(response.parsed_body.slice(*image_options.keys.map(&:to_s))).to eq(image_options.stringify_keys)
+        expect(inbox.channel.reload.screen_capture_enabled).to be(true)
       end
 
       it 'turns the reopen team setting on and off and exposes it' do
