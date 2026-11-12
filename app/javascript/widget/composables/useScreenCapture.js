@@ -11,29 +11,16 @@ const wait = ms =>
     setTimeout(resolve, ms);
   });
 
-// The SDK hides the widget iframe, where requestAnimationFrame can stop, so the frame
-// comes from ImageCapture or, where it does not exist, from a playing <video>.
-const grabFrame = async track => {
-  if (window.ImageCapture) return new window.ImageCapture(track).grabFrame();
+const timeout = ms =>
+  wait(ms).then(() => {
+    throw new Error('Timed out waiting for the screen frame');
+  });
 
-  const video = document.createElement('video');
-  video.muted = true;
-  video.srcObject = new MediaStream([track]);
-  await Promise.race([
-    video.play(),
-    wait(FRAME_TIMEOUT_MS).then(() => {
-      throw new Error('Timed out waiting for the screen frame');
-    }),
-  ]);
-  return video;
-};
-
-const frameToFile = frame => {
+const frameToFile = video => {
   const canvas = document.createElement('canvas');
-  canvas.width = frame.videoWidth || frame.width;
-  canvas.height = frame.videoHeight || frame.height;
-  canvas.getContext('2d').drawImage(frame, 0, 0);
-  frame.close?.();
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
   return new Promise(resolve => {
     canvas.toBlob(blob => {
       resolve(
@@ -64,14 +51,19 @@ export function useScreenCapture() {
       throw error;
     }
 
+    // The video starts before the widget hides, so the repaint without the widget reaches
+    // it as the latest frame. requestAnimationFrame is not used: it can stop in the
+    // hidden iframe.
+    const video = document.createElement('video');
+    video.muted = true;
+    video.srcObject = stream;
+    const playing = video.play();
     const isEmbedded = IFrameHelper.isIFrame();
+    if (isEmbedded) IFrameHelper.sendMessage({ event: 'closeWindow' });
     try {
-      if (isEmbedded) {
-        IFrameHelper.sendMessage({ event: 'closeWindow' });
-        await wait(HIDE_DELAY_MS);
-      }
-      const [track] = stream.getVideoTracks();
-      return await frameToFile(await grabFrame(track));
+      await Promise.race([playing, timeout(FRAME_TIMEOUT_MS)]);
+      await wait(HIDE_DELAY_MS);
+      return await frameToFile(video);
     } finally {
       stream.getTracks().forEach(track => track.stop());
       if (isEmbedded) IFrameHelper.sendMessage({ event: 'toggleBubble' });

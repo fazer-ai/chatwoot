@@ -7,7 +7,7 @@ vi.mock('widget/helpers/utils', () => ({
 
 describe('useScreenCapture', () => {
   const track = { stop: vi.fn() };
-  const stream = { getVideoTracks: () => [track], getTracks: () => [track] };
+  const stream = { getTracks: () => [track] };
   const calls = [];
 
   beforeEach(() => {
@@ -24,16 +24,13 @@ describe('useScreenCapture', () => {
         return stream;
       }),
     };
-    window.ImageCapture = function ImageCapture() {
-      return {
-        grabFrame: async () => {
-          calls.push('grabFrame');
-          return { width: 1280, height: 720, close: vi.fn() };
-        },
-      };
-    };
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
+      async () => {
+        calls.push('play');
+      }
+    );
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      drawImage: vi.fn(),
+      drawImage: () => calls.push('drawImage'),
     });
     HTMLCanvasElement.prototype.toBlob = function toBlob(callback, type) {
       callback(new Blob(['frame'], { type }));
@@ -51,8 +48,9 @@ describe('useScreenCapture', () => {
 
     expect(calls).toEqual([
       'getDisplayMedia',
+      'play',
       'closeWindow',
-      'grabFrame',
+      'drawImage',
       'stop',
       'toggleBubble',
     ]);
@@ -70,18 +68,14 @@ describe('useScreenCapture', () => {
     expect(IFrameHelper.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('reopens the widget and stops the stream when the frame fails', async () => {
-    window.ImageCapture = function ImageCapture() {
-      return {
-        grabFrame: async () => {
-          throw new DOMException('Track ended', 'InvalidStateError');
-        },
-      };
-    };
+  it('reopens the widget and stops the stream when no frame arrives', async () => {
+    HTMLMediaElement.prototype.play.mockImplementation(
+      () => new Promise(() => {})
+    );
     const { captureScreen } = useScreenCapture();
 
     const result = captureScreen();
-    const assertion = expect(result).rejects.toThrow('Track ended');
+    const assertion = expect(result).rejects.toThrow('Timed out');
     await vi.runAllTimersAsync();
     await assertion;
 
