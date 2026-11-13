@@ -183,6 +183,28 @@ describe('appendSignature', () => {
     ).toBe(`${cleanedSignature}\n\n${body}`);
   });
 
+  it('appends the signature at the top with none separator (no blank line)', () => {
+    const { body, signature } = DOES_NOT_HAVE_SIGNATURE['no signature'];
+    const cleanedSignature = cleanSignature(signature);
+    expect(
+      appendSignature(body, signature, {
+        position: 'top',
+        separator: 'none',
+      })
+    ).toBe(`${cleanedSignature}\n${body}`);
+  });
+
+  it('appends the signature at the bottom with none separator (no blank line)', () => {
+    const { body, signature } = DOES_NOT_HAVE_SIGNATURE['no signature'];
+    const cleanedSignature = cleanSignature(signature);
+    expect(
+      appendSignature(body, signature, {
+        position: 'bottom',
+        separator: 'none',
+      })
+    ).toBe(`${body}\n${cleanedSignature}`);
+  });
+
   it.skip('does not append signature if already present - SKIP(#78): Due to changes on append signature logic', () => {
     Object.keys(HAS_SIGNATURE).forEach(key => {
       const { body, signature } = HAS_SIGNATURE[key];

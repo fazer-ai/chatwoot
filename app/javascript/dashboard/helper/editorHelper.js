@@ -203,6 +203,7 @@ export function appendSignature(body, signature, settings = {}) {
     {
       blank: '\n\n',
       '--': '\n\n--\n\n',
+      none: '\n',
     }[separator] || separator;
 
   if (position === 'top') {
