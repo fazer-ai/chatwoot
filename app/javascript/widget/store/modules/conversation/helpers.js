@@ -63,3 +63,7 @@ export const chronological = conversations =>
   Object.values(conversations).sort(
     (a, b) => (a.created_at ?? 0) - (b.created_at ?? 0)
   );
+
+// A message the server has stored. A temporary message carries a uuid until the API answers,
+// and a uuid is not a cursor the API can page from.
+export const isPersisted = message => Number.isInteger(message.id);

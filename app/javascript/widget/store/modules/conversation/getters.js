@@ -1,6 +1,10 @@
 import { MESSAGE_TYPE } from 'widget/helpers/constants';
 import { groupBy } from 'widget/helpers/utils';
-import { chronological, groupConversationBySender } from './helpers';
+import {
+  chronological,
+  groupConversationBySender,
+  isPersisted,
+} from './helpers';
 import { formatUnixDate } from 'shared/helpers/DateHelper';
 
 export const getters = {
@@ -10,13 +14,9 @@ export const getters = {
   getPendingTyping: _state => _state.pendingTyping,
   getConversation: _state => _state.conversations,
   getConversationSize: _state => Object.keys(_state.conversations).length,
-  getEarliestMessage: _state => {
-    const conversation = chronological(_state.conversations);
-    if (conversation.length) {
-      return conversation[0];
-    }
-    return {};
-  },
+  // The `before` cursor for older pages, so the earliest stored message, never a temporary one.
+  getEarliestMessage: _state =>
+    chronological(_state.conversations).find(isPersisted) || {},
   getLastMessage: _state => {
     const conversation = chronological(_state.conversations);
     if (conversation.length) {

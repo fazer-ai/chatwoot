@@ -36,14 +36,17 @@ describe('#getters', () => {
     const state = {
       conversations: {
         1: {
+          id: 1,
           content: 'hello',
         },
         2: {
+          id: 2,
           content: 'hello1',
         },
       },
     };
     expect(getters.getEarliestMessage(state)).toEqual({
+      id: 1,
       content: 'hello',
     });
   });
@@ -504,6 +507,16 @@ describe('#getters', () => {
 
     it('getLastMessage is the latest in time', () => {
       expect(getters.getLastMessage(state).id).toEqual(11);
+    });
+
+    it('getEarliestMessage skips a temporary message, whose uuid is no cursor', () => {
+      const pending = {
+        conversations: {
+          40: { id: 40, created_at: today },
+          'b7c1e2f0-temp': { id: 'b7c1e2f0-temp', created_at: today - 60 },
+        },
+      };
+      expect(getters.getEarliestMessage(pending).id).toEqual(40);
     });
 
     it('breaks a created_at tie by id', () => {

@@ -332,4 +332,18 @@ describe('#mutations', () => {
       expect(state.pendingTyping).toEqual({ messageId: 7, until: 0 });
     });
   });
+
+  describe('#setLastMessageId', () => {
+    it('takes the highest stored id, never a temporary message uuid', () => {
+      const state = {
+        conversations: {
+          5: { id: 5 },
+          6: { id: 6 },
+          'b7c1e2f0-temp': { id: 'b7c1e2f0-temp' },
+        },
+      };
+      mutations.setLastMessageId(state);
+      expect(state.lastMessageId).toEqual(6);
+    });
+  });
 });

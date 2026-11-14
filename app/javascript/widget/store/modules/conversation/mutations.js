@@ -1,5 +1,5 @@
 import { AGENT_TYPING_TIMEOUT, MESSAGE_TYPE } from 'widget/helpers/constants';
-import { chronological, findUndeliveredMessage } from './helpers';
+import { chronological, findUndeliveredMessage, isPersisted } from './helpers';
 
 export const mutations = {
   clearConversations($state) {
@@ -125,7 +125,9 @@ export const mutations = {
 
   setLastMessageId($state) {
     const { conversations } = $state;
-    const lastMessage = Object.values(conversations).pop();
+    // The `after` cursor, which the API answers by id: the highest stored id, never a temporary
+    // message's uuid (string keys iterate after the integer ones).
+    const lastMessage = Object.values(conversations).filter(isPersisted).pop();
     if (!lastMessage) return;
     const { id } = lastMessage;
     $state.lastMessageId = id;
