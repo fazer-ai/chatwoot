@@ -206,20 +206,41 @@ describe('appendSignature', () => {
       ).toBe('Hello there\\\nAcme Support');
     });
 
-    // A hard break before a block leaves a literal backslash, and after a
-    // closing fence it stops the fence from closing.
+    // Next to a markdown block only a blank line keeps the signature out of
+    // it: a single newline continues a list, quote or table, and a hard break
+    // leaves a literal backslash or keeps a fence open.
     it.each([
       ['a list', '- first\n- second'],
+      ['an ordered list that cannot interrupt a paragraph', '2. second'],
       ['a heading', '# Title\nSome text'],
       ['a quote', '> quoted'],
+      ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
       ['a code fence', '```\ncode\n```'],
-    ])('uses a plain newline when the message starts with %s', (_, body) => {
+      ['a setext underline', '---\ntext'],
+      ['a thematic break', '***'],
+      ['an HTML block', '<div>x</div>'],
+    ])('keeps a blank line when the message starts with %s', (_, body) => {
       expect(
         appendSignature(body, signature, {
           position: 'top',
           separator: 'none',
         })
-      ).toBe(`Acme Support\n${body}`);
+      ).toBe(`Acme Support\n\n${body}`);
+    });
+
+    it.each([
+      ['a list', '- first\n- second'],
+      ['a quote', '> quoted'],
+      ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
+      ['a code fence', '```\ncode\n```'],
+      ['an indented code block', 'Text\n\n    code'],
+    ])('keeps a blank line when the message ends with %s', (_, body) => {
+      expect(
+        appendSignature(body, signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe(`${body}\n\nAcme Support`);
     });
 
     it('keeps the hard break when only the far end of the message is a block', () => {
@@ -230,16 +251,6 @@ describe('appendSignature', () => {
           separator: 'none',
         })
       ).toBe(`${body}\\\nAcme Support`);
-    });
-
-    it('uses a plain newline when the message ends with a code fence', () => {
-      const body = '```\ncode\n```';
-      expect(
-        appendSignature(body, signature, {
-          position: 'bottom',
-          separator: 'none',
-        })
-      ).toBe(`${body}\nAcme Support`);
     });
   });
 
