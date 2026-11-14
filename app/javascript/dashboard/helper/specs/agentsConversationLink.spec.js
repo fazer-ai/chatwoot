@@ -80,10 +80,7 @@ describe('agentsConversationLink', () => {
         agentsConsoleBase('https://console.example.com:8443/', WEBHOOK_BASE)
       ).toBe('https://console.example.com:8443');
       expect(
-        agentsConsoleBase(
-          'http://example.com/agents/?x=1#top',
-          WEBHOOK_BASE
-        )
+        agentsConsoleBase('http://example.com/agents/?x=1#top', WEBHOOK_BASE)
       ).toBe('http://example.com/agents');
     });
 
@@ -92,6 +89,7 @@ describe('agentsConversationLink', () => {
         undefined,
         null,
         '',
+        // eslint-disable-next-line no-script-url
         'javascript:alert(1)',
         'data:text/html,hi',
         'ftp://console.example.com',

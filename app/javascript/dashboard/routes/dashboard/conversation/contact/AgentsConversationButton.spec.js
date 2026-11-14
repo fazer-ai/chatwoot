@@ -10,7 +10,8 @@ vi.mock('dashboard/api/inboxes', () => ({
 
 const AGENTS = 'https://agents.example.com/api/v1/chatwoot/webhook/tok';
 const tokSha256 = createHash('sha256').update('tok').digest('hex');
-const botReply = (outgoingUrl, botConfig = {}) => ({
+// `bot_config` defaults to {} but the column is nullable, and an API client can null it.
+const botReply = (outgoingUrl, botConfig = null) => ({
   data: {
     agent_bot: outgoingUrl
       ? { outgoing_url: outgoingUrl, bot_config: botConfig }
