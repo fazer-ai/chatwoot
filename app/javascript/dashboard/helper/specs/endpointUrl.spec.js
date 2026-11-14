@@ -26,6 +26,22 @@ describe('endpointUrl', () => {
     });
   });
 
+  it('rejects what the browser would repair but the server cannot parse', () => {
+    [
+      'http:/agents:3000/hook',
+      'http:///hook',
+      'https://example.com/hook ',
+      ' https://example.com/hook',
+      'http://exa mple.com/hook',
+      'http:\\\\agents\\hook',
+      'https://example.com/<hook>',
+      'http://:3000/hook',
+      'http://[zz]/hook',
+    ].forEach(value => {
+      expect(endpointUrl(value)).toBe(false);
+    });
+  });
+
   it('leaves an empty value to the required rule', () => {
     expect(endpointUrl('')).toBe(true);
   });
