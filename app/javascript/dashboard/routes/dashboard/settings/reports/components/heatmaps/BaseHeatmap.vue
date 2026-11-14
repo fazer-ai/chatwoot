@@ -99,6 +99,38 @@ const chartData = computed(() => {
   return { columns, rows };
 });
 
+// The day and date are in the user's language, and their length varies a lot
+// ("Wed" / "Quarta-feira", "Apr 1, 2026" / "1 de abr. de 2026"). A fixed column
+// wraps the longer ones into the row below, so size it to the widest label.
+const MIN_ROW_LABEL_WIDTH = 96;
+// The chart's own 0.75rem right padding, plus a little room for rounding.
+const ROW_LABEL_PADDING = 16;
+// Without a canvas (tests), estimate from the character count.
+const FALLBACK_CHAR_WIDTH = 7;
+
+let measureContext;
+function textWidth(text, font) {
+  if (measureContext === undefined) {
+    measureContext =
+      document.createElement('canvas').getContext?.('2d') ?? null;
+  }
+  if (!measureContext) return text.length * FALLBACK_CHAR_WIDTH;
+  measureContext.font = font;
+  return measureContext.measureText(text).width;
+}
+
+const rowLabelWidth = computed(() => {
+  const { fontFamily } = getComputedStyle(document.body);
+  const widest = Math.max(
+    0,
+    ...chartData.value.rows.flatMap(row => [
+      textWidth(row.label, `600 12px ${fontFamily}`),
+      textWidth(row.description, `11px ${fontFamily}`),
+    ])
+  );
+  return Math.max(MIN_ROW_LABEL_WIDTH, Math.ceil(widest) + ROW_LABEL_PADDING);
+});
+
 const heatmapColors = computed(() => COLOR_SCHEMES[props.colorScheme]);
 
 const colorSchemeClass = computed(() => {
@@ -151,7 +183,7 @@ const colorSchemeClass = computed(() => {
     :quantiles="QUANTILES"
     :cell-min-width="24"
     :gap="5"
-    :row-label-width="96"
+    :row-label-width="rowLabelWidth"
     zero-color="rgb(var(--solid-2))"
     class="[--cw-viz-heatmap-level-0-color:rgb(var(--slate-2))] [--cw-viz-heatmap-cell-border-color:rgb(var(--border-strong))] [--cw-viz-heatmap-label-color:rgb(var(--slate-11))] [--cw-viz-heatmap-label-background:rgb(var(--solid-2))] [--cw-viz-heatmap-row-title-color:rgb(var(--slate-12))] [--cw-viz-heatmap-column-label-color:rgb(var(--slate-12))] [--cw-viz-heatmap-tooltip-border-color:rgb(var(--border-strong))] [--cw-viz-heatmap-tooltip-color:rgb(var(--slate-12))] [--cw-viz-heatmap-tooltip-background:rgb(var(--solid-2))] [--cw-viz-heatmap-tooltip-label-color:rgb(var(--slate-11))]"
     :class="colorSchemeClass"
