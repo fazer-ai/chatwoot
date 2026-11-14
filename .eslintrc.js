@@ -2,6 +2,20 @@
 const airbnbRestrictedSyntax = require('eslint-config-airbnb-base/rules/style')
   .rules['no-restricted-syntax'];
 
+const localizedDatesSyntax = require('./.eslintrc.localized-dates.syntax.js');
+
+const restrictedSyntax = [
+  ...airbnbRestrictedSyntax,
+  {
+    // The stores rethrow axios errors, whose answer is `response.data`; `response.message`
+    // is always undefined, so the toast silently falls back to "try again later".
+    selector:
+      "MemberExpression[property.name='message'][object.type='MemberExpression'][object.property.name='response']",
+    message:
+      'Build the toast with requestErrorMessage (dashboard/helper/requestErrorMessage); error.response.message is always undefined.',
+  },
+];
+
 module.exports = {
   extends: [
     'airbnb-base/legacy',
@@ -18,6 +32,9 @@ module.exports = {
       env: {
         'vitest-globals/env': true,
       },
+      // Specs compare against Intl directly, as they are exempt from the
+      // date imports in .eslintrc.localized-dates.js.
+      rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] },
     },
     {
       files: ['**/*.story.vue'],
@@ -237,18 +254,7 @@ module.exports = {
     'vue/singleline-html-element-content-newline': 'off',
     'import/extensions': ['off'],
     'no-console': 'error',
-    'no-restricted-syntax': [
-      ...airbnbRestrictedSyntax,
-      {
-        // The stores rethrow axios errors, whose answer is `response.data`; `response.message`
-        // is always undefined, so the toast silently falls back to "try again later".
-        selector:
-          "MemberExpression[property.name='message'][object.type='MemberExpression'][object.property.name='response']",
-        message:
-          'Build the toast with requestErrorMessage (dashboard/helper/requestErrorMessage); error.response.message is always undefined.',
-      },
-      ...require('./.eslintrc.localized-dates.syntax.js'),
-    ],
+    'no-restricted-syntax': [...restrictedSyntax, ...localizedDatesSyntax],
     '@intlify/vue-i18n/no-dynamic-keys': 'warn',
     '@intlify/vue-i18n/no-unused-keys': [
       'warn',

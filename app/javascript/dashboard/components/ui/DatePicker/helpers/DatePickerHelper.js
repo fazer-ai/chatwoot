@@ -19,6 +19,7 @@ import {
 } from 'date-fns';
 import {
   currentDateLocale,
+  dateTimeFormat,
   formatLocalized,
 } from 'shared/helpers/localizedDate';
 
@@ -95,7 +96,7 @@ export const yearName = currentDate => formatLocalized(currentDate, 'yyyy');
 const BIDI_MARKS = /[\u200e\u200f\u061c]/g;
 
 export const formatCalendarInput = (date, locale = currentDateLocale()) =>
-  new Intl.DateTimeFormat(locale, {
+  dateTimeFormat(locale, {
     calendar: 'gregory',
     numberingSystem: 'latn',
   })

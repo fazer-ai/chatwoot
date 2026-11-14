@@ -71,12 +71,24 @@ const cached = (key, build) => {
   return formatters.get(key);
 };
 
+/**
+ * `new Intl.DateTimeFormat` in the Gregorian calendar. Every date the app
+ * shows uses it: `fa` and `th` would otherwise switch to the Solar Hijri and
+ * Buddhist calendars, and a month name from one calendar next to a day number
+ * from the other names a day that does not exist.
+ * @param {string} locale
+ * @param {Intl.DateTimeFormatOptions} [options]
+ * @returns {Intl.DateTimeFormat}
+ */
+export const dateTimeFormat = (locale, options = {}) =>
+  // eslint-disable-next-line no-restricted-syntax
+  new Intl.DateTimeFormat(locale, { calendar: 'gregory', ...options });
+
 // A 24-hour locale writes midnight as 00:05, but `hour: 'numeric'` gives 0:05.
 const usesTwentyFourHours = locale =>
   cached(`h24|${locale}`, () =>
     ['h23', 'h24'].includes(
-      new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions()
-        .hourCycle
+      dateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hourCycle
     )
   );
 
@@ -86,12 +98,7 @@ const dateTimeFormatter = (locale, options) =>
       options.hour === 'numeric' && usesTwentyFourHours(locale)
         ? { hour: '2-digit' }
         : {};
-    // `fa` and `th` would otherwise use the Solar Hijri and Buddhist calendars.
-    return new Intl.DateTimeFormat(locale, {
-      calendar: 'gregory',
-      ...options,
-      ...hour,
-    });
+    return dateTimeFormat(locale, { ...options, ...hour });
   });
 
 // date-fns tokens, longest first, mapped to the Intl option they ask for. A

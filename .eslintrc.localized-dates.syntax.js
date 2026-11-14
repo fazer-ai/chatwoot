@@ -22,4 +22,9 @@ module.exports = BROWSER_LOCALE_ARGUMENT.flatMap(argument => [
     selector: `NewExpression[callee.object.name='Intl'][callee.property.name=/^(DateTimeFormat|RelativeTimeFormat)$/]${argument}`,
     message: LOCALE_MESSAGE,
   },
-]);
+]).concat({
+  selector:
+    "NewExpression[callee.object.name='Intl'][callee.property.name='DateTimeFormat']",
+  message:
+    'Use dateTimeFormat from shared/helpers/localizedDate: it keeps every date the app shows in the Gregorian calendar.',
+});

@@ -17,7 +17,7 @@ import {
   parseDateFromText,
 } from 'dashboard/helper/snoozeDateParser';
 import { UNIT_MAP } from 'dashboard/helper/snoozeDateParser/tokenMaps';
-import { formatLocalized } from 'shared/helpers/localizedDate';
+import { dateTimeFormat, formatLocalized } from 'shared/helpers/localizedDate';
 
 const SNOOZE_OPTIONS = wootConstants.SNOOZE_OPTIONS;
 
@@ -80,7 +80,7 @@ const formatSnoozeDate = (snoozeDate, currentDate, locale = 'en') => {
       minute: '2-digit',
       ...(sameYear ? {} : { year: 'numeric' }),
     };
-    return new Intl.DateTimeFormat(locale, opts).format(snoozeDate);
+    return dateTimeFormat(locale, opts).format(snoozeDate);
   } catch {
     return sameYear
       ? formatLocalized(snoozeDate, 'EEE, d MMM, h:mm a')

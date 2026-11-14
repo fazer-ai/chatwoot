@@ -18,6 +18,7 @@ import {
 
 import { parseDateFromText } from './parser';
 import { buildSuggestionCandidates, MAX_SUGGESTIONS } from './suggestions';
+import { dateTimeFormat } from 'shared/helpers/localizedDate';
 
 // ─── English Reference Data ─────────────────────────────────────────────────
 
@@ -270,8 +271,8 @@ const buildReplacementPairsUncached = (translations, locale) => {
   SINGLE_KEYS.forEach(key => addPair(t[key], EN_DEFAULTS[key]));
 
   try {
-    const longFmt = new Intl.DateTimeFormat(locale, { weekday: 'long' });
-    const shortFmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+    const longFmt = dateTimeFormat(locale, { weekday: 'long' });
+    const shortFmt = dateTimeFormat(locale, { weekday: 'short' });
     // Jan 1, 2024 is a Monday — aligns with EN_WEEKDAYS_LIST[0]='monday'
     EN_WEEKDAYS_LIST.forEach((en, i) => {
       addDateName(nameForms(longFmt, shortFmt, new Date(2024, 0, i + 1)), en);
@@ -281,8 +282,8 @@ const buildReplacementPairsUncached = (translations, locale) => {
   }
 
   try {
-    const longFmt = new Intl.DateTimeFormat(locale, { month: 'long' });
-    const shortFmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+    const longFmt = dateTimeFormat(locale, { month: 'long' });
+    const shortFmt = dateTimeFormat(locale, { month: 'short' });
     EN_MONTHS_LIST.forEach((en, i) => {
       addDateName(nameForms(longFmt, shortFmt, new Date(2024, i, 1)), en);
     });

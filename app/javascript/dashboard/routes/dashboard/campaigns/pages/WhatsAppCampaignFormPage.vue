@@ -31,7 +31,10 @@ import TemplateFields from 'dashboard/components-next/Campaigns/WhatsAppCampaign
 import AccountInformationCard from 'dashboard/components-next/Campaigns/WhatsAppCampaign/AccountInformationCard.vue';
 import MessagePreviewCard from 'dashboard/components-next/Campaigns/WhatsAppCampaign/MessagePreviewCard.vue';
 import SchedulePopover from 'dashboard/components-next/Campaigns/WhatsAppCampaign/SchedulePopover.vue';
-import { currentDateLocale } from 'shared/helpers/localizedDate';
+import {
+  currentDateLocale,
+  dateTimeFormat,
+} from 'shared/helpers/localizedDate';
 
 const SECTION_FIELDS = {
   basic: ['title', 'inboxId'],
@@ -271,7 +274,7 @@ const scheduleButtonLabel = computed(() => {
   if (!isEditMode.value || !state.scheduledAt)
     return t('CAMPAIGN.WHATSAPP.FORM.SCHEDULE');
 
-  const date = new Intl.DateTimeFormat(currentDateLocale(), {
+  const date = dateTimeFormat(currentDateLocale(), {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',

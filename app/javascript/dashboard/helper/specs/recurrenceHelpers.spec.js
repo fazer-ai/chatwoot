@@ -65,3 +65,21 @@ describe('recurrence descriptions', () => {
     expect(label).toBe('Cada año el 20 de diciembre');
   });
 });
+
+describe('recurrence names in a language with another calendar', () => {
+  it('names the Gregorian month that the day number belongs to', () => {
+    const month = formatShortcutLabel(
+      { label: 'YEARLY', labelParams: { month: 0, dayNum: 1 } },
+      (key, params) => params.month,
+      'fa'
+    );
+    // Persian's own calendar would call early January "دی" (Dey).
+    expect(month).not.toBe('دی');
+    expect(month).toBe(
+      new Intl.DateTimeFormat('fa', {
+        calendar: 'gregory',
+        month: 'long',
+      }).format(new Date(2024, 0, 1))
+    );
+  });
+});

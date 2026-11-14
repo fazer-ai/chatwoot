@@ -66,3 +66,16 @@ describe('snooze parser with the names people actually type', () => {
     });
   });
 });
+
+describe('snooze month names in a language with another calendar', () => {
+  it('reads a Gregorian month name as that month', () => {
+    const march = new Intl.DateTimeFormat('fa', {
+      calendar: 'gregory',
+      month: 'long',
+    }).format(new Date(2024, 2, 1));
+    const [match] = generateDateSuggestions(`${march} 20 9am`, now, {
+      locale: 'fa',
+    });
+    expect(match?.date.getMonth()).toBe(2);
+  });
+});

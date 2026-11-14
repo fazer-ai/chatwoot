@@ -1,10 +1,14 @@
-import { formatLocalized, normalizeLocale } from 'shared/helpers/localizedDate';
+import {
+  dateTimeFormat,
+  formatLocalized,
+  normalizeLocale,
+} from 'shared/helpers/localizedDate';
 
 // Day and month names come from Intl in the language being shown, so every
 // language gets them, not only the two that once had a table here. The
 // trailing dot of a short name ("sáb.") is dropped, as the labels always had.
 const intlNames = (locale, options, dates) => {
-  const fmt = new Intl.DateTimeFormat(normalizeLocale(locale), options);
+  const fmt = dateTimeFormat(normalizeLocale(locale), options);
   return dates.map(date => fmt.format(date).replace(/\.$/, ''));
 };
 

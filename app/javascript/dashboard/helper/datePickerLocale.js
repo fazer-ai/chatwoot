@@ -7,6 +7,7 @@ import { watch } from 'vue';
 import DatePicker from 'vue-datepicker-next';
 import {
   currentDateLocale,
+  dateTimeFormat,
   formatLocalized,
 } from 'shared/helpers/localizedDate';
 
@@ -16,7 +17,7 @@ const monthOf = month => new Date(2024, month, 1);
 const range = length => Array.from({ length }, (_, index) => index);
 
 export const datePickerLang = locale => {
-  const parts = new Intl.DateTimeFormat(locale, {
+  const parts = dateTimeFormat(locale, {
     month: 'long',
     year: 'numeric',
   })
