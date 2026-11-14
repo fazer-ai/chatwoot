@@ -306,7 +306,17 @@ const buildReplacementPairsUncached = (translations, locale) => {
   });
 
   pairs.sort((a, b) => b[0].length - a[0].length);
-  return { pairs, dateForms: [...dateForms] };
+
+  // One local word can name two things ("mar" is Tuesday and March in
+  // Spanish, "dez" is ten and December in Portuguese); the reading that parses
+  // is chosen per input, in `translations` below.
+  const meanings = new Map();
+  pairs.forEach(([local, en]) => {
+    if (!local.includes(' '))
+      meanings.set(local, [...(meanings.get(local) || []), en]);
+  });
+  const ambiguous = new Map([...meanings].filter(([, ens]) => ens.length > 1));
+  return { pairs, dateForms: [...dateForms], ambiguous };
 };
 
 /** Same as above but cached. Keeps up to 20 entries to avoid rebuilding every call. */
@@ -434,21 +444,43 @@ export const generateDateSuggestions = (
   const replacements =
     locale && locale !== 'en'
       ? buildReplacementPairs(translations, locale)
-      : { pairs: [], dateForms: [] };
-  const { pairs } = replacements;
+      : { pairs: [], dateForms: [], ambiguous: new Map() };
 
   // Try English parse first, then translated parse if we have locale pairs.
   // This avoids the problem where a single overlapping word (e.g. "in" in German)
   // would skip token translation entirely.
   const directParse = parseDateFromText(stripped, referenceDate);
 
-  const translated = pairs.length
-    ? replaceTokens(normalized, replacements)
-    : null;
-  const translatedParse =
-    translated && translated !== stripped
-      ? parseDateFromText(translated, referenceDate)
-      : null;
+  // Every reading of the ambiguous words the input holds, in the order the
+  // pairs list them (translations, then weekdays, then months); the first one
+  // that parses wins, and the first one stands in when none does.
+  const words = new Set(normalized.split(/\s+/));
+  const readings = [...replacements.ambiguous]
+    .filter(([local]) => words.has(local))
+    .reduce(
+      (options, [local, ens]) =>
+        options.flatMap(option =>
+          ens.map(en => option.filter(([l, e]) => l !== local || e === en))
+        ),
+      [replacements.pairs]
+    );
+  const attempts = replacements.pairs.length
+    ? readings.map(option => {
+        const reading = replaceTokens(normalized, {
+          ...replacements,
+          pairs: option,
+        });
+        const parsed =
+          reading && reading !== stripped
+            ? parseDateFromText(reading, referenceDate)
+            : null;
+        return { pairs: option, text: reading, parsed };
+      })
+    : [];
+  const chosen = attempts.find(attempt => attempt.parsed) || attempts[0];
+  const pairs = chosen?.pairs || [];
+  const translated = chosen?.text ?? null;
+  const translatedParse = chosen?.parsed ?? null;
 
   // Prefer direct English parse; fall back to translated parse
   const useTranslated = !directParse && !!translatedParse;

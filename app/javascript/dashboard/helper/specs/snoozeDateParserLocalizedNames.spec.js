@@ -25,6 +25,9 @@ describe('snooze parser with the names people actually type', () => {
       ['sábado 14h', 'saturday 2pm'],
       ['sabado 14h', 'saturday 2pm'],
       ['20 fev 9h', 'feb 20 9am'],
+      // "dez" is both ten and December.
+      ['20 dez 9h', 'dec 20 9am'],
+      ['em dez minutos', 'in 10 minutes'],
     ])('reads "%s" as "%s"', (local, en) => {
       expect(english(en)).toBeInstanceOf(Date);
       expect(pt(local)).toEqual(english(en));
@@ -52,6 +55,9 @@ describe('snooze parser with the names people actually type', () => {
       ['vie 9h', 'friday 9am'],
       ['sábado 14h', 'saturday 2pm'],
       ['20 dic 9h', 'dec 20 9am'],
+      // "mar" is both Tuesday and March; the one that makes a date wins.
+      ['20 mar 9h', 'mar 20 9am'],
+      ['mar 9h', 'tuesday 9am'],
     ])('reads "%s" as "%s"', (local, en) => {
       expect(spanish(local)).toEqual(english(en));
     });
