@@ -224,6 +224,20 @@ export const attributeCalendarDate = value => {
  */
 export const formatTimeOfDay = date => formatLocalized(date, 'h:mm a');
 
+/**
+ * A wall-clock time with no date (a business-hours slot), in the locale's
+ * clock. Formatted at UTC so no daylight-saving gap can shift the hour.
+ * @param {number} hours
+ * @param {number} minutes
+ * @returns {string}
+ */
+export const formatClockTime = (hours, minutes) =>
+  dateTimeFormatter(dateLocale.value, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(Date.UTC(2000, 0, 1, hours, minutes));
+
 // Relative times. date-fns words them in English only, and the short form the
 // lists show ("5m") was derived by parsing that English. Each relative string
 // produced in another language is remembered with the value and unit behind

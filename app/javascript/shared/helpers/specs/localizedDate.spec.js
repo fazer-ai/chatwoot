@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import {
   attributeCalendarDate,
   bindDateLocale,
+  formatClockTime,
   formatElapsed,
   formatLocalized,
   intlOptionsFor,
@@ -201,5 +202,15 @@ describe('elapsed durations', () => {
     expect(
       formatElapsed(start, new Date(start.getTime() + 50 * 60 * 1000))
     ).toBe('50 minutos');
+  });
+});
+
+describe('clock times', () => {
+  it('format a slot hour that a daylight-saving gap would skip locally', () => {
+    locale.value = 'pt_BR';
+    // 02:00 does not exist on 2026-03-08 in America/New_York.
+    vi.setSystemTime(new Date(Date.UTC(2026, 2, 8, 12)));
+    expect(formatClockTime(2, 0)).toBe('02:00');
+    expect(formatClockTime(14, 30)).toBe('14:30');
   });
 });

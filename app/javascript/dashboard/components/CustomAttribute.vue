@@ -69,7 +69,7 @@ export default {
     formattedValue() {
       return this.isAttributeTypeDate
         ? formatFixed(
-            this.value ? new Date(this.value) : new Date(),
+            this.value ? attributeCalendarDate(this.value) : new Date(),
             DATE_FORMAT
           )
         : this.value;

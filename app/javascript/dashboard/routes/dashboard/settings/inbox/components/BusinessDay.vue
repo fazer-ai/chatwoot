@@ -5,15 +5,19 @@ import { generateTimeSlots } from '../helpers/businessHour';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import NextSelect from 'dashboard/components-next/select/Select.vue';
 import {
-  formatTimeOfDay,
+  formatClockTime,
   isEnglishDateLocale,
 } from 'shared/helpers/localizedDate';
 
 const timeSlots = generateTimeSlots(30);
 
-// Slot values stay "09:00 AM", which is what the API stores; the labels read
-// in the app language and clock.
-const slotLabel = slot => formatTimeOfDay(parse(slot, 'hh:mm a', new Date()));
+// Slot values stay "09:00 AM", which is what the API stores, and English keeps
+// showing them as they are; other languages read them in their own clock.
+const slotLabel = slot => {
+  if (isEnglishDateLocale()) return slot;
+  const time = parse(slot, 'hh:mm a', new Date(2000, 0, 1));
+  return formatClockTime(time.getHours(), time.getMinutes());
+};
 
 const groupByPeriod = slots =>
   ['AM', 'PM']

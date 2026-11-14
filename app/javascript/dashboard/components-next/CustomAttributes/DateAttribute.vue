@@ -8,8 +8,9 @@ import { vOnClickOutside } from '@vueuse/components';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import {
-  formatLocalized,
   attributeCalendarDate,
+  formatFixed,
+  formatLocalized,
 } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
@@ -50,10 +51,13 @@ const hasError = computed(() => v$.value.$errors.length > 0);
 
 const defaultDateValue = computed({
   get() {
+    // The same calendar day the attribute is shown with.
     const existingDate = editedValue.value ?? props.attribute.value;
-    if (existingDate) return new Date(existingDate).toISOString().slice(0, 10);
+    if (existingDate) {
+      return formatFixed(attributeCalendarDate(existingDate), 'yyyy-MM-dd');
+    }
     return isEditingValue.value && !hasError.value
-      ? new Date().toISOString().slice(0, 10)
+      ? formatFixed(new Date(), 'yyyy-MM-dd')
       : '';
   },
   set(value) {
