@@ -519,6 +519,22 @@ describe('#getters', () => {
       expect(getters.getEarliestMessage(pending).id).toEqual(40);
     });
 
+    it('keeps a message being sent after stored replies when the visitor clock is behind', () => {
+      const behind = {
+        conversations: {
+          50: { id: 50, created_at: today + 600, content: 'agent reply' },
+          'c4d2-temp': {
+            id: 'c4d2-temp',
+            created_at: today,
+            content: 'just sent',
+          },
+        },
+      };
+      expect(getters.getLastMessage(behind).id).toEqual('c4d2-temp');
+      const [group] = getters.getGroupedConversation(behind);
+      expect(group.messages.map(m => m.id)).toEqual([50, 'c4d2-temp']);
+    });
+
     it('breaks a created_at tie by id', () => {
       const tied = {
         conversations: {
