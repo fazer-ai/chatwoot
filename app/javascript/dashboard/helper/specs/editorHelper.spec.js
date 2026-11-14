@@ -183,6 +183,86 @@ describe('appendSignature', () => {
     ).toBe(`${cleanedSignature}\n\n${body}`);
   });
 
+  describe('with the none separator', () => {
+    const signature = 'Acme Support';
+
+    // A lone newline is a markdown soft break, which the Email and Line
+    // renderers turn into a space, so plain lines are joined by a hard break.
+    it('puts the signature on its own line above the message', () => {
+      expect(
+        appendSignature('Hello there', signature, {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toBe('Acme Support\\\nHello there');
+    });
+
+    it('puts the signature on its own line below the message', () => {
+      expect(
+        appendSignature('Hello there', signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe('Hello there\\\nAcme Support');
+    });
+
+    // Next to a markdown block only a blank line keeps the signature out of
+    // it: a single newline continues a list, quote or table, and a hard break
+    // leaves a literal backslash or keeps a fence open.
+    it.each([
+      ['a list', '- first\n- second'],
+      ['an ordered list that cannot interrupt a paragraph', '2. second'],
+      ['a heading', '# Title\nSome text'],
+      ['a quote', '> quoted'],
+      ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
+      ['a code fence', '```\ncode\n```'],
+      ['a setext underline', '---\ntext'],
+      ['a thematic break', '***'],
+      ['an HTML block', '<div>x</div>'],
+    ])('keeps a blank line when the message starts with %s', (_, body) => {
+      expect(
+        appendSignature(body, signature, {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toBe(`Acme Support\n\n${body}`);
+    });
+
+    it.each([
+      ['a list', '- first\n- second'],
+      ['a quote', '> quoted'],
+      ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
+      ['a code fence', '```\ncode\n```'],
+      ['an indented code block', 'Text\n\n    code'],
+    ])('keeps a blank line when the message ends with %s', (_, body) => {
+      expect(
+        appendSignature(body, signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe(`${body}\n\nAcme Support`);
+    });
+
+    it('keeps the hard break when only the far end of the message is a block', () => {
+      const body = '- first\n\nThanks';
+      expect(
+        appendSignature(body, signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe(`${body}\\\nAcme Support`);
+    });
+  });
+
+  it('falls back to the blank separator for an unknown value', () => {
+    expect(
+      appendSignature('Hello there', 'Acme Support', {
+        position: 'bottom',
+        separator: 'custom',
+      })
+    ).toBe('Hello there\n\nAcme Support');
+  });
+
   it.skip('does not append signature if already present - SKIP(#78): Due to changes on append signature logic', () => {
     Object.keys(HAS_SIGNATURE).forEach(key => {
       const { body, signature } = HAS_SIGNATURE[key];
