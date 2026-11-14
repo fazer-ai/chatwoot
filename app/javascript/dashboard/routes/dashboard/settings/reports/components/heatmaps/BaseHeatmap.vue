@@ -41,7 +41,9 @@ function formatDate(dateString) {
   return formatLocalized(new Date(dateString), 'MMM d, yyyy');
 }
 
-const DAYS_OF_WEEK = [
+// Translated inside the computed below, not once at setup: the page can mount
+// before the user's language is applied, and a setup-time label stays English.
+const dayNames = () => [
   t('DAYS_OF_WEEK.SUNDAY'),
   t('DAYS_OF_WEEK.MONDAY'),
   t('DAYS_OF_WEEK.TUESDAY'),
@@ -81,13 +83,14 @@ const COLOR_SCHEMES = {
 
 const chartData = computed(() => {
   const groupedData = groupHeatmapByDay(props.heatmapData);
+  const daysOfWeek = dayNames();
   const rows = Array.from(groupedData.entries()).map(([dateKey, rowData]) => {
     const valuesByHour = new Map(rowData.map(item => [item.hour, item]));
     const date = new Date(dateKey);
 
     return {
       id: dateKey,
-      label: DAYS_OF_WEEK[getDay(date)],
+      label: daysOfWeek[getDay(date)],
       description: formatDate(dateKey),
       data: columns.map(({ id }) => valuesByHour.get(id) ?? null),
     };
