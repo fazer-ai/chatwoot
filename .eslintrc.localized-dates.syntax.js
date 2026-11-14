@@ -6,6 +6,11 @@
 const LOCALE_MESSAGE =
   "Pass the app locale (currentDateLocale() from shared/helpers/localizedDate), not the browser's.";
 
+// Every date shown goes through dateTimeFormat, which keeps it in the
+// Gregorian calendar the rest of the app uses.
+const CALENDAR_MESSAGE =
+  'Use dateTimeFormat from shared/helpers/localizedDate: it keeps every date the app shows in the Gregorian calendar.';
+
 const BROWSER_LOCALE_ARGUMENT = [
   '[arguments.length=0]',
   "[arguments.0.type='Identifier'][arguments.0.name='undefined']",
@@ -22,9 +27,21 @@ module.exports = BROWSER_LOCALE_ARGUMENT.flatMap(argument => [
     selector: `NewExpression[callee.object.name='Intl'][callee.property.name=/^(DateTimeFormat|RelativeTimeFormat)$/]${argument}`,
     message: LOCALE_MESSAGE,
   },
-]).concat({
-  selector:
-    "NewExpression[callee.object.name='Intl'][callee.property.name='DateTimeFormat']",
-  message:
-    'Use dateTimeFormat from shared/helpers/localizedDate: it keeps every date the app shows in the Gregorian calendar.',
-});
+]).concat(
+  {
+    selector:
+      "NewExpression[callee.object.name='Intl'][callee.property.name='DateTimeFormat']",
+    message: CALENDAR_MESSAGE,
+  },
+  {
+    selector:
+      'CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]',
+    message: CALENDAR_MESSAGE,
+  },
+  {
+    // A date with options; a number takes Intl.NumberFormat instead.
+    selector:
+      "CallExpression[callee.property.name='toLocaleString'][arguments.length>1]",
+    message: CALENDAR_MESSAGE,
+  }
+);

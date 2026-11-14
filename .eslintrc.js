@@ -32,8 +32,8 @@ module.exports = {
       env: {
         'vitest-globals/env': true,
       },
-      // Specs compare against Intl directly, as they are exempt from the
-      // date imports in .eslintrc.localized-dates.js.
+      // Specs compare against Intl directly; exempt from the date syntax
+      // rules, as from the date imports in .eslintrc.localized-dates.js.
       rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax] },
     },
     {
@@ -47,6 +47,8 @@ module.exports = {
         ],
         // Story files can have static strings, it doesn't need to handle i18n always.
         'vue/no-bare-strings-in-template': 'off',
+        // Exempt from the date syntax rules, as from the date imports.
+        'no-restricted-syntax': ['error', ...restrictedSyntax],
         'no-console': 'off',
       },
     },

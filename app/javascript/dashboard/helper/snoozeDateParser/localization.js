@@ -364,6 +364,10 @@ const filterToEnglishVocab = text =>
  * is a date the user wrote and we could not read. Dropping it would quietly
  * turn "sextaa 9h" into tomorrow at 9.
  */
+// A three-letter short form is the start of ordinary words too ("marcar" starts
+// like "mar", March in Spanish), so only a longer name counts as the stem of a
+// misspelled one.
+const MIN_TYPO_STEM = 4;
 const dropsDateWord = (text, dateForms) =>
   text
     .split(/\s+/)
@@ -372,7 +376,7 @@ const dropsDateWord = (text, dateForms) =>
     .some(w =>
       dateForms.some(
         form =>
-          (form.length >= MIN_NAME_FORM && w.startsWith(form)) ||
+          (form.length >= MIN_TYPO_STEM && w.startsWith(form)) ||
           (w.length >= MIN_NAME_FORM && form.startsWith(w))
       )
     );

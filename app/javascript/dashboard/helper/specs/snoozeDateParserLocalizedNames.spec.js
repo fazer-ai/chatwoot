@@ -27,6 +27,8 @@ describe('snooze parser with the names people actually type', () => {
       ['20 fev 9h', 'feb 20 9am'],
       // "dez" is both ten and December.
       ['20 dez 9h', 'dec 20 9am'],
+      // A word that only starts like a short name is not a misspelled date.
+      ['marcar amanhã 9h', 'tomorrow 9am'],
       ['em dez minutos', 'in 10 minutes'],
     ])('reads "%s" as "%s"', (local, en) => {
       expect(english(en)).toBeInstanceOf(Date);
@@ -44,6 +46,7 @@ describe('snooze parser with the names people actually type', () => {
     it('does not turn a day it cannot read into another date', () => {
       expect(pt('sextaa 9h')).toBeUndefined();
       expect(pt('dezembroo 20 9h')).toBeUndefined();
+      expect(pt('sext 9h')).toBeUndefined();
     });
   });
 
@@ -58,6 +61,7 @@ describe('snooze parser with the names people actually type', () => {
       // "mar" is both Tuesday and March; the one that makes a date wins.
       ['20 mar 9h', 'mar 20 9am'],
       ['mar 9h', 'tuesday 9am'],
+      ['marcar mañana 9h', 'tomorrow 9am'],
     ])('reads "%s" as "%s"', (local, en) => {
       expect(spanish(local)).toEqual(english(en));
     });
