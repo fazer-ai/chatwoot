@@ -3,11 +3,13 @@ import {
   attributeCalendarDate,
   bindDateLocale,
   formatClockTime,
+  formatDuration,
   formatElapsed,
   formatLocalized,
   intlOptionsFor,
   normalizeLocale,
   relativeParts,
+  weekdayName,
 } from 'shared/helpers/localizedDate';
 import {
   dateFormat,
@@ -212,5 +214,50 @@ describe('clock times', () => {
     vi.setSystemTime(new Date(Date.UTC(2026, 2, 8, 12)));
     expect(formatClockTime(2, 0)).toBe('02:00');
     expect(formatClockTime(14, 30)).toBe('14:30');
+  });
+});
+
+describe('weekday names', () => {
+  it('names the days of the week in the app language, as labels', () => {
+    expect([0, 3, 6].map(weekdayName)).toEqual([
+      'Sunday',
+      'Wednesday',
+      'Saturday',
+    ]);
+
+    locale.value = 'pt_BR';
+    expect([0, 3, 6].map(weekdayName)).toEqual([
+      'Domingo',
+      'Quarta-feira',
+      'Sábado',
+    ]);
+
+    locale.value = 'es';
+    expect(weekdayName(5)).toBe('Viernes');
+  });
+});
+
+describe('report durations', () => {
+  const samples = [45, 28 * 60 + 40, 3 * 3600 + 5 * 60, 2 * 86400 + 4 * 3600];
+
+  it('keeps the English report units', () => {
+    expect(samples.map(formatDuration)).toEqual([
+      '45 Sec',
+      '28 Min 40 Sec',
+      '3 Hr 5 Min',
+      '2 Day 4 Hr',
+    ]);
+  });
+
+  it('writes the units of the app language', () => {
+    locale.value = 'pt_BR';
+    const pt = samples.map(formatDuration);
+    locale.value = 'es';
+    const es = samples.map(formatDuration);
+    [...pt, ...es].forEach(text => {
+      expect(text).not.toMatch(/Sec|Min|Hr|Day/);
+    });
+    expect(pt[1]).toMatch(/^28 min 40 s$/);
+    expect(es[3]).toMatch(/^2 d(ías?)? 4 h$/);
   });
 });

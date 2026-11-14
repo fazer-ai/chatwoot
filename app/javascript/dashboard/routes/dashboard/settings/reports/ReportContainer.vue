@@ -3,13 +3,12 @@ import { mapGetters } from 'vuex';
 import { useReportMetrics } from 'dashboard/composables/useReportMetrics';
 import { GROUP_BY_FILTER } from './constants';
 import fromUnixTime from 'date-fns/fromUnixTime';
-import { formatTime } from '@chatwoot/utils';
 import { useAlert } from 'dashboard/composables';
 import ChartStats from './components/ChartElements/ChartStats.vue';
 import BarChart from 'shared/components/charts/BarChart.vue';
 import ReportDrilldownDrawer from './components/ReportDrilldownDrawer.vue';
 import { metricHintKey } from './helpers/conversationMetrics';
-import { formatLocalized } from 'shared/helpers/localizedDate';
+import { formatDuration, formatLocalized } from 'shared/helpers/localizedDate';
 
 const METRIC_HINTS = {
   CONVERSATIONS: 'conversations',
@@ -190,7 +189,7 @@ export default {
       return (value, dataPoint) => {
         if (!dataPoint && value === 0) return '0';
 
-        return formatTime(value || 0);
+        return formatDuration(value || 0);
       };
     },
     getPointDescription(metric) {

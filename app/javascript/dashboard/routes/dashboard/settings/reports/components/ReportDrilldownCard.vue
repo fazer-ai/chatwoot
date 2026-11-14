@@ -2,14 +2,13 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
-import { formatTime } from '@chatwoot/utils';
 import fromUnixTime from 'date-fns/fromUnixTime';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
 import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
 import { dynamicTime, shortTimestamp } from 'shared/helpers/timeHelper';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
-import { formatLocalized } from 'shared/helpers/localizedDate';
+import { formatDuration, formatLocalized } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
   record: {
@@ -48,7 +47,7 @@ const metricValue = computed(() => {
   const value = props.record.metric_value;
   if (value === null || value === undefined) return '';
 
-  return formatTime(value) || `${value}`;
+  return formatDuration(value) || `${value}`;
 });
 
 const previewText = computed(() => {

@@ -15,6 +15,7 @@ import {
   formatDistanceToNow,
   isSameYear,
 } from 'date-fns';
+import { formatTime } from '@chatwoot/utils';
 
 const ENGLISH = 'en';
 
@@ -165,6 +166,18 @@ export const formatLocalized = (date, pattern) => {
   const options = isEnglish(locale) ? null : intlOptionsFor(pattern);
   if (!options) return format(date, pattern);
   return dateTimeFormatter(locale, options).format(date);
+};
+
+/**
+ * The full name of a weekday in the app language, written as a label: Intl
+ * gives "domingo" in Portuguese, and a label starts with a capital.
+ * @param {number} day - 0 for Sunday through 6 for Saturday, as Date#getDay.
+ * @returns {string}
+ */
+export const weekdayName = day => {
+  // Jan 7, 2024 is a Sunday, so the day number lines up with Date#getDay.
+  const name = formatLocalized(new Date(2024, 0, 7 + day), 'EEEE');
+  return name.charAt(0).toLocaleUpperCase(dateLocale.value) + name.slice(1);
 };
 
 /**
@@ -356,4 +369,64 @@ export const formatElapsed = (start, end) => {
         unitDisplay: 'long',
       })
   ).format(Math.abs(value));
+};
+
+// The two largest units of a duration, cut where @chatwoot/utils' formatTime
+// cuts them, so a translated report says what the English one says.
+const durationParts = seconds => {
+  if (seconds >= DAY) {
+    const days = Math.floor(seconds / DAY);
+    const hours =
+      seconds % DAY < HOUR || days >= 364
+        ? 0
+        : Math.floor((seconds % DAY) / HOUR);
+    return [
+      [days, 'day'],
+      [hours, 'hour'],
+    ];
+  }
+  if (seconds >= HOUR) {
+    const hours = Math.floor(seconds / HOUR);
+    const minutes =
+      seconds % HOUR < MINUTE || hours === 24
+        ? 0
+        : Math.floor((seconds % HOUR) / MINUTE);
+    return [
+      [hours, 'hour'],
+      [minutes, 'minute'],
+    ];
+  }
+  if (seconds >= MINUTE) {
+    const minutes = Math.floor(seconds / MINUTE);
+    return [
+      [minutes, 'minute'],
+      [minutes === 60 ? 0 : Math.floor(seconds % MINUTE), 'second'],
+    ];
+  }
+  return [[Math.floor(seconds), 'second']];
+};
+
+/**
+ * A duration in seconds for a report ("28 Min 40 Sec" / "28 min 40 s").
+ * English keeps @chatwoot/utils' formatTime output as it was.
+ * @param {number} seconds
+ * @returns {string}
+ */
+export const formatDuration = seconds => {
+  const locale = dateLocale.value;
+  if (isEnglish(locale)) return formatTime(seconds);
+  return durationParts(seconds)
+    .filter(([value], index) => index === 0 || value > 0)
+    .map(([value, unit]) =>
+      cached(
+        `nfs|${locale}|${unit}`,
+        () =>
+          new Intl.NumberFormat(locale, {
+            style: 'unit',
+            unit,
+            unitDisplay: 'short',
+          })
+      ).format(value)
+    )
+    .join(' ');
 };

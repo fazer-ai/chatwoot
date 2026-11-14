@@ -34,6 +34,11 @@ module.exports = {
             message: IMPORT_MESSAGE,
           },
           { name: 'date-fns/locale', message: IMPORT_MESSAGE },
+          {
+            name: '@chatwoot/utils',
+            importNames: ['formatTime'],
+            message: `Durations shown to people go through formatDuration from ${HELPER}; formatTime writes English units.`,
+          },
           ...DATE_FNS_FORMATTERS.map(name => ({
             name: `date-fns/${name}`,
             message: IMPORT_MESSAGE,
