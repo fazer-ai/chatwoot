@@ -29,4 +29,6 @@ jobs:
       - name: Open, update or close the tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
+          # gh would otherwise resolve this fork to its parent, chatwoot/chatwoot.
+          GH_REPO: ${{ github.repository }}
         run: bundle exec ruby scripts/security/bundler_audit.rb report
