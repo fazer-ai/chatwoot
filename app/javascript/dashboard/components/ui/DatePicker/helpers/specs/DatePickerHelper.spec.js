@@ -39,9 +39,8 @@ describe('Date formatting functions', () => {
   });
 
   it('returns the correct date format for the current locale en-IN', () => {
-    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-IN');
     const expected = 'dd/MM/yyyy';
-    expect(getIntlDateFormatForLocale()).toBe(expected);
+    expect(getIntlDateFormatForLocale('en-IN')).toBe(expected);
   });
 });
 

@@ -1,5 +1,6 @@
 import { TemplateTypeDetector } from 'dashboard/services/TemplateTypeDetector';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
+import { currentDateLocale } from 'shared/helpers/localizedDate';
 import {
   PLATFORMS,
   TEMPLATE_TYPES,
@@ -111,7 +112,7 @@ export const formatTemplateLanguage = language => {
 export const formatTemplateDate = value => {
   if (!value) return '—';
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(currentDateLocale(), {
     dateStyle: 'medium',
   }).format(new Date(value));
 };

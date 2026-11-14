@@ -11,6 +11,7 @@ import CreateCategoryModal from './CreateCategoryModal.vue';
 import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
 import Draggable from 'vuedraggable';
 import { emitter } from 'shared/helpers/mitt';
+import { currentDateLocale } from 'shared/helpers/localizedDate';
 import ProFeatureNudge from './ProFeatureNudge.vue';
 import {
   useBreakpoints,
@@ -251,12 +252,12 @@ function formatMessageTime(createdAt) {
       : new Date(createdAt);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString(undefined, {
+    return date.toLocaleTimeString(currentDateLocale(), {
       hour: '2-digit',
       minute: '2-digit',
     });
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(currentDateLocale(), {
     month: 'short',
     day: 'numeric',
   });

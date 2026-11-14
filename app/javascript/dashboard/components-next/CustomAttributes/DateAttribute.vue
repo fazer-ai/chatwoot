@@ -7,6 +7,7 @@ import { required } from '@vuelidate/validators';
 import { vOnClickOutside } from '@vueuse/components';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import { formatLocalized, utcCalendarDate } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
   attribute: {
@@ -38,7 +39,7 @@ const v$ = useVuelidate(rules, { editedValue });
 
 const formattedDate = computed(() => {
   return props.attribute.value
-    ? new Date(props.attribute.value).toLocaleDateString()
+    ? formatLocalized(utcCalendarDate(props.attribute.value), 'M/d/yyyy')
     : t('CONTACTS_LAYOUT.SIDEBAR.ATTRIBUTES.TRIGGER.INPUT');
 });
 

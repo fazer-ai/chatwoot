@@ -13,7 +13,6 @@ export default {
     return {
       snoozeTime: null,
       lang: {
-        days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         yearFormat: 'YYYY',
         monthFormat: 'MMMM',
       },

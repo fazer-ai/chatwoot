@@ -1,0 +1,161 @@
+import { ref } from 'vue';
+import {
+  bindDateLocale,
+  formatLocalized,
+  intlOptionsFor,
+  normalizeLocale,
+  relativeParts,
+} from 'shared/helpers/localizedDate';
+import {
+  dateFormat,
+  dynamicTime,
+  messageStamp,
+  messageTimestamp,
+  relativeDayTimestamp,
+  shortTimestamp,
+} from 'shared/helpers/timeHelper';
+import { formatDate } from 'shared/helpers/DateHelper';
+
+const locale = ref('en');
+bindDateLocale({ global: { locale } });
+
+// 2026-04-21 21:48 UTC and 2025-08-03 00:05 UTC.
+const APRIL_EVENING = Date.UTC(2026, 3, 21, 21, 48) / 1000;
+const LAST_YEAR_MIDNIGHT = Date.UTC(2025, 7, 3, 0, 5) / 1000;
+
+beforeEach(() => {
+  process.env.TZ = 'UTC';
+  vi.useFakeTimers('modern');
+  vi.setSystemTime(new Date(Date.UTC(2026, 4, 5, 12)));
+  locale.value = 'en';
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('message times in the conversation', () => {
+  it('follow pt_BR with a 24-hour clock', () => {
+    locale.value = 'pt_BR';
+    const text = messageTimestamp(APRIL_EVENING, 'LLL d, h:mm a');
+    expect(text).toContain('abr');
+    expect(text).toContain('21:48');
+    expect(text).not.toMatch(/Apr|AM|PM/);
+  });
+
+  it('carry the year and a 24-hour midnight for another year', () => {
+    locale.value = 'pt_BR';
+    const text = messageTimestamp(LAST_YEAR_MIDNIGHT, 'LLL d, h:mm a');
+    expect(text).toContain('2025');
+    expect(text).toContain('ago');
+    expect(text).toContain('00:05');
+  });
+
+  it('follow Spanish', () => {
+    locale.value = 'es';
+    expect(messageTimestamp(APRIL_EVENING, 'LLL d, h:mm a')).toContain('21:48');
+  });
+
+  it('stay byte-identical in English', () => {
+    expect(messageTimestamp(APRIL_EVENING, 'LLL d, h:mm a')).toBe(
+      'Apr 21, 9:48 PM'
+    );
+    expect(messageTimestamp(LAST_YEAR_MIDNIGHT, 'LLL d, h:mm a')).toBe(
+      'Aug 3 2025, 12:05 AM'
+    );
+    expect(messageStamp(APRIL_EVENING)).toBe('9:48 PM');
+  });
+
+  it('switch language without a reload', () => {
+    locale.value = 'pt_BR';
+    expect(messageStamp(APRIL_EVENING)).toBe('21:48');
+    locale.value = 'en';
+    expect(messageStamp(APRIL_EVENING)).toBe('9:48 PM');
+  });
+
+  it('fall back to English for a locale Intl does not know', () => {
+    locale.value = 'xx_YY';
+    expect(messageStamp(APRIL_EVENING)).toBe('9:48 PM');
+  });
+});
+
+describe('list timestamps', () => {
+  it('show today as a 24-hour time and older dates by name in pt_BR', () => {
+    locale.value = 'pt_BR';
+    vi.setSystemTime(new Date(Date.UTC(2026, 3, 21, 23)));
+    expect(relativeDayTimestamp(APRIL_EVENING, 'ontem')).toBe('21:48');
+    expect(dateFormat(LAST_YEAR_MIDNIGHT)).toContain('2025');
+    expect(dateFormat(LAST_YEAR_MIDNIGHT)).not.toContain('Aug');
+  });
+
+  it('word relative times in pt_BR and shorten them from numbers', () => {
+    locale.value = 'pt_BR';
+    const fiveMinutesAgo = Date.now() / 1000 - 5 * 60;
+    const long = dynamicTime(fiveMinutesAgo);
+    expect(long).toBe('há 5 minutos');
+    expect(shortTimestamp(long)).toMatch(/^5\s?min/);
+    expect(shortTimestamp(long, true)).toContain('5');
+    expect(shortTimestamp(long, true)).not.toContain('ago');
+  });
+
+  it('keep the English short form', () => {
+    const fiveMinutesAgo = Date.now() / 1000 - 5 * 60;
+    expect(shortTimestamp(dynamicTime(fiveMinutesAgo))).toBe('5m');
+  });
+});
+
+describe('date separators', () => {
+  it('name the month in the app language, keeping Today and Yesterday', () => {
+    locale.value = 'pt_BR';
+    expect(
+      formatDate({
+        date: 'Apr 21, 2026',
+        todayText: 'Hoje',
+        yesterdayText: 'Ontem',
+      })
+    ).toBe('21 de abr. de 2026');
+    expect(
+      formatDate({
+        date: 'May 05, 2026',
+        todayText: 'Hoje',
+        yesterdayText: 'Ontem',
+      })
+    ).toBe('Hoje');
+  });
+});
+
+describe('pattern reading', () => {
+  it('drops literals and day periods and keeps the fields', () => {
+    expect(intlOptionsFor("EEE, MMM d, yyyy 'at' p")).toEqual({
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  });
+
+  it('refuses machine patterns so they stay date-fns', () => {
+    expect(intlOptionsFor("yyyy-MM-dd'T'HH:mm:ssXXX")).toBeNull();
+    locale.value = 'pt_BR';
+    expect(formatLocalized(new Date(APRIL_EVENING * 1000), 'T')).toBe(
+      String(APRIL_EVENING * 1000)
+    );
+  });
+
+  it('normalizes vue-i18n locales into Intl tags', () => {
+    expect(normalizeLocale('pt_BR')).toBe('pt-BR');
+    expect(normalizeLocale('zz')).toBe('en');
+    expect(normalizeLocale(undefined)).toBe('en');
+  });
+});
+
+describe('relative units', () => {
+  it('round like date-fns at the unit edges', () => {
+    expect(relativeParts(-30)).toEqual({ value: 0, unit: 'second' });
+    expect(relativeParts(-44 * 60)).toEqual({ value: -44, unit: 'minute' });
+    expect(relativeParts(-46 * 60)).toEqual({ value: -1, unit: 'hour' });
+    expect(relativeParts(3 * 86400)).toEqual({ value: 3, unit: 'day' });
+  });
+});

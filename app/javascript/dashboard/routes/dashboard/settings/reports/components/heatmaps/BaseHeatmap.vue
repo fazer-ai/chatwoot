@@ -2,11 +2,11 @@
 import { computed } from 'vue';
 import { HeatmapChart } from '@chatwoot/viz';
 
-import format from 'date-fns/format';
 import getDay from 'date-fns/getDay';
 
 import { groupHeatmapByDay } from 'helpers/ReportsDataHelper';
 import { useI18n } from 'vue-i18n';
+import { formatLocalized } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
   heatmapData: {
@@ -38,7 +38,7 @@ const props = defineProps({
 const { t } = useI18n();
 
 function formatDate(dateString) {
-  return format(new Date(dateString), 'MMM d, yyyy');
+  return formatLocalized(new Date(dateString), 'MMM d, yyyy');
 }
 
 const DAYS_OF_WEEK = [

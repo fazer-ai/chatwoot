@@ -10,6 +10,7 @@ module.exports = {
     'plugin:vitest-globals/recommended',
     // use recommended-legacy when upgrading the plugin to v4
     'plugin:@intlify/vue-i18n/recommended',
+    './.eslintrc.localized-dates.js',
   ],
   overrides: [
     {

@@ -1,0 +1,319 @@
+// Every date and time shown to a person goes through this module, so it reads in
+// the app language (the dashboard UI language, the widget locale) instead of in
+// English or in the browser language. The bundles bind their vue-i18n instance
+// with `bindDateLocale`; reading the bound locale inside these functions makes
+// any `computed` that calls them recompute when the user switches languages.
+//
+// English keeps the exact date-fns output it always had. Other languages go
+// through Intl, which picks the field order, the separators and the 12/24-hour
+// clock from the locale: a date-fns pattern is read as the list of fields to
+// show, not as a layout.
+import { computed, shallowRef } from 'vue';
+import {
+  format,
+  formatDistanceStrict,
+  formatDistanceToNow,
+  isSameYear,
+} from 'date-fns';
+
+const ENGLISH = 'en';
+
+const boundLocale = shallowRef(null);
+
+const isSupported = tag => {
+  try {
+    return Intl.DateTimeFormat.supportedLocalesOf([tag]).length > 0;
+  } catch (error) {
+    // A malformed tag ("xx_YY!") throws RangeError instead of returning [].
+    return false;
+  }
+};
+
+/**
+ * Turns a vue-i18n locale (`pt_BR`) into a tag Intl accepts (`pt-BR`), falling
+ * back to the base language and then to English when Intl does not know it.
+ * @param {string} locale
+ * @returns {string}
+ */
+export const normalizeLocale = locale => {
+  if (!locale) return ENGLISH;
+  const tag = String(locale).replace(/_/g, '-');
+  if (isSupported(tag)) return tag;
+  const base = tag.split('-')[0];
+  return isSupported(base) ? base : ENGLISH;
+};
+
+const dateLocale = computed(() => normalizeLocale(boundLocale.value?.value));
+
+/**
+ * Makes this module follow the locale of a vue-i18n instance created with
+ * `legacy: false`.
+ * @param {import('vue-i18n').I18n} i18n
+ */
+export const bindDateLocale = i18n => {
+  boundLocale.value = i18n.global.locale;
+};
+
+/** @returns {string} The Intl tag the formatters use right now. */
+export const currentDateLocale = () => dateLocale.value;
+
+// American English is the only locale whose output must stay byte-identical to
+// the date-fns patterns. `en-GB` and friends follow their own conventions.
+const isEnglish = locale => locale === ENGLISH || locale === 'en-US';
+
+/** @returns {boolean} Whether formatting follows the English date-fns patterns. */
+export const isEnglishDateLocale = () => isEnglish(dateLocale.value);
+
+const formatters = new Map();
+const cached = (key, build) => {
+  if (!formatters.has(key)) formatters.set(key, build());
+  return formatters.get(key);
+};
+
+// A 24-hour locale writes midnight as 00:05, but `hour: 'numeric'` gives 0:05.
+const usesTwentyFourHours = locale =>
+  cached(`h24|${locale}`, () =>
+    ['h23', 'h24'].includes(
+      new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions()
+        .hourCycle
+    )
+  );
+
+const dateTimeFormatter = (locale, options) =>
+  cached(`dt|${locale}|${JSON.stringify(options)}`, () => {
+    const hour =
+      options.hour === 'numeric' && usesTwentyFourHours(locale)
+        ? { hour: '2-digit' }
+        : {};
+    // `fa` and `th` would otherwise use the Solar Hijri and Buddhist calendars.
+    return new Intl.DateTimeFormat(locale, {
+      calendar: 'gregory',
+      ...options,
+      ...hour,
+    });
+  });
+
+// date-fns tokens, longest first, mapped to the Intl option they ask for. A
+// pattern made of anything else (week numbers, quarters, timestamps, ISO
+// offsets) is a machine format and falls back to date-fns untouched.
+const TOKEN_OPTIONS = [
+  [/^(yyyy|yyy|y|YYYY|Y)$/, { year: 'numeric' }],
+  [/^(yy|YY)$/, { year: '2-digit' }],
+  [/^(MMMMM|LLLLL)$/, { month: 'narrow' }],
+  [/^(MMMM|LLLL)$/, { month: 'long' }],
+  [/^(MMM|LLL)$/, { month: 'short' }],
+  [/^(MM|LL)$/, { month: '2-digit' }],
+  [/^(M|L)$/, { month: 'numeric' }],
+  [/^dd$/, { day: '2-digit' }],
+  [/^d$/, { day: 'numeric' }],
+  [/^(EEEE|eeee|cccc)$/, { weekday: 'long' }],
+  [/^(EEEEE|eeeee|ccccc)$/, { weekday: 'narrow' }],
+  // Intl has no two-letter weekday; the short one is the closest.
+  [/^(EEEEEE|eeeeee|cccccc)$/, { weekday: 'short' }],
+  [/^(E|EE|EEE|eee|ccc)$/, { weekday: 'short' }],
+  [/^(h|hh|H|HH|k|kk|K|KK)$/, { hour: 'numeric' }],
+  [/^(m|mm)$/, { minute: '2-digit' }],
+  [/^(s|ss)$/, { second: '2-digit' }],
+  [/^p$/, { hour: 'numeric', minute: '2-digit' }],
+  [/^P$/, { year: 'numeric', month: '2-digit', day: '2-digit' }],
+  [/^PP$/, { year: 'numeric', month: 'short', day: 'numeric' }],
+  [/^PPP$/, { year: 'numeric', month: 'long', day: 'numeric' }],
+  [
+    /^PPPP$/,
+    { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' },
+  ],
+];
+// Day period markers: the locale decides whether there is one.
+const IGNORED_TOKEN = /^(a+|b+|B+)$/;
+
+const patternOptions = new Map();
+
+/**
+ * Reads a date-fns pattern as a set of Intl options, or `null` when the
+ * pattern holds a token Intl cannot express.
+ * @param {string} pattern
+ * @returns {Intl.DateTimeFormatOptions|null}
+ */
+export const intlOptionsFor = pattern => {
+  if (patternOptions.has(pattern)) return patternOptions.get(pattern);
+  // Quoted literals ('at') and punctuation carry no field.
+  const tokens = pattern.replace(/'[^']*'/g, ' ').match(/([A-Za-z])\1*/g);
+  let options = null;
+  if (tokens) {
+    options = {};
+    const known = tokens.every(token => {
+      if (IGNORED_TOKEN.test(token)) return true;
+      const match = TOKEN_OPTIONS.find(([regex]) => regex.test(token));
+      if (!match) return false;
+      Object.assign(options, match[1]);
+      return true;
+    });
+    if (!known || !Object.keys(options).length) options = null;
+  }
+  patternOptions.set(pattern, options);
+  return options;
+};
+
+/**
+ * Formats a date for display in the app language.
+ * @param {Date|number} date - A Date or epoch milliseconds.
+ * @param {string} pattern - The date-fns pattern English has always used.
+ * @returns {string}
+ */
+export const formatLocalized = (date, pattern) => {
+  const locale = dateLocale.value;
+  const options = isEnglish(locale) ? null : intlOptionsFor(pattern);
+  if (!options) return format(date, pattern);
+  return dateTimeFormatter(locale, options).format(date);
+};
+
+/**
+ * Formats a date with a fixed, language-independent pattern: API parameters,
+ * file names, protocol text. Saying so here keeps machine formats apart from
+ * the display ones, which the lint rule sends through `formatLocalized`.
+ * @param {Date|number} date
+ * @param {string} pattern
+ * @returns {string}
+ */
+export const formatFixed = (date, pattern) => format(date, pattern);
+
+/**
+ * `formatLocalized` with the year added when the date is not in the current
+ * year, so an old message still says which year it is from.
+ * @param {Date} date
+ * @param {string} pattern - Pattern for a date in the current year.
+ * @param {string} otherYearPattern - English pattern for another year.
+ * @returns {string}
+ */
+export const formatWithYear = (date, pattern, otherYearPattern) => {
+  if (isSameYear(date, new Date())) return formatLocalized(date, pattern);
+  const locale = dateLocale.value;
+  if (isEnglish(locale)) return format(date, otherYearPattern);
+  const options = intlOptionsFor(pattern);
+  if (!options) return format(date, otherYearPattern);
+  return dateTimeFormatter(locale, { ...options, year: 'numeric' }).format(
+    date
+  );
+};
+
+/**
+ * A date attribute is saved as UTC midnight of the chosen day. Read back with
+ * the browser's offset it would land on the day before west of Greenwich, so
+ * it is rebuilt as local midnight of the same calendar day.
+ * @param {string|Date} value
+ * @returns {Date}
+ */
+export const utcCalendarDate = value => {
+  const date = new Date(value);
+  return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
+
+/**
+ * Formats the time of day on its own, with the locale's clock.
+ * @param {Date|number} date
+ * @returns {string}
+ */
+export const formatTimeOfDay = date => formatLocalized(date, 'h:mm a');
+
+// Relative times. date-fns words them in English only, and the short form the
+// lists show ("5m") was derived by parsing that English. Each relative string
+// produced in another language is remembered with the value and unit behind
+// it, so the short form can be built from numbers instead of from words.
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const MONTH = 30 * DAY;
+const YEAR = 365 * DAY;
+
+/**
+ * Picks the unit date-fns would use for a distance, rounding the same way.
+ * @param {number} seconds - Signed distance from now, negative in the past.
+ * @returns {{value: number, unit: Intl.RelativeTimeFormatUnit}}
+ */
+export const relativeParts = seconds => {
+  const distance = Math.abs(seconds);
+  const sign = seconds < 0 ? -1 : 1;
+  const pick = (size, unit) => ({
+    value: sign * Math.max(1, Math.round(distance / size)),
+    unit,
+  });
+  if (distance < 45) return { value: 0, unit: 'second' };
+  if (distance < 45 * MINUTE) return pick(MINUTE, 'minute');
+  if (distance < DAY) return pick(HOUR, 'hour');
+  if (distance < MONTH) return pick(DAY, 'day');
+  if (distance < YEAR) return pick(MONTH, 'month');
+  return pick(YEAR, 'year');
+};
+
+const relativeByText = new Map();
+const MAX_REMEMBERED = 500;
+
+const relativeFormatter = (locale, style) =>
+  cached(
+    `rt|${locale}|${style}`,
+    () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style })
+  );
+
+/**
+ * "5 minutes ago" / "há 5 minutos", relative to now.
+ * @param {Date} date
+ * @returns {string}
+ */
+export const formatRelative = date => {
+  const locale = dateLocale.value;
+  if (isEnglish(locale)) return formatDistanceToNow(date, { addSuffix: true });
+  const parts = relativeParts((date.getTime() - Date.now()) / 1000);
+  const text = relativeFormatter(locale, 'long').format(
+    parts.value,
+    parts.unit
+  );
+  if (relativeByText.size >= MAX_REMEMBERED) relativeByText.clear();
+  relativeByText.set(text, parts);
+  return text;
+};
+
+/**
+ * The short form of a relative time produced by `formatRelative` in a
+ * language other than English: "5 min", or "há 5 min." with `withAgo`.
+ * @param {string} text - What `formatRelative` returned.
+ * @param {boolean} withAgo
+ * @returns {string|null} `null` when the text did not come from there.
+ */
+export const shortRelative = (text, withAgo) => {
+  const locale = dateLocale.value;
+  const parts = relativeByText.get(text);
+  if (isEnglish(locale) || !parts) return null;
+  if (parts.value === 0 || withAgo) {
+    return relativeFormatter(locale, 'narrow').format(parts.value, parts.unit);
+  }
+  return cached(
+    `nf|${locale}|${parts.unit}`,
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: 'unit',
+        unit: parts.unit,
+        unitDisplay: 'narrow',
+      })
+  ).format(Math.abs(parts.value));
+};
+
+/**
+ * Length of time between two dates ("3 minutes" / "3 minutos").
+ * @param {Date} start
+ * @param {Date} end
+ * @returns {string}
+ */
+export const formatElapsed = (start, end) => {
+  const locale = dateLocale.value;
+  if (isEnglish(locale)) return formatDistanceStrict(start, end);
+  const { value, unit } = relativeParts((end - start) / 1000);
+  return cached(
+    `nfl|${locale}|${unit}`,
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: 'unit',
+        unit,
+        unitDisplay: 'long',
+      })
+  ).format(Math.abs(value));
+};

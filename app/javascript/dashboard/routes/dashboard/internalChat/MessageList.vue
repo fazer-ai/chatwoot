@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import MessageSkeleton from './MessageSkeleton.vue';
 import MessageBubble from './MessageBubble.vue';
+import { currentDateLocale } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
   channelId: {
@@ -156,7 +157,7 @@ function formatDateSeparator(date) {
   if (date.toDateString() === yesterday.toDateString()) {
     return t('INTERNAL_CHAT.DATE_SEPARATOR.YESTERDAY');
   }
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(currentDateLocale(), {
     month: 'short',
     day: 'numeric',
     year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,

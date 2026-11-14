@@ -3,13 +3,13 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { formatTime } from '@chatwoot/utils';
-import format from 'date-fns/format';
 import fromUnixTime from 'date-fns/fromUnixTime';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import TimeAgo from 'dashboard/components/ui/TimeAgo.vue';
 import { frontendURL, conversationUrl } from 'dashboard/helper/URLHelper';
 import { dynamicTime, shortTimestamp } from 'shared/helpers/timeHelper';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
+import { formatLocalized } from 'shared/helpers/localizedDate';
 
 const props = defineProps({
   record: {
@@ -35,7 +35,7 @@ const messageDirection = computed(() => message.value.message_type);
 const formatTimestamp = timestamp => {
   if (!timestamp) return '';
 
-  return format(fromUnixTime(timestamp), 'dd MMM yyyy, h:mm a');
+  return formatLocalized(fromUnixTime(timestamp), 'dd MMM yyyy, h:mm a');
 };
 
 const compactTimestamp = timestamp => {
