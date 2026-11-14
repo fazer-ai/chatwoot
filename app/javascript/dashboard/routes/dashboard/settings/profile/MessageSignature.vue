@@ -10,8 +10,8 @@ import SingleSelect from 'dashboard/components-next/filter/inputs/SingleSelect.v
 import {
   DEFAULT_SIGNATURE_SEPARATOR,
   SIGNATURE_SEPARATORS,
-  findSignatureSeparator,
 } from 'dashboard/constants/signatureSeparators';
+import { appendSignature } from 'dashboard/helper/editorHelper';
 
 const props = defineProps({
   messageSignature: {
@@ -106,27 +106,20 @@ const separatorOptions = computed(() =>
   }))
 );
 
-const sampleMessage = computed(
-  () =>
-    `<p>${t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.SAMPLE_MESSAGE')}</p>`
+const sampleMessage = computed(() =>
+  t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.SAMPLE_MESSAGE')
 );
 
-const formattedSignature = computed(() => {
-  if (!signature.value) return '';
-  return formatMessage(signature.value, false, false);
-});
-
+// Rendered from what appendSignature sends, so the preview shows the same
+// separator the message gets, including its fallback next to a block.
 const messagePreview = computed(() => {
-  if (!signature.value) return sampleMessage.value;
-
-  const separator = findSignatureSeparator(
-    signatureSeparator.value
-  ).previewHtml;
-
-  if (signaturePosition.value === 'top') {
-    return `${formattedSignature.value}${separator}${sampleMessage.value}`;
-  }
-  return `${sampleMessage.value}${separator}${formattedSignature.value}`;
+  const message = signature.value
+    ? appendSignature(sampleMessage.value, signature.value, {
+        position: signaturePosition.value,
+        separator: signatureSeparator.value,
+      })
+    : sampleMessage.value;
+  return formatMessage(message, false, false);
 });
 
 const loadSignatureForSelection = () => {

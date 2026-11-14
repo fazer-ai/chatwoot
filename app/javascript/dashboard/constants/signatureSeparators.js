@@ -8,7 +8,6 @@ export const SIGNATURE_SEPARATORS = [
     labelKey:
       'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.SIGNATURE_SEPARATOR.OPTIONS.BLANK',
     delimiter: () => '\n\n',
-    previewHtml: '<p></p>',
     editorLine: null,
   },
   {
@@ -16,7 +15,6 @@ export const SIGNATURE_SEPARATORS = [
     labelKey:
       'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.SIGNATURE_SEPARATOR.OPTIONS.HORIZONTAL_LINE',
     delimiter: () => '\n\n--\n\n',
-    previewHtml: '<p>--</p>',
     editorLine: '--',
   },
   {
@@ -24,7 +22,6 @@ export const SIGNATURE_SEPARATORS = [
     labelKey:
       'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.SIGNATURE_SEPARATOR.OPTIONS.NONE',
     delimiter: lineBreakBetween,
-    previewHtml: '',
     editorLine: null,
   },
 ];
