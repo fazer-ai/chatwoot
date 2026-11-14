@@ -9,39 +9,24 @@ const md = new MarkdownIt({ html: true });
 // that send the raw text (API, TikTok) show nothing for it.
 export const HARD_BREAK = '  \n';
 
-const blockTypes = tokens =>
-  tokens
-    .filter(token => token.level === 0 && token.nesting >= 0)
-    .map(token => token.type);
-
-const hardBreakCount = tokens =>
-  tokens
-    .filter(token => token.type === 'inline')
-    .reduce(
-      (count, token) =>
-        count +
-        token.children.filter(child => child.type === 'hardbreak').length,
-      0
-    );
+const PARAGRAPH_OPEN = '<p>';
+const PARAGRAPH_CLOSE = '</p>\n';
 
 // Joins two texts on adjacent lines. A lone newline is a markdown soft break,
 // which the Email and Line renderers turn into a space, so a hard break joins
-// them when the last block above and the first below are paragraphs and the
-// joined text gains exactly that hard break. Anything that changes the
-// structure at the seam (a `===` turning the paragraph into a heading, a
-// delimiter row turning it into a table, a backslash before the break) loses
-// it, and a list, quote or table above would swallow the next line, so those
-// need a blank line to stay apart.
+// them when that changes nothing else: rendering the joined text must give
+// exactly the two renderings with their boundary paragraphs merged by a
+// `<br>`. Anything the seam would change (a list, quote or table swallowing
+// the next line, an ordered item or a `===` reshaping the paragraph, emphasis
+// markers pairing across the two texts, a backslash before the break) needs a
+// blank line to stay apart.
 export const lineBreakBetween = (upper, lower) => {
-  const [upperTokens, lowerTokens, joinedTokens] = [
-    upper,
-    lower,
-    `${upper}${HARD_BREAK}${lower}`,
-  ].map(text => md.parse(text, {}));
+  const upperHtml = md.render(upper);
+  const lowerHtml = md.render(lower);
   const joinsParagraphs =
-    blockTypes(upperTokens).at(-1) === 'paragraph_open' &&
-    blockTypes(lowerTokens)[0] === 'paragraph_open' &&
-    hardBreakCount(joinedTokens) ===
-      hardBreakCount(upperTokens) + hardBreakCount(lowerTokens) + 1;
+    upperHtml.endsWith(PARAGRAPH_CLOSE) &&
+    lowerHtml.startsWith(PARAGRAPH_OPEN) &&
+    md.render(`${upper}${HARD_BREAK}${lower}`) ===
+      `${upperHtml.slice(0, -PARAGRAPH_CLOSE.length)}<br>\n${lowerHtml.slice(PARAGRAPH_OPEN.length)}`;
   return joinsParagraphs ? HARD_BREAK : '\n\n';
 };

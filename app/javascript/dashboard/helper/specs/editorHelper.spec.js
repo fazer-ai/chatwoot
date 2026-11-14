@@ -244,6 +244,15 @@ describe('appendSignature', () => {
       expect(appendNone(body, 'bottom')).toBe(`${body}  \nAcme Support`);
     });
 
+    it('keeps a blank line when emphasis markers would pair across the join', () => {
+      expect(
+        appendSignature('Hello*', '*Acme', {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toBe('*Acme\n\nHello*');
+    });
+
     it('keeps a blank line when the joined lines would form a table', () => {
       expect(
         appendSignature('|---|---|', '| a | b', {
