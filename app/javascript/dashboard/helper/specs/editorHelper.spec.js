@@ -183,26 +183,73 @@ describe('appendSignature', () => {
     ).toBe(`${cleanedSignature}\n\n${body}`);
   });
 
-  it('appends the signature at the top with none separator (no blank line)', () => {
-    const { body, signature } = DOES_NOT_HAVE_SIGNATURE['no signature'];
-    const cleanedSignature = cleanSignature(signature);
-    expect(
-      appendSignature(body, signature, {
-        position: 'top',
-        separator: 'none',
-      })
-    ).toBe(`${cleanedSignature}\n${body}`);
+  describe('with the none separator', () => {
+    const signature = 'Acme Support';
+
+    // A lone newline is a markdown soft break, which the Email and Line
+    // renderers turn into a space, so plain lines are joined by a hard break.
+    it('puts the signature on its own line above the message', () => {
+      expect(
+        appendSignature('Hello there', signature, {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toBe('Acme Support\\\nHello there');
+    });
+
+    it('puts the signature on its own line below the message', () => {
+      expect(
+        appendSignature('Hello there', signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe('Hello there\\\nAcme Support');
+    });
+
+    // A hard break before a block leaves a literal backslash, and after a
+    // closing fence it stops the fence from closing.
+    it.each([
+      ['a list', '- first\n- second'],
+      ['a heading', '# Title\nSome text'],
+      ['a quote', '> quoted'],
+      ['a code fence', '```\ncode\n```'],
+    ])('uses a plain newline when the message starts with %s', (_, body) => {
+      expect(
+        appendSignature(body, signature, {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toBe(`Acme Support\n${body}`);
+    });
+
+    it('keeps the hard break when only the far end of the message is a block', () => {
+      const body = '- first\n\nThanks';
+      expect(
+        appendSignature(body, signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe(`${body}\\\nAcme Support`);
+    });
+
+    it('uses a plain newline when the message ends with a code fence', () => {
+      const body = '```\ncode\n```';
+      expect(
+        appendSignature(body, signature, {
+          position: 'bottom',
+          separator: 'none',
+        })
+      ).toBe(`${body}\nAcme Support`);
+    });
   });
 
-  it('appends the signature at the bottom with none separator (no blank line)', () => {
-    const { body, signature } = DOES_NOT_HAVE_SIGNATURE['no signature'];
-    const cleanedSignature = cleanSignature(signature);
+  it('falls back to the blank separator for an unknown value', () => {
     expect(
-      appendSignature(body, signature, {
+      appendSignature('Hello there', 'Acme Support', {
         position: 'bottom',
-        separator: 'none',
+        separator: 'custom',
       })
-    ).toBe(`${body}\n${cleanedSignature}`);
+    ).toBe('Hello there\n\nAcme Support');
   });
 
   it.skip('does not append signature if already present - SKIP(#78): Due to changes on append signature logic', () => {
