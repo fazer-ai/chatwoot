@@ -53,3 +53,13 @@ export const getNonDeletedMessages = ({ messages }) => {
     item => !(item.content_attributes && item.content_attributes.deleted)
   );
 };
+
+// The store is keyed by message id, so Object.values iterates by id. Ids only follow time
+// while messages are created in the order they happened; a backdated created_at breaks that.
+// Sort by created_at, which is what the API pages by. The sort is stable and integer keys
+// iterate in ascending order, so messages sharing a second stay in id order, the API's
+// tiebreak, and a temporary message (non-numeric id) stays after them.
+export const chronological = conversations =>
+  Object.values(conversations).sort(
+    (a, b) => (a.created_at ?? 0) - (b.created_at ?? 0)
+  );

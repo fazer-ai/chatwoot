@@ -474,4 +474,62 @@ describe('#getters', () => {
     };
     expect(getters.getLastMessage(state).id).toEqual(3);
   });
+
+  describe('when ids do not follow created_at', () => {
+    // A message whose created_at is older than a message with a lower id: the store is
+    // keyed by id, so Object.values iterates by id and not by time.
+    const today = 1794614400; // 2026-11-14 00:00 UTC
+    const april = 1776808080; // 2026-04-21 21:48 UTC
+    const state = {
+      conversations: {
+        10: { id: 10, content: 'today, first', created_at: today + 3600 },
+        11: { id: 11, content: 'today, second', created_at: today + 7200 },
+        12: { id: 12, content: 'april', created_at: april },
+        13: { id: 13, content: 'today, between', created_at: today + 5400 },
+      },
+      meta: { userLastSeenAt: 0 },
+    };
+
+    it('getGroupedConversation puts the older day first and orders messages by time', () => {
+      const groups = getters.getGroupedConversation(state);
+      expect(groups.map(group => group.messages.map(m => m.id))).toEqual([
+        [12],
+        [10, 13, 11],
+      ]);
+    });
+
+    it('getEarliestMessage is the earliest in time, the cursor the API pages back from', () => {
+      expect(getters.getEarliestMessage(state).id).toEqual(12);
+    });
+
+    it('getLastMessage is the latest in time', () => {
+      expect(getters.getLastMessage(state).id).toEqual(11);
+    });
+
+    it('breaks a created_at tie by id', () => {
+      const tied = {
+        conversations: {
+          21: { id: 21, created_at: today },
+          20: { id: 20, created_at: today },
+        },
+      };
+      expect(getters.getEarliestMessage(tied).id).toEqual(20);
+      expect(getters.getLastMessage(tied).id).toEqual(21);
+    });
+
+    it('getUnreadTextMessages keeps the latest agent messages in time', () => {
+      const outgoing = {
+        conversations: {
+          30: { id: 30, message_type: 1, created_at: today + 300 },
+          31: { id: 31, message_type: 1, created_at: today + 400 },
+          32: { id: 32, message_type: 1, created_at: april },
+        },
+        meta: { userLastSeenAt: 0 },
+      };
+      const unread = getters.getUnreadTextMessages(outgoing, {
+        getUnreadMessageCount: 2,
+      });
+      expect(unread.map(m => m.id)).toEqual([30, 31]);
+    });
+  });
 });

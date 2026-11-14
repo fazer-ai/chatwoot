@@ -318,4 +318,18 @@ describe('#mutations', () => {
       });
     });
   });
+
+  describe('#endPendingTyping', () => {
+    it('keys the ended bubble on the latest message in time, not the highest id', () => {
+      const state = {
+        conversations: {
+          7: { id: 7, created_at: 1794618000 },
+          8: { id: 8, created_at: 1776808080 },
+        },
+        pendingTyping: null,
+      };
+      mutations.endPendingTyping(state);
+      expect(state.pendingTyping).toEqual({ messageId: 7, until: 0 });
+    });
+  });
 });

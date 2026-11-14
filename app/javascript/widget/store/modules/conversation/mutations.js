@@ -1,5 +1,5 @@
 import { AGENT_TYPING_TIMEOUT, MESSAGE_TYPE } from 'widget/helpers/constants';
-import { findUndeliveredMessage } from './helpers';
+import { chronological, findUndeliveredMessage } from './helpers';
 
 export const mutations = {
   clearConversations($state) {
@@ -108,7 +108,8 @@ export const mutations = {
   },
 
   endPendingTyping($state) {
-    const lastMessage = Object.values($state.conversations).at(-1);
+    // The same message getLastMessage returns, or the typing bubble would key on another one.
+    const lastMessage = chronological($state.conversations).at(-1);
     $state.pendingTyping = lastMessage
       ? { messageId: lastMessage.id, until: 0 }
       : null;
