@@ -1,6 +1,6 @@
 # Daily gem advisory audit. A new advisory otherwise only shows up when the security-scan job
 # of run_foss_spec.yml fails on a push to main; this opens (or updates) one tracking issue as
-# soon as the advisory database has it, and closes it once nothing is left to triage.
+# soon as the advisory database has it. With nothing to triage it touches no issue.
 name: Security audit
 
 on:
@@ -26,7 +26,7 @@ jobs:
           bundler-cache: true
       - name: Update the advisory database
         run: bundle exec bundle-audit update
-      - name: Open, update or close the tracking issue
+      - name: Open or update the tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
           # gh would otherwise resolve this fork to its parent, chatwoot/chatwoot.

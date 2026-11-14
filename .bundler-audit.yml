@@ -33,17 +33,17 @@ ignore:
   # Not reachable: no code passes the return value of params.each_key to mass assignment.
   - GHSA-wm3x-v3qw-4jh3
   # Medium and low, assessed in the issue above:
-  - GHSA-5957-c7qm-m469
-  - GHSA-2586-8ghr-69fj
-  - GHSA-gmj8-hvj3-49mw
-  - GHSA-r9jg-fmfx-2gv6
-  - GHSA-rwvh-fw6r-pwvp
-  - GHSA-x6mj-8jx9-qhqv
-  - GHSA-2p2f-4rq4-gjwc
-  - GHSA-68p9-83h6-5wpj
-  - GHSA-rq8q-p985-fjq7
-  - GHSA-v6rj-xm57-3p59
-  - GHSA-3f4q-8x5m-76v8
-  - GHSA-3w93-6hmw-whh4
-  - GHSA-hfr4-8rjc-97m2
-  - GHSA-p2pm-g2h6-7j5j
+  - GHSA-5957-c7qm-m469 # Mailgun ingress signature replay: only with RAILS_INBOUND_EMAIL_SERVICE=mailgun
+  - GHSA-2586-8ghr-69fj # CacheStore sessions: the session store is :cookie_store
+  - GHSA-gmj8-hvj3-49mw # missing SameSite: the session cookie sets same_site: :lax explicitly
+  - GHSA-r9jg-fmfx-2gv6 # missing Vary: Accept: only matters behind a shared cache of API responses
+  - GHSA-rwvh-fw6r-pwvp # ActionController::Live DoS: no controller includes ActionController::Live
+  - GHSA-x6mj-8jx9-qhqv # session cookie on Active Storage proxy: needs rotated secrets or a hybrid serializer
+  - GHSA-2p2f-4rq4-gjwc # Action View XSS (highlight with an attribute highlighter): not used that way
+  - GHSA-68p9-83h6-5wpj # Action View XSS (simple_format with the HTML5 sanitizer): not used that way
+  - GHSA-rq8q-p985-fjq7 # Action View XSS (strip_tags in an HTML attribute): the one use renders into JSON
+  - GHSA-v6rj-xm57-3p59 # Action View XSS (whitespace Symbol attribute names): not used that way
+  - GHSA-3f4q-8x5m-76v8 # HLS playlist read by ffprobe: uploads go through authenticated endpoints; low
+  - GHSA-3w93-6hmw-whh4 # GCS direct uploads: only with the GCS storage service
+  - GHSA-hfr4-8rjc-97m2 # GCS direct uploads: only with the GCS storage service
+  - GHSA-p2pm-g2h6-7j5j # NUL in filename: needs a database that stores NUL bytes; Postgres rejects them

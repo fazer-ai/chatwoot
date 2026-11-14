@@ -102,17 +102,17 @@ RSpec.describe BundlerAuditExceptions do
         expect(sync_issue.last).to start_with('issue edit 42 --body-file ')
       end
 
-      it 'closes it once nothing needs triage' do
+      it 'leaves it alone once nothing needs triage' do
         ignore('CVE-2099-0001', 'CVE-2099-0002', 'CVE-2099-0003')
 
-        expect(sync_issue.last).to start_with('issue close 42 --comment ')
+        expect(sync_issue).to be_empty
       end
     end
 
     it 'does nothing when nothing needs triage and no issue is open' do
       ignore('CVE-2099-0001', 'CVE-2099-0002', 'CVE-2099-0003')
 
-      expect(sync_issue).to eq([%(issue list --state open --search in:title "#{described_class::ISSUE_TITLE}" --json number,title)])
+      expect(sync_issue).to be_empty
     end
 
     it 'reports stale ignores in the issue too' do

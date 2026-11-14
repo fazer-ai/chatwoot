@@ -4,7 +4,7 @@
 #
 #   ruby scripts/security/bundler_audit.rb stale   # exit 1 when an ignored id no longer matches
 #                                                  # any vulnerable gem in Gemfile.lock
-#   ruby scripts/security/bundler_audit.rb report  # open, update or close the tracking issue for
+#   ruby scripts/security/bundler_audit.rb report  # open or update the tracking issue for
 #                                                  # advisories nobody has triaged yet (needs gh)
 #
 # `stale` runs in the security-scan job of run_foss_spec.yml, `report` in the daily
@@ -41,11 +41,10 @@ class BundlerAuditExceptions
   end
 
   def sync_issue
+    # Nothing to decide: leave any open issue as it is, a person closes it with the fix.
+    return if untriaged.empty? && stale_ignores.empty?
+
     issue = open_issue
-    if untriaged.empty? && stale_ignores.empty?
-      gh('issue', 'close', issue.to_s, '--comment', 'Every advisory is triaged and no ignore is stale.') if issue
-      return
-    end
 
     Tempfile.create('bundler-audit-issue') do |file|
       file.write(issue_body)
