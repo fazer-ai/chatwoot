@@ -1,26 +1,6 @@
 // The message signature separators. InboxSignature::SEPARATORS mirrors the
 // values, so a new option is one entry here and one value there.
-
-// A line that opens, closes or underlines a markdown block: list item, ATX
-// heading, quote, table row, code fence, HTML block, thematic break or setext
-// underline (`---`, `===`), and an indented line that may be a code block.
-const MARKDOWN_BLOCK_LINE =
-  /^( {4}|\t| {0,3}([-*+] |\d{1,9}[.)] |#{1,6}( |$)|>|\||```|~~~|<[a-zA-Z/!?]|([-*_=])( *\4){2,} *$))/;
-
-// A lone newline is a markdown soft break, which the Email and Line renderers
-// turn into a space, so two plain lines are joined by a hard break. Next to a
-// block neither works: a following line is swallowed by the list, quote or
-// table above it (lazy continuation), `2. item` below a line joins its
-// paragraph, and a hard break leaves a literal `\` or keeps a fence open. Only
-// a blank line keeps a block apart, so that is what separates them there.
-const lineBreakBetween = (upper, lower) => {
-  const lastLine = upper.split('\n').pop();
-  const firstLine = lower.split('\n')[0];
-  return MARKDOWN_BLOCK_LINE.test(lastLine) ||
-    MARKDOWN_BLOCK_LINE.test(firstLine)
-    ? '\n\n'
-    : '\\\n';
-};
+import { lineBreakBetween } from 'dashboard/helper/markdownLineJoin';
 
 export const SIGNATURE_SEPARATORS = [
   {

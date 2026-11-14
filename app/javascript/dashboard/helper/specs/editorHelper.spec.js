@@ -185,30 +185,35 @@ describe('appendSignature', () => {
 
   describe('with the none separator', () => {
     const signature = 'Acme Support';
+    const appendNone = (body, position) =>
+      appendSignature(body, signature, { position, separator: 'none' });
 
     // A lone newline is a markdown soft break, which the Email and Line
     // renderers turn into a space, so plain lines are joined by a hard break.
     it('puts the signature on its own line above the message', () => {
-      expect(
-        appendSignature('Hello there', signature, {
-          position: 'top',
-          separator: 'none',
-        })
-      ).toBe('Acme Support\\\nHello there');
+      expect(appendNone('Hello there', 'top')).toBe(
+        'Acme Support  \nHello there'
+      );
     });
 
     it('puts the signature on its own line below the message', () => {
-      expect(
-        appendSignature('Hello there', signature, {
-          position: 'bottom',
-          separator: 'none',
-        })
-      ).toBe('Hello there\\\nAcme Support');
+      expect(appendNone('Hello there', 'bottom')).toBe(
+        'Hello there  \nAcme Support'
+      );
+    });
+
+    // A `\` + newline break would be escaped by this backslash, and
+    // markdown-it (the dashboard bubble) reads even two trailing spaces after
+    // it as a soft break, so a blank line is the only break that holds.
+    it('keeps a blank line after an authored trailing backslash', () => {
+      expect(appendNone('Open C:\\', 'bottom')).toBe(
+        'Open C:\\\n\nAcme Support'
+      );
     });
 
     // Next to a markdown block only a blank line keeps the signature out of
-    // it: a single newline continues a list, quote or table, and a hard break
-    // leaves a literal backslash or keeps a fence open.
+    // it: a single line continues a list, quote or table, joins an ordered
+    // item to the paragraph, or turns the paragraph into a heading.
     it.each([
       ['a list', '- first\n- second'],
       ['an ordered list that cannot interrupt a paragraph', '2. second'],
@@ -216,41 +221,45 @@ describe('appendSignature', () => {
       ['a quote', '> quoted'],
       ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
       ['a code fence', '```\ncode\n```'],
-      ['a setext underline', '---\ntext'],
+      ['a setext underline', '===\ntext'],
       ['a thematic break', '***'],
       ['an HTML block', '<div>x</div>'],
     ])('keeps a blank line when the message starts with %s', (_, body) => {
-      expect(
-        appendSignature(body, signature, {
-          position: 'top',
-          separator: 'none',
-        })
-      ).toBe(`Acme Support\n\n${body}`);
+      expect(appendNone(body, 'top')).toBe(`Acme Support\n\n${body}`);
     });
 
     it.each([
       ['a list', '- first\n- second'],
+      ['a list item with a continuation line', '- first\n  continuation'],
       ['a quote', '> quoted'],
       ['a table', '| a | b |\n|---|---|\n| 1 | 2 |'],
       ['a code fence', '```\ncode\n```'],
       ['an indented code block', 'Text\n\n    code'],
     ])('keeps a blank line when the message ends with %s', (_, body) => {
-      expect(
-        appendSignature(body, signature, {
-          position: 'bottom',
-          separator: 'none',
-        })
-      ).toBe(`${body}\n\nAcme Support`);
+      expect(appendNone(body, 'bottom')).toBe(`${body}\n\nAcme Support`);
     });
 
     it('keeps the hard break when only the far end of the message is a block', () => {
       const body = '- first\n\nThanks';
+      expect(appendNone(body, 'bottom')).toBe(`${body}  \nAcme Support`);
+    });
+
+    it('keeps a blank line when the joined lines would form a table', () => {
       expect(
-        appendSignature(body, signature, {
-          position: 'bottom',
+        appendSignature('|---|---|', '| a | b', {
+          position: 'top',
           separator: 'none',
         })
-      ).toBe(`${body}\\\nAcme Support`);
+      ).toBe('| a | b\n\n|---|---|');
+    });
+
+    it('keeps a blank line when the signature itself ends with a block', () => {
+      expect(
+        appendSignature('Hello there', 'Acme\n\n- Support', {
+          position: 'top',
+          separator: 'none',
+        })
+      ).toMatch(/Support\n\nHello there$/);
     });
   });
 
