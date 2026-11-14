@@ -64,6 +64,10 @@ describe('message times in the conversation', () => {
       'Aug 3 2025, 12:05 AM'
     );
     expect(messageStamp(APRIL_EVENING)).toBe('9:48 PM');
+    // Intl would reorder this one to "Apr 21, 2026, 9:48 PM".
+    expect(dateFormat(APRIL_EVENING, 'dd MMM yyyy, h:mm a')).toBe(
+      '21 Apr 2026, 9:48 PM'
+    );
   });
 
   it('switch language without a reload', () => {
