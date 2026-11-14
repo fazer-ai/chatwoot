@@ -1,8 +1,8 @@
-// vue-datepicker-next keeps one global default locale, read by every picker
-// when it mounts. Registering the app language there translates the month and
-// weekday names of all of them (custom snooze, scheduled messages, reports)
-// without touching each component. Built from Intl, so it covers every
-// language the dashboard ships instead of the few the library bundles.
+// Month and weekday names for vue-datepicker-next in the app language, built
+// from Intl so they cover every language the dashboard ships instead of the few
+// the library bundles. A picker reads its locale once, from its `lang` prop, so
+// each one binds `currentDatePickerLang()` there to follow a language switch
+// while it is mounted; the global default only covers a picker that does not.
 import { watch } from 'vue';
 import DatePicker from 'vue-datepicker-next';
 import {
@@ -41,9 +41,18 @@ export const datePickerLang = locale => {
   };
 };
 
+const langs = new Map();
+
+/** @returns {object} The `lang` prop for a picker, for the current app language. */
+export const currentDatePickerLang = () => {
+  const locale = currentDateLocale();
+  if (!langs.has(locale)) langs.set(locale, datePickerLang(locale));
+  return langs.get(locale);
+};
+
 export const bindDatePickerLocale = () =>
   watch(
     currentDateLocale,
-    locale => DatePicker.locale(locale, datePickerLang(locale)),
+    locale => DatePicker.locale(locale, currentDatePickerLang()),
     { immediate: true }
   );

@@ -1,6 +1,7 @@
 <script>
 import DatePicker from 'vue-datepicker-next';
 import NextButton from 'dashboard/components-next/button/Button.vue';
+import { currentDatePickerLang } from 'dashboard/helper/datePickerLocale';
 
 export default {
   components: {
@@ -12,11 +13,12 @@ export default {
   data() {
     return {
       snoozeTime: null,
-      lang: {
-        yearFormat: 'YYYY',
-        monthFormat: 'MMMM',
-      },
     };
+  },
+  computed: {
+    lang() {
+      return { ...currentDatePickerLang(), monthFormat: 'MMMM' };
+    },
   },
 
   methods: {

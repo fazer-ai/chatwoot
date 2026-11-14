@@ -53,6 +53,14 @@ describe('message times in the conversation', () => {
     expect(text).toContain('00:05');
   });
 
+  it('keep the day and month of an old time-only stamp', () => {
+    locale.value = 'pt_BR';
+    const text = messageTimestamp(LAST_YEAR_MIDNIGHT, 'h:mm a');
+    expect(text).toContain('3');
+    expect(text).toContain('ago');
+    expect(text).toContain('2025');
+  });
+
   it('follow Spanish', () => {
     locale.value = 'es';
     expect(messageTimestamp(APRIL_EVENING, 'LLL d, h:mm a')).toContain('21:48');

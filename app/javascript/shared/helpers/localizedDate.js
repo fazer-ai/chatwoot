@@ -189,11 +189,11 @@ export const formatWithYear = (date, pattern, otherYearPattern) => {
   if (isSameYear(date, new Date())) return formatLocalized(date, pattern);
   const locale = dateLocale.value;
   if (isEnglish(locale)) return format(date, otherYearPattern);
-  const options = intlOptionsFor(pattern);
+  // The other-year pattern names every field an old date needs; a time-only
+  // current-year pattern ('h:mm a') plus a year would drop the day and month.
+  const options = intlOptionsFor(otherYearPattern);
   if (!options) return format(date, otherYearPattern);
-  return dateTimeFormatter(locale, { ...options, year: 'numeric' }).format(
-    date
-  );
+  return dateTimeFormatter(locale, options).format(date);
 };
 
 /**
