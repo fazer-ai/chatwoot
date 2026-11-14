@@ -247,6 +247,7 @@ module.exports = {
         message:
           'Build the toast with requestErrorMessage (dashboard/helper/requestErrorMessage); error.response.message is always undefined.',
       },
+      ...require('./.eslintrc.localized-dates.syntax.js'),
     ],
     '@intlify/vue-i18n/no-dynamic-keys': 'warn',
     '@intlify/vue-i18n/no-unused-keys': [

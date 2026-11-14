@@ -4,13 +4,13 @@
 // write English only, and Intl or toLocale* without the app locale follow the
 // browser language instead. Machine formats (API parameters, file names) use
 // `formatFixed` from the same module, which says so at the call site.
-const airbnbRestrictedSyntax = require('eslint-config-airbnb-base/rules/style')
-  .rules['no-restricted-syntax'];
-
+//
+// ESLint keeps one `no-restricted-syntax` list per config and a later one
+// replaces an earlier one, so the date selectors live in
+// .eslintrc.localized-dates.syntax.js and .eslintrc.js spreads them into its
+// own list instead of this file setting the rule.
 const HELPER = 'shared/helpers/localizedDate';
 const IMPORT_MESSAGE = `Dates shown to people go through ${HELPER} (formatLocalized, formatRelative, formatElapsed); machine formats use formatFixed.`;
-const LOCALE_MESSAGE = `Pass the app locale (currentDateLocale() from ${HELPER}), not the browser's.`;
-
 const DATE_FNS_FORMATTERS = [
   'format',
   'formatDistance',
@@ -20,15 +20,6 @@ const DATE_FNS_FORMATTERS = [
   'formatRelative',
   'intlFormat',
   'intlFormatDistance',
-];
-
-const BROWSER_LOCALE_ARGUMENT = [
-  // toLocaleDateString(), toLocaleTimeString(undefined, ...)
-  '[arguments.length=0]',
-  "[arguments.0.type='Identifier'][arguments.0.name='undefined']",
-  "[arguments.0.object.name='navigator'][arguments.0.property.name='language']",
-  // vue-i18n's `locale.value` is `pt_BR`, which Intl rejects.
-  "[arguments.0.object.name='locale'][arguments.0.property.name='value']",
 ];
 
 module.exports = {
@@ -50,26 +41,8 @@ module.exports = {
         ],
       },
     ],
-    'no-restricted-syntax': [
-      ...airbnbRestrictedSyntax,
-      ...BROWSER_LOCALE_ARGUMENT.flatMap(argument => [
-        {
-          selector: `CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]${argument}`,
-          message: LOCALE_MESSAGE,
-        },
-        {
-          selector: `NewExpression[callee.object.name='Intl'][callee.property.name=/^(DateTimeFormat|RelativeTimeFormat)$/]${argument}`,
-          message: LOCALE_MESSAGE,
-        },
-      ]),
-    ],
   },
   overrides: [
-    {
-      // Stories are design-system demos, not screens people read.
-      files: ['**/*.story.vue'],
-      rules: { 'no-restricted-syntax': airbnbRestrictedSyntax },
-    },
     {
       files: [
         `app/javascript/${HELPER}.js`,
