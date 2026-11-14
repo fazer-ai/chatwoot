@@ -202,12 +202,10 @@ describe('appendSignature', () => {
       );
     });
 
-    // A `\` + newline break would be escaped by this backslash, and
-    // markdown-it (the dashboard bubble) reads even two trailing spaces after
-    // it as a soft break, so a blank line is the only break that holds.
-    it('keeps a blank line after an authored trailing backslash', () => {
+    // A `\` + newline break would be escaped by this backslash.
+    it('keeps the hard break after an authored trailing backslash', () => {
       expect(appendNone('Open C:\\', 'bottom')).toBe(
-        'Open C:\\\n\nAcme Support'
+        'Open C:\\  \nAcme Support'
       );
     });
 
