@@ -1,6 +1,8 @@
 import { ref } from 'vue';
 import {
+  attributeCalendarDate,
   bindDateLocale,
+  formatElapsed,
   formatLocalized,
   intlOptionsFor,
   normalizeLocale,
@@ -161,5 +163,35 @@ describe('relative units', () => {
     expect(relativeParts(-44 * 60)).toEqual({ value: -44, unit: 'minute' });
     expect(relativeParts(-46 * 60)).toEqual({ value: -1, unit: 'hour' });
     expect(relativeParts(3 * 86400)).toEqual({ value: 3, unit: 'day' });
+  });
+});
+
+// These hold in any time zone; the suite runs in UTC, so run this file with
+// TZ=America/Sao_Paulo and TZ=Asia/Kolkata too when touching the helper.
+describe('date attributes', () => {
+  it('read UTC midnight (contact page, API) as that UTC day', () => {
+    const day = attributeCalendarDate('2026-03-07T00:00:00.000Z');
+    expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([
+      2026, 2, 7,
+    ]);
+    expect(attributeCalendarDate('2026-03-07').getDate()).toBe(7);
+  });
+
+  it('read local midnight (conversation sidebar) as that local day', () => {
+    const saved = new Date(2026, 10, 14).toISOString();
+    expect(attributeCalendarDate(saved).getDate()).toBe(14);
+  });
+});
+
+describe('elapsed durations', () => {
+  it('keep strict units in other languages', () => {
+    locale.value = 'pt_BR';
+    const start = new Date(Date.UTC(2026, 0, 1, 10));
+    expect(formatElapsed(start, new Date(start.getTime() + 30 * 1000))).toBe(
+      '30 segundos'
+    );
+    expect(
+      formatElapsed(start, new Date(start.getTime() + 50 * 60 * 1000))
+    ).toBe('50 minutos');
   });
 });

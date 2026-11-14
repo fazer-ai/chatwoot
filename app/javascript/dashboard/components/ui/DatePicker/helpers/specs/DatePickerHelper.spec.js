@@ -42,6 +42,12 @@ describe('Date formatting functions', () => {
     const expected = 'dd/MM/yyyy';
     expect(getIntlDateFormatForLocale('en-IN')).toBe(expected);
   });
+
+  it('keeps a Gregorian, Latin-digit pattern the parser can read', () => {
+    expect(getIntlDateFormatForLocale('th')).toBe('dd/MM/yyyy');
+    expect(getIntlDateFormatForLocale('ar')).toBe('dd/MM/yyyy');
+    expect(getIntlDateFormatForLocale('fa')).toBe('yyyy/MM/dd');
+  });
 });
 
 describe('chunk', () => {

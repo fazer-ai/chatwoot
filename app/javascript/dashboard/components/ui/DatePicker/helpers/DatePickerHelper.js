@@ -86,12 +86,28 @@ export const CALENDAR_PERIODS = {
 export const monthName = currentDate => formatLocalized(currentDate, 'MMMM');
 export const yearName = currentDate => formatLocalized(currentDate, 'yyyy');
 
+// The typed date field shows and parses a numeric date, so it stays in the
+// Gregorian calendar with Latin digits whatever the language (Thai would
+// otherwise count Buddhist years, Persian would use its own calendar and
+// digits) and only takes the field order and separators from the locale.
+// Bidi marks (Arabic puts one after each field) are dropped, since nobody
+// types them and `parse` would demand them.
+const BIDI_MARKS = /[\u200e\u200f\u061c]/g;
+
+export const formatCalendarInput = (date, locale = currentDateLocale()) =>
+  new Intl.DateTimeFormat(locale, {
+    calendar: 'gregory',
+    numberingSystem: 'latn',
+  })
+    .format(date)
+    .replace(BIDI_MARKS, '');
+
 export const getIntlDateFormatForLocale = (locale = currentDateLocale()) => {
   const year = 2222;
   const month = 12;
   const day = 15;
   const date = new Date(year, month - 1, day);
-  const formattedDate = new Intl.DateTimeFormat(locale).format(date);
+  const formattedDate = formatCalendarInput(date, locale);
   return formattedDate
     .replace(`${year}`, 'yyyy')
     .replace(`${month}`, 'MM')

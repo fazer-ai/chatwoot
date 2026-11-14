@@ -197,14 +197,23 @@ export const formatWithYear = (date, pattern, otherYearPattern) => {
 };
 
 /**
- * A date attribute is saved as UTC midnight of the chosen day. Read back with
- * the browser's offset it would land on the day before west of Greenwich, so
- * it is rebuilt as local midnight of the same calendar day.
+ * The calendar day a date custom attribute holds, as local midnight. The two
+ * editors save it differently: the contact page saves UTC midnight of the day
+ * (and the API accepts a bare `yyyy-MM-dd`, which parses the same way), the
+ * conversation sidebar saves local midnight. Local midnight is UTC midnight
+ * only at UTC+0, where both readings agree, so an instant at UTC midnight is
+ * read as its UTC day and any other instant as its local day.
  * @param {string|Date} value
  * @returns {Date}
  */
-export const utcCalendarDate = value => {
+export const attributeCalendarDate = value => {
   const date = new Date(value);
+  const atUtcMidnight =
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0;
+  if (!atUtcMidnight) return date;
   return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 };
 
@@ -239,6 +248,23 @@ export const relativeParts = seconds => {
   });
   if (distance < 45) return { value: 0, unit: 'second' };
   if (distance < 45 * MINUTE) return pick(MINUTE, 'minute');
+  if (distance < DAY) return pick(HOUR, 'hour');
+  if (distance < MONTH) return pick(DAY, 'day');
+  if (distance < YEAR) return pick(MONTH, 'month');
+  return pick(YEAR, 'year');
+};
+
+/**
+ * The unit `formatDistanceStrict` picks: the largest one the distance fills,
+ * never an approximation (30 seconds stays seconds, 50 minutes stays minutes).
+ * @param {number} seconds
+ * @returns {{value: number, unit: string}}
+ */
+export const strictParts = seconds => {
+  const distance = Math.abs(seconds);
+  const pick = (size, unit) => ({ value: Math.round(distance / size), unit });
+  if (distance < MINUTE) return pick(1, 'second');
+  if (distance < HOUR) return pick(MINUTE, 'minute');
   if (distance < DAY) return pick(HOUR, 'hour');
   if (distance < MONTH) return pick(DAY, 'day');
   if (distance < YEAR) return pick(MONTH, 'month');
@@ -306,7 +332,7 @@ export const shortRelative = (text, withAgo) => {
 export const formatElapsed = (start, end) => {
   const locale = dateLocale.value;
   if (isEnglish(locale)) return formatDistanceStrict(start, end);
-  const { value, unit } = relativeParts((end - start) / 1000);
+  const { value, unit } = strictParts((end - start) / 1000);
   return cached(
     `nfl|${locale}|${unit}`,
     () =>

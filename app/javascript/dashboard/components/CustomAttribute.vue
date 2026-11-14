@@ -14,7 +14,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import {
   formatFixed,
   formatLocalized,
-  utcCalendarDate,
+  attributeCalendarDate,
 } from 'shared/helpers/localizedDate';
 
 const DATE_FORMAT = 'yyyy-MM-dd';
@@ -58,7 +58,7 @@ export default {
     displayValue() {
       if (this.isAttributeTypeDate) {
         return this.value
-          ? formatLocalized(utcCalendarDate(this.value), 'M/d/yyyy')
+          ? formatLocalized(attributeCalendarDate(this.value), 'M/d/yyyy')
           : '---';
       }
       if (this.isAttributeTypeCheckbox) {
