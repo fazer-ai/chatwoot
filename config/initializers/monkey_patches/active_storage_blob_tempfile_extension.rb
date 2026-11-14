@@ -36,6 +36,8 @@ module ActiveStorageBlobTempfileExtension
   end
 end
 
-ActiveSupport.on_load(:active_storage_blob) do
-  prepend(ActiveStorageBlobTempfileExtension) unless self < ActiveStorageBlobTempfileExtension
+if SecurityBackport.register(advisory: 'GHSA-v924-7rp8-4mxh', gem_name: 'activestorage', fixed_in: '8.0.5.2')
+  ActiveSupport.on_load(:active_storage_blob) do
+    prepend(ActiveStorageBlobTempfileExtension) unless self < ActiveStorageBlobTempfileExtension
+  end
 end

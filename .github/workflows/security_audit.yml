@@ -1,0 +1,32 @@
+# Daily gem advisory audit. A new advisory otherwise only shows up when the security-scan job
+# of run_foss_spec.yml fails on a push to main; this opens (or updates) one tracking issue as
+# soon as the advisory database has it, and closes it once nothing is left to triage.
+name: Security audit
+
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: security-audit
+  cancel-in-progress: false
+
+jobs:
+  bundle-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Update the advisory database
+        run: bundle exec bundle-audit update
+      - name: Open, update or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bundle exec ruby scripts/security/bundler_audit.rb report

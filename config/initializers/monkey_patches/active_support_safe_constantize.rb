@@ -21,5 +21,7 @@ module ActiveSupportSafeConstantizeLiteralMatch
   end
 end
 
-ActiveSupport::Inflector.singleton_class.prepend(ActiveSupportSafeConstantizeLiteralMatch) unless
-  ActiveSupport::Inflector.singleton_class < ActiveSupportSafeConstantizeLiteralMatch
+if SecurityBackport.register(advisory: 'GHSA-8474-xrp6-wh69', gem_name: 'activesupport', fixed_in: '8.0.5.2') &&
+   !(ActiveSupport::Inflector.singleton_class < ActiveSupportSafeConstantizeLiteralMatch)
+  ActiveSupport::Inflector.singleton_class.prepend(ActiveSupportSafeConstantizeLiteralMatch)
+end
