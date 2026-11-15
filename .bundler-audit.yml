@@ -2,9 +2,10 @@
 #
 # Dependency versions are upstream's: a fixed gem reaches the fork through the upstream sync, not
 # through a bump of our own. So a new advisory is ignored here with the reason and the issue that
-# assessed it, and when the vulnerable path is reachable on this install the fix is also backported
-# under config/initializers/monkey_patches/ with a spec. When the upstream sync brings the fixed
-# version, its entry (and any backport) goes.
+# assessed it. When the vulnerable path is reachable on this install, the entry says so, and the fix
+# is backported under config/initializers/monkey_patches/ with a spec when a local patch is practical;
+# when it is not (a server's internals, for example), the advisory stays ignored until the sync.
+# When the upstream sync brings the fixed version, its entry (and any backport) goes.
 ignore:
   - GHSA-57hq-95w6-v4fc # Devise confirmable race condition — patched locally in User model (remove once on Devise 5+)
   # Devise 5 is currently blocked by devise-secure_password/devise_token_auth/devise-two-factor.
@@ -45,8 +46,9 @@ ignore:
   # Not reachable: pumactl's SSL control server and ssl_cipher_filter are not used (Puma serves plain HTTP behind the proxy).
   - GHSA-86xc-wrr9-xmmq
   - GHSA-r885-m39c-939g
-  # Slow-client and resource-exhaustion DoS: Puma runs behind a reverse proxy (Traefik/Nginx) that holds the client
-  # connections, so a client cannot trickle bodies or stop reading directly against Puma.
+  # Reachable: slow-client and resource-exhaustion DoS. The Coolify/Traefik deploy streams request bodies to Puma
+  # without buffering, so a client can trickle a body or stop reading. No practical local backport (Puma's reactor);
+  # accepted until the upstream sync brings Puma >= 7.2.2.
   - GHSA-jm4r-w4xx-qxw7
   - GHSA-m5xw-3hrw-qcmf
   - GHSA-rf6g-xhmp-gm7v
