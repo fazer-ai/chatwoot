@@ -73,6 +73,24 @@ describe('floating editor menubar inside a scroll container', () => {
     expect(mounted.menu.style.position).toBe('');
   });
 
+  it('keeps floating while a strip of the editor shorter than the menu is still visible', () => {
+    mounted = mountFloatingEditor();
+    mounted.scrollEditorTo(150, 400);
+
+    mounted.scrollEditorTo(-100, SCROLL_TOP + 20);
+
+    expect(mounted.menu.style.position).toBe('fixed');
+  });
+
+  it('stops floating once less than 10px of the editor is visible', () => {
+    mounted = mountFloatingEditor();
+    mounted.scrollEditorTo(150, 400);
+
+    mounted.scrollEditorTo(-100, SCROLL_TOP + 9);
+
+    expect(mounted.menu.style.position).toBe('');
+  });
+
   it('does not start floating for an editor already hidden above the scroll area', () => {
     mounted = mountFloatingEditor();
 

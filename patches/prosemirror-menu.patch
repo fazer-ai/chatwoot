@@ -7,7 +7,7 @@ index a837b6c223bf81705e58e3945832e4b862e5bad1..0ed03f6774dd6c4e76a58d32b428e014
  
        if (this.floating) {
 -        if (editorRect.top >= top || editorRect.bottom < this.menu.offsetHeight + 10) {
-+        if (editorRect.top >= top || editorRect.bottom < top + this.menu.offsetHeight + 10) {
++        if (editorRect.top >= top || editorRect.bottom < top + 10) {
            this.floating = false;
            this.menu.style.position = this.menu.style.left = this.menu.style.top = this.menu.style.width = "";
            this.menu.style.display = "";
@@ -16,7 +16,7 @@ index a837b6c223bf81705e58e3945832e4b862e5bad1..0ed03f6774dd6c4e76a58d32b428e014
          }
        } else {
 -        if (editorRect.top < top && editorRect.bottom >= this.menu.offsetHeight + 10) {
-+        if (editorRect.top < top && editorRect.bottom >= top + this.menu.offsetHeight + 10) {
++        if (editorRect.top < top && editorRect.bottom >= top + 10) {
            this.floating = true;
            var menuRect = this.menu.getBoundingClientRect();
            this.menu.style.left = menuRect.left + "px";
@@ -29,7 +29,7 @@ index 341abd28f96f1929c0826677bb37fd56180894ab..499a7ea1e60c0ece6cf6dae86d0a7fdc
          let parent = this.wrapper, editorRect = parent.getBoundingClientRect(), top = scrollAncestor ? Math.max(0, scrollAncestor.getBoundingClientRect().top) : 0;
          if (this.floating) {
 -            if (editorRect.top >= top || editorRect.bottom < this.menu.offsetHeight + 10) {
-+            if (editorRect.top >= top || editorRect.bottom < top + this.menu.offsetHeight + 10) {
++            if (editorRect.top >= top || editorRect.bottom < top + 10) {
                  this.floating = false;
                  this.menu.style.position = this.menu.style.left = this.menu.style.top = this.menu.style.width = "";
                  this.menu.style.display = "";
@@ -38,7 +38,7 @@ index 341abd28f96f1929c0826677bb37fd56180894ab..499a7ea1e60c0ece6cf6dae86d0a7fdc
          }
          else {
 -            if (editorRect.top < top && editorRect.bottom >= this.menu.offsetHeight + 10) {
-+            if (editorRect.top < top && editorRect.bottom >= top + this.menu.offsetHeight + 10) {
++            if (editorRect.top < top && editorRect.bottom >= top + 10) {
                  this.floating = true;
                  let menuRect = this.menu.getBoundingClientRect();
                  this.menu.style.left = menuRect.left + "px";
