@@ -1200,7 +1200,9 @@ defineExpose({ focusEditorInputField, insertMentionTrigger });
 
     // prosemirror-menu pins the menubar with an inline position: fixed while
     // the editor scrolls under it; without a background the text shows through.
-    &[style*='position: fixed'] {
+    // components-next/Editor keeps its menubar in place (.editor-wrapper sets
+    // position: relative !important), so it stays as it is.
+    &[style*='position: fixed']:not(:where(.editor-wrapper *)) {
       @apply bg-n-background py-1 z-10 shadow-sm;
     }
 
