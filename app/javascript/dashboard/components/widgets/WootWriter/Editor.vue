@@ -1198,6 +1198,12 @@ defineExpose({ focusEditorInputField, insertMentionTrigger });
     min-height: 1.25rem !important;
     @apply items-center gap-4 flex pb-0 bg-transparent text-n-slate-11 relative ltr:-left-[3px] rtl:-right-[3px];
 
+    // prosemirror-menu pins the menubar with an inline position: fixed while
+    // the editor scrolls under it; without a background the text shows through.
+    &[style*='position: fixed'] {
+      @apply bg-n-background py-1 z-10 shadow-sm;
+    }
+
     .ProseMirror-menu-active {
       @apply bg-n-slate-5 dark:bg-n-solid-3 !important;
     }
