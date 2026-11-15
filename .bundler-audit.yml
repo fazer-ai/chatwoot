@@ -41,3 +41,14 @@ ignore:
   - GHSA-p2pm-g2h6-7j5j # NUL in filename: needs a database that stores NUL bytes; Postgres rejects them
   # msgpack JRuby decoder allocation (2026-11-14): only the JRuby extension is affected; this install runs MRI.
   - GHSA-73v3-wf97-vpgj
+  # Puma 7.2.1 advisories (2026-11-15), fixed in 7.2.2; upstream is still on 7.2.1 and the version comes with the sync.
+  # Not reachable: pumactl's SSL control server and ssl_cipher_filter are not used (Puma serves plain HTTP behind the proxy).
+  - GHSA-86xc-wrr9-xmmq
+  - GHSA-r885-m39c-939g
+  # Slow-client and resource-exhaustion DoS: Puma runs behind a reverse proxy (Traefik/Nginx) that holds the client
+  # connections, so a client cannot trickle bodies or stop reading directly against Puma.
+  - GHSA-jm4r-w4xx-qxw7
+  - GHSA-m5xw-3hrw-qcmf
+  - GHSA-rf6g-xhmp-gm7v
+  - GHSA-x646-wp7c-h9mg
+  - GHSA-xw3h-pgr9-3vg7
