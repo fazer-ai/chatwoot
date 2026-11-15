@@ -329,7 +329,9 @@ export const formatQuotedTextAsBlockquote = (text, header = '') => {
 
   normalizedLines.forEach(line => {
     const trimmedLine = line.trimEnd();
-    quotedLines.push(trimmedLine ? `> ${trimmedLine}` : '>');
+    // Two or more trailing spaces are a markdown hard break; keep it.
+    const hardBreak = / {2,}$/.test(line) ? '  ' : '';
+    quotedLines.push(trimmedLine ? `> ${trimmedLine}${hardBreak}` : '>');
   });
 
   return quotedLines.join('\n');
