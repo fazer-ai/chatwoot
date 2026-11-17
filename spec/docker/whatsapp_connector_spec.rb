@@ -340,6 +340,13 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         expect(calls.map { |call| call.last[:host] }).to eq(['localhost', nil])
       end
 
+      it 'decodes a plus in a query value as a space and reads lib/pq names, as the connector does' do
+        db = described_class.explicit_database('postgres://wac:a+b@store-db/wac_store?password=with+space&dbname=other&database=ignored')
+
+        expect(db).to include(password: 'with space', database: 'other')
+        expect(described_class.explicit_database('postgres://wac:a+b@store-db/wac_store')[:password]).to eq('a+b')
+      end
+
       it 'leaves PGPASSWORD to psql when the URL carries no password' do
         expect(described_class.psql_env(described_class.explicit_database('postgres://wac@store-db/wac_store'))).to eq({})
       end
@@ -399,6 +406,11 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     it 'escapes a space as %20 and reads a plus in the URL as a plus' do
       expect(url_for('POSTGRES_PASSWORD' => 'with space')).to start_with('postgres://cw:with%20space@')
       expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:a+b@db/app')[:password]).to eq('a+b')
+    end
+
+    it 'refuses a DATABASE_URL that does not parse without repeating it' do
+      expect { described_class.chatwoot_database('DATABASE_URL' => 'postgres://cw:se cret@db/app') }
+        .to raise_error(WhatsappConnectorEmbedded::StartFailure) { |error| expect(error.message).not_to include('se cret') }
     end
 
     it 'reads a plus in a query value as a plus, as Rails does' do
@@ -519,6 +531,12 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         report.failed('bad URI (is not URI?): "postgres://bad host/app?user=cw&password=secret&sslmode=disable"')
 
         expect(WhatsappConnectorEmbedded).to have_received(:log).with(including('?user=cw&password=***&sslmode=disable'))
+      end
+
+      it 'redacts all of a query password, spaces and quotes included' do
+        report.failed(%(bad URI (is not URI?): "postgres://cw@bad host/app?password= top "secret" here"))
+
+        expect(WhatsappConnectorEmbedded).to have_received(:log).with(satisfy { |line| line.scan('secret').empty? })
       end
 
       it 'does not repeat a Redis password from a URL that would not parse' do

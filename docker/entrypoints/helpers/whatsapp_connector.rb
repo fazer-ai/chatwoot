@@ -102,6 +102,9 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     }
     url = env['DATABASE_URL'].to_s
     url.empty? ? config : config.merge(database_from_url(url))
+  rescue URI::Error, ArgumentError
+    # Raised with the URL in its message, password included, and this text is published.
+    raise StartFailure, 'DATABASE_URL is not a valid URL (a password with reserved characters has to be percent-encoded)'
   end
 
   # Only the fields the URL actually carries, so the rest fall through to the defaults. A
@@ -233,15 +236,26 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     place.empty? ? '' : " #{preposition} #{place}"
   end
 
-  # Read the way Chatwoot's own URL is, so query parameters (user, password, host, port,
-  # dbname) override the URL's parts as they do for lib/pq. A URL that does not parse is
-  # refused without repeating it, since it carries the password.
-  # Only what the URL says: whatever it leaves out (host, port, user, password, database) is
-  # libpq's to fill from the PG* variables and its defaults, as lib/pq does for the connector.
+  # Read the way the connector reads it, which is lib/pq's way and not Rails': its parameter
+  # names (user, password, host, port, dbname), query values form-decoded (a plus is a
+  # space), and query parameters over the URL's own parts. Only what the URL says: whatever it
+  # leaves out is libpq's to fill from the PG* variables and its defaults, as lib/pq does. A URL
+  # that does not parse is refused without repeating it, since it carries the password.
   def explicit_database(url)
-    database_from_url(url)
-  rescue URI::Error
+    uri = URI(url)
+    query = URI.decode_www_form(uri.query.to_s).to_h
+    from_query = { host: present(query['host']), port: present(query['port']), user: query['user'],
+                   password: query['password'], database: present(query['dbname']) }
+    explicit_url_parts(uri).merge(from_query.compact).merge(options: query.slice(*CONNECTION_OPTIONS.keys))
+  rescue URI::Error, ArgumentError
     raise StartFailure, 'WAC_DATABASE_URL is not a valid URL (a password with reserved characters has to be percent-encoded)'
+  end
+
+  # The URL's own parts, percent-decoded only: a plus there is a plus.
+  def explicit_url_parts(uri)
+    decode = ->(part) { part && URI.decode_uri_component(part) }
+    { host: present(uri.hostname), port: uri.port&.to_s, user: decode.call(uri.user), password: decode.call(uri.password),
+      database: present(decode.call(uri.path.to_s.delete_prefix('/'))) }.compact
   end
 
   def unreachable(env, err, db: chatwoot_database(env), source: nil)
@@ -306,7 +320,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # parameter, the two places a connection URL carries one.
   def redact(text)
     text.gsub(%r{([a-z][a-z0-9+.-]*://[^\s/@:]*:)[^@\n]*?@}i, '\\1***@')
-        .gsub(/([?&;]password=)[^&\s"']*/i, '\\1***')
+        .gsub(/([?&;]password=)[^&\n]*/i, '\\1***')
   end
 
   # The key the reason for a failed start is published under, next to the connector's own
@@ -322,7 +336,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # the connector reads (REDIS_URL and REDIS_PASSWORD), so it reaches the Redis the connector
   # registers in, and the health page reads both from the same place.
   def redis_command(env, *command)
-    url = URI(present(env['REDIS_URL']) || 'redis://127.0.0.1:6379')
+    url = redis_url(env)
     Timeout.timeout(REDIS_TIMEOUT) do
       socket = redis_socket(env, url)
       redis_auth(env, url, socket)
@@ -332,6 +346,12 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     ensure
       socket&.close
     end
+  end
+
+  def redis_url(env)
+    URI(present(env['REDIS_URL']) || 'redis://127.0.0.1:6379')
+  rescue URI::Error
+    raise 'REDIS_URL is not a valid URL'
   end
 
   def redis_auth(env, url, socket)
