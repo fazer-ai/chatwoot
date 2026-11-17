@@ -133,9 +133,15 @@ const onImageError = item => {
           </span>
           <span class="text-xs text-n-slate-11">
             {{
-              t('CONVERSATION.CATALOG.QUANTITY', { quantity: item.quantity })
+              item.price
+                ? t('CONVERSATION.CATALOG.QUANTITY_PRICE', {
+                    quantity: item.quantity,
+                    price: item.price,
+                  })
+                : t('CONVERSATION.CATALOG.QUANTITY', {
+                    quantity: item.quantity,
+                  })
             }}
-            <template v-if="item.price"> · {{ item.price }}</template>
           </span>
         </div>
       </li>

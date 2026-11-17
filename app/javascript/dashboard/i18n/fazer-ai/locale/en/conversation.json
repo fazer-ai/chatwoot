@@ -131,7 +131,8 @@
       "ESTIMATED_TOTAL": "{total} (estimated total)",
       "VIEW_ORDER": "View order",
       "HIDE_ORDER": "Hide items",
-      "QUANTITY": "Quantity: {quantity}"
+      "QUANTITY": "Quantity: {quantity}",
+      "QUANTITY_PRICE": "Quantity: {quantity} · {price}"
     }
   },
   "CONVERSATION_SIDEBAR": {

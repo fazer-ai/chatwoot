@@ -3,11 +3,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'next/icon/Icon.vue';
 import { useMessageContext } from '../provider.js';
-import {
-  formatPrice,
-  hasText,
-  toImageDataUri,
-} from './catalogHelpers';
+import { formatPrice, hasText, toImageDataUri } from './catalogHelpers';
 
 // A question asked from a WhatsApp catalog quotes the product, not a message: WhatsApp
 // shows it above the text with the store icon, the name, the price and a miniature.
