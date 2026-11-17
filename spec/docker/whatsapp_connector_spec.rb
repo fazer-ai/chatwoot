@@ -444,11 +444,17 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       expect(env.keys).not_to include('WAC_ENGINE', 'WAC_DATABASE_URL', 'WAC_EVENT_SHARDS')
     end
 
+    # The Redis the suite runs against. CI sets no REDIS_URL, and the helper falls back to the same default.
+    def redis_env
+      { 'REDIS_URL' => ENV.fetch('REDIS_URL', 'redis://127.0.0.1:6379'),
+        'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
+    end
+
     it 'publishes the reason and its index entry on the Redis the connector registers in, and clears both', :redis_streams do
-      env = { 'REDIS_URL' => ENV.fetch('REDIS_URL'), 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
+      env = redis_env
       key = described_class.failure_key(env)
       index = described_class.failure_index(env)
-      redis = Redis.new(url: ENV.fetch('REDIS_URL'))
+      redis = Redis.new(url: env['REDIS_URL'])
       report = described_class::FailureReport.new(env)
       allow(described_class).to receive(:log)
 
@@ -465,9 +471,9 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     end
 
     it 'drops from the index the entries that expired', :redis_streams do
-      env = { 'REDIS_URL' => ENV.fetch('REDIS_URL'), 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
+      env = redis_env
       index = described_class.failure_index(env)
-      redis = Redis.new(url: ENV.fetch('REDIS_URL'))
+      redis = Redis.new(url: env['REDIS_URL'])
       redis.zadd(index, Time.now.to_i - 1, 'gone-worker')
       allow(described_class).to receive(:log)
 
