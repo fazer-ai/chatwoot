@@ -70,9 +70,8 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
 
   module_function
 
-  # Every line goes through redact: an exception from a malformed URL repeats the URL.
   def log(message)
-    warn "[whatsapp-connector] #{redact(message.to_s)}"
+    warn "[whatsapp-connector] #{message}"
   end
 
   # The connection options that mean the same to libpq (Rails, psql) and to lib/pq (the
