@@ -103,8 +103,11 @@ RSpec.describe 'WhatsApp Session Providers API', type: :request do
 
         it 'carries the reason the newest failed start published' do
           # listed in the opposite order of their times, so the order of the keys decides nothing
-          redis.set("#{prefix}embedded:a-worker", { error: 'connector exited (status 1)', at: '2026-11-17T10:00:00Z' }.to_json)
-          redis.set("#{prefix}embedded:b-worker", { error: 'schema whatsapp_connector does not exist', at: '2026-11-17T11:00:00Z' }.to_json)
+          { 'a-worker' => ['connector exited (status 1)', '2026-11-17T10:00:00Z'],
+            'b-worker' => ['schema whatsapp_connector does not exist', '2026-11-17T11:00:00Z'] }.each do |id, (error, at)|
+            redis.set("#{prefix}embedded:#{id}", { error: error, at: at }.to_json)
+            redis.zadd("#{prefix}embedded", Time.now.to_i + 120, id)
+          end
 
           with_modified_env WHATSAPP_CONNECTOR_ENABLED: nil do
             expect(native['unavailable_detail']).to eq('schema whatsapp_connector does not exist')

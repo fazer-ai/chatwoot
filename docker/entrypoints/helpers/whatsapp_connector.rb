@@ -326,8 +326,17 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # registry entry and under the same instance id, so the health page can show it for the
   # instance that never registered.
   def failure_key(env)
-    prefix = present(env['WHATSAPP_CONNECTOR_REDIS_PREFIX']) || 'wa:'
-    "#{prefix}embedded:#{present(env['WAC_INSTANCE']) || Socket.gethostname}"
+    "#{failure_index(env)}:#{failure_instance(env)}"
+  end
+
+  # The instances that published a reason, scored by when it expires, so a reader lists them
+  # without scanning the whole Redis database for their keys.
+  def failure_index(env)
+    "#{present(env['WHATSAPP_CONNECTOR_REDIS_PREFIX']) || 'wa:'}embedded"
+  end
+
+  def failure_instance(env)
+    present(env['WAC_INSTANCE']) || Socket.gethostname
   end
 
   # One Redis command over a plain socket, for the one thing this file writes there. The
@@ -335,13 +344,20 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # the connector reads (REDIS_URL and REDIS_PASSWORD), so it reaches the Redis the connector
   # registers in, and the health page reads both from the same place.
   def redis_command(env, *command)
+    redis_commands(env, command)
+  end
+
+  # Several commands over one connection, in order. The reply is the last one's. Only the
+  # first line of each reply is read, so these are commands that answer in one line (SET,
+  # DEL, ZADD and the like), never one that returns a value.
+  def redis_commands(env, *commands)
     url = redis_url(env)
     Timeout.timeout(REDIS_TIMEOUT) do
       socket = redis_socket(env, url)
       redis_auth(env, url, socket)
       database = url.path.to_s.delete_prefix('/')
       redis_call(socket, 'SELECT', database) unless database.empty?
-      redis_call(socket, *command)
+      commands.map { |command| redis_call(socket, *command) }.last
     ensure
       socket&.close
     end
@@ -406,27 +422,35 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
         @last = reason
         @logged_at = @clock.call
       end
-      publish('SET', WhatsappConnectorEmbedded.failure_key(@env), JSON.generate(error: reason, at: Time.now.utc.iso8601), 'EX', FAILURE_TTL)
+      expires_at = Time.now.to_i + FAILURE_TTL
+      publish(['SET', key, JSON.generate(error: reason, at: Time.now.utc.iso8601), 'EX', FAILURE_TTL],
+              ['ZADD', index, expires_at, instance],
+              ['ZREMRANGEBYSCORE', index, '-inf', "(#{Time.now.to_i}"],
+              ['EXPIRE', index, FAILURE_TTL])
     end
 
     def recovered
       return if @last.nil?
 
       @last = nil
-      publish('DEL', WhatsappConnectorEmbedded.failure_key(@env))
+      publish(['DEL', key], ['ZREM', index, instance])
     end
 
     private
 
     # Losing the health page's copy must never stop the connector from being retried. A
     # Redis that refuses it is said once, since the connector would fail on it too.
-    def publish(*command)
-      WhatsappConnectorEmbedded.redis_command(@env, *command)
+    def publish(*commands)
+      WhatsappConnectorEmbedded.redis_commands(@env, *commands)
       @publish_failed = false
     rescue StandardError => e
       WhatsappConnectorEmbedded.log "could not publish the start status to Redis: #{e.message}" unless @publish_failed
       @publish_failed = true
     end
+
+    def key = WhatsappConnectorEmbedded.failure_key(@env)
+    def index = WhatsappConnectorEmbedded.failure_index(@env)
+    def instance = WhatsappConnectorEmbedded.failure_instance(@env)
   end
 
   class Supervisor

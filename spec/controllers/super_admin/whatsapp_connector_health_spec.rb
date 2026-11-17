@@ -20,6 +20,13 @@ RSpec.describe 'Super Admin instance status: WhatsApp connector', type: :request
     response.body
   end
 
+  # As docker/entrypoints/helpers/whatsapp_connector.rb publishes it: the reason, and its
+  # entry in the index the page reads instead of scanning.
+  def publish_start_failure(id, error, at, expires_at: Time.now.to_i + 120)
+    redis.set("#{prefix}embedded:#{id}", { error: error, at: at }.to_json)
+    redis.zadd("#{prefix}embedded", expires_at, id)
+  end
+
   def register(id, version)
     redis.hset("#{prefix}instance:#{id}", 'version', version, 'protocol_min', '1', 'protocol_max', '1')
     redis.sadd("#{prefix}instances", id)
@@ -39,13 +46,23 @@ RSpec.describe 'Super Admin instance status: WhatsApp connector', type: :request
   end
 
   it 'says it is not running and why the last start failed' do
-    redis.set("#{prefix}embedded:cw-worker-1",
-              { error: 'connector did not start: schema whatsapp_connector does not exist', at: '2026-11-17T11:00:00Z' }.to_json)
+    publish_start_failure('cw-worker-1', 'connector did not start: schema whatsapp_connector does not exist', '2026-11-17T11:00:00Z')
 
     body = page
 
     expect(body).to include('not running', 'WhatsApp connector start error (cw-worker-1)',
                             'schema whatsapp_connector does not exist')
+  end
+
+  it 'lists only the reasons the index still holds, and skips one that expired meanwhile' do
+    publish_start_failure('cw-worker-1', 'schema whatsapp_connector does not exist', '2026-11-17T11:00:00Z')
+    publish_start_failure('cw-worker-2', 'stale reason', '2026-11-17T09:00:00Z', expires_at: Time.now.to_i - 1)
+    redis.zadd("#{prefix}embedded", Time.now.to_i + 120, 'cw-worker-3')
+
+    body = page
+
+    expect(body).to include('WhatsApp connector start error (cw-worker-1)')
+    expect(body).not_to include('stale reason', 'cw-worker-3')
   end
 
   it 'leaves the connector out of an installation that turned it off' do

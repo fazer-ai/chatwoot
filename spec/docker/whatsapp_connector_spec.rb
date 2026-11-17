@@ -444,18 +444,38 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       expect(env.keys).not_to include('WAC_ENGINE', 'WAC_DATABASE_URL', 'WAC_EVENT_SHARDS')
     end
 
-    it 'writes and deletes a key on the Redis the connector registers in', :redis_streams do
+    it 'publishes the reason and its index entry on the Redis the connector registers in, and clears both', :redis_streams do
       env = { 'REDIS_URL' => ENV.fetch('REDIS_URL'), 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
       key = described_class.failure_key(env)
+      index = described_class.failure_index(env)
       redis = Redis.new(url: ENV.fetch('REDIS_URL'))
+      report = described_class::FailureReport.new(env)
+      allow(described_class).to receive(:log)
 
-      described_class.redis_command(env, 'SET', key, '{"error":"x"}', 'EX', 60)
-      expect([redis.get(key), redis.ttl(key)]).to match(['{"error":"x"}', be_between(1, 60)])
+      report.failed('schema missing')
+      expect(JSON.parse(redis.get(key))).to include('error' => 'schema missing')
+      expect(redis.ttl(key)).to be_between(1, described_class::FAILURE_TTL)
+      expect(redis.zscore(index, 'i1')).to be > Time.now.to_i
+      expect(redis.ttl(index)).to be_between(1, described_class::FAILURE_TTL)
 
-      described_class.redis_command(env, 'DEL', key)
-      expect(redis.exists?(key)).to be(false)
+      report.recovered
+      expect([redis.exists?(key), redis.zscore(index, 'i1')]).to eq([false, nil])
     ensure
-      redis&.del(key)
+      redis&.del(key, index)
+    end
+
+    it 'drops from the index the entries that expired', :redis_streams do
+      env = { 'REDIS_URL' => ENV.fetch('REDIS_URL'), 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
+      index = described_class.failure_index(env)
+      redis = Redis.new(url: ENV.fetch('REDIS_URL'))
+      redis.zadd(index, Time.now.to_i - 1, 'gone-worker')
+      allow(described_class).to receive(:log)
+
+      described_class::FailureReport.new(env).failed('schema missing')
+
+      expect(redis.zrange(index, 0, -1)).to eq(['i1'])
+    ensure
+      redis&.del(described_class.failure_key(env), index)
     end
 
     it 'reaches a Redis whose URL names an IPv6 address' do
@@ -551,7 +571,9 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       let(:report) { described_class.new({ 'WAC_INSTANCE' => 'i1' }, clock: -> { now.first }) }
 
       before do
-        allow(WhatsappConnectorEmbedded).to receive(:redis_command) { |_env, *command| published << command.first(2) }
+        allow(WhatsappConnectorEmbedded).to receive(:redis_commands) do |_env, *commands|
+          published.concat(commands.filter_map { |name, key| [name, key] if %w[SET DEL].include?(name) })
+        end
         allow(WhatsappConnectorEmbedded).to receive(:log)
       end
 
@@ -574,9 +596,9 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
 
         expect(WhatsappConnectorEmbedded).to have_received(:log).with(including('postgres://wac:***@store-db/wac_store'))
         expect(WhatsappConnectorEmbedded).not_to have_received(:log).with(including('secret'))
-        expect(WhatsappConnectorEmbedded).to have_received(:redis_command) do |_env, *command|
-          expect(command[2]).to include('postgres://wac:***@store-db/wac_store')
-          expect(command[2]).not_to include('secret')
+        expect(WhatsappConnectorEmbedded).to have_received(:redis_commands) do |_env, *commands|
+          expect(commands.first[2]).to include('postgres://wac:***@store-db/wac_store')
+          expect(commands.flatten.join).not_to include('secret')
         end
       end
 
@@ -593,7 +615,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       end
 
       it 'does not repeat a Redis password from a URL that would not parse' do
-        allow(WhatsappConnectorEmbedded).to receive(:redis_command).and_call_original
+        allow(WhatsappConnectorEmbedded).to receive(:redis_commands).and_call_original
         allow(WhatsappConnectorEmbedded).to receive(:log).and_call_original
         report = described_class.new({ 'REDIS_URL' => 'redis://:super secret@redis' })
 

@@ -23,15 +23,15 @@ class Whatsapp::Connector::Status
     instances.any?
   end
 
+  # Read through the index the helper keeps next to the reasons, never by scanning: the
+  # picker asks on every request while no connector runs, and the Redis is the application's.
   def start_failures
     @start_failures ||= with_redis do |redis|
-      prefix = Whatsapp::Connector.key('embedded', '')
-      redis.scan_each(match: "#{prefix}*").to_a.sort.filter_map do |key|
-        failure = JSON.parse(redis.get(key).to_s, symbolize_names: true)
-        StartFailure.new(instance: key.delete_prefix(prefix), error: failure[:error], at: failure[:at])
-      rescue JSON::ParserError
-        nil
-      end
+      ids = redis.zrangebyscore(Whatsapp::Connector.key('embedded'), Time.now.to_i, '+inf').sort
+      next [] if ids.empty?
+
+      records = redis.mget(*ids.map { |id| Whatsapp::Connector.key('embedded', id) })
+      ids.zip(records).filter_map { |id, record| start_failure(id, record) }
     end
   end
 
@@ -42,6 +42,16 @@ class Whatsapp::Connector::Status
   end
 
   private
+
+  # nil for a record that expired after the index was read, or that is not ours to parse.
+  def start_failure(id, record)
+    return unless record
+
+    failure = JSON.parse(record, symbolize_names: true)
+    StartFailure.new(instance: id, error: failure[:error], at: failure[:at])
+  rescue JSON::ParserError
+    nil
+  end
 
   def with_redis(&)
     Whatsapp::Connector::Client.with_redis(&)
