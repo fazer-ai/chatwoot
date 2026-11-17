@@ -34,7 +34,8 @@ const photo = computed(() =>
   usable(props.attachment?.dataUrl) ? props.attachment : null
 );
 const imageSrc = computed(
-  () => photo.value?.dataUrl ?? (usable(thumbnail.value) ? thumbnail.value : null)
+  () =>
+    photo.value?.dataUrl ?? (usable(thumbnail.value) ? thumbnail.value : null)
 );
 const onImageError = () => {
   failedSources.value = [...failedSources.value, imageSrc.value];
