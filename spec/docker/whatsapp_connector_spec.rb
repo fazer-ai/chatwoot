@@ -1,6 +1,8 @@
 require 'spec_helper'
 require 'fileutils'
 require 'open3'
+require 'redis'
+require 'securerandom'
 require 'timeout'
 require 'tmpdir'
 require_relative '../../docker/entrypoints/helpers/whatsapp_connector'
@@ -16,6 +18,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
   let(:bin_dir) { File.join(dir, 'bin') }
   let(:script) { File.expand_path('../../docker/entrypoints/helpers/whatsapp_connector.rb', __dir__) }
   let(:supervisors) { [] }
+  let(:outputs) { [] }
 
   before do
     FileUtils.mkdir_p(bin_dir)
@@ -36,7 +39,8 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       while [ ! -f "#{dir}/worker_exit" ]; do sleep 0.05; done
       exit "$(cat "#{dir}/worker_exit")"
     SH
-    stub('psql', "echo 1\n")
+    # what the store check reads: no older database, the schema there, and usable
+    stub('psql', "echo 'f|t|t'\n")
   end
 
   # A failing example can leave the supervisor and its children running; they share one
@@ -60,11 +64,13 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     env = {
       'PATH' => "#{bin_dir}:#{ENV.fetch('PATH')}",
       'POSTGRES_HOST' => 'pg', 'POSTGRES_PORT' => nil, 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'pw',
-      'POSTGRES_DATABASE' => 'chatwoot_production', 'WAC_MEDIA_ROOT' => File.join(dir, 'media')
+      'POSTGRES_DATABASE' => 'chatwoot_production', 'WAC_MEDIA_ROOT' => File.join(dir, 'media'),
+      # nothing listens there: publishing the start status fails, and must not matter
+      'REDIS_URL' => 'redis://127.0.0.1:1'
     }.merge(extra)
     stdin, out, wait = Open3.popen2e(env, 'ruby', script, 'worker', pgroup: true)
     stdin.close
-    @output = out
+    outputs << out
     supervisors << wait
     wait
   end
@@ -95,7 +101,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     _, pid, engine, url, media_root, token = lines('connector').first.split
     expect(pid).to match(/\A\d+\z/)
     expect(engine).to eq('whatsmeow')
-    expect(url).to eq('postgres://cw:pw@pg:5432/chatwoot_production_whatsapp_connector?sslmode=prefer')
+    expect(url).to eq('postgres://cw:pw@pg:5432/chatwoot_production?sslmode=prefer&search_path=whatsapp_connector')
     expect(media_root).to eq(File.join(dir, 'media'))
     expect(token).to match(/\A\h{64}\z/)
     expect(Dir.exist?(File.join(dir, 'media'))).to be(true)
@@ -188,29 +194,140 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     expect(lines('connector')).to be_empty
   end
 
+  it 'says once why the connector cannot start, keeps retrying, and leaves the worker alone' do
+    stub('psql', <<~SH)
+      echo "query" >> "#{dir}/psql"
+      echo 'f|f|f'
+    SH
+    wait = start
+    # three retries: the reason is the same each time
+    eventually { lines('psql').size >= 3 }
+    stop(wait)
+    output = outputs.last.read
+
+    expect(output.scan('schema whatsapp_connector does not exist').size).to eq(1)
+    expect(output).to include('bundle exec rails db:migrate')
+    expect(output.scan('could not publish the start status').size).to eq(1)
+    expect(lines('connector')).to be_empty
+    expect(lines('worker').grep(/\Astart /).size).to eq(1)
+  end
+
+  it 'refuses a WAC_DATABASE_URL database that does not exist, with the statement that creates it' do
+    stub('psql', <<~SH)
+      echo "query $*" >> "#{dir}/psql"
+      echo 'psql: error: connection to server at "store" (10.0.0.9), port 5432 failed: FATAL:  database "wac_store" does not exist' >&2
+      exit 2
+    SH
+    wait = start('WAC_DATABASE_URL' => 'postgres://wac:pw@store:5432/wac_store')
+    eventually { lines('psql').size >= 2 }
+    stop(wait)
+
+    expect(lines('psql').first).to include('-h store', '-d wac_store')
+    expect(outputs.last.read.scan('create it with CREATE DATABASE "wac_store"').size).to eq(1)
+    expect(lines('connector')).to be_empty
+  end
+
   describe WhatsappConnectorEmbedded do
     let(:base) { { 'POSTGRES_HOST' => 'pg', 'POSTGRES_USERNAME' => 'cw', 'POSTGRES_PASSWORD' => 'p@ss:w', 'POSTGRES_DATABASE' => 'cw_db' } }
 
+    let(:ok) { instance_double(Process::Status, success?: true) }
+    let(:failed) { instance_double(Process::Status, success?: false) }
+    let(:calls) { [] }
+
+    def answering(out, err = '', status = ok)
+      lambda do |_env, sql, db: nil|
+        calls << [sql, db]
+        [out, err, status]
+      end
+    end
+
+    def url_for(extra = {}, state = "f|t|t\n")
+      described_class.store_url(base.merge(extra), runner: answering(state))
+    end
+
     def env_for(extra = {})
-      described_class.connector_env(base.merge(extra), media_token: 'tok', media_root: '/m')
+      described_class.connector_env(base.merge(extra), media_token: 'tok', media_root: '/m', database_url: 'postgres://x')
     end
 
-    it 'derives the database from DATABASE_URL before the POSTGRES_* parameters, as Rails does' do
-      url = env_for('DATABASE_URL' => 'postgres://u:secret@db.internal:6543/app?sslmode=require')['WAC_DATABASE_URL']
+    it 'puts the store in the whatsapp_connector schema of the database Rails connects to' do
+      url = url_for('DATABASE_URL' => 'postgres://u:secret@db.internal:6543/app?sslmode=require')
 
-      expect(url).to eq('postgres://u:secret@db.internal:6543/app_whatsapp_connector?sslmode=require')
+      expect(url).to eq('postgres://u:secret@db.internal:6543/app?sslmode=require&search_path=whatsapp_connector')
     end
 
-    it 'escapes credentials and follows PGSSLMODE when the URL names no sslmode' do
-      url = env_for('PGSSLMODE' => 'disable')['WAC_DATABASE_URL']
+    it 'keeps an installation that already has a database of the connector on it' do
+      expect(url_for({}, "t|t|t\n")).to eq('postgres://cw:p%40ss%3Aw@pg:5432/cw_db_whatsapp_connector?sslmode=prefer')
+      expect(url_for({}, "t|f|f\n")).to end_with('/cw_db_whatsapp_connector?sslmode=prefer')
+    end
 
-      expect(url).to eq('postgres://cw:p%40ss%3Aw@pg:5432/cw_db_whatsapp_connector?sslmode=disable')
+    it 'creates nothing, and says how to create the schema when it is missing' do
+      expect { url_for({}, "f|f|f\n") }
+        .to raise_error(WhatsappConnectorEmbedded::StartFailure) { |error|
+          expect(error.message).to start_with('schema whatsapp_connector does not exist in database cw_db: ')
+          expect(error.message).to include('bundle exec rails db:migrate', 'CREATE SCHEMA whatsapp_connector AUTHORIZATION "cw"')
+        }
+      expect(calls.size).to eq(1)
+      expect(calls.first.first).to start_with('SELECT')
+      expect(calls.first.first).not_to match(/CREATE (DATABASE|SCHEMA)/)
+    end
+
+    it 'says which grant is missing when the schema is there but not usable by this user' do
+      expect { url_for({}, "f|t|f\n") }
+        .to raise_error(WhatsappConnectorEmbedded::StartFailure,
+                        /user cw lacks USAGE or CREATE on schema whatsapp_connector .*GRANT USAGE, CREATE ON SCHEMA whatsapp_connector TO "cw"/)
+    end
+
+    it 'tells a database that does not answer apart from a missing schema' do
+      runner = answering('', "psql: error: connection to server at \"pg\", port 5432 failed: Connection refused\nmore\n", failed)
+
+      expect { described_class.store_url(base, runner: runner) }
+        .to raise_error(WhatsappConnectorEmbedded::StartFailure, /could not query database cw_db at pg:5432 as cw \(.*Connection refused\): check/)
+    end
+
+    describe '.check_explicit_store' do
+      let(:explicit) { base.merge('WAC_DATABASE_URL' => 'postgres://wac:s%2Blt@store-db:6000/wac_store?sslmode=require') }
+
+      it 'checks the database WAC_DATABASE_URL names, on its own server and with its own credentials' do
+        described_class.check_explicit_store(explicit, runner: answering("1\n"))
+
+        expect(calls).to eq([['SELECT 1', { host: 'store-db', port: '6000', user: 'wac', password: 's+lt',
+                                            database: 'wac_store', options: { 'sslmode' => 'require' } }]])
+      end
+
+      it 'refuses a database that does not exist with the statement that creates it, and creates nothing' do
+        runner = answering('', "psql: error: connection to server at \"store-db\" failed: FATAL:  database \"wac_store\" does not exist\n",
+                           failed)
+
+        expect { described_class.check_explicit_store(explicit, runner: runner) }
+          .to raise_error(WhatsappConnectorEmbedded::StartFailure) { |error|
+            expect(error.message).to start_with('database wac_store named by WAC_DATABASE_URL does not exist on store-db:6000: ')
+            expect(error.message).to include('create it with CREATE DATABASE "wac_store"')
+          }
+        expect(calls.map(&:first)).to eq(['SELECT 1'])
+      end
+
+      it 'says the server does not answer when that is the failure' do
+        runner = answering('', "psql: error: connection to server at \"store-db\", port 6000 failed: Connection refused\n", failed)
+
+        expect { described_class.check_explicit_store(explicit, runner: runner) }
+          .to raise_error(WhatsappConnectorEmbedded::StartFailure,
+                          /could not query database wac_store at store-db:6000 .*WAC_DATABASE_URL is right/)
+      end
+
+      it 'leaves a store that is not Postgres to the connector' do
+        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'sqlite:///data/wac.db'), runner: answering(''))
+
+        expect(calls).to be_empty
+      end
+    end
+
+    it 'follows PGSSLMODE and escapes credentials when the URL names no sslmode' do
+      expect(url_for('PGSSLMODE' => 'disable')).to eq('postgres://cw:p%40ss%3Aw@pg:5432/cw_db?sslmode=disable&search_path=whatsapp_connector')
     end
 
     it 'takes from POSTGRES_* what the URL leaves out, as Rails merges them' do
-      url = env_for('DATABASE_URL' => 'postgresql://u@db.internal/app')['WAC_DATABASE_URL']
-
-      expect(url).to eq('postgres://u:p%40ss%3Aw@db.internal:5432/app_whatsapp_connector?sslmode=prefer')
+      expect(url_for('DATABASE_URL' => 'postgresql://u@db.internal/app'))
+        .to eq('postgres://u:p%40ss%3Aw@db.internal:5432/app?sslmode=prefer&search_path=whatsapp_connector')
     end
 
     it 'reads connection fields from the query as Rails does, over the URL parts' do
@@ -222,14 +339,13 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     end
 
     it 'keeps the TLS options of the URL and drops the ones only Rails understands' do
-      url = env_for('DATABASE_URL' => 'postgres://u:s@db/app?pool=5&sslmode=verify-full&sslrootcert=/ca.pem&checkout_timeout=5')
-            .fetch('WAC_DATABASE_URL')
+      url = url_for('DATABASE_URL' => 'postgres://u:s@db/app?pool=5&sslmode=verify-full&sslrootcert=/ca.pem&checkout_timeout=5')
 
-      expect(url).to eq('postgres://u:s@db:5432/app_whatsapp_connector?sslmode=verify-full&sslrootcert=%2Fca.pem')
+      expect(url).to eq('postgres://u:s@db:5432/app?sslmode=verify-full&sslrootcert=%2Fca.pem&search_path=whatsapp_connector')
     end
 
     it 'escapes a space as %20 and reads a plus in the URL as a plus' do
-      expect(env_for('POSTGRES_PASSWORD' => 'with space')['WAC_DATABASE_URL']).to start_with('postgres://cw:with%20space@')
+      expect(url_for('POSTGRES_PASSWORD' => 'with space')).to start_with('postgres://cw:with%20space@')
       expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:a+b@db/app')[:password]).to eq('a+b')
     end
 
@@ -240,9 +356,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
     end
 
     it 'brackets an IPv6 host once' do
-      url = env_for('DATABASE_URL' => 'postgres://u:s@[::1]:5432/app')['WAC_DATABASE_URL']
-
-      expect(url).to start_with('postgres://u:s@[::1]:5432/')
+      expect(url_for('DATABASE_URL' => 'postgres://u:s@[::1]:5432/app')).to start_with('postgres://u:s@[::1]:5432/')
       expect(described_class.chatwoot_database('DATABASE_URL' => 'postgres://u:s@[::1]:5432/app')[:host]).to eq('::1')
     end
 
@@ -256,7 +370,7 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       env = env_for('WHATSAPP_CONNECTOR_EVENT_SHARDS' => '8', 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => 'x:')
 
       expect(env).to include('WAC_EVENT_SHARDS' => '8', 'WAC_REDIS_PREFIX' => 'x:', 'WAC_ENGINE' => 'whatsmeow',
-                             'WAC_MEDIA_ROOT' => '/m', 'WAC_MEDIA_TOKEN' => 'tok')
+                             'WAC_MEDIA_ROOT' => '/m', 'WAC_MEDIA_TOKEN' => 'tok', 'WAC_DATABASE_URL' => 'postgres://x')
     end
 
     it 'never overrides an explicit WAC_* value' do
@@ -266,42 +380,51 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       expect(env.keys).not_to include('WAC_ENGINE', 'WAC_DATABASE_URL', 'WAC_EVENT_SHARDS')
     end
 
-    describe '.ensure_database' do
-      let(:calls) { [] }
-      let(:ok) { instance_double(Process::Status, success?: true) }
-      let(:failed) { instance_double(Process::Status, success?: false) }
+    it 'writes and deletes a key on the Redis the connector registers in', :redis_streams do
+      env = { 'REDIS_URL' => ENV.fetch('REDIS_URL'), 'WHATSAPP_CONNECTOR_REDIS_PREFIX' => "spec#{SecureRandom.hex(4)}:", 'WAC_INSTANCE' => 'i1' }
+      key = described_class.failure_key(env)
+      redis = Redis.new(url: ENV.fetch('REDIS_URL'))
 
-      def runner(answers)
-        lambda do |_env, sql|
-          calls << sql
-          answers.shift.call(sql)
-        end
+      described_class.redis_command(env, 'SET', key, '{"error":"x"}', 'EX', 60)
+      expect([redis.get(key), redis.ttl(key)]).to match(['{"error":"x"}', be_between(1, 60)])
+
+      described_class.redis_command(env, 'DEL', key)
+      expect(redis.exists?(key)).to be(false)
+    ensure
+      redis&.del(key)
+    end
+
+    describe WhatsappConnectorEmbedded::FailureReport do
+      let(:now) { [1000.0] }
+      let(:published) { [] }
+      let(:report) { described_class.new({ 'WAC_INSTANCE' => 'i1' }, clock: -> { now.first }) }
+
+      before do
+        allow(WhatsappConnectorEmbedded).to receive(:redis_command) { |_env, *command| published << command.first(2) }
+        allow(WhatsappConnectorEmbedded).to receive(:log)
       end
 
-      it 'creates the database when it is missing' do
-        described_class.ensure_database(base, runner: runner([->(_) { ['', '', ok] }, ->(_) { ['', '', ok] }]))
+      it 'logs a reason once while it repeats, and again when it changes or after a while' do
+        3.times { report.failed('schema missing') }
+        now[0] += WhatsappConnectorEmbedded::REPEAT_FAILURE_AFTER - 1
+        report.failed('schema missing')
+        report.failed('no grant')
+        now[0] += WhatsappConnectorEmbedded::REPEAT_FAILURE_AFTER
+        report.failed('no grant')
 
-        expect(calls).to eq(["SELECT 1 FROM pg_database WHERE datname = 'cw_db_whatsapp_connector'",
-                             'CREATE DATABASE "cw_db_whatsapp_connector"'])
+        expect(WhatsappConnectorEmbedded).to have_received(:log).with(/\Aschema missing\. Retrying/).once
+        expect(WhatsappConnectorEmbedded).to have_received(:log).with(/\Ano grant\. Retrying/).twice
+        expect(published).to all(eq(['SET', 'wa:embedded:i1']))
+        expect(published.size).to eq(6)
       end
 
-      it 'leaves an existing database alone' do
-        described_class.ensure_database(base, runner: runner([->(_) { ["1\n", '', ok] }]))
+      it 'forgets the reason once the connector ran, so the same failure is news again' do
+        report.failed('connector exited (status 1)')
+        report.recovered
+        report.failed('connector exited (status 1)')
 
-        expect(calls.size).to eq(1)
-      end
-
-      it 'accepts losing the race to another replica' do
-        answers = [->(_) { ['', '', ok] }, ->(_) { ['', 'already exists', failed] }, ->(_) { ["1\n", '', ok] }]
-
-        expect { described_class.ensure_database(base, runner: runner(answers)) }.not_to raise_error
-      end
-
-      it 'fails when the database cannot be created and does not exist' do
-        answers = [->(_) { ['', '', ok] }, ->(_) { ['', 'permission denied to create database', failed] }, ->(_) { ['', '', ok] }]
-
-        expect { described_class.ensure_database(base, runner: runner(answers)) }
-          .to raise_error(/permission denied to create database/)
+        expect(WhatsappConnectorEmbedded).to have_received(:log).twice
+        expect(published).to eq([%w[SET wa:embedded:i1], %w[DEL wa:embedded:i1], %w[SET wa:embedded:i1]])
       end
     end
   end
