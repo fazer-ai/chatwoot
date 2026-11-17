@@ -11,11 +11,16 @@
 module WhatsappConnectorSchema
   NAME = 'whatsapp_connector'.freeze
 
-  # In a savepoint, so a refusal inside a migration's transaction does not abort it.
+  # In a savepoint, so a refusal inside a migration's transaction does not abort it. Always
+  # IF NOT EXISTS for this schema: db/schema.rb dumps it without, and a schema load over an
+  # already migrated database would otherwise stop at it.
   def create_schema(schema_name, **options)
-    transaction(requires_new: true) { super }
+    options = options.merge(if_not_exists: true) if schema_name.to_s == NAME
+    transaction(requires_new: true) { super(schema_name, **options) }
   rescue ActiveRecord::StatementInvalid => e
     raise unless schema_name.to_s == NAME && e.cause.is_a?(PG::InsufficientPrivilege)
+    # Postgres checks the privilege before IF NOT EXISTS: a schema already there is no failure.
+    return if schema_exists?(NAME)
 
     Rails.logger.warn(
       "Could not create schema #{NAME} (#{e.cause.message.strip}). The WhatsApp (native) connector will not " \

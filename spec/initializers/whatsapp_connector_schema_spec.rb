@@ -24,7 +24,24 @@ RSpec.describe WhatsappConnectorSchema do
     expect(connection.schema_exists?('whatsapp_connector')).to be(true)
   end
 
+  it 'loads db/schema.rb over a database that already has it' do
+    connection.create_schema 'whatsapp_connector', if_not_exists: true
+
+    expect { connection.create_schema 'whatsapp_connector' }.not_to raise_error
+  end
+
+  it 'stays quiet when the role may not create it but it is already there' do
+    connection.create_schema 'whatsapp_connector', if_not_exists: true
+    refuse_schema_creation
+    allow(Rails.logger).to receive(:warn)
+
+    connection.create_schema 'whatsapp_connector'
+
+    expect(Rails.logger).not_to have_received(:warn)
+  end
+
   it 'warns instead of failing when the role may not create it, and the transaction goes on' do
+    connection.drop_schema 'whatsapp_connector', if_exists: true
     refuse_schema_creation
     allow(Rails.logger).to receive(:warn)
 
