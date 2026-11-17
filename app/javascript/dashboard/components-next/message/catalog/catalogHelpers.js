@@ -32,11 +32,5 @@ export const toHttpUrl = url => {
   }
 };
 
-const hasText = value => typeof value === 'string' && value.trim() !== '';
-
-// Every field travels on its own, so a product is readable when any of them came.
-export const isReadableProduct = product =>
-  hasText(product?.title) ||
-  hasText(product?.description) ||
-  typeof product?.price1000 === 'number' ||
-  typeof product?.salePrice1000 === 'number';
+export const hasText = value =>
+  typeof value === 'string' && value.trim() !== '';

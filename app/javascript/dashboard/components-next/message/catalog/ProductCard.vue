@@ -7,7 +7,7 @@ import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { useMessageContext } from '../provider.js';
 import {
   formatPrice,
-  isReadableProduct,
+  hasText,
   toHttpUrl,
   toImageDataUri,
 } from './catalogHelpers';
@@ -32,7 +32,6 @@ const photo = computed(() =>
 );
 const imageSrc = computed(() => photo.value?.dataUrl ?? thumbnail.value);
 
-const readable = computed(() => isReadableProduct(props.product));
 const currentPrice = computed(() =>
   formatPrice(
     props.product.salePrice1000 ?? props.product.price1000,
@@ -46,6 +45,13 @@ const originalPrice = computed(() =>
     : null
 );
 const productUrl = computed(() => toHttpUrl(props.product.url));
+// Every field travels on its own: the card is readable when it has something to show.
+const readable = computed(
+  () =>
+    hasText(props.product.title) ||
+    hasText(props.product.description) ||
+    Boolean(currentPrice.value)
+);
 </script>
 
 <template>

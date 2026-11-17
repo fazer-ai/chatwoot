@@ -5,7 +5,7 @@ import Icon from 'next/icon/Icon.vue';
 import { useMessageContext } from '../provider.js';
 import {
   formatPrice,
-  isReadableProduct,
+  hasText,
   toImageDataUri,
 } from './catalogHelpers';
 
@@ -15,7 +15,6 @@ const { contentAttributes } = useMessageContext();
 const { t, locale } = useI18n();
 
 const product = computed(() => contentAttributes.value?.quotedProduct ?? null);
-const readable = computed(() => isReadableProduct(product.value));
 const thumbnail = computed(() => toImageDataUri(product.value?.thumbnail));
 const price = computed(() =>
   formatPrice(
@@ -24,6 +23,11 @@ const price = computed(() =>
     locale.value
   )
 );
+// Readable when the quote has something to show: the name, else the description.
+const label = computed(() =>
+  [product.value?.title, product.value?.description].find(hasText)
+);
+const readable = computed(() => Boolean(label.value || price.value));
 </script>
 
 <template>
@@ -38,7 +42,7 @@ const price = computed(() =>
         <span>{{ t('CONVERSATION.CATALOG.PRODUCT_LABEL') }}</span>
       </div>
       <template v-if="readable">
-        <span class="font-medium truncate">{{ product.title }}</span>
+        <span v-if="label" class="font-medium truncate">{{ label }}</span>
         <span v-if="price" class="text-xs text-n-slate-11">{{ price }}</span>
       </template>
       <span v-else class="text-xs text-n-slate-11">

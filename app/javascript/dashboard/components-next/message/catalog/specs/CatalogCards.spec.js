@@ -161,6 +161,17 @@ describe('catalog product card', () => {
     expect(text(wrapper)).not.toContain('Veja no WhatsApp');
   });
 
+  it('says there is a product to see on WhatsApp when only a price without currency came', () => {
+    const wrapper = mountWith(RichMessage, {
+      rich: {
+        type: 'product',
+        product: { price1000: 34900, thumbnail: THUMB },
+      },
+    });
+
+    expect(text(wrapper)).toContain('Veja no WhatsApp');
+  });
+
   it('opens the delivered photo in the gallery', async () => {
     const wrapper = mountWith(
       RichMessage,
@@ -305,6 +316,23 @@ describe('quoted catalog product', () => {
 
     expect(text(wrapper)).toContain('Veja no WhatsApp');
     expect(text(wrapper)).not.toContain('0,00');
+  });
+
+  it('shows the description of a quoted product that came without a name', () => {
+    const wrapper = mountWith(QuotedProduct, {
+      quotedProduct: product({ title: undefined }),
+    });
+
+    expect(text(wrapper)).toContain('Caneca de cerâmica, 300 ml');
+    expect(text(wrapper)).not.toContain('Veja no WhatsApp');
+  });
+
+  it('says there is a product when the quote has only a price without currency', () => {
+    const wrapper = mountWith(QuotedProduct, {
+      quotedProduct: { price1000: 34900 },
+    });
+
+    expect(text(wrapper)).toContain('Veja no WhatsApp');
   });
 
   it('renders nothing for a message that quotes no product', () => {
