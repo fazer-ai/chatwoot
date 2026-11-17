@@ -501,21 +501,35 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       before do
         allow(failures).to receive(:recovered)
         allow(failures).to receive(:failed)
+        allow(supervisor).to receive(:kill)
         allow(supervisor).to receive(:monotonic) { clock.first }
         allow(supervisor).to receive(:pause)
       end
 
-      # Two runs of 120 s each, the second one stopping the loop.
+      # Two rounds of 120 s each, the second one stopping the loop. A spawned round spends
+      # its time in the connector, the other one in a store check that ends up failing.
       def supervise(spawned:)
-        runs = 0
-        allow(supervisor).to receive(:run_connector_once) do
-          runs += 1
-          supervisor.instance_variable_set(:@spawned_at, clock.first) if spawned
+        rounds = 0
+        allow(supervisor).to receive(:locate_store) do
+          rounds += 1
+          supervisor.instance_variable_set(:@stopping, true) if rounds == 2
+          next 'postgres://store-db/chatwoot' if spawned
+
           clock[0] += 120
-          supervisor.instance_variable_set(:@stopping, true) if runs == 2
-          spawned ? status : nil
+          raise WhatsappConnectorEmbedded::StartFailure, 'store unreachable'
         end
+        stub_connector_run
         supervisor.send(:keep_connector_running)
+      end
+
+      def stub_connector_run
+        allow(FileUtils).to receive(:mkdir_p)
+        allow(WhatsappConnectorEmbedded).to receive(:connector_env).and_return({})
+        allow(Process).to receive(:spawn).and_return(4242)
+        allow(Process).to receive(:wait2) do
+          clock[0] += 120
+          [4242, status]
+        end
       end
 
       it 'keeps the reason of a store check that took long and failed: nothing ran' do
