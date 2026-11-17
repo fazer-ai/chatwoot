@@ -17,10 +17,20 @@ const { t, locale } = useI18n();
 const expanded = ref(false);
 const thumbnail = computed(() => toImageDataUri(props.order.thumbnail));
 
+// WhatsApp counts units, not lines, and the items carry the same count when the
+// summary does not.
+const units = computed(() => {
+  if (typeof props.order.itemCount === 'number') return props.order.itemCount;
+  if (!Array.isArray(props.order.items)) return null;
+  return props.order.items.reduce(
+    (sum, item) => sum + (Number(item?.quantity) || 0),
+    0
+  );
+});
 const itemCount = computed(() =>
-  typeof props.order.itemCount === 'number'
-    ? t('CONVERSATION.CATALOG.ITEM_COUNT', { count: props.order.itemCount })
-    : null
+  units.value === null
+    ? null
+    : t('CONVERSATION.CATALOG.ITEM_COUNT', { count: units.value })
 );
 const total = computed(() => {
   const amount = formatPrice(
@@ -40,6 +50,7 @@ const items = computed(() =>
     .map((item, index) => ({
       key: `${item.productId || item.name}-${index}`,
       name: item.name,
+      variant: item.variant,
       quantity: item.quantity,
       image: toHttpUrl(item.image),
       price: formatPrice(
@@ -117,6 +128,9 @@ const onImageError = item => {
         </div>
         <div class="flex flex-col min-w-0">
           <span class="font-medium break-words">{{ item.name }}</span>
+          <span v-if="item.variant" class="text-xs text-n-slate-11">
+            {{ item.variant }}
+          </span>
           <span class="text-xs text-n-slate-11">
             {{
               t('CONVERSATION.CATALOG.QUANTITY', { quantity: item.quantity })

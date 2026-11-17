@@ -81,6 +81,29 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       expect(row.content_attributes.dig('rich', 'product')).to eq({})
     end
 
+    it 'keeps what WhatsApp sent of a product that came without a name' do
+      message = payload('product_received')
+      message['content']['product'].delete('title')
+
+      content = deliver(message).content
+      expect(content).to end_with("34,90\n\nCaneca de cerâmica, 300 ml")
+      expect(content).not_to include('Mensagem com um produto')
+    end
+
+    it 'writes a currency with three decimals as three, the way the card shows it' do
+      message = payload('product_received')
+      message['content']['product'].merge!('price_1000' => 1234, 'currency' => 'KWD')
+
+      expect(deliver(message).content).to include('KWD 1,234')
+    end
+
+    it 'writes a currency without decimals without them' do
+      message = payload('product_received')
+      message['content']['product'].merge!('price_1000' => 1_500_000, 'currency' => 'JPY')
+
+      expect(deliver(message).content).to include('JPY 1.500')
+    end
+
     it 'files the business own product as an outgoing message' do
       message = deliver(payload('product_sent'))
 
@@ -175,6 +198,20 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
       message['content']['order']['items'][0].delete('currency')
 
       expect(deliver(message).content).to include('× 1 · R$ 59,90')
+    end
+
+    it 'names the variant the customer chose' do
+      message = payload('order_received')
+      message['content']['order']['items'][0]['variant'] = 'Tamanho: M'
+
+      expect(deliver(message).content).to include('• Camiseta básica (Tamanho: M) × 1')
+    end
+
+    it 'counts the units of the items when the summary has no count' do
+      message = payload('order_received')
+      message['content']['order'].delete('item_count')
+
+      expect(deliver(message).content).to include("Pedido 2000000000000001\n3 itens ·")
     end
 
     it 'writes one item in the singular' do

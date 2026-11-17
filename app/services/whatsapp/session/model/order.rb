@@ -13,4 +13,8 @@ class Whatsapp::Session::Model::Order < Data.define(
   end
 
   coerce seller: Whatsapp::Session::Model::Address, items: [Item]
+
+  # WhatsApp counts units, not lines (2 shirts and a mug are 3 items), and the items carry
+  # the same count when the summary does not.
+  def units = item_count || items&.sum { |item| item.quantity.to_i }
 end

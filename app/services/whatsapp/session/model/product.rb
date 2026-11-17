@@ -12,6 +12,4 @@ class Whatsapp::Session::Model::Product < Data.define(
 
   # The price the customer pays: the sale price when the business set one.
   def current_price_1000 = sale_price_1000 || price_1000
-
-  def readable? = title.present?
 end

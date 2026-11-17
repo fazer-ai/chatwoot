@@ -7,6 +7,11 @@ import { provideMessageContext } from '../../provider.js';
 import ptBR from 'dashboard/i18n/fazer-ai/locale/pt_BR/conversation.json';
 import en from 'dashboard/i18n/fazer-ai/locale/en/conversation.json';
 
+// The gallery lists the chat's attachments from the store.
+vi.mock('dashboard/composables/store', () => ({
+  useMapGetter: () => ref([]),
+}));
+
 // Payloads as content_attributes reach the bubble: deep-camelized, so price_1000 is
 // price1000. The values are the live order and product of fazer-ai/chatwoot#996.
 const THUMB = 'data:image/jpeg;base64,/9j/4AAQ';
@@ -75,6 +80,7 @@ const mountWith = (
       stubs: {
         BaseBubble: { template: '<div><slot /></div>' },
         Icon: { props: ['icon'], template: '<i :data-icon="icon" />' },
+        GalleryView: { template: '<div data-gallery />' },
       },
     },
   });
@@ -145,6 +151,41 @@ describe('catalog product card', () => {
     );
   });
 
+  it('shows the price and description of a product that came without a name', () => {
+    const wrapper = mountWith(RichMessage, {
+      rich: { type: 'product', product: product({ title: undefined }) },
+    });
+
+    expect(text(wrapper)).toContain('34,90');
+    expect(text(wrapper)).toContain('Caneca de cerâmica, 300 ml');
+    expect(text(wrapper)).not.toContain('Veja no WhatsApp');
+  });
+
+  it('opens the delivered photo in the gallery', async () => {
+    const wrapper = mountWith(
+      RichMessage,
+      { rich: { type: 'product', product: product() } },
+      {
+        attachments: [
+          { id: 9, fileType: 'image', dataUrl: 'https://cw/rails/photo.jpg' },
+        ],
+      }
+    );
+
+    expect(wrapper.find('[data-gallery]').exists()).toBe(false);
+    await wrapper.find('img').trigger('click');
+    expect(wrapper.find('[data-gallery]').exists()).toBe(true);
+  });
+
+  it('does not open a gallery for the inline thumbnail', async () => {
+    const wrapper = mountWith(RichMessage, {
+      rich: { type: 'product', product: product() },
+    });
+
+    await wrapper.find('img').trigger('click');
+    expect(wrapper.find('[data-gallery]').exists()).toBe(false);
+  });
+
   it('draws the delivered photo inside the card instead of a separate attachment', () => {
     const wrapper = mountWith(
       RichMessage,
@@ -213,6 +254,26 @@ describe('catalog order card', () => {
     expect(text(wrapper)).toContain('3 itens');
     expect(text(wrapper)).toContain('R$ 129,70');
     expect(wrapper.find('button').exists()).toBe(false);
+  });
+
+  it('shows the variant the customer chose', async () => {
+    const withVariant = order();
+    withVariant.items[0].variant = 'Tamanho: M';
+    const wrapper = mountWith(RichMessage, {
+      rich: { type: 'order', order: withVariant },
+    });
+
+    await wrapper.find('button').trigger('click');
+
+    expect(wrapper.find('[data-catalog-item]').text()).toContain('Tamanho: M');
+  });
+
+  it('counts the units of the items when the summary has no count', () => {
+    const wrapper = mountWith(RichMessage, {
+      rich: { type: 'order', order: order({ itemCount: undefined }) },
+    });
+
+    expect(text(wrapper)).toContain('3 itens');
   });
 
   it('writes one item in the singular and leaves out a missing total', () => {

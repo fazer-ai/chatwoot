@@ -27,8 +27,8 @@ const order = computed(() =>
 // The product's photo arrives as the message's image once the connector delivers it.
 const productImage = computed(
   () =>
-    attachments.value?.find(attachment => attachment.fileType === 'image')
-      ?.dataUrl ?? null
+    attachments.value?.find(attachment => attachment.fileType === 'image') ??
+    null
 );
 
 const formattedBody = computed(() =>
@@ -75,7 +75,7 @@ const buttons = computed(() => {
 
 <template>
   <BaseBubble class="px-4 py-3 text-sm" data-bubble-name="rich">
-    <ProductCard v-if="product" :product="product" :image-url="productImage" />
+    <ProductCard v-if="product" :product="product" :attachment="productImage" />
     <OrderCard v-else-if="order" :order="order" :note="rich.body || ''" />
     <div v-else class="flex flex-col gap-2">
       <AttachmentChips

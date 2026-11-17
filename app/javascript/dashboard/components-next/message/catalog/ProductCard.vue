@@ -2,6 +2,9 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import Icon from 'next/icon/Icon.vue';
+import GalleryView from 'dashboard/components/widgets/conversation/components/GalleryView.vue';
+import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
+import { useMessageContext } from '../provider.js';
 import {
   formatPrice,
   isReadableProduct,
@@ -11,20 +14,23 @@ import {
 
 // A product sent from a WhatsApp catalog, drawn the way WhatsApp draws it: the photo on
 // top, then the name, the price and the description. The photo is the message's image
-// attachment when the connector delivered it, the inline thumbnail until then.
+// attachment when the connector delivered it, and opens in the gallery like any other
+// image. Until then it is the inline thumbnail.
 const props = defineProps({
   product: { type: Object, required: true },
-  imageUrl: { type: String, default: null },
+  attachment: { type: Object, default: null },
 });
 
 const { t, locale } = useI18n();
+const { filteredCurrentChatAttachments } = useMessageContext();
 
 const imageFailed = ref(false);
+const showGallery = ref(false);
 const thumbnail = computed(() => toImageDataUri(props.product.thumbnail));
-const imageSrc = computed(() => {
-  if (props.imageUrl && !imageFailed.value) return props.imageUrl;
-  return thumbnail.value;
-});
+const photo = computed(() =>
+  props.attachment?.dataUrl && !imageFailed.value ? props.attachment : null
+);
+const imageSrc = computed(() => photo.value?.dataUrl ?? thumbnail.value);
 
 const readable = computed(() => isReadableProduct(props.product));
 const currentPrice = computed(() =>
@@ -49,14 +55,23 @@ const productUrl = computed(() => toHttpUrl(props.product.url));
       :src="imageSrc"
       :alt="product.title || ''"
       class="object-cover w-full rounded-lg max-h-72 bg-n-alpha-black1"
+      :class="{ 'cursor-pointer skip-context-menu': photo }"
+      @click="showGallery = !!photo"
       @error="imageFailed = true"
+    />
+    <GalleryView
+      v-if="showGallery && photo"
+      v-model:show="showGallery"
+      :attachment="useSnakeCase(photo)"
+      :all-attachments="filteredCurrentChatAttachments"
+      @close="showGallery = false"
     />
     <div class="flex items-center gap-1 text-xs text-n-slate-11">
       <Icon icon="i-lucide-store" class="size-3 shrink-0" />
       <span>{{ t('CONVERSATION.CATALOG.PRODUCT_LABEL') }}</span>
     </div>
     <template v-if="readable">
-      <p class="mb-0 font-medium">{{ product.title }}</p>
+      <p v-if="product.title" class="mb-0 font-medium">{{ product.title }}</p>
       <p v-if="currentPrice" class="flex flex-wrap items-baseline gap-2 mb-0">
         <span class="font-medium">{{ currentPrice }}</span>
         <s v-if="originalPrice" class="text-xs text-n-slate-11">
