@@ -212,6 +212,9 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     return unless %w[postgres postgresql].include?(scheme)
 
     db = explicit_database(url)
+    # The one default lib/pq does not share with libpq: with no host anywhere it dials TCP on
+    # localhost, where psql would try a Unix socket the connector never uses.
+    db[:host] ||= 'localhost' unless present(env['PGHOST'])
     _out, err, status = runner.call(env, 'SELECT 1', db: db)
     return if status.success?
 
@@ -299,9 +302,11 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     value unless value.nil? || value.empty? # rubocop:disable Rails/Blank -- runs before bundler, without ActiveSupport
   end
 
-  # A password inside any URL in the text, replaced.
+  # A password inside any URL in the text, replaced: in the userinfo, and as a query
+  # parameter, the two places a connection URL carries one.
   def redact(text)
     text.gsub(%r{([a-z][a-z0-9+.-]*://[^\s/@:]*:)[^@\n]*?@}i, '\\1***@')
+        .gsub(/([?&;]password=)[^&\s"']*/i, '\\1***')
   end
 
   # The key the reason for a failed start is published under, next to the connector's own

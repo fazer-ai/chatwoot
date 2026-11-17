@@ -332,6 +332,14 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         expect(calls.first.last).not_to include(:database, :password, :port)
       end
 
+      it 'dials localhost over TCP when no host is given anywhere, as the connector does' do
+        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres:///wac_store?user=wac'), runner: answering("1\n"))
+        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres:///wac_store?user=wac', 'PGHOST' => 'pg-env'),
+                                             runner: answering("1\n"))
+
+        expect(calls.map { |call| call.last[:host] }).to eq(['localhost', nil])
+      end
+
       it 'leaves PGPASSWORD to psql when the URL carries no password' do
         expect(described_class.psql_env(described_class.explicit_database('postgres://wac@store-db/wac_store'))).to eq({})
       end
@@ -505,6 +513,12 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
           expect(command[2]).to include('postgres://wac:***@store-db/wac_store')
           expect(command[2]).not_to include('secret')
         end
+      end
+
+      it 'redacts a password given as a query parameter too' do
+        report.failed('bad URI (is not URI?): "postgres://bad host/app?user=cw&password=secret&sslmode=disable"')
+
+        expect(WhatsappConnectorEmbedded).to have_received(:log).with(including('?user=cw&password=***&sslmode=disable'))
       end
 
       it 'does not repeat a Redis password from a URL that would not parse' do
