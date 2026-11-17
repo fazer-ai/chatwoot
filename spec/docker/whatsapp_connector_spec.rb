@@ -492,6 +492,45 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       server&.close
     end
 
+    describe WhatsappConnectorEmbedded::Supervisor do
+      let(:supervisor) { described_class.new(['true'], env: {}, binary: 'connector') }
+      let(:failures) { supervisor.instance_variable_get(:@failures) }
+      let(:clock) { [0.0] }
+      let(:status) { instance_double(Process::Status, exitstatus: 1) }
+
+      before do
+        allow(failures).to receive(:recovered)
+        allow(failures).to receive(:failed)
+        allow(supervisor).to receive(:monotonic) { clock.first }
+        allow(supervisor).to receive(:pause)
+      end
+
+      # Two runs of 120 s each, the second one stopping the loop.
+      def supervise(spawned:)
+        runs = 0
+        allow(supervisor).to receive(:run_connector_once) do
+          runs += 1
+          supervisor.instance_variable_set(:@spawned_at, clock.first) if spawned
+          clock[0] += 120
+          supervisor.instance_variable_set(:@stopping, true) if runs == 2
+          spawned ? status : nil
+        end
+        supervisor.send(:keep_connector_running)
+      end
+
+      it 'keeps the reason of a store check that took long and failed: nothing ran' do
+        supervise(spawned: false)
+
+        expect(failures).not_to have_received(:recovered)
+      end
+
+      it 'clears the reason once a connector it spawned ran long enough' do
+        supervise(spawned: true)
+
+        expect(failures).to have_received(:recovered).once
+      end
+    end
+
     describe WhatsappConnectorEmbedded::FailureReport do
       let(:now) { [1000.0] }
       let(:published) { [] }

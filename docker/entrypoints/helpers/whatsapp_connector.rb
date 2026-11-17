@@ -487,11 +487,13 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     def keep_connector_running
       backoff = 1
       until @stopping
-        started = monotonic
+        @spawned_at = nil
         status = run_connector_once
         break if @stopping
 
-        if monotonic - started >= HEALTHY_AFTER
+        # Healthy is a connector that ran that long, counted from its spawn: time spent
+        # checking the store, however slow, is not a run.
+        if @spawned_at && monotonic - @spawned_at >= HEALTHY_AFTER
           backoff = 1
           @failures.recovered
         end
@@ -509,6 +511,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
       env = WhatsappConnectorEmbedded.connector_env(@env, media_token: @media_token, media_root: @media_root,
                                                           database_url: database_url)
       @connector_pid = Process.spawn(env, @binary, 'serve')
+      @spawned_at = monotonic
       # a signal that landed between the spawn and the assignment above found no pid to forward to
       kill('TERM', @connector_pid) if @stopping
       _, status = Process.wait2(@connector_pid)
