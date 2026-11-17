@@ -11,10 +11,8 @@
 module WhatsappConnectorSchema
   NAME = 'whatsapp_connector'.freeze
 
+  # In a savepoint, so a refusal inside a migration's transaction does not abort it.
   def create_schema(schema_name, **options)
-    return super unless schema_name.to_s == NAME
-
-    # A savepoint, so a refusal inside a migration's transaction does not abort it.
     transaction(requires_new: true) { super }
   rescue ActiveRecord::StatementInvalid => e
     raise unless schema_name.to_s == NAME && e.cause.is_a?(PG::InsufficientPrivilege)
