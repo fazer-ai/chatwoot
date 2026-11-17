@@ -322,6 +322,26 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         expect(calls.first.last).to include(host: 'other-db', port: '6001', user: 'wac', password: 'se+cret', database: 'wac_store')
       end
 
+      it 'takes the database named after the user when the URL names none, as PostgreSQL does' do
+        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres://wac:pw@store-db'), runner: answering("1\n"))
+
+        expect(calls.first.last).to include(user: 'wac', database: 'wac')
+      end
+
+      it 'leaves user and database to libpq when the URL names neither' do
+        stub('psql', %(echo "$@" > "#{dir}/psql_args"\necho 1\n))
+        path = ENV.fetch('PATH')
+        ENV['PATH'] = "#{bin_dir}:#{path}"
+
+        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres://store-db'))
+
+        args = File.read(File.join(dir, 'psql_args'))
+        expect(args).to include('-h store-db -p 5432 -c SELECT 1')
+        expect(args).not_to match(/ -[Ud] /)
+      ensure
+        ENV['PATH'] = path
+      end
+
       it 'refuses a URL that does not parse without repeating it, since it carries the password' do
         env = base.merge('WAC_DATABASE_URL' => 'postgres://wac:my secret@store-db/wac_store')
 
@@ -408,6 +428,27 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       expect(redis.exists?(key)).to be(false)
     ensure
       redis&.del(key)
+    end
+
+    it 'reaches a Redis whose URL names an IPv6 address' do
+      skip 'no IPv6 loopback here' unless Socket.ip_address_list.any?(&:ipv6_loopback?)
+
+      server = TCPServer.new('::1', 0)
+      received = Queue.new
+      answering = Thread.new do
+        client = server.accept
+        received << client.readpartial(1024)
+        client.write("+OK\r\n")
+        client.close
+      end
+
+      reply = described_class.redis_command({ 'REDIS_URL' => "redis://[::1]:#{server.addr[1]}" }, 'DEL', 'k')
+
+      expect(reply).to eq("+OK\r\n")
+      expect(received.pop).to eq("*2\r\n$3\r\nDEL\r\n$1\r\nk\r\n")
+    ensure
+      answering&.join(1)
+      server&.close
     end
 
     it 'gives up on a Redis that took the connection and stopped answering' do

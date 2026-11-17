@@ -223,8 +223,11 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # Read the way Chatwoot's own URL is, so query parameters (user, password, host, port,
   # dbname) override the URL's parts as they do for lib/pq. A URL that does not parse is
   # refused without repeating it, since it carries the password.
+  # A URL that names no database means the one named after the user, as PostgreSQL reads it.
   def explicit_database(url)
-    { host: 'localhost', port: '5432' }.merge(database_from_url(url))
+    db = { host: 'localhost', port: '5432' }.merge(database_from_url(url))
+    db[:database] ||= db[:user]
+    db
   rescue URI::Error
     raise StartFailure, 'WAC_DATABASE_URL is not a valid URL (a password with reserved characters has to be percent-encoded)'
   end
@@ -237,9 +240,12 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
 
   # `on_spawn` gets psql's pid, so whoever runs it can end it: psql has no timeout of its own,
   # and a server that stopped answering would otherwise hold it, and its caller, forever.
+  #
+  # A user or database the configuration leaves out is left to libpq's own defaults.
   def psql(env, sql, db: chatwoot_database(env), on_spawn: nil)
+    named = { '-U' => db[:user], '-d' => db[:database] }.select { |_, value| present(value) }.flatten
     Open3.popen3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
-                 '-h', db[:host], '-p', db[:port], '-U', db[:user].to_s, '-d', db[:database], '-c', sql) do |stdin, out, err, wait|
+                 '-h', db[:host], '-p', db[:port], *named, '-c', sql) do |stdin, out, err, wait|
       stdin.close
       on_spawn&.call(wait.pid)
       error = Thread.new { err.read }
@@ -321,7 +327,8 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   end
 
   def redis_socket(env, url)
-    tcp = Socket.tcp(url.host, url.port || 6379, connect_timeout: REDIS_TIMEOUT)
+    # hostname, not host: an IPv6 address comes without the brackets the URL needs.
+    tcp = Socket.tcp(url.hostname, url.port || 6379, connect_timeout: REDIS_TIMEOUT)
     return tcp unless url.scheme == 'rediss'
 
     # set_params brings the system trust store and hostname verification along; without it
@@ -329,7 +336,7 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     context = OpenSSL::SSL::SSLContext.new
     context.set_params(verify_mode: env['REDIS_OPENSSL_VERIFY_MODE'] == 'none' ? OpenSSL::SSL::VERIFY_NONE : OpenSSL::SSL::VERIFY_PEER)
     OpenSSL::SSL::SSLSocket.new(tcp, context).tap do |tls|
-      tls.hostname = url.host
+      tls.hostname = url.hostname
       tls.sync_close = true
       tls.connect
     end
