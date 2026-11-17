@@ -24,13 +24,21 @@ const props = defineProps({
 const { t, locale } = useI18n();
 const { filteredCurrentChatAttachments } = useMessageContext();
 
-const imageFailed = ref(false);
 const showGallery = ref(false);
+// Failures are kept per source: a thumbnail that does not decode must not hide the
+// photo that is delivered after it.
+const failedSources = ref([]);
+const usable = src => Boolean(src) && !failedSources.value.includes(src);
 const thumbnail = computed(() => toImageDataUri(props.product.thumbnail));
 const photo = computed(() =>
-  props.attachment?.dataUrl && !imageFailed.value ? props.attachment : null
+  usable(props.attachment?.dataUrl) ? props.attachment : null
 );
-const imageSrc = computed(() => photo.value?.dataUrl ?? thumbnail.value);
+const imageSrc = computed(
+  () => photo.value?.dataUrl ?? (usable(thumbnail.value) ? thumbnail.value : null)
+);
+const onImageError = () => {
+  failedSources.value = [...failedSources.value, imageSrc.value];
+};
 
 const currentPrice = computed(() =>
   formatPrice(
@@ -63,7 +71,7 @@ const readable = computed(
       class="object-cover w-full rounded-lg max-h-72 bg-n-alpha-black1"
       :class="{ 'cursor-pointer skip-context-menu': photo }"
       @click="showGallery = !!photo"
-      @error="imageFailed = true"
+      @error="onImageError"
     />
     <GalleryView
       v-if="showGallery && photo"
@@ -86,7 +94,7 @@ const readable = computed(
       </p>
       <p
         v-if="product.description"
-        class="mb-0 text-n-slate-11 line-clamp-4 whitespace-pre-line"
+        class="mb-0 text-n-slate-11 whitespace-pre-line"
       >
         {{ product.description }}
       </p>

@@ -1,8 +1,9 @@
-import { defineComponent, ref } from 'vue';
+import { defineComponent, nextTick, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import RichMessage from '../../bubbles/RichMessage.vue';
 import QuotedProduct from '../QuotedProduct.vue';
+import ProductCard from '../ProductCard.vue';
 import { provideMessageContext } from '../../provider.js';
 import ptBR from 'dashboard/i18n/fazer-ai/locale/pt_BR/conversation.json';
 import en from 'dashboard/i18n/fazer-ai/locale/en/conversation.json';
@@ -195,6 +196,63 @@ describe('catalog product card', () => {
 
     await wrapper.find('img').trigger('click');
     expect(wrapper.find('[data-gallery]').exists()).toBe(false);
+  });
+
+  it('shows the photo delivered after a thumbnail that failed to decode', async () => {
+    const attachment = ref(null);
+    const Host = defineComponent({
+      components: { ProductCard },
+      setup() {
+        provideMessageContext({ id: ref(1), contentAttributes: ref({}) });
+        return { attachment, product: product() };
+      },
+      template: '<ProductCard :product="product" :attachment="attachment" />',
+    });
+    const wrapper = mount(Host, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: 'pt_BR',
+            messages: { pt_BR: ptBR },
+          }),
+        ],
+        stubs: {
+          Icon: true,
+          GalleryView: { template: '<div data-gallery />' },
+        },
+      },
+    });
+
+    await wrapper.find('img').trigger('error');
+    expect(wrapper.find('img').exists()).toBe(false);
+
+    attachment.value = {
+      id: 9,
+      fileType: 'image',
+      dataUrl: 'https://cw/rails/photo.jpg',
+    };
+    await nextTick();
+    expect(wrapper.find('img').attributes('src')).toBe(
+      'https://cw/rails/photo.jpg'
+    );
+  });
+
+  it('shows the whole description, however long', () => {
+    const description = Array.from(
+      { length: 12 },
+      (_, i) => `Linha ${i + 1}`
+    ).join('\n');
+    const wrapper = mountWith(RichMessage, {
+      rich: { type: 'product', product: product({ description }) },
+    });
+
+    const paragraph = wrapper
+      .findAll('p')
+      .find(p => p.text().includes('Linha 12'));
+    expect(paragraph.classes().some(c => c.startsWith('line-clamp'))).toBe(
+      false
+    );
   });
 
   it('draws the delivered photo inside the card instead of a separate attachment', () => {
