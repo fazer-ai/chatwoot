@@ -201,6 +201,10 @@
             "additionalProperties": true
           }
         },
+        "product": {
+          "description": "The catalog product a card of kind product is, the kind a product sent on its own arrives as. Present, possibly empty, on every such card (#426).",
+          "oneOf": [{ "$ref": "#/definitions/product" }, { "type": "null" }]
+        },
         "media": {
           "description": "Media in the header of the card, if any.",
           "oneOf": [{ "$ref": "#/definitions/content_media" }, { "type": "null" }]
@@ -218,6 +222,25 @@
         "detail": { "type": "string", "minLength": 1 }
       },
       "required": ["type", "reason"],
+      "additionalProperties": true
+    },
+
+    "product": {
+      "type": "object",
+      "description": "A product from a business's catalog, as WhatsApp carries it in a message. Every field is what WhatsApp sent: one it left out is absent, never zero or a default. An empty object is a product WhatsApp sent nothing readable about, still shown as one (#426).",
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "title": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "price_1000": { "type": ["integer", "null"], "description": "in thousandths of the currency's unit" },
+        "sale_price_1000": { "type": ["integer", "null"], "description": "in thousandths of the currency's unit" },
+        "currency": { "type": ["string", "null"], "description": "ISO 4217 code, as WhatsApp sent it" },
+        "retailer_id": { "type": ["string", "null"], "description": "the business's own code for the product" },
+        "url": { "type": ["string", "null"], "description": "the product's page, when the business filled it in" },
+        "image_count": { "type": ["integer", "null"], "minimum": 0, "description": "how many pictures the product has in the catalog" },
+        "owner": { "description": "the account whose catalog the product is from", "oneOf": [{ "$ref": "#/definitions/address" }, { "type": "null" }] },
+        "thumbnail": { "type": ["string", "null"], "description": "inline preview of the product's picture, a data: URI" }
+      },
       "additionalProperties": true
     },
 
@@ -243,6 +266,7 @@
         "timestamp": { "$ref": "#/definitions/timestamp_ms" },
         "content": { "$ref": "#/definitions/content" },
         "quoted_id": { "type": ["string", "null"] },
+        "quoted_product": { "description": "the catalog product the message quotes, which is what a question asked from a business's catalog does: quoted_id then names no message. Present, possibly empty, whenever the quote is a product (#426)", "oneOf": [{ "$ref": "#/definitions/product" }, { "type": "null" }] },
         "mentions": { "type": "array", "items": { "$ref": "#/definitions/address" } },
         "referral": { "type": ["object", "null"], "description": "Click-to-WhatsApp ad context" },
         "entry_point": { "type": ["object", "null"] },
