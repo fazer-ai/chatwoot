@@ -70,8 +70,9 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
 
   module_function
 
+  # Every line goes through redact: an exception from a malformed URL repeats the URL.
   def log(message)
-    warn "[whatsapp-connector] #{message}"
+    warn "[whatsapp-connector] #{redact(message.to_s)}"
   end
 
   # The connection options that mean the same to libpq (Rails, psql) and to lib/pq (the
@@ -213,39 +214,47 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     db = explicit_database(url)
     _out, err, status = runner.call(env, 'SELECT 1', db: db)
     return if status.success?
-    raise StartFailure, unreachable(env, err, db: db, source: 'WAC_DATABASE_URL') unless err.match?(/database ".*" does not exist/)
 
-    raise StartFailure, "database #{db[:database]} named by WAC_DATABASE_URL does not exist on #{db[:host]}:#{db[:port]}: " \
-                        "create it with CREATE DATABASE #{quote_ident(db[:database].to_s)} (it is never created automatically, " \
+    # The name comes from the server's answer: with the URL silent on it, libpq picked it
+    # (PGDATABASE, or the user's name), and that is the one the connector would open too.
+    missing = err[/database "(.+?)" does not exist/, 1]
+    raise StartFailure, unreachable(env, err, db: db, source: 'WAC_DATABASE_URL') unless missing
+
+    raise StartFailure, "database #{missing} named by WAC_DATABASE_URL does not exist#{location(db)}: " \
+                        "create it with CREATE DATABASE #{quote_ident(missing)} (it is never created automatically, " \
                         'so a mistyped name cannot start the connector on an empty store), or fix WAC_DATABASE_URL'
+  end
+
+  def location(db, preposition = 'on')
+    place = [db[:host], db[:port]].compact.join(':')
+    place.empty? ? '' : " #{preposition} #{place}"
   end
 
   # Read the way Chatwoot's own URL is, so query parameters (user, password, host, port,
   # dbname) override the URL's parts as they do for lib/pq. A URL that does not parse is
   # refused without repeating it, since it carries the password.
-  # A URL that names no database means the one named after the user, as PostgreSQL reads it.
+  # Only what the URL says: whatever it leaves out (host, port, user, password, database) is
+  # libpq's to fill from the PG* variables and its defaults, as lib/pq does for the connector.
   def explicit_database(url)
-    db = { host: 'localhost', port: '5432' }.merge(database_from_url(url))
-    db[:database] ||= db[:user]
-    db
+    database_from_url(url)
   rescue URI::Error
     raise StartFailure, 'WAC_DATABASE_URL is not a valid URL (a password with reserved characters has to be percent-encoded)'
   end
 
   def unreachable(env, err, db: chatwoot_database(env), source: nil)
     settings = source || 'POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USERNAME and POSTGRES_PASSWORD (or DATABASE_URL)'
-    "could not query database #{db[:database]} at #{db[:host]}:#{db[:port]} as #{db[:user]} (#{err.strip.lines.first&.strip}): " \
+    "could not query database #{db[:database]}#{location(db, 'at')} as #{db[:user]} (#{err.strip.lines.first&.strip}): " \
       "check that PostgreSQL is up and that #{settings} #{source ? 'is' : 'are'} right"
   end
 
   # `on_spawn` gets psql's pid, so whoever runs it can end it: psql has no timeout of its own,
   # and a server that stopped answering would otherwise hold it, and its caller, forever.
   #
-  # A user or database the configuration leaves out is left to libpq's own defaults.
+  # Whatever the configuration leaves out is left to libpq's own defaults.
   def psql(env, sql, db: chatwoot_database(env), on_spawn: nil)
-    named = { '-U' => db[:user], '-d' => db[:database] }.select { |_, value| present(value) }.flatten
-    Open3.popen3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1',
-                 '-h', db[:host], '-p', db[:port], *named, '-c', sql) do |stdin, out, err, wait|
+    named = { '-h' => db[:host], '-p' => db[:port], '-U' => db[:user], '-d' => db[:database] }
+            .select { |_, value| present(value) }.flatten
+    Open3.popen3(psql_env(db), 'psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', *named, '-c', sql) do |stdin, out, err, wait|
       stdin.close
       on_spawn&.call(wait.pid)
       error = Thread.new { err.read }
@@ -255,8 +264,10 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
 
   # The URL's connection options reach psql the way libpq reads them from the environment;
   # the ones set as PG* variables on the container are inherited as they are.
+  # A password the configuration does not give leaves PGPASSWORD (or ~/.pgpass) as it was.
   def psql_env(db)
-    db[:options].each_with_object({ 'PGPASSWORD' => db[:password].to_s }) do |(option, value), pg_env|
+    base = db[:password].nil? ? {} : { 'PGPASSWORD' => db[:password] }
+    db.fetch(:options, {}).each_with_object(base) do |(option, value), pg_env|
       pg_env[CONNECTION_OPTIONS.fetch(option)] = value
     end
   end

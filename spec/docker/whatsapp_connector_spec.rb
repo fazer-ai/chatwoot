@@ -322,13 +322,21 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         expect(calls.first.last).to include(host: 'other-db', port: '6001', user: 'wac', password: 'se+cret', database: 'wac_store')
       end
 
-      it 'takes the database named after the user when the URL names none, as PostgreSQL does' do
-        described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres://wac:pw@store-db'), runner: answering("1\n"))
+      it 'names the database libpq picked when the URL names none, from the server answer' do
+        runner = answering('', "psql: error: connection to server at \"store-db\" failed: FATAL:  database \"wac_store\" does not exist\n", failed)
 
-        expect(calls.first.last).to include(user: 'wac', database: 'wac')
+        expect { described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres://wac@store-db'), runner: runner) }
+          .to raise_error(WhatsappConnectorEmbedded::StartFailure) { |error|
+            expect(error.message).to start_with('database wac_store named by WAC_DATABASE_URL does not exist on store-db: ')
+          }
+        expect(calls.first.last).not_to include(:database, :password, :port)
       end
 
-      it 'leaves user and database to libpq when the URL names neither' do
+      it 'leaves PGPASSWORD to psql when the URL carries no password' do
+        expect(described_class.psql_env(described_class.explicit_database('postgres://wac@store-db/wac_store'))).to eq({})
+      end
+
+      it 'leaves port, user and database to libpq when the URL names none of them' do
         stub('psql', %(echo "$@" > "#{dir}/psql_args"\necho 1\n))
         path = ENV.fetch('PATH')
         ENV['PATH'] = "#{bin_dir}:#{path}"
@@ -336,8 +344,8 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'postgres://store-db'))
 
         args = File.read(File.join(dir, 'psql_args'))
-        expect(args).to include('-h store-db -p 5432 -c SELECT 1')
-        expect(args).not_to match(/ -[Ud] /)
+        expect(args).to include('-h store-db -c SELECT 1')
+        expect(args).not_to match(/ -[pUd] /)
       ensure
         ENV['PATH'] = path
       end
@@ -497,6 +505,15 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
           expect(command[2]).to include('postgres://wac:***@store-db/wac_store')
           expect(command[2]).not_to include('secret')
         end
+      end
+
+      it 'does not repeat a Redis password from a URL that would not parse' do
+        allow(WhatsappConnectorEmbedded).to receive(:redis_command).and_call_original
+        allow(WhatsappConnectorEmbedded).to receive(:log).and_call_original
+        report = described_class.new({ 'REDIS_URL' => 'redis://:super secret@redis' })
+
+        expect { report.failed('schema missing') }
+          .to output(a_string_including('could not publish').and(satisfy { |text| text.scan('super secret').empty? })).to_stderr
       end
 
       it 'forgets the reason once the connector ran, so the same failure is news again' do
