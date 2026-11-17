@@ -33,6 +33,7 @@ require 'openssl'
 require 'securerandom'
 require 'socket'
 require 'time'
+require 'timeout'
 require 'tmpdir'
 require 'uri'
 
@@ -51,6 +52,10 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # How long the reason a start failed stays readable in Redis (the super admin health page
   # shows it). Every retry, at most MAX_BACKOFF apart, writes it again.
   FAILURE_TTL = 120
+  # The most a publish of that reason may take, connect and TLS included: it runs in the
+  # supervising thread, and a Redis that took the connection and stopped answering must not
+  # stop the retries or hold a shutdown.
+  REDIS_TIMEOUT = 3
   # A connector that stayed up this long is treated as healthy, and its next crash starts
   # the backoff over instead of continuing it.
   HEALTHY_AFTER = 60
@@ -201,10 +206,11 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # every pairing with no error at all. So a Postgres one is checked to exist, and one that
   # does not is refused with the statement that creates it.
   def check_explicit_store(env, runner: method(:psql))
-    uri = URI(env['WAC_DATABASE_URL'])
-    return unless %w[postgres postgresql].include?(uri.scheme)
+    url = env['WAC_DATABASE_URL']
+    scheme = url[/\A[a-z][a-z0-9+.-]*(?=:)/i].to_s.downcase
+    return unless %w[postgres postgresql].include?(scheme)
 
-    db = explicit_database(uri)
+    db = explicit_database(url)
     _out, err, status = runner.call(env, 'SELECT 1', db: db)
     return if status.success?
     raise StartFailure, unreachable(env, err, db: db, source: 'WAC_DATABASE_URL') unless err.match?(/database ".*" does not exist/)
@@ -214,10 +220,13 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
                         'so a mistyped name cannot start the connector on an empty store), or fix WAC_DATABASE_URL'
   end
 
-  def explicit_database(uri)
-    { host: present(uri.hostname) || 'localhost', port: uri.port&.to_s || '5432' }
-      .merge(url_fields(uri).slice(:user, :password, :database))
-      .merge(options: query_params(uri.query.to_s).slice(*CONNECTION_OPTIONS.keys))
+  # Read the way Chatwoot's own URL is, so query parameters (user, password, host, port,
+  # dbname) override the URL's parts as they do for lib/pq. A URL that does not parse is
+  # refused without repeating it, since it carries the password.
+  def explicit_database(url)
+    { host: 'localhost', port: '5432' }.merge(database_from_url(url))
+  rescue URI::Error
+    raise StartFailure, 'WAC_DATABASE_URL is not a valid URL (a password with reserved characters has to be percent-encoded)'
   end
 
   def unreachable(env, err, db: chatwoot_database(env), source: nil)
@@ -273,6 +282,11 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
     value unless value.nil? || value.empty? # rubocop:disable Rails/Blank -- runs before bundler, without ActiveSupport
   end
 
+  # A password inside any URL in the text, replaced.
+  def redact(text)
+    text.gsub(%r{([a-z][a-z0-9+.-]*://[^\s/@:]*:)[^@\n]*?@}i, '\\1***@')
+  end
+
   # The key the reason for a failed start is published under, next to the connector's own
   # registry entry and under the same instance id, so the health page can show it for the
   # instance that never registered.
@@ -287,13 +301,15 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   # registers in, and the health page reads both from the same place.
   def redis_command(env, *command)
     url = URI(present(env['REDIS_URL']) || 'redis://127.0.0.1:6379')
-    socket = redis_socket(env, url)
-    redis_auth(env, url, socket)
-    database = url.path.to_s.delete_prefix('/')
-    redis_call(socket, 'SELECT', database) unless database.empty?
-    redis_call(socket, *command)
-  ensure
-    socket&.close
+    Timeout.timeout(REDIS_TIMEOUT) do
+      socket = redis_socket(env, url)
+      redis_auth(env, url, socket)
+      database = url.path.to_s.delete_prefix('/')
+      redis_call(socket, 'SELECT', database) unless database.empty?
+      redis_call(socket, *command)
+    ensure
+      socket&.close
+    end
   end
 
   def redis_auth(env, url, socket)
@@ -305,11 +321,13 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
   end
 
   def redis_socket(env, url)
-    tcp = Socket.tcp(url.host, url.port || 6379, connect_timeout: 2)
+    tcp = Socket.tcp(url.host, url.port || 6379, connect_timeout: REDIS_TIMEOUT)
     return tcp unless url.scheme == 'rediss'
 
+    # set_params brings the system trust store and hostname verification along; without it
+    # VERIFY_PEER rejects every certificate.
     context = OpenSSL::SSL::SSLContext.new
-    context.verify_mode = env['REDIS_OPENSSL_VERIFY_MODE'] == 'none' ? OpenSSL::SSL::VERIFY_NONE : OpenSSL::SSL::VERIFY_PEER
+    context.set_params(verify_mode: env['REDIS_OPENSSL_VERIFY_MODE'] == 'none' ? OpenSSL::SSL::VERIFY_NONE : OpenSSL::SSL::VERIFY_PEER)
     OpenSSL::SSL::SSLSocket.new(tcp, context).tap do |tls|
       tls.hostname = url.host
       tls.sync_close = true
@@ -337,7 +355,10 @@ module WhatsappConnectorEmbedded # rubocop:disable Metrics/ModuleLength -- one s
       @publish_failed = false
     end
 
+    # Credentials never leave this process: the reason goes to the log, to the health page
+    # and to every account administrator who opens the inbox picker.
     def failed(reason)
+      reason = WhatsappConnectorEmbedded.redact(reason)
       if reason != @last || @clock.call - @logged_at >= REPEAT_FAILURE_AFTER
         WhatsappConnectorEmbedded.log "#{reason}. Retrying in the background; this is logged again when the reason changes."
         @last = reason

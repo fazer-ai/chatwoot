@@ -3,6 +3,7 @@ require 'fileutils'
 require 'open3'
 require 'redis'
 require 'securerandom'
+require 'socket'
 require 'timeout'
 require 'tmpdir'
 require_relative '../../docker/entrypoints/helpers/whatsapp_connector'
@@ -314,6 +315,21 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
                           /could not query database wac_store at store-db:6000 .*WAC_DATABASE_URL is right/)
       end
 
+      it 'reads credentials, host and port from the query, as lib/pq does' do
+        env = base.merge('WAC_DATABASE_URL' => 'postgres://store-db/wac_store?user=wac&password=se%2Bcret&host=other-db&port=6001')
+        described_class.check_explicit_store(env, runner: answering("1\n"))
+
+        expect(calls.first.last).to include(host: 'other-db', port: '6001', user: 'wac', password: 'se+cret', database: 'wac_store')
+      end
+
+      it 'refuses a URL that does not parse without repeating it, since it carries the password' do
+        env = base.merge('WAC_DATABASE_URL' => 'postgres://wac:my secret@store-db/wac_store')
+
+        expect { described_class.check_explicit_store(env, runner: answering('')) }
+          .to raise_error(WhatsappConnectorEmbedded::StartFailure) { |error| expect(error.message).not_to include('secret') }
+        expect(calls).to be_empty
+      end
+
       it 'leaves a store that is not Postgres to the connector' do
         described_class.check_explicit_store(base.merge('WAC_DATABASE_URL' => 'sqlite:///data/wac.db'), runner: answering(''))
 
@@ -394,6 +410,19 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
       redis&.del(key)
     end
 
+    it 'gives up on a Redis that took the connection and stopped answering' do
+      server = TCPServer.new('127.0.0.1', 0)
+      silent = Thread.new { server.accept }
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      expect { described_class.redis_command({ 'REDIS_URL' => "redis://127.0.0.1:#{server.addr[1]}" }, 'DEL', 'k') }
+        .to raise_error(Timeout::Error)
+      expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < WhatsappConnectorEmbedded::REDIS_TIMEOUT + 1
+    ensure
+      silent&.kill
+      server&.close
+    end
+
     describe WhatsappConnectorEmbedded::FailureReport do
       let(:now) { [1000.0] }
       let(:published) { [] }
@@ -416,6 +445,17 @@ RSpec.describe 'docker/entrypoints/helpers/whatsapp_connector.rb', type: :script
         expect(WhatsappConnectorEmbedded).to have_received(:log).with(/\Ano grant\. Retrying/).twice
         expect(published).to all(eq(['SET', 'wa:embedded:i1']))
         expect(published.size).to eq(6)
+      end
+
+      it 'never logs or publishes a password that a reason carries' do
+        report.failed('bad URI (is not URI?): "postgres://wac:my secret@store-db/wac_store"')
+
+        expect(WhatsappConnectorEmbedded).to have_received(:log).with(including('postgres://wac:***@store-db/wac_store'))
+        expect(WhatsappConnectorEmbedded).not_to have_received(:log).with(including('secret'))
+        expect(WhatsappConnectorEmbedded).to have_received(:redis_command) do |_env, *command|
+          expect(command[2]).to include('postgres://wac:***@store-db/wac_store')
+          expect(command[2]).not_to include('secret')
+        end
       end
 
       it 'forgets the reason once the connector ran, so the same failure is news again' do
