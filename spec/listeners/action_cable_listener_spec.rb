@@ -157,13 +157,14 @@ describe ActionCableListener do
 
       listener.message_created(event)
 
-      expect(ActionCableBroadcastJob).to have_received(:perform_later).once.with(
-        a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token, api_session.pubsub_token),
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
+        a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
         'message.created',
         message.push_event_data.merge(account_id: account.id),
         widget_members: [conversation.contact_inbox.pubsub_token],
         widget_data: message.widget_push_event_data.merge(account_id: account.id)
       )
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with([api_session.pubsub_token], 'message.created', anything)
     end
 
     it 'skips a verified session whose inbox no longer exists' do
@@ -179,20 +180,28 @@ describe ActionCableListener do
       )
     end
 
-    it 'sends a Client API session the full message in the agents job' do
+    # The fork sends Client API sessions their own job: the message as agents see it, minus the
+    # assignee of the conversation it embeds and the acting agent (`performer`).
+    it 'sends a Client API session the message without the assignee or the performer' do
       api_inbox = create(:inbox, account: account, channel: create(:channel_api, account: account))
-      api_conversation = create(:conversation, account: account, inbox: api_inbox)
-      api_message = create(:message, message_type: 'incoming', sender: api_conversation.contact,
+      api_conversation = create(:conversation, account: account, inbox: api_inbox, assignee: admin)
+      api_message = create(:message, message_type: 'outgoing', sender: admin,
                                      account: account, inbox: api_inbox, conversation: api_conversation)
       allow(ActionCableBroadcastJob).to receive(:perform_later)
+      Current.user = admin
 
       listener.message_created(Events::Base.new(event_name, Time.zone.now, message: api_message))
 
-      expect(ActionCableBroadcastJob).to have_received(:perform_later).once.with(
-        a_collection_containing_exactly(admin.pubsub_token, api_conversation.contact_inbox.pubsub_token),
+      agents_data = api_message.push_event_data.merge(account_id: account.id, performer: admin.push_event_data)
+      expect(agents_data.dig(:conversation, :assignee_id)).to eq(admin.id)
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with([admin.pubsub_token], 'message.created', agents_data)
+      expect(ActionCableBroadcastJob).to have_received(:perform_later).with(
+        [api_conversation.contact_inbox.pubsub_token],
         'message.created',
-        api_message.push_event_data.merge(account_id: account.id)
+        agents_data.except(:performer).merge(conversation: agents_data[:conversation].except(:assignee_id))
       )
+    ensure
+      Current.reset
     end
 
     it 'does not send a private note to the contact' do
