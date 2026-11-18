@@ -550,6 +550,27 @@ describe ActionCableListener do
         expect(payloads.flat_map(&:keys).uniq - allowed).to be_empty
       end
 
+      # The messages a conversation event carries embed the conversation, assignee included (#1001).
+      it 'keeps the assignee out of every payload the session gets, nested ones included' do
+        create(:message, conversation: api_conversation, account: account, inbox: api_inbox, message_type: :outgoing, sender: agent)
+        api_conversation.reload
+
+        payloads = contact_bound_payloads(client_token) { broadcast_every_conversation_event(api_conversation) }
+
+        expect(payloads.size).to eq(6)
+        expect(payloads.first[:messages].first[:conversation]).to include(:unread_count)
+        expect(payloads.to_s).not_to include('assignee_id')
+      end
+
+      it 'queues the session its own job, which narrows the conversation it refreshes' do
+        allow(ActionCableBroadcastJob).to receive(:perform_later)
+        allow(ContactSessionBroadcastJob).to receive(:perform_later)
+
+        listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: api_conversation))
+
+        expect(ContactSessionBroadcastJob).to have_received(:perform_later).with([client_token], 'conversation.updated', anything)
+      end
+
       it 'keeps the operational fields agents work with out of the session copy' do
         api_conversation.update!(custom_attributes: { internal_score: 'high risk' }, priority: 'urgent')
         api_conversation.add_labels(['inadimplente'])

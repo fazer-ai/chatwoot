@@ -283,15 +283,7 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
     broadcast(conversation.account, inbox_user_tokens(conversation), event_name, data,
               widget: { tokens: widget_tokens, data: message.widget_push_event_data(data) })
-    broadcast_to_client_sessions(conversation.account, client_tokens, event_name, client_message_data(data))
-  end
-
-  # The message itself is the contact's to see, sender included. The conversation it embeds names
-  # the assigned agent, which is the agents' business, like everything the contact allowlist drops.
-  def client_message_data(data)
-    return data if data[:conversation].blank?
-
-    data.merge(conversation: data[:conversation].except(:assignee_id))
+    broadcast_to_client_sessions(conversation.account, client_tokens, event_name, Conversations::EventDataPresenter.contact_message(data))
   end
 
   # Built once and shared: `push_event_data` is several queries deep, and the contact's copy is a
@@ -312,12 +304,12 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
   # copy, narrowed by the caller: a Client API session is the contact's own browser as much as
   # the widget is, and the agents' conversation payload carries labels, custom attributes, the
   # assignee and the last private note. `performer` is skipped for the same reason: it is the
-  # acting agent's name and status. ActionCableBroadcastJob refreshes the values but keeps the
-  # keys it is handed, so the narrowing survives the refresh.
+  # acting agent's name and status. ContactSessionBroadcastJob narrows the conversation it
+  # refreshes the same way.
   def broadcast_to_client_sessions(account, client_tokens, event_name, data)
     return if client_tokens.blank?
 
-    ::ActionCableBroadcastJob.perform_later(client_tokens.uniq, event_name, data.merge(account_id: account.id))
+    ::ContactSessionBroadcastJob.perform_later(client_tokens.uniq, event_name, data.merge(account_id: account.id))
   end
 
   # Client API sessions get the contact's copy of the conversation, like every other conversation
