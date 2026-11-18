@@ -16,6 +16,7 @@ RSpec.describe Api::V1::Accounts::BaseController do
 
     it 'runs current_account before validate_token_api_access in every descendant' do
       Rails.application.eager_load!
+      defects_seen = []
 
       ([described_class] + described_class.descendants).each do |controller|
         filters = controller._process_action_callbacks.select { |callback| callback.kind == :before }.map(&:filter)
@@ -23,6 +24,7 @@ RSpec.describe Api::V1::Accounts::BaseController do
         next if validate_index.nil?
 
         if known_upstream_defects.key?(controller.name)
+          defects_seen << controller.name
           expect(filters.index(:current_account)).to be > validate_index,
                                                      "#{controller.name} is fixed upstream: drop it (#{known_upstream_defects[controller.name]})"
           next
@@ -31,6 +33,9 @@ RSpec.describe Api::V1::Accounts::BaseController do
         expect(filters.index(:current_account)).to be < validate_index,
                                                    "#{controller.name} runs validate_token_api_access before current_account"
       end
+
+      # An entry whose controller is gone, or no longer runs the check, is stale too.
+      expect(defects_seen).to match_array(known_upstream_defects.keys) if ChatwootApp.enterprise?
     end
   end
 end
