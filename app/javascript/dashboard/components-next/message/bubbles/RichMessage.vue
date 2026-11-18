@@ -101,16 +101,18 @@ const buttons = computed(() => {
         {{ rich.footer }}
       </p>
       <template v-if="isList && buttons.length">
-        <button
-          type="button"
-          data-rich-list-toggle
-          class="flex items-center justify-center gap-1.5 px-3 py-1.5 mt-1 text-sm font-medium border-t border-n-weak text-n-blue-11 hover:bg-n-alpha-black1 rounded-b-lg"
-          :aria-expanded="listOpen"
-          @click="listOpen = !listOpen"
-        >
-          <Icon icon="i-lucide-list" class="size-4 shrink-0" />
-          <span>{{ t('CONVERSATION.RICH.VIEW_OPTIONS') }}</span>
-        </button>
+        <div class="pt-1 mt-1 border-t border-n-weak">
+          <button
+            type="button"
+            data-rich-list-toggle
+            class="flex items-center justify-center w-full gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-n-blue-11 hover:bg-n-alpha-black1"
+            :aria-expanded="listOpen"
+            @click="listOpen = !listOpen"
+          >
+            <Icon icon="i-lucide-list" class="size-4 shrink-0" />
+            <span>{{ t('CONVERSATION.RICH.VIEW_OPTIONS') }}</span>
+          </button>
+        </div>
         <ul
           v-if="listOpen"
           class="flex flex-col p-0 m-0 list-none border rounded-lg divide-y divide-n-weak border-n-weak"
