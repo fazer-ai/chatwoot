@@ -38,4 +38,46 @@ RSpec.describe Api::V1::Accounts::BaseController do
       expect(defects_seen).to match_array(known_upstream_defects.keys) if ChatwootApp.enterprise?
     end
   end
+
+  # Regressão: `validate_token_api_access` chamava `Current.account` direto.
+  # Com a conta suspensa `Current.account` é nil, e a chamada estourava
+  # `NoMethodError` — 500 para quem chamou, quando o correto é 401.
+  #
+  # Este patch vivia apenas como camada sobre a imagem local, nunca no git.
+  describe 'validate_token_api_access com conta suspensa' do
+    controller(Api::V1::Accounts::BaseController) do
+      def index
+        render json: { ok: true }
+      end
+    end
+
+    it 'responde 401 quando Current.account é nil' do
+      # Sem conta no contexto: é o estado de uma conta suspensa/inacessível.
+      Current.reset if Current.respond_to?(:reset)
+      Current.account = nil
+
+      get :index
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.body).to include('Account is suspended or inaccessible')
+    end
+
+    it 'não estoura NoMethodError (500) quando Current.account é nil' do
+      Current.reset if Current.respond_to?(:reset)
+      Current.account = nil
+
+      expect { get :index }.not_to raise_error
+      expect(response).not_to have_http_status(:internal_server_error)
+    end
+
+    it 'mantém o 403 quando a conta existe mas a API está desabilitada' do
+      account = create(:account, api_and_webhooks_enabled: false)
+      Current.account = account
+
+      get :index
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.body).to include('API access is not enabled for this account')
+    end
+  end
 end
