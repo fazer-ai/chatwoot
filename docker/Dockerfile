@@ -197,6 +197,13 @@ COPY --from=pre-builder /app/.git_sha /app/.git_sha
 # A static binary, built for the platform this stage resolves to
 COPY --from=whatsapp-connector /connector /usr/local/bin/whatsapp-connector
 
+# Injeta os secrets do Swarm como variáveis de ambiente antes do entrypoint.
+# O serviço no Swarm roda `with-chatwoot-secrets`, e sem este COPY a imagem
+# publicada sobe sem POSTGRES_PASSWORD/REDIS_PASSWORD/SECRET_KEY_BASE e o
+# container falha no exec. Antes este arquivo existia só no host.
+COPY docker/entrypoints/with-chatwoot-secrets /usr/local/bin/with-chatwoot-secrets
+RUN chmod 0755 /usr/local/bin/with-chatwoot-secrets
+
 WORKDIR /app
 
 EXPOSE 3000
