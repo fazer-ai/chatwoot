@@ -153,13 +153,15 @@ class Messages::MessageBuilder
     attachment.meta = attachment.meta.except('is_video_note') if attachment.meta.to_h.key?('is_video_note')
   end
 
-  # Where a note keeps its mark: a WhatsApp contact reached through the native connector, and an
-  # API inbox, which sends nothing itself and records notes that arrived or already went out
-  # elsewhere. Not a private note, which never leaves, and not the other providers and channels,
-  # which would deliver the same request as an ordinary video (Uazapi and Baileys are #1017).
+  # Where a note keeps its mark: a WhatsApp contact reached through the native connector, an API
+  # inbox, which sends nothing itself, and any message that arrived or already went out. Not a
+  # private note, which never leaves, and not the other providers and channels, which would deliver
+  # the same request as an ordinary video (Uazapi and Baileys are #1017).
   def video_note_destination?
     return false if @private
-    return true if @message_type == 'incoming'
+    # Arrived, or already went out elsewhere and is only being recorded: either way it is a note
+    # somebody recorded, and nothing here will send it.
+    return true if @message_type == 'incoming' || @params[:source_id].present?
 
     channel = @conversation.inbox.channel
     return true if channel.is_a?(Channel::Api)

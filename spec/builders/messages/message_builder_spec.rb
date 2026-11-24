@@ -486,6 +486,20 @@ describe Messages::MessageBuilder do
           expect(message_builder.attachments.first.meta).to include('is_video_note' => true)
         end
 
+        # Recorded with its WhatsApp id on a provider that could not have sent it as a note: the
+        # phone did, and the record keeps saying so.
+        it 'keeps the mark on a note recorded with its WhatsApp id on another provider' do
+          uazapi = create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false,
+                                             sync_templates: false)
+          recorded = create(:conversation, account: account, inbox: uazapi.inbox)
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true' } }
+          params[:source_id] = '3EB0A1B2C3D4E5F60743'
+
+          meta = described_class.new(user, recorded, params).perform.attachments.first.meta
+
+          expect(meta).to include('is_video_note' => true)
+        end
+
         # A private note never leaves, so there is no circle to send and no caption to refuse.
         it 'does not tag a private note, and keeps its text' do
           params[:is_video_note] = 'true'
