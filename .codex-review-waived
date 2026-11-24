@@ -237,3 +237,7 @@ app/builders/messages/message_builder.rb: Recognize video MIME types with codec 
 # WhatsApp, then retried by an agent. Even then the connector refuses the caption and the message
 # turns red with the reason; nothing wrong reaches the contact.
 app/models/concerns/composed_attachment_checks.rb: Check recorded video notes before retrying delivery  # PR#1018
+# PR#1018: a web widget reply that a caller sends with both a source_id and is_video_note is a
+# combination no client produces; the worst case is a circle in the dashboard for a video the
+# widget plays as a rectangle.
+app/builders/messages/message_builder.rb: Keep source-ID-tagged widget replies as ordinary videos  # PR#1018
