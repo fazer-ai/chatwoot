@@ -409,6 +409,14 @@ describe Messages::MessageBuilder do
           expect(conversation.messages.count).to eq(0)
         end
 
+        # Blank to Rails and still a body to the dashboard, which would draw it as a rectangle.
+        it 'refuses a blank text sent with the note' do
+          params[:is_video_note] = 'true'
+          params[:content] = ' '
+
+          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /no text/)
+        end
+
         # A survey sends its text and link as the caption even with no content of its own.
         it 'refuses a survey sent as a note' do
           params[:is_video_note] = 'true'

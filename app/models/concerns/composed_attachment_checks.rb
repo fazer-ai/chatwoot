@@ -30,8 +30,13 @@ module ComposedAttachmentChecks
   def video_note_goes_alone
     return unless video_note? && message
 
-    # What goes out as the caption, which a survey writes even when the content is blank.
-    errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if message.outgoing_content.present?
+    errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if text_alongside?
     errors.add(:base, I18n.t('errors.attachments.video_note.not_alone')) if message.attachments.size > 1
+  end
+
+  # Any text at all, even a blank one the dashboard would still read as a body and draw a rectangle
+  # for, and the caption a survey writes even when the content is empty.
+  def text_alongside?
+    !message.content.to_s.empty? || message.outgoing_content.present?
   end
 end
