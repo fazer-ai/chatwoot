@@ -167,6 +167,14 @@ RSpec.describe Attachment do
       expect(attachment.push_event_data).not_to have_key(:is_video_note)
     end
 
+    # Attachment metadata also comes from API uploads, where a form field arrives as a
+    # string and "false" is truthy in Ruby.
+    it 'does not read a string from an upload as the flag' do
+      attachment.update!(meta: { 'is_video_note' => 'false' })
+
+      expect(attachment.push_event_data).not_to have_key(:is_video_note)
+    end
+
     it 'keeps the external address when we hold only a link' do
       linked = message.attachments.create!(account_id: message.account_id, file_type: :video,
                                            external_url: 'https://cdn.example.com/clip.mp4')

@@ -75,8 +75,15 @@ describe('VideoNote bubble', () => {
       paused = true;
     });
 
+    expect(wrapper.find('button').attributes('aria-label')).toBe(
+      'COMPONENTS.MEDIA.PLAY_VIDEO_NOTE'
+    );
     await wrapper.find('button').trigger('click');
     expect(video.play).toHaveBeenCalledTimes(1);
+    await wrapper.find('video').trigger('play');
+    expect(wrapper.find('button').attributes('aria-label')).toBe(
+      'COMPONENTS.MEDIA.PAUSE_VIDEO_NOTE'
+    );
 
     await wrapper.find('button').trigger('click');
     expect(video.pause).toHaveBeenCalledTimes(1);

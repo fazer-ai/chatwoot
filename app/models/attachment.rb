@@ -148,7 +148,8 @@ class Attachment < ApplicationRecord
     metadata = file_metadata
     # WhatsApp plays a video note in a circle, and this is all the dashboard has to tell one
     # from the ordinary video it also is.
-    metadata[:is_video_note] = true if meta&.[]('is_video_note')
+    # Only the boolean the inbound handler writes: an API upload can carry any string here.
+    metadata[:is_video_note] = true if meta&.[]('is_video_note') == true
     return metadata if instagram_incoming_message?
 
     metadata.merge({ data_url: inline_storage_url })

@@ -52,6 +52,11 @@ const handleError = () => {
     <button
       v-else-if="isLoaded"
       type="button"
+      :aria-label="
+        isPlaying
+          ? $t('COMPONENTS.MEDIA.PAUSE_VIDEO_NOTE')
+          : $t('COMPONENTS.MEDIA.PLAY_VIDEO_NOTE')
+      "
       class="relative block p-0 overflow-hidden border-0 rounded-full size-60 bg-n-slate-4"
       @click="togglePlayback"
     >
