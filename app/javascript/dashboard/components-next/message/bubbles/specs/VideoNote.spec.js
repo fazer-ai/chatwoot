@@ -15,7 +15,7 @@ vi.mock('dashboard/composables/loadWithRetry', async () => {
   };
 });
 
-const mountVideoNote = () => {
+const mountVideoNote = (variant = MESSAGE_VARIANTS.USER) => {
   const TestHost = defineComponent({
     components: { VideoNoteBubble },
     setup() {
@@ -23,7 +23,7 @@ const mountVideoNote = () => {
         attachments: ref([
           { fileType: 'video', dataUrl: 'note.mp4', isVideoNote: true },
         ]),
-        variant: ref(MESSAGE_VARIANTS.USER),
+        variant: ref(variant),
         orientation: ref(ORIENTATION.LEFT),
         contentAttributes: ref({}),
         additionalAttributes: ref({}),
@@ -61,6 +61,23 @@ describe('VideoNote bubble', () => {
     expect(wrapper.find('[data-bubble-name="video-note"]').classes()).toContain(
       'bg-transparent'
     );
+  });
+
+  // The circle has no native controls and no padding around it, so a right-click on it is
+  // the only way to the message's own menu: reply, copy link, delete.
+  it('leaves a right-click to the message menu', () => {
+    expect(mountVideoNote().find('video').classes()).not.toContain(
+      'skip-context-menu'
+    );
+  });
+
+  it('keeps the amber that marks a private note', () => {
+    const bubble = mountVideoNote(MESSAGE_VARIANTS.PRIVATE).find(
+      '[data-bubble-name="video-note"]'
+    );
+
+    expect(bubble.classes()).toContain('bg-n-solid-amber');
+    expect(bubble.classes()).not.toContain('bg-transparent');
   });
 
   it('plays on a click and pauses on the next, as on the phone', async () => {

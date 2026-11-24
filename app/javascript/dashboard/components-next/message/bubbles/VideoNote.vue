@@ -4,10 +4,15 @@ import BaseBubble from './Base.vue';
 import Icon from 'next/icon/Icon.vue';
 import { useLoadWithRetry } from 'dashboard/composables/loadWithRetry';
 import { useMessageContext } from '../provider.js';
+import { MESSAGE_VARIANTS } from '../constants';
 
 // WhatsApp's video note: recorded square and played in a circle, with no frame around
 // it. A click plays it with sound and pauses it, as on the phone.
-const { attachments } = useMessageContext();
+const { attachments, variant } = useMessageContext();
+
+// No bubble behind the circle, except on a private note: the amber is what marks it as
+// internal, as on the audio bubble.
+const isPrivate = computed(() => variant.value === MESSAGE_VARIANTS.PRIVATE);
 
 const attachment = computed(() => attachments.value[0]);
 const player = ref(null);
@@ -43,7 +48,10 @@ const handleError = () => {
 </script>
 
 <template>
-  <BaseBubble class="bg-transparent" data-bubble-name="video-note">
+  <BaseBubble
+    :class="isPrivate ? 'p-2' : 'bg-transparent'"
+    data-bubble-name="video-note"
+  >
     <div
       v-if="hasError"
       class="flex items-center gap-1 p-3 text-center rounded-lg bg-n-slate-4"
@@ -66,7 +74,7 @@ const handleError = () => {
     >
       <video
         ref="player"
-        class="object-cover skip-context-menu size-full"
+        class="object-cover size-full"
         :src="attachment.dataUrl"
         playsinline
         @play="isPlaying = true"
