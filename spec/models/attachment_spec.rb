@@ -169,16 +169,16 @@ RSpec.describe Attachment do
 
     # Attachment metadata also comes from API uploads, where a form field arrives as a
     # string and "false" is truthy in Ruby.
-    # Nothing sends a video note yet, so the circle on an outgoing file would show the agent
-    # a message the contact never received.
-    it 'does not mark an outgoing video, whatever its metadata says' do
-      outgoing = create(:message, message_type: :outgoing, account: message.account, inbox: message.inbox,
-                                  conversation: message.conversation)
-      upload = outgoing.attachments.new(account_id: outgoing.account_id, file_type: :video, meta: { is_video_note: true })
-      upload.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'up.mp4', content_type: 'video/mp4')
-      upload.save!
+    # A note recorded on the connected phone comes back as the outgoing echo of it, and it
+    # is as much a video note as one the contact sent.
+    it 'marks the echo of a video note recorded on the connected phone' do
+      echo = create(:message, message_type: :outgoing, account: message.account, inbox: message.inbox,
+                              conversation: message.conversation, source_id: '3EB0ECHO')
+      note = echo.attachments.new(account_id: echo.account_id, file_type: :video, meta: { 'is_video_note' => true })
+      note.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'note.mp4', content_type: 'video/mp4')
+      note.save!
 
-      expect(upload.push_event_data).not_to have_key(:is_video_note)
+      expect(note.push_event_data).to include(is_video_note: true)
     end
 
     it 'does not read a string from an upload as the flag' do
