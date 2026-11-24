@@ -26,12 +26,18 @@ module ComposedAttachmentChecks
   # Refused when the message is stored, so the caller hears a 422 instead of seeing the message
   # turn red later. The circle has nowhere to show a caption, and the connector refuses one. And
   # the native channel sends one file per message, the first: a note behind another file would
-  # never leave.
+  # never leave. Only where the connector is the one sending: an API inbox records a note that went
+  # out elsewhere, in whatever shape it went.
   def video_note_goes_alone
-    return unless video_note? && message
+    return unless video_note? && sent_by_the_connector?
 
     errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if text_alongside?
     errors.add(:base, I18n.t('errors.attachments.video_note.not_alone')) if message.attachments.size > 1
+  end
+
+  def sent_by_the_connector?
+    channel = message&.inbox&.channel
+    channel.is_a?(Channel::Whatsapp) && channel.provider == 'native'
   end
 
   # Any text at all, even a blank one the dashboard would still read as a body and draw a rectangle

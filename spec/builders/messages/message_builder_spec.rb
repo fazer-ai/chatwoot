@@ -450,6 +450,32 @@ describe Messages::MessageBuilder do
           expect(meta).to include('is_video_note' => true)
         end
 
+        # The one-file and no-text rules are the native connector's. A record of what already went out
+        # elsewhere is kept in whatever shape it went.
+        it 'records a note sent elsewhere with text and another file through an API inbox' do
+          api = create(:channel_api, account: account).inbox
+          recorded = create(:conversation, account: account, inbox: api)
+          params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png'), video]
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true' } }
+          params[:content] = 'enviado pelo celular'
+
+          message = described_class.new(user, recorded, params).perform
+
+          expect(message.attachments.map { |attachment| attachment.meta.to_h['is_video_note'] }).to eq([nil, true])
+        end
+
+        it 'does not tag a private note even when it says it came in' do
+          api = create(:channel_api, account: account).inbox
+          incoming = create(:conversation, account: account, inbox: api)
+          params[:message_type] = 'incoming'
+          params[:private] = 'true'
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: true } }
+
+          meta = described_class.new(user, incoming, params).perform.attachments.first.meta.to_h
+
+          expect(meta).not_to have_key('is_video_note')
+        end
+
         # A private note never leaves, so there is no circle to send and no caption to refuse.
         it 'does not tag a private note, and keeps its text' do
           params[:is_video_note] = 'true'

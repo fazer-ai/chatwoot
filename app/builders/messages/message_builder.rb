@@ -158,8 +158,8 @@ class Messages::MessageBuilder
   # elsewhere. Not a private note, which never leaves, and not the other providers and channels,
   # which would deliver the same request as an ordinary video (Uazapi and Baileys are #1017).
   def video_note_destination?
-    return true if @message_type == 'incoming'
     return false if @private
+    return true if @message_type == 'incoming'
 
     channel = @conversation.inbox.channel
     return true if channel.is_a?(Channel::Api)
