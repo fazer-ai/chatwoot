@@ -30,7 +30,8 @@ module ComposedAttachmentChecks
   def video_note_goes_alone
     return unless video_note? && message
 
-    errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if message.content.present?
+    # What goes out as the caption, which a survey writes even when the content is blank.
+    errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if message.outgoing_content.present?
     errors.add(:base, I18n.t('errors.attachments.video_note.not_alone')) if message.attachments.size > 1
   end
 end

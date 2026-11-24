@@ -409,6 +409,27 @@ describe Messages::MessageBuilder do
           expect(conversation.messages.count).to eq(0)
         end
 
+        # A survey sends its text and link as the caption even with no content of its own.
+        it 'refuses a survey sent as a note' do
+          params[:is_video_note] = 'true'
+          params[:content_type] = 'input_csat'
+
+          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /no text/)
+        end
+
+        # An API inbox ingesting a note somebody recorded keeps it a note: the rule about where a note
+        # can go out is about sending, not about what arrives.
+        it 'keeps the mark on an incoming note through an API inbox' do
+          api = create(:channel_api, account: account).inbox
+          incoming = create(:conversation, account: account, inbox: api)
+          params[:message_type] = 'incoming'
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: true } }
+
+          meta = described_class.new(user, incoming, params).perform.attachments.first.meta
+
+          expect(meta).to include('is_video_note' => true)
+        end
+
         # A private note never leaves, so there is no circle to send and no caption to refuse.
         it 'does not tag a private note, and keeps its text' do
           params[:is_video_note] = 'true'

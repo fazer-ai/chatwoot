@@ -155,7 +155,11 @@ class Messages::MessageBuilder
 
   # A message that goes to a WhatsApp contact through the native connector: not a private note,
   # which never leaves, and not Uazapi or Baileys, whose format for a note is not measured (#1017).
+  # An incoming message is a note somebody recorded, whatever inbox it came through, so an API
+  # inbox ingesting one keeps the circle it had.
   def video_note_destination?
+    return true if @message_type == 'incoming'
+
     channel = @conversation.inbox.channel
     !@private && channel.is_a?(Channel::Whatsapp) && channel.provider == 'native'
   end
