@@ -15,11 +15,17 @@ vi.mock('dashboard/composables/loadWithRetry', async () => {
   };
 });
 
+vi.mock('dashboard/composables/store', async () => {
+  const { ref: vueRef } = await import('vue');
+  return { useMapGetter: () => vueRef([]) };
+});
+
 const mountVideoNote = (variant = MESSAGE_VARIANTS.USER) => {
   const TestHost = defineComponent({
     components: { VideoNoteBubble },
     setup() {
       provideMessageContext({
+        filteredCurrentChatAttachments: ref([]),
         attachments: ref([
           { fileType: 'video', dataUrl: 'note.mp4', isVideoNote: true },
         ]),
@@ -43,6 +49,7 @@ const mountVideoNote = (variant = MESSAGE_VARIANTS.USER) => {
         MessageMeta: true,
         ReferralCard: true,
         CaptainGenerationDetails: true,
+        GalleryView: { template: '<div data-gallery />' },
       },
       mocks: { $t: key => key },
     },
@@ -63,12 +70,16 @@ describe('VideoNote bubble', () => {
     );
   });
 
-  // The circle has no native controls and no padding around it, so a right-click on it is
-  // the only way to the message's own menu: reply, copy link, delete.
-  it('leaves a right-click to the message menu', () => {
-    expect(mountVideoNote().find('video').classes()).not.toContain(
-      'skip-context-menu'
-    );
+  // The circle's own click plays the note, so full size and download need a way in.
+  it('opens the note in the gallery from its own button', async () => {
+    const wrapper = mountVideoNote();
+    expect(wrapper.find('[data-gallery]').exists()).toBe(false);
+
+    await wrapper
+      .find('[aria-label="COMPONENTS.MEDIA.OPEN_VIDEO_NOTE"]')
+      .trigger('click');
+
+    expect(wrapper.find('[data-gallery]').exists()).toBe(true);
   });
 
   it('keeps the amber that marks a private note', () => {

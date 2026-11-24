@@ -3,12 +3,15 @@ import { ref, computed, onMounted } from 'vue';
 import BaseBubble from './Base.vue';
 import Icon from 'next/icon/Icon.vue';
 import { useLoadWithRetry } from 'dashboard/composables/loadWithRetry';
+import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { useMessageContext } from '../provider.js';
+import GalleryView from 'dashboard/components/widgets/conversation/components/GalleryView.vue';
 import { MESSAGE_VARIANTS } from '../constants';
 
 // WhatsApp's video note: recorded square and played in a circle, with no frame around
 // it. A click plays it with sound and pauses it, as on the phone.
-const { attachments, variant } = useMessageContext();
+const { attachments, variant, filteredCurrentChatAttachments } =
+  useMessageContext();
 
 // No bubble behind the circle, except on a private note: the amber is what marks it as
 // internal, as on the audio bubble.
@@ -17,6 +20,9 @@ const isPrivate = computed(() => variant.value === MESSAGE_VARIANTS.PRIVATE);
 const attachment = computed(() => attachments.value[0]);
 const player = ref(null);
 const isPlaying = ref(false);
+// The circle's click plays the note, so full size and download sit behind a button of their
+// own, the same gallery the ordinary video bubble opens.
+const showGallery = ref(false);
 
 const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry({
   type: 'video',
@@ -61,37 +67,54 @@ const handleError = () => {
         {{ $t('COMPONENTS.MEDIA.VIDEO_UNAVAILABLE') }}
       </p>
     </div>
-    <button
-      v-else-if="isLoaded"
-      type="button"
-      :aria-label="
-        isPlaying
-          ? $t('COMPONENTS.MEDIA.PAUSE_VIDEO_NOTE')
-          : $t('COMPONENTS.MEDIA.PLAY_VIDEO_NOTE')
-      "
-      class="relative block p-0 overflow-hidden border-0 rounded-full size-60 bg-n-slate-4"
-      @click="togglePlayback"
-    >
-      <video
-        ref="player"
-        class="object-cover size-full"
-        :src="attachment.dataUrl"
-        playsinline
-        @play="isPlaying = true"
-        @pause="isPlaying = false"
-        @ended="isPlaying = false"
-        @error="handleError"
-      />
-      <span
-        v-if="!isPlaying"
-        class="absolute inset-0 flex items-center justify-center pointer-events-none"
+    <div v-else-if="isLoaded" class="relative size-60">
+      <button
+        type="button"
+        :aria-label="
+          isPlaying
+            ? $t('COMPONENTS.MEDIA.PAUSE_VIDEO_NOTE')
+            : $t('COMPONENTS.MEDIA.PLAY_VIDEO_NOTE')
+        "
+        class="relative block p-0 overflow-hidden border-0 rounded-full size-60 bg-n-slate-4"
+        @click="togglePlayback"
       >
+        <video
+          ref="player"
+          class="object-cover size-full"
+          :src="attachment.dataUrl"
+          playsinline
+          @play="isPlaying = true"
+          @pause="isPlaying = false"
+          @ended="isPlaying = false"
+          @error="handleError"
+        />
         <span
-          class="flex items-center justify-center rounded-full size-12 bg-n-alpha-black1 backdrop-blur-sm"
+          v-if="!isPlaying"
+          class="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
-          <Icon icon="i-lucide-play" class="text-white size-6" />
+          <span
+            class="flex items-center justify-center rounded-full size-12 bg-n-alpha-black1 backdrop-blur-sm"
+          >
+            <Icon icon="i-lucide-play" class="text-white size-6" />
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      <button
+        type="button"
+        :aria-label="$t('COMPONENTS.MEDIA.OPEN_VIDEO_NOTE')"
+        class="absolute bottom-2 end-2 flex items-center justify-center p-0 border-0 rounded-full size-8 bg-n-alpha-black1 backdrop-blur-sm"
+        @click="showGallery = true"
+      >
+        <Icon icon="i-lucide-maximize-2" class="text-white size-4" />
+      </button>
+    </div>
   </BaseBubble>
+  <GalleryView
+    v-if="showGallery"
+    v-model:show="showGallery"
+    :attachment="useSnakeCase(attachment)"
+    :all-attachments="filteredCurrentChatAttachments"
+    @error="handleError"
+    @close="() => (showGallery = false)"
+  />
 </template>

@@ -49,7 +49,8 @@
       "AUDIO_UNAVAILABLE": "Este audio ya no está disponible.",
       "VIDEO_UNAVAILABLE": "Este video ya no está disponible.",
       "PLAY_VIDEO_NOTE": "Reproducir videomensaje",
-      "PAUSE_VIDEO_NOTE": "Pausar videomensaje"
+      "PAUSE_VIDEO_NOTE": "Pausar videomensaje",
+      "OPEN_VIDEO_NOTE": "Abrir videomensaje"
     }
   },
   "SIDEBAR": {
