@@ -10,13 +10,19 @@ class Api::V1::Accounts::BaseController < Api::BaseController
   private
 
   def validate_token_api_access
-    # `Current.account` is nil when this check runs before the account lookup: a
-    # subclass that re-declares `before_action :current_account` makes Rails
-    # de-duplicate the callback and move it to the end of the chain. Calling
-    # `api_and_webhooks_enabled?` on nil raised NoMethodError, turning the 401 the
-    # account lookup is about to render into a 500.
-    return if Current.account.nil?
-    return if Current.account.api_and_webhooks_enabled?
+    # `Current.account` is nil when this check runs before the account lookup: a subclass
+    # that re-declares `before_action :current_account` makes Rails de-duplicate the
+    # callback and move it to the end of the chain. Reading `api_and_webhooks_enabled?`
+    # off nil raised NoMethodError, so the request answered 500 instead of the 401 the
+    # account lookup is about to render.
+    #
+    # Returning early on nil would be worse than the crash: the request would skip this
+    # check entirely and the later lookup would let an active-but-API-disabled account
+    # through. So the account is resolved from the path when the context does not carry
+    # it, and only a request with no resolvable account falls through to `current_account`.
+    account = Current.account || Account.find_by(id: params[:account_id])
+    return if account.nil?
+    return if account.api_and_webhooks_enabled?
 
     render json: { error: 'API access is not enabled for this account' }, status: :forbidden
   end

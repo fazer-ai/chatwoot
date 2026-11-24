@@ -125,5 +125,18 @@ RSpec.describe Api::V1::Accounts::BaseController do
       expect(response).to have_http_status(:unauthorized)
       expect(response.parsed_body['error']).to eq('Account is suspended')
     end
+
+    # O motivo de não bastar `return if Current.account.nil?`: com a ordem invertida o
+    # lookup roda depois, então sair cedo pularia esta checagem e uma conta ativa com a
+    # API desabilitada passaria. O teste roda na ordem invertida de propósito.
+    it 'still answers 403 when the account is active but API access is disabled' do
+      allow(Account).to receive(:find_by).and_return(account)
+      allow(account).to receive(:api_and_webhooks_enabled?).and_return(false)
+
+      get :index, params: { account_id: account.id }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body['error']).to eq('API access is not enabled for this account')
+    end
   end
 end
