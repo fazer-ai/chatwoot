@@ -19,6 +19,11 @@ RSpec.describe Api::V1::Accounts::BaseController do
       defects_seen = []
 
       ([described_class] + described_class.descendants).each do |controller|
+        # Anonymous controllers from examples are not part of the application: RSpec names
+        # them after the described class, and some deliberately invert the order to
+        # reproduce a subclass defect. A real controller's name resolves to itself.
+        next unless controller.name && controller.name.safe_constantize.equal?(controller)
+
         filters = controller._process_action_callbacks.select { |callback| callback.kind == :before }.map(&:filter)
         validate_index = filters.index(:validate_token_api_access)
         next if validate_index.nil?
@@ -39,45 +44,86 @@ RSpec.describe Api::V1::Accounts::BaseController do
     end
   end
 
-  # Regressão: `validate_token_api_access` chamava `Current.account` direto.
-  # Com a conta suspensa `Current.account` é nil, e a chamada estourava
-  # `NoMethodError` — 500 para quem chamou, quando o correto é 401.
-  #
-  # Este patch vivia apenas como camada sobre a imagem local, nunca no git.
-  describe 'validate_token_api_access com conta suspensa' do
+  # Dois controllers anônimos, porque a ordem dos callbacks muda o que cada caminho testa:
+  # com a ordem do app `current_account` roda antes e `Current.account` já existe; com a
+  # ordem invertida (a de um subclass que redeclara o callback) é este check que roda
+  # primeiro, com `Current.account` nil.
+  describe 'com a ordem de callbacks do app' do
     controller(Api::V1::Accounts::BaseController) do
       def index
         render json: { ok: true }
       end
     end
 
-    it 'responde 401 quando Current.account é nil' do
-      # Sem conta no contexto: é o estado de uma conta suspensa/inacessível.
-      Current.reset if Current.respond_to?(:reset)
-      Current.account = nil
+    let(:account) { create(:account) }
+    let(:user) { create(:user, account: account) }
 
-      get :index
+    before do
+      request.headers['api_access_token'] = user.access_token.token
+    end
+
+    it 'answers 401 for a suspended account' do
+      account.update!(status: :suspended)
+
+      get :index, params: { account_id: account.id }
 
       expect(response).to have_http_status(:unauthorized)
-      expect(response.body).to include('Account is suspended or inaccessible')
+      expect(response.parsed_body['error']).to eq('Account is suspended')
     end
 
-    it 'não estoura NoMethodError (500) quando Current.account é nil' do
-      Current.reset if Current.respond_to?(:reset)
-      Current.account = nil
+    it 'keeps the 403 when the account is readable but API access is disabled' do
+      allow(Account).to receive(:find).and_call_original
+      allow(Account).to receive(:find).with(account.id.to_s).and_return(account)
+      allow(account).to receive(:api_and_webhooks_enabled?).and_return(false)
 
-      expect { get :index }.not_to raise_error
-      expect(response).not_to have_http_status(:internal_server_error)
-    end
-
-    it 'mantém o 403 quando a conta existe mas a API está desabilitada' do
-      account = create(:account, api_and_webhooks_enabled: false)
-      Current.account = account
-
-      get :index
+      get :index, params: { account_id: account.id }
 
       expect(response).to have_http_status(:forbidden)
-      expect(response.body).to include('API access is not enabled for this account')
+      expect(response.parsed_body['error']).to eq('API access is not enabled for this account')
+    end
+
+    # The previous version of this PR accepted `Current.user` as an authenticated identity
+    # when `current_user` was nil. That widened who could pass the account check, so it is
+    # gone: a thread-local left behind by another layer must not authenticate the request.
+    it 'does not authenticate a request through a residual Current.user' do
+      Current.user = create(:user, account: account)
+      allow(controller).to receive(:current_user).and_return(nil)
+
+      get :index, params: { account_id: account.id }
+
+      expect(response).to have_http_status(:unauthorized)
+    ensure
+      Current.reset
+    end
+  end
+
+  # Reproduz a forma de um controller cuja declaração de `current_account` foi
+  # de-duplicada para o fim da cadeia: este callback roda primeiro, com
+  # `Current.account` ainda nil. Chamar `api_and_webhooks_enabled?` no nil levantava
+  # NoMethodError, então uma conta suspensa respondia 500 em vez de 401.
+  describe 'validate_token_api_access before the account lookup' do
+    controller(Api::V1::Accounts::BaseController) do
+      before_action :current_account
+
+      def index
+        render json: { ok: true }
+      end
+    end
+
+    let(:account) { create(:account) }
+    let(:user) { create(:user, account: account) }
+
+    before do
+      request.headers['api_access_token'] = user.access_token.token
+    end
+
+    it 'answers 401 for a suspended account instead of raising' do
+      account.update!(status: :suspended)
+
+      get :index, params: { account_id: account.id }
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body['error']).to eq('Account is suspended')
     end
   end
 end
