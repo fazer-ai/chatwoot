@@ -197,11 +197,11 @@ COPY --from=pre-builder /app/.git_sha /app/.git_sha
 # A static binary, built for the platform this stage resolves to
 COPY --from=whatsapp-connector /connector /usr/local/bin/whatsapp-connector
 
-# Injeta os secrets do deployment como variáveis de ambiente antes do entrypoint.
-# O serviço roda `with-chatwoot-secrets` como `entrypoint:`, e sem este COPY o
-# script não existe na imagem e o exec falha. O modo vai explícito no COPY: o
-# arquivo já é 100755 no git, mas um checkout com filemode desligado perderia o bit.
-# `COPY --chmod` exige BuildKit, que é o builder do workflow de publish deste repo.
+# Ships the secret loader inside the image, so a service can use it as `entrypoint:`
+# without mounting it from a `docker config`. The mode is set in the COPY rather than
+# in a RUN: the file is 100755 in git, but a checkout with filemode off would lose the
+# bit. `COPY --chmod` needs BuildKit (Dockerfile 1.2+), which the publish workflow uses
+# (docker/setup-buildx-action in .github/workflows/publish_*.yml).
 COPY --chmod=0755 docker/entrypoints/with-chatwoot-secrets /usr/local/bin/with-chatwoot-secrets
 
 WORKDIR /app
