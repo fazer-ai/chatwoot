@@ -414,9 +414,9 @@ theirs, and the connector is always upgraded first.
   know the flag has an ordinary video to render, which is what the file is. Outbound, it
   is refused (`invalid_payload`) on any other kind and with a `caption`, which the circle
   has nowhere to show. The connector does not transcode or crop: the file goes out as it
-  was given. A client forwarding one it received hands back the file WhatsApp recorded,
-  which is the safe case; what WhatsApp's clients make of any other video sent with the
-  flag has not been measured.
+  was given. Measured on a phone: the
+  file WhatsApp recorded, forwarded back, and a 1280x720 video sent with the flag both
+  played in the circle, the wider one cropped to it.
 - A media message published with no `ref` is followed by `media.download_failed`, and
   `recoverable` on it is what says whether that is the end. False is every reason the
   file is not coming back -- the key lapsed, the bytes did not check out, the file is
