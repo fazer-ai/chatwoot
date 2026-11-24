@@ -438,6 +438,18 @@ describe Messages::MessageBuilder do
           expect(meta).to include('is_video_note' => true)
         end
 
+        # An integration recording a note it already sent elsewhere: the API inbox delivers nothing
+        # itself, so the mark is a record of what went out, not a request.
+        it 'keeps the mark on an outgoing note recorded through an API inbox' do
+          api = create(:channel_api, account: account).inbox
+          recorded = create(:conversation, account: account, inbox: api)
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true' } }
+
+          meta = described_class.new(user, recorded, params).perform.attachments.first.meta
+
+          expect(meta).to include('is_video_note' => true)
+        end
+
         # A private note never leaves, so there is no circle to send and no caption to refuse.
         it 'does not tag a private note, and keeps its text' do
           params[:is_video_note] = 'true'

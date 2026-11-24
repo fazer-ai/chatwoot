@@ -226,3 +226,6 @@ app/builders/messages/message_builder.rb: Expose the video-note flag in the mess
 # ordinary video, so nothing is lost and nothing fails; the image ships 1.1.0 pinned, and a separate
 # deployment is told to keep the connector current for the rest of the channel anyway.
 app/builders/messages/message_builder.rb: Check connector support before sending a video note  # PR#1018
+# PR#1018: `is_video_note[]=false` is a malformed request, and the repo rule is to fix the client
+# rather than add coercions; the sibling `is_voice_message` casts the same way.
+app/builders/messages/message_builder.rb: Reject non-scalar video-note flags before casting  # PR#1018
