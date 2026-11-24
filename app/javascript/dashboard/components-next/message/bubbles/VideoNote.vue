@@ -21,7 +21,8 @@ const attachment = computed(() => attachments.value[0]);
 const player = ref(null);
 const isPlaying = ref(false);
 // The circle's click plays the note, so full size and download sit behind a button of their
-// own, the same gallery the ordinary video bubble opens.
+// own, the same gallery the ordinary video bubble opens. It is there in every state of the
+// bubble: loading, playing, and a file this browser cannot decode but can still download.
 const showGallery = ref(false);
 
 const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry({
@@ -48,6 +49,13 @@ const togglePlayback = () => {
   }
 };
 
+// The gallery mounts a player of its own, so the inline one stops first: one note, one
+// player, and the agent never hears audio from a circle behind the modal.
+const openGallery = () => {
+  player.value?.pause();
+  showGallery.value = true;
+};
+
 const handleError = () => {
   hasError.value = true;
 };
@@ -58,17 +66,27 @@ const handleError = () => {
     :class="isPrivate ? 'p-2' : 'bg-transparent'"
     data-bubble-name="video-note"
   >
-    <div
-      v-if="hasError"
-      class="flex items-center gap-1 p-3 text-center rounded-lg bg-n-slate-4"
-    >
-      <Icon icon="i-lucide-circle-off" class="text-n-slate-11" />
-      <p class="mb-0 text-n-slate-11">
-        {{ $t('COMPONENTS.MEDIA.VIDEO_UNAVAILABLE') }}
-      </p>
-    </div>
-    <div v-else-if="isLoaded" class="relative size-60">
+    <div v-if="hasError" class="flex items-center gap-2">
+      <div
+        class="flex items-center gap-1 p-3 text-center rounded-lg bg-n-slate-4"
+      >
+        <Icon icon="i-lucide-circle-off" class="text-n-slate-11" />
+        <p class="mb-0 text-n-slate-11">
+          {{ $t('COMPONENTS.MEDIA.VIDEO_UNAVAILABLE') }}
+        </p>
+      </div>
       <button
+        type="button"
+        :aria-label="$t('COMPONENTS.MEDIA.OPEN_VIDEO_NOTE')"
+        class="flex items-center justify-center p-0 border-0 rounded-full size-8 bg-n-slate-4"
+        @click="openGallery"
+      >
+        <Icon icon="i-lucide-maximize-2" class="text-n-slate-11 size-4" />
+      </button>
+    </div>
+    <div v-else class="relative size-60">
+      <button
+        v-if="isLoaded"
         type="button"
         :aria-label="
           isPlaying
@@ -99,11 +117,12 @@ const handleError = () => {
           </span>
         </span>
       </button>
+      <div v-else class="rounded-full size-60 bg-n-slate-4" />
       <button
         type="button"
         :aria-label="$t('COMPONENTS.MEDIA.OPEN_VIDEO_NOTE')"
         class="absolute bottom-2 end-2 flex items-center justify-center p-0 border-0 rounded-full size-8 bg-n-alpha-black1 backdrop-blur-sm"
-        @click="showGallery = true"
+        @click="openGallery"
       >
         <Icon icon="i-lucide-maximize-2" class="text-white size-4" />
       </button>

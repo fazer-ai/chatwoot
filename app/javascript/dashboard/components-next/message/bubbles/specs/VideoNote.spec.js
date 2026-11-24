@@ -4,15 +4,23 @@ import VideoNoteBubble from '../VideoNote.vue';
 import { provideMessageContext } from '../../provider.js';
 import { MESSAGE_VARIANTS, ORIENTATION } from '../../constants';
 
+// The state each case mounts in: loaded unless a case says otherwise.
+const loadState = vi.hoisted(() => ({ isLoaded: true, hasError: false }));
+
 vi.mock('dashboard/composables/loadWithRetry', async () => {
   const { ref: vueRef } = await import('vue');
   return {
     useLoadWithRetry: () => ({
-      isLoaded: vueRef(true),
-      hasError: vueRef(false),
+      isLoaded: vueRef(loadState.isLoaded),
+      hasError: vueRef(loadState.hasError),
       loadWithRetry: vi.fn(),
     }),
   };
+});
+
+beforeEach(() => {
+  loadState.isLoaded = true;
+  loadState.hasError = false;
 });
 
 vi.mock('dashboard/composables/store', async () => {
@@ -79,6 +87,36 @@ describe('VideoNote bubble', () => {
       .find('[aria-label="COMPONENTS.MEDIA.OPEN_VIDEO_NOTE"]')
       .trigger('click');
 
+    expect(wrapper.find('[data-gallery]').exists()).toBe(true);
+  });
+
+  // The gallery is the way to the file in every state of the bubble: still loading, and a
+  // file this browser cannot decode but can still download.
+  it.each([
+    ['still loading', { isLoaded: false, hasError: false }],
+    ['unplayable here', { isLoaded: false, hasError: true }],
+  ])('offers the gallery while %s', async (_, state) => {
+    Object.assign(loadState, state);
+    const wrapper = mountVideoNote();
+
+    await wrapper
+      .find('[aria-label="COMPONENTS.MEDIA.OPEN_VIDEO_NOTE"]')
+      .trigger('click');
+
+    expect(wrapper.find('[data-gallery]').exists()).toBe(true);
+  });
+
+  // The gallery mounts a player of its own, so the circle behind it has to stop.
+  it('pauses the circle before opening the gallery', async () => {
+    const wrapper = mountVideoNote();
+    const video = wrapper.find('video').element;
+    video.pause = vi.fn();
+
+    await wrapper
+      .find('[aria-label="COMPONENTS.MEDIA.OPEN_VIDEO_NOTE"]')
+      .trigger('click');
+
+    expect(video.pause).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-gallery]').exists()).toBe(true);
   });
 
