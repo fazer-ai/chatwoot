@@ -343,6 +343,61 @@ describe Messages::MessageBuilder do
         expect(message.attachments.first.meta).to include('is_voice_message' => true, 'description' => 'recado')
       end
 
+      # A video note is asked for the way a voice note is: on the message for the one file a caller
+      # sends, or per file. The note is what the native channel sends as a circle, so a missed tag
+      # is a rectangle on the customer's phone and a stray one is a circle nobody asked for.
+      describe 'a video note' do
+        let(:video) { Rack::Test::UploadedFile.new('spec/assets/sample.mp4', 'video/mp4') }
+
+        # The context sends a text with its file, and a note goes out without one.
+        before do
+          params[:attachments] = [video]
+          params.delete(:content)
+        end
+
+        it 'tags the video when the message asks for one' do
+          params[:is_video_note] = 'true'
+
+          expect(message_builder.attachments.first.meta).to include('is_video_note' => true)
+        end
+
+        it 'leaves the video alone when a multipart request says false' do
+          params[:is_video_note] = 'false'
+
+          expect(message_builder.attachments.first.meta.to_h).not_to include('is_video_note' => true)
+        end
+
+        it 'lets a per-file refusal beat the flag on the message' do
+          params[:is_video_note] = 'true'
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'false' } }
+
+          expect(message_builder.attachments.first.meta).to include('is_video_note' => false)
+        end
+
+        it 'casts a per-file yes sent as a string' do
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true' } }
+
+          expect(message_builder.attachments.first.meta).to include('is_video_note' => true)
+        end
+
+        it 'does not tag a file that is not a video' do
+          params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/sample.mp3', 'audio/mpeg')]
+          params[:is_video_note] = 'true'
+
+          expect(message_builder.attachments.first.meta.to_h).not_to have_key('is_video_note')
+        end
+
+        # The circle has nowhere to show a caption and the connector refuses one, so the text would
+        # turn the message red after it was created. Refused here, before anything is stored.
+        it 'refuses text sent with the note, and stores nothing' do
+          params[:is_video_note] = 'true'
+          params[:content] = 'legenda'
+
+          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid)
+          expect(conversation.messages.count).to eq(0)
+        end
+      end
+
       # What the cast covers is `ActiveModel::Type::Boolean`'s own list, and no more. Widening it
       # would be inventing a second truth table one line from the sibling parameter that uses the
       # standard one, which is the inconsistency this exists to remove.
