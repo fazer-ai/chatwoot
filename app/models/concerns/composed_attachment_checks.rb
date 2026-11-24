@@ -35,9 +35,11 @@ module ComposedAttachmentChecks
     errors.add(:base, I18n.t('errors.attachments.video_note.not_alone')) if message.attachments.size > 1
   end
 
+  # Not a message that arrives already carrying its WhatsApp id: the send job skips that one as
+  # sent elsewhere, so nothing reaches the connector.
   def sent_by_the_connector?
     channel = message&.inbox&.channel
-    channel.is_a?(Channel::Whatsapp) && channel.provider == 'native'
+    channel.is_a?(Channel::Whatsapp) && channel.provider == 'native' && message.source_id.blank?
   end
 
   # Any text at all, even a blank one the dashboard would still read as a body and draw a rectangle

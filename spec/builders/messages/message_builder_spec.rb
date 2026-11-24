@@ -476,6 +476,16 @@ describe Messages::MessageBuilder do
           expect(meta).not_to have_key('is_video_note')
         end
 
+        # Already sent from the phone and recorded with its WhatsApp id, so the send job skips it and
+        # the connector's rules have nothing to protect.
+        it 'records a note that already went out with its WhatsApp id' do
+          params[:is_video_note] = 'true'
+          params[:content] = 'enviado pelo celular'
+          params[:source_id] = '3EB0A1B2C3D4E5F60742'
+
+          expect(message_builder.attachments.first.meta).to include('is_video_note' => true)
+        end
+
         # A private note never leaves, so there is no circle to send and no caption to refuse.
         it 'does not tag a private note, and keeps its text' do
           params[:is_video_note] = 'true'
