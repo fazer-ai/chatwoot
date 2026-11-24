@@ -116,6 +116,8 @@
         "filename": { "type": ["string", "null"] },
         "caption": { "type": ["string", "null"] },
         "voice_note": { "type": "boolean" },
+        "video_note": { "type": "boolean",
+          "description": "a video recorded to play in a circle (WhatsApp's video message); only on a video, and absent reads as false" },
         "size": { "type": ["integer", "null"], "minimum": 0 },
         "duration": { "type": ["integer", "null"], "minimum": 0 },
         "width": { "type": ["integer", "null"], "minimum": 0,

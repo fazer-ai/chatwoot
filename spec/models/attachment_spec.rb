@@ -156,6 +156,17 @@ RSpec.describe Attachment do
       expect(zipped.file.blob.send(:forced_disposition_for_serving)).to eq(:attachment)
     end
 
+    # WhatsApp plays a video note in a circle, and the dashboard has nothing but this
+    # payload to tell one from the video it also is.
+    it 'says when it is a video note, and says nothing when it is not' do
+      note = message.attachments.new(account_id: message.account_id, file_type: :video, meta: { is_video_note: true })
+      note.file.attach(io: Rails.root.join('spec/assets/sample.mp4').open, filename: 'note.mp4', content_type: 'video/mp4')
+      note.save!
+
+      expect(note.push_event_data).to include(is_video_note: true)
+      expect(attachment.push_event_data).not_to have_key(:is_video_note)
+    end
+
     it 'keeps the external address when we hold only a link' do
       linked = message.attachments.create!(account_id: message.account_id, file_type: :video,
                                            external_url: 'https://cdn.example.com/clip.mp4')
