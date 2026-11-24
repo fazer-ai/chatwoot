@@ -27,7 +27,11 @@ const togglePlayback = () => {
   if (!player.value) return;
 
   if (player.value.paused) {
-    player.value.play();
+    // A pause before playback starts aborts the request, and a browser that refuses it
+    // fires no error event. Either way the note is not playing, and the play icon stays.
+    player.value.play().catch(() => {
+      isPlaying.value = false;
+    });
   } else {
     player.value.pause();
   }
