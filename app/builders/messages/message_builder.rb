@@ -139,11 +139,25 @@ class Messages::MessageBuilder
 
   # The same rule as the voice flag, for the note WhatsApp plays in a circle: the message-level
   # flag reaches a video whose own entry says nothing about it, and the entry wins when it does.
+  # Only where a note can actually go out as one. Anywhere else the dashboard would draw a circle
+  # for a video the recipient gets as a rectangle, so a per-file entry is dropped there too.
   def tag_video_note(attachment)
+    return drop_video_note(attachment) unless video_note_destination?
     return unless @is_video_note && attachment.file_type == 'video'
     return if attachment.meta.to_h.key?('is_video_note')
 
     attachment.meta = (attachment.meta || {}).merge('is_video_note' => true)
+  end
+
+  def drop_video_note(attachment)
+    attachment.meta = attachment.meta.except('is_video_note') if attachment.meta.to_h.key?('is_video_note')
+  end
+
+  # A message that goes to a WhatsApp contact through the native connector: not a private note,
+  # which never leaves, and not Uazapi or Baileys, whose format for a note is not measured (#1017).
+  def video_note_destination?
+    channel = @conversation.inbox.channel
+    !@private && channel.is_a?(Channel::Whatsapp) && channel.provider == 'native'
   end
 
   def process_metadata(attachment)

@@ -10,7 +10,7 @@ module ComposedAttachmentChecks
     attr_accessor :refuse_empty_file
 
     validate :file_is_not_empty, if: :refuse_empty_file
-    validate :video_note_carries_no_caption, if: :refuse_empty_file
+    validate :video_note_goes_alone, if: :refuse_empty_file
   end
 
   private
@@ -23,11 +23,14 @@ module ComposedAttachmentChecks
     errors.add(:file, 'is empty')
   end
 
-  # The circle has nowhere to show a caption, and the connector refuses one. Refused when the
-  # message is stored, so the caller hears a 422 instead of seeing the message turn red later.
-  def video_note_carries_no_caption
-    return unless video_note? && message&.content.present?
+  # Refused when the message is stored, so the caller hears a 422 instead of seeing the message
+  # turn red later. The circle has nowhere to show a caption, and the connector refuses one. And
+  # the native channel sends one file per message, the first: a note behind another file would
+  # never leave.
+  def video_note_goes_alone
+    return unless video_note? && message
 
-    errors.add(:base, 'a video note carries no caption: send the text as its own message')
+    errors.add(:base, I18n.t('errors.attachments.video_note.with_text')) if message.content.present?
+    errors.add(:base, I18n.t('errors.attachments.video_note.not_alone')) if message.attachments.size > 1
   end
 end

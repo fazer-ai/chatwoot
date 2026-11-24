@@ -348,6 +348,8 @@ describe Messages::MessageBuilder do
       # is a rectangle on the customer's phone and a stray one is a circle nobody asked for.
       describe 'a video note' do
         let(:video) { Rack::Test::UploadedFile.new('spec/assets/sample.mp4', 'video/mp4') }
+        let(:native) { create(:channel_whatsapp, account: account, provider: 'native', validate_provider_config: false, sync_templates: false) }
+        let(:inbox) { native.inbox }
 
         # The context sends a text with its file, and a note goes out without one.
         before do
@@ -393,8 +395,41 @@ describe Messages::MessageBuilder do
           params[:is_video_note] = 'true'
           params[:content] = 'legenda'
 
-          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid)
+          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /no text/)
           expect(conversation.messages.count).to eq(0)
+        end
+
+        # The native channel sends the first file of a message and nothing else, so a note behind a
+        # picture would be stored, reported as sent, and never reach the phone.
+        it 'refuses a note that travels with another file' do
+          params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png'), video]
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true' } }
+
+          expect { message_builder }.to raise_error(ActiveRecord::RecordInvalid, /goes alone/)
+          expect(conversation.messages.count).to eq(0)
+        end
+
+        # A private note never leaves, so there is no circle to send and no caption to refuse.
+        it 'does not tag a private note, and keeps its text' do
+          params[:is_video_note] = 'true'
+          params[:private] = 'true'
+          params[:content] = 'para o time'
+
+          expect(message_builder.attachments.first.meta.to_h).not_to have_key('is_video_note')
+        end
+
+        # Uazapi sends the same request as an ordinary video, so a circle in the dashboard would be a
+        # promise the phone does not keep. Dropped from the per-file entry as well as the message.
+        it 'does not tag a video on an inbox that cannot send a note' do
+          uazapi = create(:channel_whatsapp, account: account, provider: 'uazapi', validate_provider_config: false,
+                                             sync_templates: false)
+          other = create(:conversation, account: account, inbox: uazapi.inbox)
+          params[:is_video_note] = 'true'
+          params[:attachments_metadata] = { 'sample.mp4' => { is_video_note: 'true', description: 'recado' } }
+
+          meta = described_class.new(user, other, params).perform.attachments.first.meta.to_h
+
+          expect(meta).to eq('description' => 'recado')
         end
       end
 
