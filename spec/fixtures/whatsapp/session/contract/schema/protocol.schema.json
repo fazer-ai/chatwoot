@@ -320,13 +320,39 @@
         "quoted_id": { "type": ["string", "null"] },
         "quoted_product": { "description": "the catalog product the message quotes, which is what a question asked from a business's catalog does: quoted_id then names no message. Present, possibly empty, whenever the quote is a product (#426)", "oneOf": [{ "$ref": "#/definitions/product" }, { "type": "null" }] },
         "mentions": { "type": "array", "items": { "$ref": "#/definitions/address" } },
-        "referral": { "type": ["object", "null"], "description": "Click-to-WhatsApp ad context" },
-        "entry_point": { "type": ["object", "null"] },
+        "referral": { "description": "the Click-to-WhatsApp ad the message was sent from, absent on every other message", "oneOf": [{ "$ref": "#/definitions/referral" }, { "type": "null" }] },
+        "entry_point": { "description": "where WhatsApp says the conversation started, which it reports on first-contact messages with or without an ad", "oneOf": [{ "$ref": "#/definitions/entry_point" }, { "type": "null" }] },
         "client_ref": { "type": ["string", "null"], "description": "echo correlation token for providers that cannot accept a caller-supplied id" },
         "ephemeral": { "type": ["integer", "null"], "description": "disappearing-message expiration in seconds" },
         "raw": { "type": ["object", "null"], "description": "provider node, kept for the rich parser and for debugging" }
       },
       "required": ["id", "chat", "from_me", "timestamp", "content"],
+      "additionalProperties": true
+    },
+
+    "referral": {
+      "type": "object",
+      "description": "Click-to-WhatsApp ad, with the Cloud API referral's fields except the headline as `title` and the picture as `thumbnail_url`. Every field is what WhatsApp sent: one it left out is absent",
+      "properties": {
+        "source_type": { "type": "string", "description": "what was clicked, `ad` or `post`" },
+        "source_id": { "type": "string", "description": "the ad's id in Meta's ads manager" },
+        "source_url": { "type": "string" },
+        "ctwa_clid": { "type": "string", "description": "the click id Meta's Conversions API takes back to attribute a conversion" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "media_type": { "enum": ["image", "video"], "description": "the ad's creative; absent when it has none" },
+        "thumbnail_url": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "entry_point": {
+      "type": "object",
+      "description": "WhatsApp's own label for where a conversation started; source and app come separately and either can be absent",
+      "properties": {
+        "source": { "type": "string", "description": "e.g. `ctwa_ad` for an ad, `click_to_chat_link` for a wa.me link" },
+        "app": { "type": "string", "description": "the app it started in, e.g. `instagram`" }
+      },
       "additionalProperties": true
     },
 
