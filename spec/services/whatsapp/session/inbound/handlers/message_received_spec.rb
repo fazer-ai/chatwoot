@@ -109,6 +109,21 @@ RSpec.describe Whatsapp::Session::Inbound::Handlers::MessageReceived do
     expect(inbox.conversations.last.additional_attributes['referral']).to include('title' => 'Promo')
   end
 
+  # Off the frame the connector ships, so a key renamed on either side of the wire fails
+  # here instead of leaving every ad conversation with `{}`, which is what the native
+  # channel did until the connector started sending the ad.
+  it 'stores the Click-to-WhatsApp ad the connector sends as the conversation first touch' do
+    frame = Whatsapp::SessionContract.fixture('events', 'message_received_ctwa_referral')
+    sent = frame.dig('payload', 'message')
+
+    Whatsapp::Session::Inbound::Dispatcher.dispatch(channel, model::Event.from_frame(frame))
+
+    message = inbox.messages.find_by(source_id: sent['id'])
+    expect(message.conversation.additional_attributes).to eq('referral' => sent['referral'], 'entry_point' => sent['entry_point'])
+    expect(message.content_attributes['referral']).to eq(sent['referral'])
+    expect(sent['referral']).to include('ctwa_clid', 'source_id', 'title')
+  end
+
   context 'when the message came from the connected phone' do
     let(:inbound) do
       model::InboundMessage.new(
